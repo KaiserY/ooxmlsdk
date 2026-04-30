@@ -2037,40 +2037,20 @@ pub enum CompatSettingNameValues {
   AllowTextAfterFloatingTableBreak,
 }
 /// Table Cell Insertion.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cellIns.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:cellIns")]
 pub struct CellInsertion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2089,40 +2069,20 @@ pub struct CellInsertion {
   pub id: crate::simple_type::StringValue,
 }
 /// Table Cell Deletion.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cellDel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:cellDel")]
 pub struct CellDeletion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2141,40 +2101,20 @@ pub struct CellDeletion {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlInsRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlInsRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:customXmlInsRangeStart")]
 pub struct CustomXmlInsRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2193,40 +2133,20 @@ pub struct CustomXmlInsRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlDelRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlDelRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:customXmlDelRangeStart")]
 pub struct CustomXmlDelRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2245,40 +2165,20 @@ pub struct CustomXmlDelRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlMoveFromRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlMoveFromRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart")]
 pub struct CustomXmlMoveFromRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2297,40 +2197,20 @@ pub struct CustomXmlMoveFromRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlMoveToRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlMoveToRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart")]
 pub struct CustomXmlMoveToRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2349,40 +2229,20 @@ pub struct CustomXmlMoveToRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Inserted Paragraph.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:ins")]
 pub struct Inserted {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2401,40 +2261,20 @@ pub struct Inserted {
   pub id: crate::simple_type::StringValue,
 }
 /// Deleted Paragraph.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:del.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:del")]
 pub struct Deleted {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2453,40 +2293,20 @@ pub struct Deleted {
   pub id: crate::simple_type::StringValue,
 }
 /// Move Source Paragraph.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveFrom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:moveFrom")]
 pub struct MoveFrom {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2505,40 +2325,20 @@ pub struct MoveFrom {
   pub id: crate::simple_type::StringValue,
 }
 /// Move Destination Paragraph.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveTo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/w:moveTo")]
 pub struct MoveTo {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2557,41 +2357,21 @@ pub struct MoveTo {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the TrackChangeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/")]
 pub struct TrackChangeType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2610,55 +2390,27 @@ pub struct TrackChangeType {
   pub id: crate::simple_type::StringValue,
 }
 /// Vertically Merged/Split Table Cells.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cellMerge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CellMergeTrackChange/w:cellMerge")]
 pub struct CellMerge {
   pub xml_other_attrs: Vec<(String, String)>,
   /// vMerge
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vMerge
   #[sdk(attr(qname = "w:vMerge"))]
   pub vertical_merge: Option<VerticalMergeRevisionValues>,
   /// vMergeOrig
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vMergeOrig
   #[sdk(attr(qname = "w:vMergeOrig"))]
   pub vertical_merge_original: Option<VerticalMergeRevisionValues>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2677,47 +2429,23 @@ pub struct CellMerge {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the BookmarkStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bookmarkStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Bookmark/w:bookmarkStart")]
 pub struct BookmarkStart {
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 40u32))]
   pub name: crate::simple_type::StringValue,
   /// colFirst
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colFirst
   #[sdk(attr(qname = "w:colFirst"))]
   pub column_first: Option<crate::simple_type::Int32Value>,
   /// colLast
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colLast
   #[sdk(attr(qname = "w:colLast"))]
   pub column_last: Option<crate::simple_type::Int32Value>,
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2736,25 +2464,13 @@ pub struct BookmarkStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the BookmarkEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bookmarkEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/w:bookmarkEnd")]
 pub struct BookmarkEnd {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2773,25 +2489,13 @@ pub struct BookmarkEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CommentRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:commentRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/w:commentRangeStart")]
 pub struct CommentRangeStart {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2810,25 +2514,13 @@ pub struct CommentRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CommentRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:commentRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/w:commentRangeEnd")]
 pub struct CommentRangeEnd {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2847,25 +2539,13 @@ pub struct CommentRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MoveFromRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveFromRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/w:moveFromRangeEnd")]
 pub struct MoveFromRangeEnd {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2884,25 +2564,13 @@ pub struct MoveFromRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MoveToRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveToRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/w:moveToRangeEnd")]
 pub struct MoveToRangeEnd {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2921,25 +2589,13 @@ pub struct MoveToRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MarkupRangeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MarkupRange/")]
 pub struct MarkupRangeType {
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2958,61 +2614,29 @@ pub struct MarkupRangeType {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MoveFromRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveFromRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MoveBookmark/w:moveFromRangeStart")]
 pub struct MoveFromRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: crate::simple_type::DateTimeValue,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 40u32))]
   pub name: crate::simple_type::StringValue,
   /// colFirst
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colFirst
   #[sdk(attr(qname = "w:colFirst"))]
   pub column_first: Option<crate::simple_type::Int32Value>,
   /// colLast
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colLast
   #[sdk(attr(qname = "w:colLast"))]
   pub column_last: Option<crate::simple_type::Int32Value>,
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3031,61 +2655,29 @@ pub struct MoveFromRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MoveToRangeStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveToRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MoveBookmark/w:moveToRangeStart")]
 pub struct MoveToRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: crate::simple_type::DateTimeValue,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 40u32))]
   pub name: crate::simple_type::StringValue,
   /// colFirst
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colFirst
   #[sdk(attr(qname = "w:colFirst"))]
   pub column_first: Option<crate::simple_type::Int32Value>,
   /// colLast
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colLast
   #[sdk(attr(qname = "w:colLast"))]
   pub column_last: Option<crate::simple_type::Int32Value>,
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3104,61 +2696,29 @@ pub struct MoveToRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MoveBookmarkType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MoveBookmark/")]
 pub struct MoveBookmarkType {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: crate::simple_type::DateTimeValue,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 40u32))]
   pub name: crate::simple_type::StringValue,
   /// colFirst
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colFirst
   #[sdk(attr(qname = "w:colFirst"))]
   pub column_first: Option<crate::simple_type::Int32Value>,
   /// colLast
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colLast
   #[sdk(attr(qname = "w:colLast"))]
   pub column_last: Option<crate::simple_type::Int32Value>,
   /// displacedByCustomXml
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3177,18 +2737,10 @@ pub struct MoveBookmarkType {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlInsRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlInsRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/w:customXmlInsRangeEnd")]
 pub struct CustomXmlInsRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3207,18 +2759,10 @@ pub struct CustomXmlInsRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlDelRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlDelRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/w:customXmlDelRangeEnd")]
 pub struct CustomXmlDelRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3237,18 +2781,10 @@ pub struct CustomXmlDelRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlMoveFromRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlMoveFromRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd")]
 pub struct CustomXmlMoveFromRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3267,18 +2803,10 @@ pub struct CustomXmlMoveFromRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlMoveToRangeEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlMoveToRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd")]
 pub struct CustomXmlMoveToRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3297,18 +2825,10 @@ pub struct CustomXmlMoveToRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Comment Content Reference Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:commentReference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/w:commentReference")]
 pub struct CommentReference {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3327,18 +2847,10 @@ pub struct CommentReference {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MarkupType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/")]
 pub struct MarkupType {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3357,3449 +2869,1725 @@ pub struct MarkupType {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the ParagraphStyleId Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:pStyle")]
 pub struct ParagraphStyleId {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Date Display Mask.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dateFormat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:dateFormat")]
 pub struct DateFormat {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Document Part Gallery Filter.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartGallery.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:docPartGallery")]
 pub struct DocPartGallery {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Document Part Category Filter.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartCategory.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:docPartCategory")]
 pub struct DocPartCategory {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Document Part Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:docPart")]
 pub struct DocPartReference {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Custom XML Element Placeholder Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:placeholder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:placeholder")]
 pub struct CustomXmlPlaceholder {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the TableCaption Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblCaption.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:tblCaption")]
+#[sdk(office2010, qname = "w:CT_String/w:tblCaption")]
 pub struct TableCaption {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the TableDescription Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblDescription.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_String/w:tblDescription")]
+#[sdk(office2010, qname = "w:CT_String/w:tblDescription")]
 pub struct TableDescription {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Data Source Name for Column.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:name")]
 pub struct Name {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Predefined Merge Field Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mappedName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:mappedName")]
 pub struct MappedName {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// UDL Connection String.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:udl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:udl")]
 pub struct UdlConnectionString {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Data Source Table Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:table.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:table")]
 pub struct DataSourceTableName {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Data Source Connection String.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:connectString.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:connectString")]
 pub struct ConnectString {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Query For Data Source Records To Merge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:query.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:query")]
 pub struct Query {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Column Containing E-mail Address.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:addressFieldName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:addressFieldName")]
 pub struct AddressFieldName {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Merged E-mail or Fax Subject Line.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mailSubject.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:mailSubject")]
 pub struct MailSubject {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Frame Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sz.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:sz")]
 pub struct FrameSize {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Associated Paragraph Style Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:style")]
 pub struct StyleId {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Description for Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:description.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:description")]
 pub struct Description {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the SdtAlias Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:alias.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:alias")]
 pub struct SdtAlias {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the Tag Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tag.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:tag")]
 pub struct Tag {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Attached Custom XML Schema.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:attachedSchema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:attachedSchema")]
 pub struct AttachedSchema {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Radix Point for Field Code Evaluation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:decimalSymbol.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:decimalSymbol")]
 pub struct DecimalSymbol {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// List Separator for Field Code Evaluation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:listSeparator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:listSeparator")]
 pub struct ListSeparator {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the WebPageEncoding Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:encoding.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:encoding")]
 pub struct WebPageEncoding {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the AltName Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:altName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/w:altName")]
 pub struct AltName {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the StringType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String/")]
 pub struct StringType {
   /// String Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the KeepNext Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:keepNext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:keepNext")]
 pub struct KeepNext {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the KeepLines Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:keepLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:keepLines")]
 pub struct KeepLines {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the PageBreakBefore Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pageBreakBefore.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:pageBreakBefore")]
 pub struct PageBreakBefore {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the WidowControl Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:widowControl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:widowControl")]
 pub struct WidowControl {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SuppressLineNumbers Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressLineNumbers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressLineNumbers")]
 pub struct SuppressLineNumbers {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SuppressAutoHyphens Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressAutoHyphens.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressAutoHyphens")]
 pub struct SuppressAutoHyphens {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Kinsoku Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:kinsoku.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:kinsoku")]
 pub struct Kinsoku {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the WordWrap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wordWrap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:wordWrap")]
 pub struct WordWrap {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the OverflowPunctuation Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:overflowPunct.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:overflowPunct")]
 pub struct OverflowPunctuation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TopLinePunctuation Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:topLinePunct.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:topLinePunct")]
 pub struct TopLinePunctuation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the AutoSpaceDE Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoSpaceDE.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autoSpaceDE")]
 pub struct AutoSpaceDe {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the AutoSpaceDN Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoSpaceDN.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autoSpaceDN")]
 pub struct AutoSpaceDn {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the BiDi Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bidi.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bidi")]
 pub struct BiDi {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the AdjustRightIndent Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:adjustRightInd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:adjustRightInd")]
 pub struct AdjustRightIndent {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SnapToGrid Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:snapToGrid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:snapToGrid")]
 pub struct SnapToGrid {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the ContextualSpacing Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:contextualSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:contextualSpacing")]
 pub struct ContextualSpacing {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the MirrorIndents Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mirrorIndents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:mirrorIndents")]
 pub struct MirrorIndents {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SuppressOverlap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressOverlap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressOverlap")]
 pub struct SuppressOverlap {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Bold Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:b.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:b")]
 pub struct Bold {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the BoldComplexScript Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bCs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bCs")]
 pub struct BoldComplexScript {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Italic Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:i.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:i")]
 pub struct Italic {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the ItalicComplexScript Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:iCs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:iCs")]
 pub struct ItalicComplexScript {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Caps Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:caps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:caps")]
 pub struct Caps {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SmallCaps Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:smallCaps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:smallCaps")]
 pub struct SmallCaps {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Strike Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:strike.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:strike")]
 pub struct Strike {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the DoubleStrike Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dstrike.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:dstrike")]
 pub struct DoubleStrike {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Outline Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:outline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:outline")]
 pub struct Outline {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Shadow Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:shadow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:shadow")]
 pub struct Shadow {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Emboss Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:emboss.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:emboss")]
 pub struct Emboss {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Imprint Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:imprint.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:imprint")]
 pub struct Imprint {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the NoProof Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noProof.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noProof")]
 pub struct NoProof {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Vanish Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:vanish.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:vanish")]
 pub struct Vanish {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the WebHidden Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:webHidden.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:webHidden")]
 pub struct WebHidden {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the RightToLeftText Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rtl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:rtl")]
 pub struct RightToLeftText {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the ComplexScript Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:cs")]
 pub struct ComplexScript {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the SpecVanish Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:specVanish.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:specVanish")]
 pub struct SpecVanish {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the OfficeMath Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:oMath.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:oMath")]
 pub struct OfficeMath {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the Hidden Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hidden.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:hidden")]
 pub struct Hidden {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the FormProtection Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:formProt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:formProt")]
 pub struct FormProtection {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the NoEndnote Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noEndnote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noEndnote")]
 pub struct NoEndnote {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TitlePage Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:titlePg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:titlePg")]
 pub struct TitlePage {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the GutterOnRight Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rtlGutter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:rtlGutter")]
 pub struct GutterOnRight {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Form Field Enabled.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:enabled.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:enabled")]
 pub struct Enabled {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Recalculate Fields When Current Field Is Modified.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:calcOnExit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:calcOnExit")]
 pub struct CalculateOnExit {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Automatically Size Form Field.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sizeAuto.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:sizeAuto")]
 pub struct AutomaticallySizeFormField {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Default Checkbox Form Field State.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:default")]
 pub struct DefaultCheckBoxFormFieldState {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Checkbox Form Field State.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:checked.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:checked")]
 pub struct Checked {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Keep Source Formatting on Import.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:matchSrc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:matchSrc")]
 pub struct MatchSource {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Invalidated Field Cache.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dirty.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:dirty")]
 pub struct Dirty {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Built-In Document Part.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartUnique.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:docPartUnique")]
 pub struct DocPartUnique {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Record Is Included in Mail Merge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:active.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:active")]
 pub struct Active {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Country/Region-Based Address Field Ordering.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dynamicAddress.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:dynamicAddress")]
 pub struct DynamicAddress {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// First Row of Data Source Contains Column Names.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fHdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:fHdr")]
 pub struct FirstRowHeader {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Query Contains Link to External Query File.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:linkToQuery.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:linkToQuery")]
 pub struct LinkToQuery {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Remove Blank Lines from Merged Documents.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotSuppressBlankLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotSuppressBlankLines")]
 pub struct DoNotSuppressBlankLines {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Merged Document To E-Mail Attachment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mailAsAttachment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:mailAsAttachment")]
 pub struct MailAsAttachment {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// View Merged Data Within Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:viewMergedData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:viewMergedData")]
 pub struct ViewMergedData {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Display All Levels Using Arabic Numerals.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:isLgl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:isLgl")]
 pub struct IsLegalNumberingStyle {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Data for HTML blockquote Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:blockQuote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:blockQuote")]
 pub struct BlockQuote {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Data for HTML body Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bodyDiv.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bodyDiv")]
 pub struct BodyDiv {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Simplified Rules For Table Border Conflicts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useSingleBorderforContiguousCells.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useSingleBorderforContiguousCells")]
 pub struct UseSingleBorderForContiguousCells {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate WordPerfect 6.x Paragraph Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wpJustification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:wpJustification")]
 pub struct WordPerfectJustification {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Create Custom Tab Stop for Hanging Indent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noTabHangInd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noTabHangInd")]
 pub struct NoTabHangIndent {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Add Leading Between Lines of Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noLeading.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noLeading")]
 pub struct NoLeading {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Add Additional Space Below Baseline For Underlined East Asian Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:spaceForUL.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:spaceForUL")]
 pub struct SpaceForUnderline {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Balance Text Columns within a Section.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noColumnBalance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noColumnBalance")]
 pub struct NoColumnBalance {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Balance Single Byte and Double Byte Characters.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:balanceSingleByteDoubleByteWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:balanceSingleByteDoubleByteWidth")]
 pub struct BalanceSingleByteDoubleByteWidth {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Center Content on Lines With Exact Line Height.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noExtraLineSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noExtraLineSpacing")]
 pub struct NoExtraLineSpacing {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Convert Backslash To Yen Sign When Entered.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotLeaveBackslashAlone.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotLeaveBackslashAlone")]
 pub struct DoNotLeaveBackslashAlone {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Underline All Trailing Spaces.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ulTrailSpace.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:ulTrailSpace")]
 pub struct UnderlineTrailingSpaces {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Don't Justify Lines Ending in Soft Line Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotExpandShiftReturn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotExpandShiftReturn")]
 pub struct DoNotExpandShiftReturn {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Only Expand/Condense Text By Whole Points.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:spacingInWholePoints.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:spacingInWholePoints")]
 pub struct SpacingInWholePoints {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 6.0 Line Wrapping for East Asian Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lineWrapLikeWord6.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:lineWrapLikeWord6")]
 pub struct LineWrapLikeWord6 {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Print Body Text before Header/Footer Contents.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printBodyTextBeforeHeader.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printBodyTextBeforeHeader")]
 pub struct PrintBodyTextBeforeHeader {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Print Colors as Black And White without Dithering.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printColBlack.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printColBlack")]
 pub struct PrintColorBlackWhite {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Space width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wpSpaceWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:wpSpaceWidth")]
 pub struct WordPerfectSpaceWidth {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Display Page/Column Breaks Present in Frames.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:showBreaksInFrames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:showBreaksInFrames")]
 pub struct ShowBreaksInFrames {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Increase Priority Of Font Size During Font Substitution.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:subFontBySize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:subFontBySize")]
 pub struct SubFontBySize {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Exact Line Height for Last Line on Page.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressBottomSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressBottomSpacing")]
 pub struct SuppressBottomSpacing {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Minimum and Exact Line Height for First Line on Page.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressTopSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressTopSpacing")]
 pub struct SuppressTopSpacing {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Minimum Line Height for First Line on Page.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressSpacingAtTopOfPage.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressSpacingAtTopOfPage")]
 pub struct SuppressSpacingAtTopOfPage {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate WordPerfect 5.x Line Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressTopSpacingWP.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressTopSpacingWP")]
 pub struct SuppressTopSpacingWordPerfect {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Use Space Before On First Line After a Page Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suppressSpBfAfterPgBrk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:suppressSpBfAfterPgBrk")]
 pub struct SuppressSpacingBeforeAfterPageBreak {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Swap Paragraph Borders on Odd Numbered Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:swapBordersFacingPages.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:swapBordersFacingPages")]
 pub struct SwapBordersFacingPages {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Treat Backslash Quotation Delimiter as Two Quotation Marks.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:convMailMergeEsc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:convMailMergeEsc")]
 pub struct ConvertMailMergeEscape {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate WordPerfect 6.x Font Height Calculation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:truncateFontHeightsLikeWP6.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:truncateFontHeightsLikeWP6")]
 pub struct TruncateFontHeightsLikeWordPerfect {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 5.x for the Macintosh Small Caps Formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mwSmallCaps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:mwSmallCaps")]
 pub struct MacWordSmallCaps {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Printer Metrics To Display Documents.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:usePrinterMetrics.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:usePrinterMetrics")]
 pub struct UsePrinterMetrics {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Suppress Paragraph Borders Next To Frames.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotSuppressParagraphBorders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotSuppressParagraphBorders")]
 pub struct DoNotSuppressParagraphBorders {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Line Wrap Trailing Spaces.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wrapTrailSpaces.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:wrapTrailSpaces")]
 pub struct WrapTrailSpaces {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 6.x/95/97 Footnote Placement.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnoteLayoutLikeWW8.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:footnoteLayoutLikeWW8")]
 pub struct FootnoteLayoutLikeWord8 {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 97 Text Wrapping Around Floating Objects.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:shapeLayoutLikeWW8.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:shapeLayoutLikeWW8")]
 pub struct ShapeLayoutLikeWord8 {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Align Table Rows Independently.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:alignTablesRowByRow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:alignTablesRowByRow")]
 pub struct AlignTablesRowByRow {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Width of Last Tab Stop When Aligning Paragraph If It Is Not Left Aligned.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:forgetLastTabAlignment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:forgetLastTabAlignment")]
 pub struct ForgetLastTabAlignment {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Add Document Grid Line Pitch To Lines in Table Cells.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:adjustLineHeightInTable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:adjustLineHeightInTable")]
 pub struct AdjustLineHeightInTable {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 95 Full-Width Character Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoSpaceLikeWord95.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autoSpaceLikeWord95")]
 pub struct AutoSpaceLikeWord95 {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Increase Line Height for Raised/Lowered Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noSpaceRaiseLower.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noSpaceRaiseLower")]
 pub struct NoSpaceRaiseLower {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Fixed Paragraph Spacing for HTML Auto Setting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotUseHTMLParagraphAutoSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotUseHTMLParagraphAutoSpacing")]
 pub struct DoNotUseHtmlParagraphAutoSpacing {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Space Before Table When Deciding If Table Should Wrap Floating Object.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:layoutRawTableWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:layoutRawTableWidth")]
 pub struct LayoutRawTableWidth {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Table Rows to Wrap Inline Objects Independently.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:layoutTableRowsApart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:layoutTableRowsApart")]
 pub struct LayoutTableRowsApart {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 97 East Asian Line Breaking.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useWord97LineBreakRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useWord97LineBreakRules")]
 pub struct UseWord97LineBreakRules {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Allow Floating Tables To Break Across Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotBreakWrappedTables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotBreakWrappedTables")]
 pub struct DoNotBreakWrappedTables {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Snap to Document Grid in Table Cells with Objects.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotSnapToGridInCell.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotSnapToGridInCell")]
 pub struct DoNotSnapToGridInCell {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Select Field When First or Last Character Is Selected.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:selectFldWithFirstOrLastChar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:selectFldWithFirstOrLastChar")]
 pub struct SelectFieldWithFirstOrLastChar {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Legacy Ethiopic and Amharic Line Breaking Rules.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:applyBreakingRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:applyBreakingRules")]
 pub struct ApplyBreakingRules {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Allow Hanging Punctuation With Character Grid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotWrapTextWithPunct.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotWrapTextWithPunct")]
 pub struct DoNotWrapTextWithPunctuation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Compress Compressible Characters When Using Document Grid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotUseEastAsianBreakRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotUseEastAsianBreakRules")]
 pub struct DoNotUseEastAsianBreakRules {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Emulate Word 2002 Table Style Rules.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useWord2002TableStyleRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useWord2002TableStyleRules")]
 pub struct UseWord2002TableStyleRules {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Tables to AutoFit Into Page Margins.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:growAutofit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:growAutofit")]
 pub struct GrowAutofit {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Bypass East Asian/Complex Script Layout Code.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useFELayout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useFELayout")]
 pub struct UseFarEastLayout {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Automatically Apply List Paragraph Style To Bulleted/Numbered Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useNormalStyleForList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useNormalStyleForList")]
 pub struct UseNormalStyleForList {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Hanging Indent When Creating Tab Stop After Numbering.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotUseIndentAsNumberingTabStop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotUseIndentAsNumberingTabStop")]
 pub struct DoNotUseIndentAsNumberingTabStop {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Alternate Set of East Asian Line Breaking Rules.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useAltKinsokuLineBreakRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useAltKinsokuLineBreakRules")]
 pub struct UseAltKinsokuLineBreakRules {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Contextual Spacing of Paragraphs in Tables.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:allowSpaceOfSameStyleInTable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:allowSpaceOfSameStyleInTable")]
 pub struct AllowSpaceOfSameStyleInTable {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Ignore Floating Objects When Calculating Paragraph Indentation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotSuppressIndentation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotSuppressIndentation")]
 pub struct DoNotSuppressIndentation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not AutoFit Tables To Fit Next To Wrapped Objects.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotAutofitConstrainedTables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotAutofitConstrainedTables")]
 pub struct DoNotAutofitConstrainedTables {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Table Columns To Exceed Preferred Widths of Constituent Cells.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autofitToFirstFixedWidthCell.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autofitToFirstFixedWidthCell")]
 pub struct AutofitToFirstFixedWidthCell {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Underline Following Character Following Numbering.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:underlineTabInNumList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:underlineTabInNumList")]
 pub struct UnderlineTabInNumberingList {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Always Use Fixed Width for Hangul Characters.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:displayHangulFixedWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:displayHangulFixedWidth")]
 pub struct DisplayHangulFixedWidth {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Always Move Paragraph Mark to Page after a Page Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:splitPgBreakAndParaMark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:splitPgBreakAndParaMark")]
 pub struct SplitPageBreakAndParagraphMark {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Don't Vertically Align Cells Containing Floating Objects.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotVertAlignCellWithSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotVertAlignCellWithSp")]
 pub struct DoNotVerticallyAlignCellWithShape {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Don't Break Table Rows Around Floating Tables.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotBreakConstrainedForcedTable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotBreakConstrainedForcedTable")]
 pub struct DoNotBreakConstrainedForcedTable {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Vertical Alignment in Textboxes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotVertAlignInTxbx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotVertAlignInTxbx")]
 pub struct DoNotVerticallyAlignInTextBox {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use ANSI Kerning Pairs from Fonts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useAnsiKerningPairs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useAnsiKerningPairs")]
 pub struct UseAnsiKerningPairs {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Cached Paragraph Information for Column Balancing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cachedColBalance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:cachedColBalance")]
 pub struct CachedColumnBalance {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the ShowingPlaceholder Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:showingPlcHdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:showingPlcHdr")]
 pub struct ShowingPlaceholder {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TemporarySdt Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:temporary.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:temporary")]
 pub struct TemporarySdt {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Remove Personal Information from Document Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:removePersonalInformation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:removePersonalInformation")]
 pub struct RemovePersonalInformation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Remove Date and Time from Annotations.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:removeDateAndTime.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:removeDateAndTime")]
 pub struct RemoveDateAndTime {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Display Visual Boundary For Header/Footer or Between Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotDisplayPageBoundaries.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotDisplayPageBoundaries")]
 pub struct DoNotDisplayPageBoundaries {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Display Background Objects When Displaying Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:displayBackgroundShape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:displayBackgroundShape")]
 pub struct DisplayBackgroundShape {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Print PostScript Codes With Document Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printPostScriptOverText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printPostScriptOverText")]
 pub struct PrintPostScriptOverText {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Print Fractional Character Widths.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printFractionalCharacterWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printFractionalCharacterWidth")]
 pub struct PrintFractionalCharacterWidth {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Only Print Form Field Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printFormsData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printFormsData")]
 pub struct PrintFormsData {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Embed TrueType Fonts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedTrueTypeFonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:embedTrueTypeFonts")]
 pub struct EmbedTrueTypeFonts {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Embed Common System Fonts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedSystemFonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:embedSystemFonts")]
 pub struct EmbedSystemFonts {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Subset Fonts When Embedding.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:saveSubsetFonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:saveSubsetFonts")]
 pub struct SaveSubsetFonts {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Only Save Form Field Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:saveFormsData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:saveFormsData")]
 pub struct SaveFormsData {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Mirror Page Margins.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mirrorMargins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:mirrorMargins")]
 pub struct MirrorMargins {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Align Paragraph and Table Borders with Page Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:alignBordersAndEdges.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:alignBordersAndEdges")]
 pub struct AlignBorderAndEdges {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Page Border Excludes Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bordersDoNotSurroundHeader.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bordersDoNotSurroundHeader")]
 pub struct BordersDoNotSurroundHeader {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Page Border Excludes Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bordersDoNotSurroundFooter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bordersDoNotSurroundFooter")]
 pub struct BordersDoNotSurroundFooter {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Position Gutter At Top of Page.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gutterAtTop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:gutterAtTop")]
 pub struct GutterAtTop {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Display Visual Indication of Spelling Errors.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hideSpellingErrors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:hideSpellingErrors")]
 pub struct HideSpellingErrors {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Display Visual Indication of Grammatical Errors.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hideGrammaticalErrors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:hideGrammaticalErrors")]
 pub struct HideGrammaticalErrors {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Structured Document Tag Placeholder Text Should be Resaved.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:formsDesign.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:formsDesign")]
 pub struct FormsDesign {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Automatically Update Styles From Document Template.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:linkStyles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:linkStyles")]
 pub struct LinkStyles {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Track Revisions to Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trackRevisions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:trackRevisions")]
 pub struct TrackRevisions {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Use Move Syntax When Tracking Revisions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotTrackMoves.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotTrackMoves")]
 pub struct DoNotTrackMoves {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Track Formatting Revisions When Tracking Revisions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotTrackFormatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotTrackFormatting")]
 pub struct DoNotTrackFormatting {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Automatic Formatting to Override Formatting Protection Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoFormatOverride.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autoFormatOverride")]
 pub struct AutoFormatOverride {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Prevent Modification of Themes Part.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:styleLockTheme.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:styleLockTheme")]
 pub struct StyleLockThemesPart {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Prevent Replacement of Styles Part.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:styleLockQFSet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:styleLockQFSet")]
 pub struct StyleLockStylesPart {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Automatically Hyphenate Document Contents When Displayed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoHyphenation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:autoHyphenation")]
 pub struct AutoHyphenation {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Hyphenate Words in ALL CAPITAL LETTERS.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotHyphenateCaps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotHyphenateCaps")]
 pub struct DoNotHyphenateCaps {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Show E-Mail Message Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:showEnvelope.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:showEnvelope")]
 pub struct ShowEnvelope {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Different Even/Odd Page Headers and Footers.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:evenAndOddHeaders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:evenAndOddHeaders")]
 pub struct EvenAndOddHeaders {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Reverse Book Fold Printing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bookFoldRevPrinting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bookFoldRevPrinting")]
 pub struct BookFoldReversePrinting {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Book Fold Printing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bookFoldPrinting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:bookFoldPrinting")]
 pub struct BookFoldPrinting {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Use Margins for Drawing Grid Origin.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotUseMarginsForDrawingGridOrigin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotUseMarginsForDrawingGridOrigin")]
 pub struct DoNotUseMarginsForDrawingGridOrigin {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Show Visual Indicator For Form Fields.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotShadeFormData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotShadeFormData")]
 pub struct DoNotShadeFormData {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Never Kern Punctuation Characters.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noPunctuationKerning.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:noPunctuationKerning")]
 pub struct NoPunctuationKerning {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Print Two Pages Per Sheet.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printTwoOnOne.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:printTwoOnOne")]
 pub struct PrintTwoOnOne {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Strict Kinsoku Rules for Japanese Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:strictFirstAndLastChars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:strictFirstAndLastChars")]
 pub struct StrictFirstAndLastChars {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Generate Thumbnail For Document On Save.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:savePreviewPicture.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:savePreviewPicture")]
 pub struct SavePreviewPicture {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Validate Custom XML Markup Against Schemas.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotValidateAgainstSchema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotValidateAgainstSchema")]
 pub struct DoNotValidateAgainstSchema {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Allow Saving Document As XML File When Custom XML Markup Is Invalid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:saveInvalidXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:saveInvalidXml")]
 pub struct SaveInvalidXml {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Ignore Mixed Content When Validating Custom XML Markup.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ignoreMixedContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:ignoreMixedContent")]
 pub struct IgnoreMixedContent {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Use Custom XML Element Names as Default Placeholder Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:alwaysShowPlaceholderText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:alwaysShowPlaceholderText")]
 pub struct AlwaysShowPlaceholderText {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Show Visual Indicator For Invalid Custom XML Markup.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotDemarcateInvalidXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotDemarcateInvalidXml")]
 pub struct DoNotDemarcateInvalidXml {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Only Save Custom XML Markup.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:saveXmlDataOnly.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:saveXmlDataOnly")]
 pub struct SaveXmlDataOnly {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Save Document as XML File through Custom XSL Transform.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:useXSLTWhenSaving.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:useXSLTWhenSaving")]
 pub struct UseXsltWhenSaving {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Show Visual Indicators for Custom XML Markup Start/End Locations.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:showXMLTags.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:showXMLTags")]
 pub struct ShowXmlTags {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Mark Custom XML Elements With No Namespace As Invalid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:alwaysMergeEmptyNamespace.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:alwaysMergeEmptyNamespace")]
 pub struct AlwaysMergeEmptyNamespace {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Automatically Recalculate Fields on Open.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:updateFields.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:updateFields")]
 pub struct UpdateFieldsOnOpen {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Disable Features Incompatible With Earlier Word Processing Formats.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:uiCompat97To2003.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:uiCompat97To2003")]
 pub struct UiCompatibleWith97To2003 {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Include Content in Text Boxes, Footnotes, and Endnotes in Document Statistics.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotIncludeSubdocsInStats.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotIncludeSubdocsInStats")]
 pub struct DoNotIncludeSubdocsInStats {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Automatically Compress Images.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotAutoCompressPictures.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotAutoCompressPictures")]
 pub struct DoNotAutoCompressPictures {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the OptimizeForBrowser Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:optimizeForBrowser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:optimizeForBrowser")]
 pub struct OptimizeForBrowser {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the RelyOnVML Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:relyOnVML.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:relyOnVML")]
 pub struct RelyOnVml {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the AllowPNG Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:allowPNG.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:allowPNG")]
 pub struct AllowPng {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the DoNotRelyOnCSS Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotRelyOnCSS.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotRelyOnCSS")]
 pub struct DoNotRelyOnCss {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the DoNotSaveAsSingleFile Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotSaveAsSingleFile.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotSaveAsSingleFile")]
 pub struct DoNotSaveAsSingleFile {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the DoNotOrganizeInFolder Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotOrganizeInFolder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotOrganizeInFolder")]
 pub struct DoNotOrganizeInFolder {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the DoNotUseLongFileNames Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:doNotUseLongFileNames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:doNotUseLongFileNames")]
 pub struct DoNotUseLongFileNames {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the NotTrueType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:notTrueType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/w:notTrueType")]
 pub struct NotTrueType {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the OnOffType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOff/")]
 pub struct OnOffType {
   /// On/Off Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the FrameProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:framePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FramePr/w:framePr")]
 pub struct FrameProperties {
   /// Drop Cap Frame
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dropCap
   #[sdk(attr(qname = "w:dropCap"))]
   pub drop_cap: Option<DropCapLocationValues>,
   /// Drop Cap Vertical Height in Lines
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lines
   #[sdk(attr(qname = "w:lines"))]
   #[sdk(number_range(
     source = 0u32,
@@ -6810,10 +4598,6 @@ pub struct FrameProperties {
   ))]
   pub lines: Option<crate::simple_type::Int32Value>,
   /// Frame Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -6824,10 +4608,6 @@ pub struct FrameProperties {
   ))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Frame Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:h
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(
     source = 0u32,
@@ -6837,10 +4617,6 @@ pub struct FrameProperties {
   ))]
   pub height: Option<crate::simple_type::UInt32Value>,
   /// Vertical Frame Padding
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vSpace
   #[sdk(attr(qname = "w:vSpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -6851,10 +4627,6 @@ pub struct FrameProperties {
   ))]
   pub vertical_space: Option<crate::simple_type::StringValue>,
   /// Horizontal Frame Padding
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hSpace
   #[sdk(attr(qname = "w:hSpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -6865,31 +4637,15 @@ pub struct FrameProperties {
   ))]
   pub horizontal_space: Option<crate::simple_type::StringValue>,
   /// Text Wrapping Around Frame
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:wrap
   #[sdk(attr(qname = "w:wrap"))]
   pub wrap: Option<TextWrappingValues>,
   /// Frame Horizontal Positioning Base
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hAnchor
   #[sdk(attr(qname = "w:hAnchor"))]
   pub horizontal_position: Option<HorizontalAnchorValues>,
   /// Frame Vertical Positioning Base
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vAnchor
   #[sdk(attr(qname = "w:vAnchor"))]
   pub vertical_position: Option<VerticalAnchorValues>,
   /// Absolute Horizontal Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:x
   #[sdk(attr(qname = "w:x"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -6900,17 +4656,9 @@ pub struct FrameProperties {
   ))]
   pub x: Option<crate::simple_type::StringValue>,
   /// Relative Horizontal Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:xAlign
   #[sdk(attr(qname = "w:xAlign"))]
   pub x_align: Option<HorizontalAlignmentValues>,
   /// Absolute Vertical Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:y
   #[sdk(attr(qname = "w:y"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -6921,32 +4669,16 @@ pub struct FrameProperties {
   ))]
   pub y: Option<crate::simple_type::StringValue>,
   /// Relative Vertical Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:yAlign
   #[sdk(attr(qname = "w:yAlign"))]
   pub y_align: Option<VerticalAlignmentValues>,
   /// Frame Height Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hRule
   #[sdk(attr(qname = "w:hRule"))]
   pub height_type: Option<HeightRuleValues>,
   /// Lock Frame Anchor to Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:anchorLock
   #[sdk(attr(qname = "w:anchorLock"))]
   pub anchor_lock: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the NumberingProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumPr/w:numPr")]
 pub struct NumberingProperties {
@@ -6966,10 +4698,6 @@ pub struct NumberingProperties {
   pub inserted: Option<Inserted>,
 }
 /// Defines the ParagraphBorders Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pBdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PBdr/w:pBdr")]
 pub struct ParagraphBorders {
@@ -6993,25 +4721,13 @@ pub struct ParagraphBorders {
   pub bar_border: Option<BarBorder>,
 }
 /// Defines the Shading Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:shd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Shd/w:shd")]
 pub struct Shading {
   /// Shading Pattern
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: ShadingPatternValues,
   /// Shading Pattern Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -7023,35 +4739,19 @@ pub struct Shading {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Shading Pattern Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Shading Pattern Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Shading Pattern Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Shading Background Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fill
   #[sdk(attr(qname = "w:fill"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -7063,36 +4763,20 @@ pub struct Shading {
   ))]
   pub fill: Option<crate::simple_type::StringValue>,
   /// Shading Background Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeFill
   #[sdk(attr(qname = "w:themeFill"))]
   pub theme_fill: Option<ThemeColorValues>,
   /// Shading Background Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeFillTint
   #[sdk(attr(qname = "w:themeFillTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_fill_tint: Option<crate::simple_type::StringValue>,
   /// Shading Background Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeFillShade
   #[sdk(attr(qname = "w:themeFillShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_fill_shade: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Tabs Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tabs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tabs/w:tabs")]
 pub struct Tabs {
@@ -7101,19 +4785,11 @@ pub struct Tabs {
   pub w_tab: Vec<TabStop>,
 }
 /// Defines the SpacingBetweenLines Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Spacing/w:spacing")]
 pub struct SpacingBetweenLines {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Spacing Above Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:before
   #[sdk(attr(qname = "w:before"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -7124,24 +4800,12 @@ pub struct SpacingBetweenLines {
   ))]
   pub before: Option<crate::simple_type::StringValue>,
   /// Spacing Above Paragraph IN Line Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:beforeLines
   #[sdk(attr(qname = "w:beforeLines"))]
   pub before_lines: Option<crate::simple_type::Int32Value>,
   /// Automatically Determine Spacing Above Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:beforeAutospacing
   #[sdk(attr(qname = "w:beforeAutospacing"))]
   pub before_auto_spacing: Option<crate::simple_type::OnOffValue>,
   /// Spacing Below Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:after
   #[sdk(attr(qname = "w:after"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -7152,24 +4816,12 @@ pub struct SpacingBetweenLines {
   ))]
   pub after: Option<crate::simple_type::StringValue>,
   /// Spacing Below Paragraph in Line Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:afterLines
   #[sdk(attr(qname = "w:afterLines"))]
   pub after_lines: Option<crate::simple_type::Int32Value>,
   /// Automatically Determine Spacing Below Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:afterAutospacing
   #[sdk(attr(qname = "w:afterAutospacing"))]
   pub after_auto_spacing: Option<crate::simple_type::OnOffValue>,
   /// Spacing Between Lines in Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:line
   #[sdk(attr(qname = "w:line"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -7180,27 +4832,15 @@ pub struct SpacingBetweenLines {
   ))]
   pub line: Option<crate::simple_type::StringValue>,
   /// Type of Spacing Between Lines
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lineRule
   #[sdk(attr(qname = "w:lineRule"))]
   pub line_rule: Option<LineSpacingRuleValues>,
 }
 /// Defines the Indentation Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ind.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Ind/w:ind")]
 pub struct Indentation {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Left Indentation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:left
   #[sdk(attr(qname = "w:left"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -7211,11 +4851,7 @@ pub struct Indentation {
   ))]
   pub left: Option<crate::simple_type::StringValue>,
   /// start
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:start
-  #[sdk(attr(qname = "w:start"))]
+  #[sdk(attr(office2010, qname = "w:start"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -7225,24 +4861,12 @@ pub struct Indentation {
   ))]
   pub start: Option<crate::simple_type::StringValue>,
   /// Left Indentation in Character Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:leftChars
   #[sdk(attr(qname = "w:leftChars"))]
   pub left_chars: Option<crate::simple_type::Int32Value>,
   /// startChars
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:startChars
-  #[sdk(attr(qname = "w:startChars"))]
+  #[sdk(attr(office2010, qname = "w:startChars"))]
   pub start_characters: Option<crate::simple_type::Int32Value>,
   /// Right Indentation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:right
   #[sdk(attr(qname = "w:right"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -7253,11 +4877,7 @@ pub struct Indentation {
   ))]
   pub right: Option<crate::simple_type::StringValue>,
   /// end
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:end
-  #[sdk(attr(qname = "w:end"))]
+  #[sdk(attr(office2010, qname = "w:end"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
   #[sdk(pattern(
@@ -7267,24 +4887,12 @@ pub struct Indentation {
   ))]
   pub end: Option<crate::simple_type::StringValue>,
   /// Right Indentation in Character Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rightChars
   #[sdk(attr(qname = "w:rightChars"))]
   pub right_chars: Option<crate::simple_type::Int32Value>,
   /// endChars
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:endChars
-  #[sdk(attr(qname = "w:endChars"))]
+  #[sdk(attr(office2010, qname = "w:endChars"))]
   pub end_characters: Option<crate::simple_type::Int32Value>,
   /// Indentation Removed from First Line
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hanging
   #[sdk(attr(qname = "w:hanging"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -7295,17 +4903,9 @@ pub struct Indentation {
   ))]
   pub hanging: Option<crate::simple_type::StringValue>,
   /// Indentation Removed From First Line in Character Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hangingChars
   #[sdk(attr(qname = "w:hangingChars"))]
   pub hanging_chars: Option<crate::simple_type::Int32Value>,
   /// Additional First Line Indentation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstLine
   #[sdk(attr(qname = "w:firstLine"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -7316,337 +4916,169 @@ pub struct Indentation {
   ))]
   pub first_line: Option<crate::simple_type::StringValue>,
   /// Additional First Line Indentation in Character Units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstLineChars
   #[sdk(attr(qname = "w:firstLineChars"))]
   pub first_line_chars: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the Justification Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:jc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Jc/w:jc")]
 pub struct Justification {
   /// Alignment Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: JustificationValues,
 }
 /// Defines the TextDirection Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:textDirection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TextDirection/w:textDirection")]
 pub struct TextDirection {
   /// Direction of Text Flow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TextDirectionValues,
 }
 /// Defines the TextAlignment Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:textAlignment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TextAlignment/w:textAlignment")]
 pub struct TextAlignment {
   /// Vertical Character Alignment Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: VerticalTextAlignmentValues,
 }
 /// Defines the TextBoxTightWrap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:textboxTightWrap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TextboxTightWrap/w:textboxTightWrap")]
 pub struct TextBoxTightWrap {
   /// Lines to Tight Wrap to Paragraph Extents
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TextBoxTightWrapValues,
 }
 /// Defines the OutlineLevel Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:outlineLvl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:outlineLvl")]
 pub struct OutlineLevel {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the GridSpan Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gridSpan.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:gridSpan")]
 pub struct GridSpan {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the GridBefore Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gridBefore.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:gridBefore")]
 pub struct GridBefore {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the GridAfter Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gridAfter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:gridAfter")]
 pub struct GridAfter {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Drop-Down List Selection.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:result.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:result")]
 pub struct DropDownListSelection {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Record Currently Displayed In Merged Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:activeRecord.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:activeRecord")]
 pub struct ActiveRecord {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Mail Merge Error Reporting Setting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:checkErrors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:checkErrors")]
 pub struct CheckErrors {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Restart Numbering Level Symbol.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvlRestart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:lvlRestart")]
 pub struct LevelRestart {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Picture Numbering Symbol Definition Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvlPicBulletId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:lvlPicBulletId")]
 pub struct LevelPictureBulletId {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Numbering Level Starting Value Override.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:startOverride.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:startOverride")]
 pub struct StartOverrideNumberingValue {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Last Reviewed Abstract Numbering Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numIdMacAtCleanup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:numIdMacAtCleanup")]
 pub struct NumberingIdMacAtCleanup {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the SdtId Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:id.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:id")]
 pub struct SdtId {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PixelsPerInch Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pixelsPerInch.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/w:pixelsPerInch")]
 pub struct PixelsPerInch {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the DecimalNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DecimalNumber/")]
 pub struct DecimalNumberType {
   /// Decimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the ParagraphPropertiesChange Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrChange/w:pPrChange")]
 pub struct ParagraphPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -7668,245 +5100,129 @@ pub struct ParagraphPropertiesChange {
   pub paragraph_properties_extended: std::boxed::Box<ParagraphPropertiesExtended>,
 }
 /// Header Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:headerReference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtrRef/w:headerReference")]
 pub struct HeaderReference {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Footer Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footerReference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtrRef/w:footerReference")]
 pub struct FooterReference {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the HeaderFooterReferenceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtrRef/")]
 pub struct HeaderFooterReferenceType {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: HeaderFooterValues,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:br.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Br/w:br")]
 pub struct Break {
   /// Break Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<BreakValues>,
   /// Restart Location For Text Wrapping Break
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:clear
   #[sdk(attr(qname = "w:clear"))]
   pub clear: Option<BreakTextRestartLocationValues>,
 }
 /// Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:t.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
 pub struct Text {
   pub xml_other_attrs: Vec<(String, String)>,
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Deleted Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:delText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delText")]
 pub struct DeletedText {
   pub xml_other_attrs: Vec<(String, String)>,
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Field Code.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:instrText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:instrText")]
 pub struct FieldCode {
   pub xml_other_attrs: Vec<(String, String)>,
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Deleted Field Code.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:delInstrText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delInstrText")]
 pub struct DeletedFieldCode {
   pub xml_other_attrs: Vec<(String, String)>,
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TextType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/")]
 pub struct TextType {
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Symbol Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sym.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Sym/w:sym")]
 pub struct SymbolChar {
   /// Symbol Character Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:font
   #[sdk(attr(qname = "w:font"))]
   #[sdk(string_length(source = 0u32, max = 31u32))]
   pub font: Option<crate::simple_type::StringValue>,
   /// Symbol Character Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:char
   #[sdk(attr(qname = "w:char"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub char: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Inline Embedded Object.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Object/w:object")]
 pub struct EmbeddedObject {
   pub xml_other_attrs: Vec<(String, String)>,
   /// dxaOrig
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dxaOrig
   #[sdk(attr(qname = "w:dxaOrig"))]
   pub dxa_original: Option<crate::simple_type::StringValue>,
   /// dyaOrig
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dyaOrig
   #[sdk(attr(qname = "w:dyaOrig"))]
   pub dya_original: Option<crate::simple_type::StringValue>,
   /// anchorId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:anchorId
-  #[sdk(attr(qname = "w14:anchorId"))]
+  #[sdk(attr(office2010, qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(choice(
@@ -7935,20 +5251,12 @@ pub struct EmbeddedObject {
   pub embedded_object_choice2: Option<EmbeddedObjectChoice2>,
 }
 /// VML Object.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pict.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Picture/w:pict")]
 pub struct Picture {
   pub xml_other_attrs: Vec<(String, String)>,
   /// anchorId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:anchorId
-  #[sdk(attr(qname = "w14:anchorId"))]
+  #[sdk(attr(office2010, qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub w14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(choice(
@@ -7974,34 +5282,18 @@ pub struct Picture {
   pub control: Option<Control>,
 }
 /// Complex Field Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fldChar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FldChar/w:fldChar")]
 pub struct FieldChar {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Field Character Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fldCharType
   #[sdk(attr(qname = "w:fldCharType"))]
   pub field_char_type: FieldCharValues,
   /// Field Should Not Be Recalculated
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fldLock
   #[sdk(attr(qname = "w:fldLock"))]
   pub field_lock: Option<crate::simple_type::OnOffValue>,
   /// Field Result Invalidated
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dirty
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   #[sdk(choice(
@@ -8012,10 +5304,6 @@ pub struct FieldChar {
   pub xml_children: Option<FieldCharChoice>,
 }
 /// Phonetic Guide.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ruby.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Ruby/w:ruby")]
 pub struct Ruby {
@@ -8030,25 +5318,13 @@ pub struct Ruby {
   pub ruby_base: std::boxed::Box<RubyBase>,
 }
 /// Footnote Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnoteReference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnRef/w:footnoteReference")]
 pub struct FootnoteReference {
   /// Suppress Footnote/Endnote Reference Mark
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:customMarkFollows
   #[sdk(attr(qname = "w:customMarkFollows"))]
   pub custom_mark_follows: Option<crate::simple_type::OnOffValue>,
   /// Footnote/Endnote ID Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8060,25 +5336,13 @@ pub struct FootnoteReference {
   pub id: crate::simple_type::IntegerValue,
 }
 /// Endnote Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnoteReference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnRef/w:endnoteReference")]
 pub struct EndnoteReference {
   /// Suppress Footnote/Endnote Reference Mark
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:customMarkFollows
   #[sdk(attr(qname = "w:customMarkFollows"))]
   pub custom_mark_follows: Option<crate::simple_type::OnOffValue>,
   /// Footnote/Endnote ID Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8090,25 +5354,13 @@ pub struct EndnoteReference {
   pub id: crate::simple_type::IntegerValue,
 }
 /// Defines the FootnoteEndnoteReferenceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnRef/")]
 pub struct FootnoteEndnoteReferenceType {
   /// Suppress Footnote/Endnote Reference Mark
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:customMarkFollows
   #[sdk(attr(qname = "w:customMarkFollows"))]
   pub custom_mark_follows: Option<crate::simple_type::OnOffValue>,
   /// Footnote/Endnote ID Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8120,10 +5372,6 @@ pub struct FootnoteEndnoteReferenceType {
   pub id: crate::simple_type::IntegerValue,
 }
 /// DrawingML Object.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Drawing/w:drawing")]
 pub struct Drawing {
@@ -8133,345 +5381,177 @@ pub struct Drawing {
   pub xml_children: Option<DrawingChoice>,
 }
 /// Absolute Position Tab Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ptab.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PTab/w:ptab")]
 pub struct PositionalTab {
   /// Positional Tab Stop Alignment
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:alignment
   #[sdk(attr(qname = "w:alignment"))]
   pub alignment: AbsolutePositionTabAlignmentValues,
   /// Positional Tab Base
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:relativeTo
   #[sdk(attr(qname = "w:relativeTo"))]
   pub relative_to: AbsolutePositionTabPositioningBaseValues,
   /// Tab Leader Character
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:leader
   #[sdk(attr(qname = "w:leader"))]
   pub leader: AbsolutePositionTabLeaderCharValues,
 }
 /// Defines the RunStyle Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:rStyle")]
 pub struct RunStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the TableStyle Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:tblStyle")]
 pub struct TableStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Paragraph Style's Associated Numbering Level.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:pStyle")]
 pub struct ParagraphStyleIdInLevel {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Abstract Numbering Definition Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:name")]
 pub struct AbstractNumDefinitionName {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Numbering Style Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:styleLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:styleLink")]
 pub struct StyleLink {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Numbering Style Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numStyleLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:numStyleLink")]
 pub struct NumberingStyleLink {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Alternate Style Names.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:aliases.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:aliases")]
 pub struct Aliases {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Parent Style ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:basedOn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:basedOn")]
 pub struct BasedOn {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Style For Next Paragraph.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:next.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:next")]
 pub struct NextParagraphStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Linked Style Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:link.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:link")]
 pub struct LinkedStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Paragraph Style Applied to Automatically Generated Paragraphs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:clickAndTypeStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:clickAndTypeStyle")]
 pub struct ClickAndTypeStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Default Table Style for Newly Inserted Tables.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:defaultTableStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/w:defaultTableStyle")]
 pub struct DefaultTableStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the String253Type Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String253/")]
 pub struct String253Type {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 253u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the RunFonts Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rFonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Fonts/w:rFonts")]
 pub struct RunFonts {
   /// Font Content Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hint
   #[sdk(attr(qname = "w:hint"))]
   pub hint: Option<FontTypeHintValues>,
   /// ASCII Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:ascii
   #[sdk(attr(qname = "w:ascii"))]
   #[sdk(string_length(source = 0u32, max = 31u32))]
   pub ascii: Option<crate::simple_type::StringValue>,
   /// High ANSI Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hAnsi
   #[sdk(attr(qname = "w:hAnsi"))]
   #[sdk(string_length(source = 0u32, max = 31u32))]
   pub high_ansi: Option<crate::simple_type::StringValue>,
   /// East Asian Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:eastAsia
   #[sdk(attr(qname = "w:eastAsia"))]
   #[sdk(string_length(source = 0u32, max = 31u32))]
   pub east_asia: Option<crate::simple_type::StringValue>,
   /// Complex Script Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cs
   #[sdk(attr(qname = "w:cs"))]
   #[sdk(string_length(source = 0u32, max = 31u32))]
   pub complex_script: Option<crate::simple_type::StringValue>,
   /// ASCII Theme Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:asciiTheme
   #[sdk(attr(qname = "w:asciiTheme"))]
   pub ascii_theme: Option<ThemeFontValues>,
   /// High ANSI Theme Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hAnsiTheme
   #[sdk(attr(qname = "w:hAnsiTheme"))]
   pub high_ansi_theme: Option<ThemeFontValues>,
   /// East Asian Theme Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:eastAsiaTheme
   #[sdk(attr(qname = "w:eastAsiaTheme"))]
   pub east_asia_theme: Option<ThemeFontValues>,
   /// Complex Script Theme Font
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cstheme
   #[sdk(attr(qname = "w:cstheme"))]
   pub complex_script_theme: Option<ThemeFontValues>,
 }
 /// Defines the Color Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Color/w:color")]
 pub struct Color {
   /// Run Content Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -8483,44 +5563,24 @@ pub struct Color {
   ))]
   pub val: crate::simple_type::StringValue,
   /// Run Content Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Run Content Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Run Content Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Spacing Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShortTwipsMeasure/w:spacing")]
 pub struct Spacing {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8532,18 +5592,10 @@ pub struct Spacing {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the CharacterScale Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:w.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TextScale/w:w")]
 pub struct CharacterScale {
   /// Text Expansion/Compression Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -8555,18 +5607,10 @@ pub struct CharacterScale {
   pub val: Option<crate::simple_type::IntegerValue>,
 }
 /// Defines the Kern Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:kern.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsKern/w:kern")]
 pub struct Kern {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8578,18 +5622,10 @@ pub struct Kern {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the Position Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedHpsMeasure/w:position")]
 pub struct Position {
   /// Signed Half-Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedHpsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -8601,18 +5637,10 @@ pub struct Position {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the FontSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sz.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/w:sz")]
 pub struct FontSize {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8631,18 +5659,10 @@ pub struct FontSize {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the FontSizeComplexScript Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:szCs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/w:szCs")]
 pub struct FontSizeComplexScript {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8661,18 +5681,10 @@ pub struct FontSizeComplexScript {
   pub val: crate::simple_type::StringValue,
 }
 /// Checkbox Form Field Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/w:size")]
 pub struct FormFieldSize {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8691,18 +5703,10 @@ pub struct FormFieldSize {
   pub val: crate::simple_type::StringValue,
 }
 /// Phonetic Guide Text Font Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/w:hps")]
 pub struct PhoneticGuideTextFontSize {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8721,18 +5725,10 @@ pub struct PhoneticGuideTextFontSize {
   pub val: crate::simple_type::StringValue,
 }
 /// Phonetic Guide Base Text Font Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hpsBaseText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/w:hpsBaseText")]
 pub struct PhoneticGuideBaseTextSize {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8751,18 +5747,10 @@ pub struct PhoneticGuideBaseTextSize {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the HpsMeasureType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsMeasure/")]
 pub struct HpsMeasureType {
   /// Half Point Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -8781,41 +5769,21 @@ pub struct HpsMeasureType {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the Highlight Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:highlight.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Highlight/w:highlight")]
 pub struct Highlight {
   /// Highlighting Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: HighlightColorValues,
 }
 /// Defines the Underline Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:u.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Underline/w:u")]
 pub struct Underline {
   /// Underline Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<UnderlineValues>,
   /// Underline Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -8827,67 +5795,35 @@ pub struct Underline {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Underline Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Underline Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Underline Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TextEffect Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TextEffect/w:effect")]
 pub struct TextEffect {
   /// Animated Text Effect Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TextEffectValues,
 }
 /// Defines the Border Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:bdr")]
 pub struct Border {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -8899,42 +5835,22 @@ pub struct Border {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -8945,40 +5861,20 @@ pub struct Border {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Paragraph Border Above Identical Paragraphs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:top.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:top")]
 pub struct TopBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -8990,42 +5886,22 @@ pub struct TopBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9036,40 +5912,20 @@ pub struct TopBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Left Paragraph Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:left.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:left")]
 pub struct LeftBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9081,42 +5937,22 @@ pub struct LeftBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9127,40 +5963,20 @@ pub struct LeftBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Paragraph Border Between Identical Paragraphs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bottom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:bottom")]
 pub struct BottomBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9172,42 +5988,22 @@ pub struct BottomBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9218,40 +6014,20 @@ pub struct BottomBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Right Paragraph Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:right")]
 pub struct RightBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9263,42 +6039,22 @@ pub struct RightBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9309,40 +6065,20 @@ pub struct RightBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Paragraph Border Between Identical Paragraphs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:between.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:between")]
 pub struct BetweenBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9354,42 +6090,22 @@ pub struct BetweenBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9400,40 +6116,20 @@ pub struct BetweenBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Paragraph Border Between Facing Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:bar")]
 pub struct BarBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9445,42 +6141,22 @@ pub struct BarBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9491,40 +6167,20 @@ pub struct BarBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the StartBorder Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:start.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:start")]
+#[sdk(office2010, qname = "w:CT_Border/w:start")]
 pub struct StartBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9536,42 +6192,22 @@ pub struct StartBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9582,40 +6218,20 @@ pub struct StartBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the EndBorder Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:end.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Border/w:end")]
+#[sdk(office2010, qname = "w:CT_Border/w:end")]
 pub struct EndBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9627,42 +6243,22 @@ pub struct EndBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9673,40 +6269,20 @@ pub struct EndBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Table Inside Horizontal Edges Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:insideH.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:insideH")]
 pub struct InsideHorizontalBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9718,42 +6294,22 @@ pub struct InsideHorizontalBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9764,40 +6320,20 @@ pub struct InsideHorizontalBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Table Inside Vertical Edges Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:insideV.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:insideV")]
 pub struct InsideVerticalBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9809,42 +6345,22 @@ pub struct InsideVerticalBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9855,40 +6371,20 @@ pub struct InsideVerticalBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Table Cell Top Left to Bottom Right Diagonal Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tl2br.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:tl2br")]
 pub struct TopLeftToBottomRightCellBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9900,42 +6396,22 @@ pub struct TopLeftToBottomRightCellBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -9946,40 +6422,20 @@ pub struct TopLeftToBottomRightCellBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Table Cell Top Right to Bottom Left Diagonal Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tr2bl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/w:tr2bl")]
 pub struct TopRightToBottomLeftCellBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -9991,42 +6447,22 @@ pub struct TopRightToBottomLeftCellBorder {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -10037,40 +6473,20 @@ pub struct TopRightToBottomLeftCellBorder {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the BorderType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Border/")]
 pub struct BorderType {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: BorderValues,
   /// Border Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -10082,42 +6498,22 @@ pub struct BorderType {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// Border Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// Border Theme Color Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Border Theme Color Shade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sz
   #[sdk(attr(qname = "w:sz"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// Border Spacing Measurement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_range(
     source = 0u32,
@@ -10128,33 +6524,17 @@ pub struct BorderType {
   ))]
   pub space: Option<crate::simple_type::UInt32Value>,
   /// Border Shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shadow
   #[sdk(attr(qname = "w:shadow"))]
   pub shadow: Option<crate::simple_type::OnOffValue>,
   /// Create Frame Effect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:frame
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the FitText Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fitText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FitText/w:fitText")]
 pub struct FitText {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10164,224 +6544,112 @@ pub struct FitText {
   ))]
   pub val: crate::simple_type::UInt32Value,
   /// Fit Text Run ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   pub id: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the VerticalTextAlignment Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:vertAlign.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_VerticalAlignRun/w:vertAlign")]
 pub struct VerticalTextAlignment {
   /// Subscript/Superscript Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: VerticalPositionValues,
 }
 /// Defines the Emphasis Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:em.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Em/w:em")]
 pub struct Emphasis {
   /// Emphasis Mark Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: EmphasisMarkValues,
 }
 /// Defines the Languages Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lang.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Language/w:lang")]
 pub struct Languages {
   /// Latin Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub val: Option<crate::simple_type::StringValue>,
   /// East Asian Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:eastAsia
   #[sdk(attr(qname = "w:eastAsia"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub east_asia: Option<crate::simple_type::StringValue>,
   /// Complex Script Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bidi
   #[sdk(attr(qname = "w:bidi"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub bidi: Option<crate::simple_type::StringValue>,
 }
 /// Theme Font Languages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:themeFontLang.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Language/w:themeFontLang")]
 pub struct ThemeFontLanguages {
   /// Latin Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub val: Option<crate::simple_type::StringValue>,
   /// East Asian Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:eastAsia
   #[sdk(attr(qname = "w:eastAsia"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub east_asia: Option<crate::simple_type::StringValue>,
   /// Complex Script Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bidi
   #[sdk(attr(qname = "w:bidi"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub bidi: Option<crate::simple_type::StringValue>,
 }
 /// Defines the LanguageType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Language/")]
 pub struct LanguageType {
   /// Latin Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub val: Option<crate::simple_type::StringValue>,
   /// East Asian Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:eastAsia
   #[sdk(attr(qname = "w:eastAsia"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub east_asia: Option<crate::simple_type::StringValue>,
   /// Complex Script Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bidi
   #[sdk(attr(qname = "w:bidi"))]
   #[sdk(string_length(source = 0u32, max = 84u32))]
   pub bidi: Option<crate::simple_type::StringValue>,
 }
 /// Defines the EastAsianLayout Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:eastAsianLayout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EastAsianLayout/w:eastAsianLayout")]
 pub struct EastAsianLayout {
   /// East Asian Typography Run ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   pub id: Option<crate::simple_type::Int32Value>,
   /// Two Lines in One
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:combine
   #[sdk(attr(qname = "w:combine"))]
   pub combine: Option<crate::simple_type::OnOffValue>,
   /// Display Brackets Around Two Lines in One
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:combineBrackets
   #[sdk(attr(qname = "w:combineBrackets"))]
   pub combine_brackets: Option<CombineBracketValues>,
   /// Horizontal in Vertical (Rotate Text)
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vert
   #[sdk(attr(qname = "w:vert"))]
   pub vertical: Option<crate::simple_type::OnOffValue>,
   /// Compress Rotated Text to Line Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vertCompress
   #[sdk(attr(qname = "w:vertCompress"))]
   pub vertical_compress: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the RunPropertiesChange Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrChange/w:rPrChange")]
 pub struct RunPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10403,10 +6671,6 @@ pub struct RunPropertiesChange {
   pub previous_run_properties: std::boxed::Box<PreviousRunProperties>,
 }
 /// Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPr/w:rPr")]
 pub struct RunProperties {
@@ -10527,54 +6791,54 @@ pub struct RunProperties {
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the Glow Class.
-  #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
   /// Defines the Shadow Class.
-  #[sdk(child(qname = "w14:CT_Shadow/w14:shadow"))]
+  #[sdk(child(office2010, qname = "w14:CT_Shadow/w14:shadow"))]
   pub shadow14:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Shadow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect: Option<
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect,
     >,
   >,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   >,
   /// Defines the Scene3D Class.
-  #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   >,
   /// Defines the Ligatures Class.
-  #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContextualAlternatives>,
   /// Defines the RunPropertiesChange Class.
@@ -10582,42 +6846,22 @@ pub struct RunProperties {
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
 }
 /// Defines the InsertedMathControl Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlIns/w:ins")]
 pub struct InsertedMathControl {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10638,41 +6882,21 @@ pub struct InsertedMathControl {
   pub inserted_math_control_choice: Option<InsertedMathControlChoice>,
 }
 /// Defines the DeletedMathControl Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:del.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlDel/w:del")]
 pub struct DeletedMathControl {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10694,42 +6918,22 @@ pub struct DeletedMathControl {
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
 }
 /// Defines the MoveFromMathControl Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveFrom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/w:moveFrom")]
 pub struct MoveFromMathControl {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10754,42 +6958,22 @@ pub struct MoveFromMathControl {
   pub eg_r_pr_math: Option<MoveFromMathControlChoice>,
 }
 /// Defines the MoveToMathControl Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveTo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/w:moveTo")]
 pub struct MoveToMathControl {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10814,41 +6998,21 @@ pub struct MoveToMathControl {
   pub eg_r_pr_math: Option<MoveToMathControlChoice>,
 }
 /// Defines the MathControlMoveType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MathCtrlMove/")]
 pub struct MathControlMoveType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -10875,10 +7039,6 @@ pub struct MathControlMoveType {
   pub xml_children: Vec<MathControlMoveTypeChoice>,
 }
 /// Defines the CustomXmlRuby Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRuby/w:customXml")]
 pub struct CustomXmlRuby {
@@ -10950,33 +7110,17 @@ pub struct CustomXmlRuby {
   pub custom_xml_ruby_choice: Vec<CustomXmlRubyChoice>,
 }
 /// Defines the SimpleFieldRuby Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fldSimple.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SimpleFieldRuby/w:fldSimple")]
 pub struct SimpleFieldRuby {
   pub xml_other_attrs: Vec<(String, String)>,
   /// instr
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:instr
   #[sdk(attr(qname = "w:instr"))]
   pub instruction: crate::simple_type::StringValue,
   /// fldLock
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fldLock
   #[sdk(attr(qname = "w:fldLock"))]
   pub field_lock: Option<crate::simple_type::OnOffValue>,
   /// dirty
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dirty
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// _
@@ -11046,58 +7190,30 @@ pub struct SimpleFieldRuby {
   pub simple_field_ruby_choice: Vec<SimpleFieldRubyChoice>,
 }
 /// Defines the HyperlinkRuby Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hyperlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HyperlinkRuby/w:hyperlink")]
 pub struct HyperlinkRuby {
   pub xml_other_attrs: Vec<(String, String)>,
   /// tgtFrame
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tgtFrame
   #[sdk(attr(qname = "w:tgtFrame"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub target_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tooltip
   #[sdk(attr(qname = "w:tooltip"))]
   #[sdk(string_length(source = 0u32, max = 260u32))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// docLocation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:docLocation
   #[sdk(attr(qname = "w:docLocation"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub doc_location: Option<crate::simple_type::StringValue>,
   /// history
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:history
   #[sdk(attr(qname = "w:history"))]
   pub history: Option<crate::simple_type::OnOffValue>,
   /// anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:anchor
   #[sdk(attr(qname = "w:anchor"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub anchor: Option<crate::simple_type::StringValue>,
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
@@ -11164,35 +7280,19 @@ pub struct HyperlinkRuby {
   pub xml_children: Vec<HyperlinkRubyChoice>,
 }
 /// Phonetic Guide Text Run.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:r.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_R/w:r")]
 pub struct Run {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Run Properties
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRPr
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_properties: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Run Deletion
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidDel
   #[sdk(attr(qname = "w:rsidDel"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_deletion: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Run
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidR
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_addition: Option<crate::simple_type::HexBinaryValue>,
@@ -11238,10 +7338,6 @@ pub struct Run {
   pub run_choice: Vec<RunChoice>,
 }
 /// Defines the SdtRunRuby Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRunRuby/w:sdt")]
 pub struct SdtRunRuby {
@@ -11282,133 +7378,65 @@ pub struct SdtRunRuby {
   pub sdt_run_ruby_choice: Vec<SdtRunRubyChoice>,
 }
 /// Defines the ProofError Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:proofErr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ProofErr/w:proofErr")]
 pub struct ProofError {
   /// Proofing Error Anchor Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: ProofingErrorValues,
 }
 /// Defines the PermStart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:permStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PermStart/w:permStart")]
 pub struct PermStart {
   /// edGrp
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:edGrp
   #[sdk(attr(qname = "w:edGrp"))]
   pub editor_group: Option<RangePermissionEditingGroupValues>,
   /// ed
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:ed
   #[sdk(attr(qname = "w:ed"))]
   pub ed: Option<crate::simple_type::StringValue>,
   /// colFirst
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colFirst
   #[sdk(attr(qname = "w:colFirst"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub column_first: Option<crate::simple_type::Int32Value>,
   /// colLast
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:colLast
   #[sdk(attr(qname = "w:colLast"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub column_last: Option<crate::simple_type::Int32Value>,
   /// Annotation ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   pub id: crate::simple_type::Int32Value,
   /// Annotation Displaced By Custom XML Markup
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
 }
 /// Defines the PermEnd Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:permEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Perm/w:permEnd")]
 pub struct PermEnd {
   /// Annotation ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   pub id: crate::simple_type::Int32Value,
   /// Annotation Displaced By Custom XML Markup
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displacedByCustomXml
   #[sdk(attr(qname = "w:displacedByCustomXml"))]
   pub displaced_by_custom_xml: Option<DisplacedByCustomXmlValues>,
 }
 /// Inserted Run Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:ins")]
 pub struct InsertedRun {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -11488,41 +7516,21 @@ pub struct InsertedRun {
   pub inserted_run_choice: Vec<InsertedRunChoice>,
 }
 /// Deleted Run Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:del.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:del")]
 pub struct DeletedRun {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -11602,41 +7610,21 @@ pub struct DeletedRun {
   pub deleted_run_choice: Vec<DeletedRunChoice>,
 }
 /// Move Source Run Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveFrom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:moveFrom")]
 pub struct MoveFromRun {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -11716,41 +7704,21 @@ pub struct MoveFromRun {
   pub move_from_run_choice: Vec<MoveFromRunChoice>,
 }
 /// Move Destination Run Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:moveTo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/w:moveTo")]
 pub struct MoveToRun {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -11830,41 +7798,21 @@ pub struct MoveToRun {
   pub move_to_run_choice: Vec<MoveToRunChoice>,
 }
 /// Defines the RunTrackChangeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/")]
 pub struct RunTrackChangeType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -11942,26 +7890,14 @@ pub struct RunTrackChangeType {
   pub xml_children: Vec<RunTrackChangeTypeChoice>,
 }
 /// Defines the ContentPart Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:contentPart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_ContentPart/w:contentPart")]
+#[sdk(office2010, qname = "w:CT_ContentPart/w:contentPart")]
 pub struct ContentPart {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the SdtRun Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRun/w:sdt")]
 pub struct SdtRun {
@@ -12002,10 +7938,6 @@ pub struct SdtRun {
   pub sdt_run_choice: Vec<SdtRunChoice>,
 }
 /// Defines the CustomXmlBlock Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlBlock/w:customXml")]
 pub struct CustomXmlBlock {
@@ -12054,10 +7986,6 @@ pub struct CustomXmlBlock {
   pub custom_xml_block_choice: Vec<CustomXmlBlockChoice>,
 }
 /// Defines the SdtBlock Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtBlock/w:sdt")]
 pub struct SdtBlock {
@@ -12098,76 +8026,40 @@ pub struct SdtBlock {
   pub sdt_block_choice: Vec<SdtBlockChoice>,
 }
 /// Defines the Paragraph Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:p.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_P/w:p")]
 pub struct Paragraph {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Paragraph Glyph Formatting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRPr
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_paragraph_mark_revision: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Paragraph
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidR
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_paragraph_addition: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Paragraph Deletion
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidDel
   #[sdk(attr(qname = "w:rsidDel"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_paragraph_deletion: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Paragraph Properties
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidP
   #[sdk(attr(qname = "w:rsidP"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_paragraph_properties: Option<crate::simple_type::HexBinaryValue>,
   /// Default Revision Identifier for Runs
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRDefault
   #[sdk(attr(qname = "w:rsidRDefault"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_addition_default: Option<crate::simple_type::HexBinaryValue>,
   /// paraId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:paraId
-  #[sdk(attr(qname = "w14:paraId"))]
+  #[sdk(attr(office2010, qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:textId
-  #[sdk(attr(qname = "w14:textId"))]
+  #[sdk(attr(office2010, qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// noSpellErr
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:noSpellErr
-  #[sdk(attr(qname = "w14:noSpellErr"))]
+  #[sdk(attr(office2010, qname = "w14:noSpellErr"))]
   pub no_spell_error: Option<crate::simple_type::OnOffValue>,
   /// Paragraph Properties
   #[sdk(child(qname = "w:CT_PPr/w:pPr"))]
@@ -12239,10 +8131,6 @@ pub struct Paragraph {
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
 /// Defines the Table Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tbl/w:tbl")]
 pub struct Table {
@@ -12315,60 +8203,32 @@ pub struct Table {
   pub table_choice2: Vec<TableChoice2>,
 }
 /// Table Row.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Row/w:tr")]
 pub struct TableRow {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Revision Identifier for Table Row Glyph Formatting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRPr
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_table_row_mark_revision: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Table Row
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidR
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_table_row_addition: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Table Row Deletion
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidDel
   #[sdk(attr(qname = "w:rsidDel"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_table_row_deletion: Option<crate::simple_type::HexBinaryValue>,
   /// Revision Identifier for Table Row Properties
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidTr
   #[sdk(attr(qname = "w:rsidTr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_table_row_properties: Option<crate::simple_type::HexBinaryValue>,
   /// paraId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:paraId
-  #[sdk(attr(qname = "w14:paraId"))]
+  #[sdk(attr(office2010, qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
   /// textId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:textId
-  #[sdk(attr(qname = "w14:textId"))]
+  #[sdk(attr(office2010, qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
   /// Table-Level Property Exceptions
@@ -12417,10 +8277,6 @@ pub struct TableRow {
   pub table_row_choice: Vec<TableRowChoice>,
 }
 /// Row-Level Custom XML Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRow/w:customXml")]
 pub struct CustomXmlRow {
@@ -12468,10 +8324,6 @@ pub struct CustomXmlRow {
   pub custom_xml_row_choice: Vec<CustomXmlRowChoice>,
 }
 /// Row-Level Structured Document Tag.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtRow/w:sdt")]
 pub struct SdtRow {
@@ -12512,10 +8364,6 @@ pub struct SdtRow {
   pub sdt_row_choice: Vec<SdtRowChoice>,
 }
 /// Table Cell.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Tc/w:tc")]
 pub struct TableCell {
@@ -12565,10 +8413,6 @@ pub struct TableCell {
   pub table_cell_choice: Vec<TableCellChoice>,
 }
 /// Cell-Level Custom XML Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlCell/w:customXml")]
 pub struct CustomXmlCell {
@@ -12616,10 +8460,6 @@ pub struct CustomXmlCell {
   pub custom_xml_cell_choice: Vec<CustomXmlCellChoice>,
 }
 /// Cell-Level Structured Document Tag.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtCell/w:sdt")]
 pub struct SdtCell {
@@ -12660,10 +8500,6 @@ pub struct SdtCell {
   pub sdt_cell_choice: Vec<SdtCellChoice>,
 }
 /// Defines the CustomXmlRun Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXml.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlRun/w:customXml")]
 pub struct CustomXmlRun {
@@ -12738,33 +8574,17 @@ pub struct CustomXmlRun {
   pub custom_xml_run_choice: Vec<CustomXmlRunChoice>,
 }
 /// Defines the SimpleField Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fldSimple.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SimpleField/w:fldSimple")]
 pub struct SimpleField {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Field Codes
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:instr
   #[sdk(attr(qname = "w:instr"))]
   pub instruction: crate::simple_type::StringValue,
   /// Field Should Not Be Recalculated
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fldLock
   #[sdk(attr(qname = "w:fldLock"))]
   pub field_lock: Option<crate::simple_type::OnOffValue>,
   /// Field Result Invalidated
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dirty
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data
@@ -12837,58 +8657,30 @@ pub struct SimpleField {
   pub simple_field_choice: Vec<SimpleFieldChoice>,
 }
 /// Defines the Hyperlink Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hyperlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Hyperlink/w:hyperlink")]
 pub struct Hyperlink {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Hyperlink Target Frame
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tgtFrame
   #[sdk(attr(qname = "w:tgtFrame"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub target_frame: Option<crate::simple_type::StringValue>,
   /// Associated String
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tooltip
   #[sdk(attr(qname = "w:tooltip"))]
   #[sdk(string_length(source = 0u32, max = 260u32))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// Location in Target Document
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:docLocation
   #[sdk(attr(qname = "w:docLocation"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub doc_location: Option<crate::simple_type::StringValue>,
   /// Add To Viewed Hyperlinks
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:history
   #[sdk(attr(qname = "w:history"))]
   pub history: Option<crate::simple_type::OnOffValue>,
   /// Hyperlink Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:anchor
   #[sdk(attr(qname = "w:anchor"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub anchor: Option<crate::simple_type::StringValue>,
   /// Hyperlink Target
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
@@ -12958,18 +8750,10 @@ pub struct Hyperlink {
   pub xml_children: Vec<HyperlinkChoice>,
 }
 /// Defines the BidirectionalOverride Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bdo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_BdoContentRun/w:bdo")]
+#[sdk(office2010, qname = "w:CT_BdoContentRun/w:bdo")]
 pub struct BidirectionalOverride {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
   #[sdk(choice(
@@ -13037,18 +8821,10 @@ pub struct BidirectionalOverride {
   pub xml_children: Vec<BidirectionalOverrideChoice>,
 }
 /// Defines the BidirectionalEmbedding Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dir.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_DirContentRun/w:dir")]
+#[sdk(office2010, qname = "w:CT_DirContentRun/w:dir")]
 pub struct BidirectionalEmbedding {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: Option<DirectionValues>,
   #[sdk(choice(
@@ -13116,281 +8892,137 @@ pub struct BidirectionalEmbedding {
   pub xml_children: Vec<BidirectionalEmbeddingChoice>,
 }
 /// Anchor for Subdocument Location.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:subDoc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:subDoc")]
 pub struct SubDocumentReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the PrinterSettingsReference Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:printerSettings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:printerSettings")]
 pub struct PrinterSettingsReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// ODSO Data Source File Path.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:src.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:src")]
 pub struct SourceReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Reference to Inclusion/Exclusion Data for Data Source.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:recipientData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:recipientData")]
 pub struct RecipientDataReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Data Source File Path.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dataSource.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:dataSource")]
 pub struct DataSourceReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Header Definition File Path.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:headerSource.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:headerSource")]
 pub struct HeaderSource {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Source File for Frame.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sourceFileName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:sourceFileName")]
 pub struct SourceFileReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MovieReference Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:movie.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:movie")]
 pub struct MovieReference {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Attached Document Template.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:attachedTemplate.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/w:attachedTemplate")]
 pub struct AttachedTemplate {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the RelationshipType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Rel/")]
 pub struct RelationshipType {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the ConditionalFormatStyle Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cnfStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Cnf/w:cnfStyle")]
 pub struct ConditionalFormatStyle {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Conditional Formatting Bit Mask
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(pattern(source = 3u32, regex = "[01]*"))]
   #[sdk(string_length(source = 3u32, min = 12u32, max = 12u32))]
   pub val: crate::simple_type::StringValue,
   /// firstRow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstRow
-  #[sdk(attr(qname = "w:firstRow"))]
+  #[sdk(attr(office2010, qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
   /// lastRow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastRow
-  #[sdk(attr(qname = "w:lastRow"))]
+  #[sdk(attr(office2010, qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
   /// firstColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstColumn
-  #[sdk(attr(qname = "w:firstColumn"))]
+  #[sdk(attr(office2010, qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
   /// lastColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastColumn
-  #[sdk(attr(qname = "w:lastColumn"))]
+  #[sdk(attr(office2010, qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
   /// oddVBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:oddVBand
-  #[sdk(attr(qname = "w:oddVBand"))]
+  #[sdk(attr(office2010, qname = "w:oddVBand"))]
   pub odd_vertical_band: Option<crate::simple_type::OnOffValue>,
   /// evenVBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:evenVBand
-  #[sdk(attr(qname = "w:evenVBand"))]
+  #[sdk(attr(office2010, qname = "w:evenVBand"))]
   pub even_vertical_band: Option<crate::simple_type::OnOffValue>,
   /// oddHBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:oddHBand
-  #[sdk(attr(qname = "w:oddHBand"))]
+  #[sdk(attr(office2010, qname = "w:oddHBand"))]
   pub odd_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// evenHBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:evenHBand
-  #[sdk(attr(qname = "w:evenHBand"))]
+  #[sdk(attr(office2010, qname = "w:evenHBand"))]
   pub even_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// firstRowFirstColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstRowFirstColumn
-  #[sdk(attr(qname = "w:firstRowFirstColumn"))]
+  #[sdk(attr(office2010, qname = "w:firstRowFirstColumn"))]
   pub first_row_first_column: Option<crate::simple_type::OnOffValue>,
   /// firstRowLastColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstRowLastColumn
-  #[sdk(attr(qname = "w:firstRowLastColumn"))]
+  #[sdk(attr(office2010, qname = "w:firstRowLastColumn"))]
   pub first_row_last_column: Option<crate::simple_type::OnOffValue>,
   /// lastRowFirstColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastRowFirstColumn
-  #[sdk(attr(qname = "w:lastRowFirstColumn"))]
+  #[sdk(attr(office2010, qname = "w:lastRowFirstColumn"))]
   pub last_row_first_column: Option<crate::simple_type::OnOffValue>,
   /// lastRowLastColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastRowLastColumn
-  #[sdk(attr(qname = "w:lastRowLastColumn"))]
+  #[sdk(attr(office2010, qname = "w:lastRowLastColumn"))]
   pub last_row_last_column: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableCellWidth Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcW.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:tcW")]
 pub struct TableCellWidth {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13399,26 +9031,14 @@ pub struct TableCellWidth {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the WidthBeforeTableRow Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wBefore.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:wBefore")]
 pub struct WidthBeforeTableRow {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13427,26 +9047,14 @@ pub struct WidthBeforeTableRow {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the WidthAfterTableRow Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:wAfter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:wAfter")]
 pub struct WidthAfterTableRow {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13455,26 +9063,14 @@ pub struct WidthAfterTableRow {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the TableCellSpacing Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblCellSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:tblCellSpacing")]
 pub struct TableCellSpacing {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13483,26 +9079,14 @@ pub struct TableCellSpacing {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the TableWidth Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblW.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:tblW")]
 pub struct TableWidth {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13511,26 +9095,14 @@ pub struct TableWidth {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table Cell Top Margin Default.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:top.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:top")]
 pub struct TopMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13539,26 +9111,14 @@ pub struct TopMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the StartMargin Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:start.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:start")]
+#[sdk(office2010, qname = "w:CT_TblWidth/w:start")]
 pub struct StartMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13567,26 +9127,14 @@ pub struct StartMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table Cell Bottom Margin Default.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bottom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:bottom")]
 pub struct BottomMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13595,26 +9143,14 @@ pub struct BottomMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the EndMargin Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:end.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidth/w:end")]
+#[sdk(office2010, qname = "w:CT_TblWidth/w:end")]
 pub struct EndMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13623,26 +9159,14 @@ pub struct EndMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table Cell Left Margin Exception.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:left.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:left")]
 pub struct LeftMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13651,26 +9175,14 @@ pub struct LeftMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table Cell Right Margin Exception.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/w:right")]
 pub struct RightMargin {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13679,26 +9191,14 @@ pub struct RightMargin {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the TableWidthType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidth/")]
 pub struct TableWidthType {
   /// Table Width Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -13707,50 +9207,26 @@ pub struct TableWidthType {
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Table Width Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the HorizontalMerge Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hMerge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HMerge/w:hMerge")]
 pub struct HorizontalMerge {
   /// Horizontal Merge Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<MergedCellValues>,
 }
 /// Defines the VerticalMerge Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:vMerge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_VMerge/w:vMerge")]
 pub struct VerticalMerge {
   /// Vertical Merge Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<MergedCellValues>,
 }
 /// Defines the TableCellBorders Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcBorders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcBorders/w:tcBorders")]
 pub struct TableCellBorders {
@@ -13763,7 +9239,7 @@ pub struct TableCellBorders {
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
   /// _
-  #[sdk(child(qname = "w:CT_Border/w:start"))]
+  #[sdk(child(office2010, qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Cell Bottom Border
   #[sdk(child(qname = "w:CT_Border/w:bottom"))]
@@ -13772,7 +9248,7 @@ pub struct TableCellBorders {
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
   /// _
-  #[sdk(child(qname = "w:CT_Border/w:end"))]
+  #[sdk(child(office2010, qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Cell Inside Horizontal Edges Border
   #[sdk(child(qname = "w:CT_Border/w:insideH"))]
@@ -13788,330 +9264,166 @@ pub struct TableCellBorders {
   pub top_right_to_bottom_left_cell_border: Option<TopRightToBottomLeftCellBorder>,
 }
 /// Defines the NoWrap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noWrap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:noWrap")]
 pub struct NoWrap {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the TableCellFitText Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcFitText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:tcFitText")]
 pub struct TableCellFitText {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the HideMark Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hideMark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:hideMark")]
 pub struct HideMark {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the CantSplit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cantSplit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:cantSplit")]
 pub struct CantSplit {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the TableHeader Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblHeader.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:tblHeader")]
 pub struct TableHeader {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the BiDiVisual Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bidiVisual.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:bidiVisual")]
 pub struct BiDiVisual {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Frame Cannot Be Resized.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noResizeAllowed.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:noResizeAllowed")]
 pub struct NoResizeAllowed {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Maintain Link to Existing File.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:linkedToFile.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:linkedToFile")]
 pub struct LinkedToFile {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Do Not Display Frameset Splitters.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noBorder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:noBorder")]
 pub struct NoBorder {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Frameset Splitter Border Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:flatBorders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:flatBorders")]
 pub struct FlatBorders {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Automatically Merge User Formatting Into Style Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoRedefine.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:autoRedefine")]
 pub struct AutoRedefine {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Hide Style From User Interface.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hidden.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:hidden")]
 pub struct StyleHidden {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Hide Style From Main User Interface.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:semiHidden.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:semiHidden")]
 pub struct SemiHidden {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Remove Semi-Hidden Property When Style Is Used.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:unhideWhenUsed.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:unhideWhenUsed")]
 pub struct UnhideWhenUsed {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Primary Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:qFormat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:qFormat")]
 pub struct PrimaryStyle {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Style Cannot Be Applied.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:locked.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:locked")]
 pub struct Locked {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// E-Mail Message Text Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:personal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:personal")]
 pub struct Personal {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// E-Mail Message Composition Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:personalCompose.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:personalCompose")]
 pub struct PersonalCompose {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// E-Mail Message Reply Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:personalReply.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/w:personalReply")]
 pub struct PersonalReply {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the OnOffOnlyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OnOffOnly/")]
 pub struct OnOffOnlyType {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<OnOffOnlyValues>,
 }
 /// Defines the TableCellMargin Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcMar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcMar/w:tcMar")]
 pub struct TableCellMargin {
@@ -14124,7 +9436,7 @@ pub struct TableCellMargin {
   #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
   pub left_margin: Option<LeftMargin>,
   /// _
-  #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
@@ -14133,38 +9445,22 @@ pub struct TableCellMargin {
   #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
   pub right_margin: Option<RightMargin>,
   /// _
-  #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Defines the TableCellVerticalAlignment Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:vAlign.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_VerticalTblJc/w:vAlign")]
 pub struct TableCellVerticalAlignment {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TableVerticalAlignmentValues,
 }
 /// Defines the DivId Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:divId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonZeroDecimalNumber/w:divId")]
 pub struct DivId {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -14183,18 +9479,10 @@ pub struct DivId {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the TableRowHeight Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trHeight.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Height/w:trHeight")]
 pub struct TableRowHeight {
   /// Table Row Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14204,95 +9492,47 @@ pub struct TableRowHeight {
   ))]
   pub val: Option<crate::simple_type::UInt32Value>,
   /// Table Row Height Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hRule
   #[sdk(attr(qname = "w:hRule"))]
   pub height_type: Option<HeightRuleValues>,
 }
 /// Defines the TableJustification Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:jc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblJc/w:jc")]
 pub struct TableJustification {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TableRowAlignmentValues,
 }
 /// Defines the TablePositionProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPPr/w:tblpPr")]
 pub struct TablePositionProperties {
   /// Distance From Left of Table to Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:leftFromText
   #[sdk(attr(qname = "w:leftFromText"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub left_from_text: Option<crate::simple_type::Int16Value>,
   /// (Distance From Right of Table to Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rightFromText
   #[sdk(attr(qname = "w:rightFromText"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub right_from_text: Option<crate::simple_type::Int16Value>,
   /// Distance From Top of Table to Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:topFromText
   #[sdk(attr(qname = "w:topFromText"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub top_from_text: Option<crate::simple_type::Int16Value>,
   /// Distance From Bottom of Table to Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bottomFromText
   #[sdk(attr(qname = "w:bottomFromText"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub bottom_from_text: Option<crate::simple_type::Int16Value>,
   /// Table Vertical Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vertAnchor
   #[sdk(attr(qname = "w:vertAnchor"))]
   pub vertical_anchor: Option<VerticalAnchorValues>,
   /// Table Horizontal Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:horzAnchor
   #[sdk(attr(qname = "w:horzAnchor"))]
   pub horizontal_anchor: Option<HorizontalAnchorValues>,
   /// Relative Horizontal Alignment From Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tblpXSpec
   #[sdk(attr(qname = "w:tblpXSpec"))]
   pub table_position_x_alignment: Option<HorizontalAlignmentValues>,
   /// Absolute Horizontal Distance From Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tblpX
   #[sdk(attr(qname = "w:tblpX"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14303,17 +9543,9 @@ pub struct TablePositionProperties {
   ))]
   pub table_position_x: Option<crate::simple_type::Int32Value>,
   /// Relative Vertical Alignment from Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tblpYSpec
   #[sdk(attr(qname = "w:tblpYSpec"))]
   pub table_position_y_alignment: Option<VerticalAlignmentValues>,
   /// Absolute Vertical Distance From Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tblpY
   #[sdk(attr(qname = "w:tblpY"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14325,34 +9557,18 @@ pub struct TablePositionProperties {
   pub table_position_y: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the TableOverlap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblOverlap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblOverlap/w:tblOverlap")]
 pub struct TableOverlap {
   /// Floating Table Overlap Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TableOverlapValues,
 }
 /// Defines the TableStyleRowBandSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblStyleRowBandSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleRowBandSize")]
 pub struct TableStyleRowBandSize {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -14364,18 +9580,10 @@ pub struct TableStyleRowBandSize {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the TableStyleColumnBandSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblStyleColBandSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumberMax3/w:tblStyleColBandSize")]
 pub struct TableStyleColumnBandSize {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -14387,18 +9595,10 @@ pub struct TableStyleColumnBandSize {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the UnsignedDecimalNumberMax3Type Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumberMax3/")]
 pub struct UnsignedDecimalNumberMax3Type {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -14410,33 +9610,17 @@ pub struct UnsignedDecimalNumberMax3Type {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the TableIndentation Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblInd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidthShort/w:tblInd")]
 pub struct TableIndentation {
   /// w
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
 /// Defines the TableBorders Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblBorders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblBorders/w:tblBorders")]
 pub struct TableBorders {
@@ -14449,7 +9633,7 @@ pub struct TableBorders {
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
   /// _
-  #[sdk(child(qname = "w:CT_Border/w:start"))]
+  #[sdk(child(office2010, qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
   /// Table Bottom Border
   #[sdk(child(qname = "w:CT_Border/w:bottom"))]
@@ -14458,7 +9642,7 @@ pub struct TableBorders {
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
   /// _
-  #[sdk(child(qname = "w:CT_Border/w:end"))]
+  #[sdk(child(office2010, qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
   /// Table Inside Horizontal Edges Border
   #[sdk(child(qname = "w:CT_Border/w:insideH"))]
@@ -14468,26 +9652,14 @@ pub struct TableBorders {
   pub inside_vertical_border: Option<InsideVerticalBorder>,
 }
 /// Defines the TableLayout Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblLayout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblLayoutType/w:tblLayout")]
 pub struct TableLayout {
   /// Table Layout Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableLayoutValues>,
 }
 /// Defines the TableCellMarginDefault Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblCellMar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblCellMar/w:tblCellMar")]
 pub struct TableCellMarginDefault {
@@ -14500,7 +9672,7 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
   /// _
-  #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
+  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
   /// Table Cell Bottom Margin Default
   #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
@@ -14509,54 +9681,30 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
   /// _
-  #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
+  #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
 }
 /// Footnote and Endnote Numbering Starting Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnNumStart/w:numStart")]
 pub struct NumberingStart {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt16Value,
 }
 /// Footnote and Endnote Numbering Restart Location.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numRestart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumRestart/w:numRestart")]
 pub struct NumberingRestart {
   /// Automatic Numbering Restart Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: RestartNumberValues,
 }
 /// Defines the AltChunk Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:altChunk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AltChunk/w:altChunk")]
 pub struct AltChunk {
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// External Content Import Properties
@@ -14564,70 +9712,34 @@ pub struct AltChunk {
   pub alt_chunk_properties: Option<std::boxed::Box<AltChunkProperties>>,
 }
 /// Defines the TableLook Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblLook.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblLook/w:tblLook")]
 pub struct TableLook {
   pub xml_other_attrs: Vec<(String, String)>,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
   /// firstRow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstRow
-  #[sdk(attr(qname = "w:firstRow"))]
+  #[sdk(attr(office2010, qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
   /// lastRow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastRow
-  #[sdk(attr(qname = "w:lastRow"))]
+  #[sdk(attr(office2010, qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
   /// firstColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:firstColumn
-  #[sdk(attr(qname = "w:firstColumn"))]
+  #[sdk(attr(office2010, qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
   /// lastColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastColumn
-  #[sdk(attr(qname = "w:lastColumn"))]
+  #[sdk(attr(office2010, qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
   /// noHBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:noHBand
-  #[sdk(attr(qname = "w:noHBand"))]
+  #[sdk(attr(office2010, qname = "w:noHBand"))]
   pub no_horizontal_band: Option<crate::simple_type::OnOffValue>,
   /// noVBand
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:noVBand
-  #[sdk(attr(qname = "w:noVBand"))]
+  #[sdk(attr(office2010, qname = "w:noVBand"))]
   pub no_vertical_band: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the FootnoteProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnotePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnProps/w:footnotePr")]
 pub struct FootnoteProperties {
@@ -14647,10 +9759,6 @@ pub struct FootnoteProperties {
   pub numbering_restart: Option<NumberingRestart>,
 }
 /// Defines the EndnoteProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnotePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnProps/w:endnotePr")]
 pub struct EndnoteProperties {
@@ -14670,34 +9778,18 @@ pub struct EndnoteProperties {
   pub numbering_restart: Option<NumberingRestart>,
 }
 /// Defines the SectionType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectType/w:type")]
 pub struct SectionType {
   /// Section Type Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: SectionMarkValues,
 }
 /// Defines the PageSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pgSz.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PageSz/w:pgSz")]
 pub struct PageSize {
   /// Page Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14707,10 +9799,6 @@ pub struct PageSize {
   ))]
   pub width: Option<crate::simple_type::UInt32Value>,
   /// Page Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:h
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14720,33 +9808,17 @@ pub struct PageSize {
   ))]
   pub height: Option<crate::simple_type::UInt32Value>,
   /// Page Orientation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:orient
   #[sdk(attr(qname = "w:orient"))]
   pub orient: Option<PageOrientationValues>,
   /// Printer Paper Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:code
   #[sdk(attr(qname = "w:code"))]
   pub code: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the PageMargin Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pgMar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PageMar/w:pgMar")]
 pub struct PageMargin {
   /// Top Margin Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:top
   #[sdk(attr(qname = "w:top"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14757,10 +9829,6 @@ pub struct PageMargin {
   ))]
   pub top: Option<crate::simple_type::Int32Value>,
   /// Right Margin Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:right
   #[sdk(attr(qname = "w:right"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14770,10 +9838,6 @@ pub struct PageMargin {
   ))]
   pub right: Option<crate::simple_type::UInt32Value>,
   /// Page Bottom Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bottom
   #[sdk(attr(qname = "w:bottom"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14784,10 +9848,6 @@ pub struct PageMargin {
   ))]
   pub bottom: Option<crate::simple_type::Int32Value>,
   /// Left Margin Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:left
   #[sdk(attr(qname = "w:left"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14797,10 +9857,6 @@ pub struct PageMargin {
   ))]
   pub left: Option<crate::simple_type::UInt32Value>,
   /// Spacing to Top of Header
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:header
   #[sdk(attr(qname = "w:header"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14810,10 +9866,6 @@ pub struct PageMargin {
   ))]
   pub header: Option<crate::simple_type::UInt32Value>,
   /// Spacing to Bottom of Footer
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:footer
   #[sdk(attr(qname = "w:footer"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14823,10 +9875,6 @@ pub struct PageMargin {
   ))]
   pub footer: Option<crate::simple_type::UInt32Value>,
   /// Page Gutter Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:gutter
   #[sdk(attr(qname = "w:gutter"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14837,55 +9885,27 @@ pub struct PageMargin {
   pub gutter: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the PaperSource Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:paperSrc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PaperSource/w:paperSrc")]
 pub struct PaperSource {
   /// First Page Printer Tray Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:first
   #[sdk(attr(qname = "w:first"))]
   pub first: Option<crate::simple_type::UInt16Value>,
   /// Non-First Page Printer Tray Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:other
   #[sdk(attr(qname = "w:other"))]
   pub other: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the PageBorders Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pgBorders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PageBorders/w:pgBorders")]
 pub struct PageBorders {
   /// Z-Ordering of Page Border
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:zOrder
   #[sdk(attr(qname = "w:zOrder"))]
   pub z_order: Option<PageBorderZOrderValues>,
   /// Pages to Display Page Borders
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:display
   #[sdk(attr(qname = "w:display"))]
   pub display: Option<PageBorderDisplayValues>,
   /// Page Border Positioning
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:offsetFrom
   #[sdk(attr(qname = "w:offsetFrom"))]
   pub offset_from: Option<PageBorderOffsetValues>,
   /// Top Border
@@ -14902,18 +9922,10 @@ pub struct PageBorders {
   pub right_border: Option<RightBorder>,
 }
 /// Defines the LineNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lnNumType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LineNumber/w:lnNumType")]
 pub struct LineNumberType {
   /// Line Number Increments to Display
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:countBy
   #[sdk(attr(qname = "w:countBy"))]
   #[sdk(number_range(
     source = 0u32,
@@ -14924,18 +9936,10 @@ pub struct LineNumberType {
   ))]
   pub count_by: Option<crate::simple_type::Int16Value>,
   /// Line Numbering Starting Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:start
   #[sdk(attr(qname = "w:start"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub start: Option<crate::simple_type::Int16Value>,
   /// Distance Between Text and Line Numbering
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:distance
   #[sdk(attr(qname = "w:distance"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -14946,71 +9950,35 @@ pub struct LineNumberType {
   ))]
   pub distance: Option<crate::simple_type::StringValue>,
   /// Line Numbering Restart Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:restart
   #[sdk(attr(qname = "w:restart"))]
   pub restart: Option<LineNumberRestartValues>,
 }
 /// Defines the PageNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pgNumType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PageNumber/w:pgNumType")]
 pub struct PageNumberType {
   /// Page Number Format
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fmt
   #[sdk(attr(qname = "w:fmt"))]
   pub format: Option<NumberFormatValues>,
   /// Starting Page Number
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:start
   #[sdk(attr(qname = "w:start"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub start: Option<crate::simple_type::Int32Value>,
   /// Chapter Heading Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:chapStyle
   #[sdk(attr(qname = "w:chapStyle"))]
   pub chapter_style: Option<crate::simple_type::ByteValue>,
   /// Chapter Separator Character
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:chapSep
   #[sdk(attr(qname = "w:chapSep"))]
   pub chapter_separator: Option<ChapterSeparatorValues>,
 }
 /// Defines the Columns Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:cols.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Columns/w:cols")]
 pub struct Columns {
   /// Equal Column Widths
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:equalWidth
   #[sdk(attr(qname = "w:equalWidth"))]
   pub equal_width: Option<crate::simple_type::OnOffValue>,
   /// Spacing Between Equal Width Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -15021,10 +9989,6 @@ pub struct Columns {
   ))]
   pub space: Option<crate::simple_type::StringValue>,
   /// Number of Equal Width Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:num
   #[sdk(attr(qname = "w:num"))]
   #[sdk(number_range(
     source = 0u32,
@@ -15035,10 +9999,6 @@ pub struct Columns {
   ))]
   pub column_count: Option<crate::simple_type::Int16Value>,
   /// Draw Line Between Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sep
   #[sdk(attr(qname = "w:sep"))]
   pub separator: Option<crate::simple_type::OnOffValue>,
   /// _
@@ -15046,56 +10006,28 @@ pub struct Columns {
   pub w_col: Vec<Column>,
 }
 /// Defines the VerticalTextAlignmentOnPage Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:vAlign.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_VerticalJc/w:vAlign")]
 pub struct VerticalTextAlignmentOnPage {
   /// Vertical Alignment Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: VerticalJustificationValues,
 }
 /// Defines the DocGrid Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docGrid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocGrid/w:docGrid")]
 pub struct DocGrid {
   /// Document Grid Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<DocGridValues>,
   /// Document Grid Line Pitch
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:linePitch
   #[sdk(attr(qname = "w:linePitch"))]
   pub line_pitch: Option<crate::simple_type::Int32Value>,
   /// Document Grid Character Pitch
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:charSpace
   #[sdk(attr(qname = "w:charSpace"))]
   pub character_space: Option<crate::simple_type::Int32Value>,
 }
 /// Inclusion/Exclusion Data for Data Source.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:recipients.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Recipients/w:recipients")]
 pub struct Recipients {
@@ -15108,10 +10040,6 @@ pub struct Recipients {
   pub w_recipient_data: Vec<RecipientData>,
 }
 /// Rich Text Box Content Container.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:txbxContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TxbxContent/w:txbxContent")]
 pub struct TextBoxContent {
@@ -15158,10 +10086,6 @@ pub struct TextBoxContent {
   pub xml_children: Vec<TextBoxContentChoice>,
 }
 /// Comments Collection.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:comments.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Comments/w:comments")]
 pub struct Comments {
@@ -15174,10 +10098,6 @@ pub struct Comments {
   pub w_comment: Vec<Comment>,
 }
 /// Document Footnotes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Footnotes/w:footnotes")]
 pub struct Footnotes {
@@ -15189,10 +10109,6 @@ pub struct Footnotes {
   pub w_footnote: Vec<Footnote>,
 }
 /// Document Endnotes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnotes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Endnotes/w:endnotes")]
 pub struct Endnotes {
@@ -15204,10 +10120,6 @@ pub struct Endnotes {
   pub w_endnote: Vec<Endnote>,
 }
 /// Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtr/w:hdr")]
 pub struct Header {
@@ -15256,10 +10168,6 @@ pub struct Header {
   pub xml_children: Vec<HeaderChoice>,
 }
 /// Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ftr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtr/w:ftr")]
 pub struct Footer {
@@ -15308,10 +10216,6 @@ pub struct Footer {
   pub xml_children: Vec<FooterChoice>,
 }
 /// Defines the HeaderFooterType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HdrFtr/")]
 pub struct HeaderFooterType {
@@ -15358,10 +10262,6 @@ pub struct HeaderFooterType {
   pub xml_children: Vec<HeaderFooterTypeChoice>,
 }
 /// Document Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Settings/w:settings")]
 pub struct Settings {
@@ -15666,34 +10566,30 @@ pub struct Settings {
   #[sdk(child(qname = "w:CT_String/w:listSeparator"))]
   pub w_list_separator: Option<ListSeparator>,
   /// _
-  #[sdk(child(qname = "w14:CT_LongHexNumber/w14:docId"))]
+  #[sdk(child(office2010, qname = "w14:CT_LongHexNumber/w14:docId"))]
   pub w14_doc_id: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DocumentId>,
   /// _
-  #[sdk(child(qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
   pub w14_discard_image_editing_data:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DiscardImageEditingData>,
   /// _
-  #[sdk(child(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
+  #[sdk(child(office2010, qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
   pub w14_default_image_dpi:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DefaultImageDpi>,
   /// _
-  #[sdk(child(qname = "w14:CT_OnOff/w14:conflictMode"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:conflictMode"))]
   pub w14_conflict_mode:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictMode>,
   /// _
-  #[sdk(child(qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
+  #[sdk(child(office2013, qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
   pub w15_chart_tracking_ref_based:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::ChartTrackingRefBased>,
   /// _
-  #[sdk(child(qname = "w15:CT_Guid/w15:docId"))]
+  #[sdk(child(office2013, qname = "w15:CT_Guid/w15:docId"))]
   pub w15_doc_id:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::PersistentDocumentId>,
 }
 /// Web Page Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:webSettings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_WebSettings/w:webSettings")]
 pub struct WebSettings {
@@ -15738,10 +10634,6 @@ pub struct WebSettings {
   pub target_screen_size: Option<TargetScreenSize>,
 }
 /// Font Table Root Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fonts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontsList/w:fonts")]
 pub struct Fonts {
@@ -15754,10 +10646,6 @@ pub struct Fonts {
   pub w_font: Vec<Font>,
 }
 /// Numbering Definitions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numbering.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Numbering/w:numbering")]
 pub struct Numbering {
@@ -15779,10 +10667,6 @@ pub struct Numbering {
   pub w_num_id_mac_at_cleanup: Option<NumberingIdMacAtCleanup>,
 }
 /// Style Definitions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:styles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Styles/w:styles")]
 pub struct Styles {
@@ -15801,10 +10685,6 @@ pub struct Styles {
   pub w_style: Vec<Style>,
 }
 /// Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:document.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Document/w:document")]
 pub struct Document {
@@ -15812,10 +10692,6 @@ pub struct Document {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// conformance
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:conformance
   #[sdk(attr(qname = "w:conformance"))]
   pub w_conformance: Option<DocumentConformance>,
   /// Document Background
@@ -15826,10 +10702,6 @@ pub struct Document {
   pub body: Option<std::boxed::Box<Body>>,
 }
 /// Glossary Document Root Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:glossaryDocument.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_GlossaryDocument/w:glossaryDocument")]
 pub struct GlossaryDocument {
@@ -15844,10 +10716,6 @@ pub struct GlossaryDocument {
   pub doc_parts: Option<std::boxed::Box<DocParts>>,
 }
 /// Previous Table-Level Property Exceptions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPrEx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrExBase/w:tblPrEx")]
 pub struct PreviousTablePropertyExceptions {
@@ -15882,10 +10750,6 @@ pub struct PreviousTablePropertyExceptions {
   pub table_look: Option<TableLook>,
 }
 /// Previous Table Cell Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrInner/w:tcPr")]
 pub struct PreviousTableCellProperties {
@@ -15938,10 +10802,6 @@ pub struct PreviousTableCellProperties {
   pub eg_cell_markup_elements: Option<PreviousTableCellPropertiesChoice>,
 }
 /// Previous Table Row Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBase/w:trPr")]
 pub struct PreviousTableRowProperties {
@@ -15965,10 +10825,6 @@ pub struct PreviousTableRowProperties {
   pub xml_children: Vec<PreviousTableRowPropertiesChoice>,
 }
 /// Previous Table Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrBase/w:tblPr")]
 pub struct PreviousTableProperties {
@@ -16014,51 +10870,31 @@ pub struct PreviousTableProperties {
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// _
-  #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
+  #[sdk(child(office2010, qname = "w:CT_String/w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// _
-  #[sdk(child(qname = "w:CT_String/w:tblDescription"))]
+  #[sdk(child(office2010, qname = "w:CT_String/w:tblDescription"))]
   pub table_description: Option<TableDescription>,
 }
 /// Previous Section Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sectPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPrBase/w:sectPr")]
 pub struct PreviousSectionProperties {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Physical Section Mark Character Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRPr
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_r_pr: Option<crate::simple_type::HexBinaryValue>,
   /// Section Deletion Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidDel
   #[sdk(attr(qname = "w:rsidDel"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_del: Option<crate::simple_type::HexBinaryValue>,
   /// Section Addition Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidR
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_r: Option<crate::simple_type::HexBinaryValue>,
   /// Section Properties Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidSect
   #[sdk(attr(qname = "w:rsidSect"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
@@ -16120,15 +10956,11 @@ pub struct PreviousSectionProperties {
   #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
+  #[sdk(child(office2013, qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::FootnoteColumns>,
 }
 /// Previous Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrExtended/w:pPr")]
 pub struct ParagraphPropertiesExtended {
@@ -16235,10 +11067,6 @@ pub struct ParagraphPropertiesExtended {
   pub conditional_format_style: Option<ConditionalFormatStyle>,
 }
 /// Previous Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrOriginal/w:rPr")]
 pub struct PreviousRunProperties {
@@ -16359,51 +11187,47 @@ pub struct PreviousRunProperties {
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Vec<SpecVanish>,
   /// Defines the Glow Class.
-  #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>,
   /// Defines the Reflection Class.
-  #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContextualAlternatives>,
 }
 /// Previous Run Properties for the Paragraph Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPrOriginal/w:rPr")]
 pub struct PreviousParagraphMarkRunProperties {
@@ -16422,6 +11246,7 @@ pub struct PreviousParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(choice(
+    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
@@ -16542,43 +11367,43 @@ pub struct PreviousParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Vec<SpecVanish>,
   /// Defines the Glow Class.
-  #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>,
   /// Defines the Reflection Class.
-  #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect>,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   /// Defines the Scene3D Class.
-  #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>,
   /// Defines the Properties3D Class.
-  #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   /// Defines the Ligatures Class.
-  #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
@@ -16586,18 +11411,10 @@ pub struct PreviousParagraphMarkRunProperties {
   pub office_math: Vec<OfficeMath>,
 }
 /// Numbering Level Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ilvl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeDecimalNumber255/w:ilvl")]
 pub struct NumberingLevelReference {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -16609,116 +11426,60 @@ pub struct NumberingLevelReference {
   pub val: crate::simple_type::Int32Value,
 }
 /// Numbering Definition Instance Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:numId")]
 pub struct NumberingId {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Starting Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:start.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:start")]
 pub struct StartNumberingValue {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the AbstractNumId Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:abstractNumId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeDecimalNumber/w:abstractNumId")]
 pub struct AbstractNumId {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the NonNegativeDecimalNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeDecimalNumber/")]
 pub struct NonNegativeDecimalNumberType {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Previous Paragraph Numbering Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numberingChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChangeNumbering/w:numberingChange")]
 pub struct NumberingChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// original
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:original
   #[sdk(attr(qname = "w:original"))]
   pub original: Option<crate::simple_type::StringValue>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -16737,32 +11498,16 @@ pub struct NumberingChange {
   pub id: crate::simple_type::StringValue,
 }
 /// Custom Tab Stop.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tab.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TabStop/w:tab")]
 pub struct TabStop {
   /// Tab Stop Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TabStopValues,
   /// Tab Leader Character
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:leader
   #[sdk(attr(qname = "w:leader"))]
   pub leader: Option<TabStopLeaderCharValues>,
   /// Tab Stop Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:pos
   #[sdk(attr(qname = "w:pos"))]
   #[sdk(number_range(
     source = 1u32,
@@ -16774,10 +11519,6 @@ pub struct TabStop {
   pub position: crate::simple_type::Int32Value,
 }
 /// Run Properties for the Paragraph Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPr/w:rPr")]
 pub struct ParagraphMarkRunProperties {
@@ -16796,6 +11537,7 @@ pub struct ParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(choice(
+    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
@@ -16915,50 +11657,50 @@ pub struct ParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
   /// Defines the Glow Class.
-  #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
+  #[sdk(child(office2010, qname = "w14:CT_Glow/w14:glow"))]
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
   /// Defines the Reflection Class.
-  #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
+  #[sdk(child(office2010, qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
   /// Defines the TextOutlineEffect Class.
-  #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
+  #[sdk(child(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect: Option<
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect,
     >,
   >,
   /// Defines the FillTextEffect Class.
-  #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   >,
   /// Defines the Scene3D Class.
-  #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>>,
   /// Defines the Properties3D Class.
-  #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
+  #[sdk(child(office2010, qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   >,
   /// Defines the Ligatures Class.
-  #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
+  #[sdk(child(office2010, qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
   /// Defines the NumberingFormat Class.
-  #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
   /// Defines the NumberSpacing Class.
-  #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
+  #[sdk(child(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
   /// Defines the StylisticSets Class.
-  #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
+  #[sdk(child(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
   /// Defines the ContextualAlternatives Class.
-  #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContextualAlternatives>,
   /// Defines the OfficeMath Class.
@@ -16969,43 +11711,23 @@ pub struct ParagraphMarkRunProperties {
   pub w_r_pr_change: Option<std::boxed::Box<ParagraphMarkRunPropertiesChange>>,
 }
 /// Section Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sectPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPr/w:sectPr")]
 pub struct SectionProperties {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Physical Section Mark Character Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidRPr
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_r_pr: Option<crate::simple_type::HexBinaryValue>,
   /// Section Deletion Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidDel
   #[sdk(attr(qname = "w:rsidDel"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_del: Option<crate::simple_type::HexBinaryValue>,
   /// Section Addition Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidR
   #[sdk(attr(qname = "w:rsidR"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_r: Option<crate::simple_type::HexBinaryValue>,
   /// Section Properties Revision ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:rsidSect
   #[sdk(attr(qname = "w:rsidSect"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_sect: Option<crate::simple_type::HexBinaryValue>,
@@ -17074,7 +11796,7 @@ pub struct SectionProperties {
   #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
   /// Defines the FootnoteColumns Class.
-  #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
+  #[sdk(child(office2013, qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::FootnoteColumns>,
   /// _
@@ -17082,16 +11804,8 @@ pub struct SectionProperties {
   pub w_sect_pr_change: Option<std::boxed::Box<SectionPropertiesChange>>,
 }
 /// Custom Field Data.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fldData.
 pub type FieldData = crate::simple_type::Base64BinaryValue;
 /// Form Field Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ffData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFData/w:ffData")]
 pub struct FormFieldData {
@@ -17110,127 +11824,67 @@ pub struct FormFieldData {
   pub xml_children: Vec<FormFieldDataChoice>,
 }
 /// Form Field Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFName/w:name")]
 pub struct FormFieldName {
   /// Form Field Name Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, max = 20u32))]
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Script Function to Execute on Form Field Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:entryMacro.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MacroName/w:entryMacro")]
 pub struct EntryMacro {
   /// Name of Script Function
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 33u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Script Function to Execute on Form Field Exit.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:exitMacro.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MacroName/w:exitMacro")]
 pub struct ExitMacro {
   /// Name of Script Function
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 33u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the MacroNameType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MacroName/")]
 pub struct MacroNameType {
   /// Name of Script Function
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 33u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Associated Help Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:helpText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFHelpText/w:helpText")]
 pub struct HelpText {
   /// Help Text Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<InfoTextValues>,
   /// Help Text Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, max = 255u32))]
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Associated Status Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:statusText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFStatusText/w:statusText")]
 pub struct StatusText {
   /// Status Text Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<InfoTextValues>,
   /// Status Text Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, union = 0u64, max = 138u32))]
   #[sdk(string_length(source = 1u32, union = 0u64, max = 140u32))]
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Checkbox Form Field Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:checkBox.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFCheckBox/w:checkBox")]
 pub struct CheckBox {
@@ -17244,10 +11898,6 @@ pub struct CheckBox {
   pub w_checked: Option<Checked>,
 }
 /// Drop-Down List Form Field Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:ddList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFDDList/w:ddList")]
 pub struct DropDownListFormField {
@@ -17262,10 +11912,6 @@ pub struct DropDownListFormField {
   pub w_list_entry: Vec<ListEntryFormField>,
 }
 /// Text Box Form Field Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:textInput.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFTextInput/w:textInput")]
 pub struct TextInput {
@@ -17283,18 +11929,10 @@ pub struct TextInput {
   pub format: Option<Format>,
 }
 /// Default Drop-Down List Item Index.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumberMax24/w:default")]
 pub struct DefaultDropDownListItemIndex {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -17306,136 +11944,72 @@ pub struct DefaultDropDownListItemIndex {
   pub val: crate::simple_type::Int32Value,
 }
 /// Drop-Down List Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:listEntry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String255/w:listEntry")]
 pub struct ListEntryFormField {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Default Text Box Form Field String.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String255/w:default")]
 pub struct DefaultTextBoxFormFieldString {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Frame Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String255/w:name")]
 pub struct FrameName {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the String255Type Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String255/")]
 pub struct String255Type {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Text Box Form Field Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FFTextType/w:type")]
 pub struct TextBoxFormFieldType {
   /// Text Box Form Field Type Values
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TextBoxFormFieldValues,
 }
 /// Text Box Form Field Maximum Length.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:maxLength.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PositiveShort/w:maxLength")]
 pub struct MaxLength {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int16Value,
 }
 /// Text Box Form Field Formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:format.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_String64/w:format")]
 pub struct Format {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 64u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Single Column Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:col.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Column/w:col")]
 pub struct Column {
   /// Column Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -17446,10 +12020,6 @@ pub struct Column {
   ))]
   pub width: Option<crate::simple_type::StringValue>,
   /// Space Before Following Column
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:space
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -17461,41 +12031,21 @@ pub struct Column {
   pub space: Option<crate::simple_type::StringValue>,
 }
 /// Revision Information for Section Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sectPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SectPrChange/w:sectPrChange")]
 pub struct SectionPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -17517,41 +12067,21 @@ pub struct SectionPropertiesChange {
   pub previous_section_properties: Option<std::boxed::Box<PreviousSectionProperties>>,
 }
 /// Revision Information for Run Properties on the Paragraph Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ParaRPrChange/w:rPrChange")]
 pub struct ParagraphMarkRunPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -17573,10 +12103,6 @@ pub struct ParagraphMarkRunPropertiesChange {
   pub previous_paragraph_mark_run_properties: std::boxed::Box<PreviousParagraphMarkRunProperties>,
 }
 /// External Content Import Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:altChunkPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AltChunkPr/w:altChunkPr")]
 pub struct AltChunkProperties {
@@ -17585,59 +12111,31 @@ pub struct AltChunkProperties {
   pub match_source: Option<MatchSource>,
 }
 /// Phonetic Guide Text Alignment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rubyAlign.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyAlign/w:rubyAlign")]
 pub struct RubyAlign {
   /// Phonetic Guide Text Alignment Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: RubyAlignValues,
 }
 /// Distance Between Phonetic Guide Text and Phonetic Guide Base Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hpsRaise.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_HpsRaise/w:hpsRaise")]
 pub struct PhoneticGuideRaise {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Int16Value,
 }
 /// Language ID for Phonetic Guide.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Lang/w:lid")]
 pub struct LanguageId {
   /// Language Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 84u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Phonetic Guide Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rubyPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyPr/w:rubyPr")]
 pub struct RubyProperties {
@@ -17661,10 +12159,6 @@ pub struct RubyProperties {
   pub dirty: Option<Dirty>,
 }
 /// Phonetic Guide Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rt")]
 pub struct RubyContent {
@@ -17733,10 +12227,6 @@ pub struct RubyContent {
   pub xml_children: Vec<RubyContentChoice>,
 }
 /// Phonetic Guide Base Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rubyBase.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/w:rubyBase")]
 pub struct RubyBase {
@@ -17805,10 +12295,6 @@ pub struct RubyBase {
   pub xml_children: Vec<RubyBaseChoice>,
 }
 /// Defines the RubyContentType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RubyContent/")]
 pub struct RubyContentType {
@@ -17874,65 +12360,33 @@ pub struct RubyContentType {
   pub xml_children: Vec<RubyContentTypeChoice>,
 }
 /// Custom XML Data Date Storage Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:storeMappedDataAs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDateMappingType/w:storeMappedDataAs")]
 pub struct SdtDateMappingType {
   /// Date Storage Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<DateFormatValues>,
 }
 /// Date Picker Calendar Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:calendar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CalendarType/w:calendar")]
 pub struct Calendar {
   /// Calendar Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<CalendarValues>,
 }
 /// Combo Box List Item.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:listItem.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtListItem/w:listItem")]
 pub struct ListItem {
   /// List Entry Display Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:displayText
   #[sdk(attr(qname = "w:displayText"))]
   pub display_text: Option<crate::simple_type::StringValue>,
   /// List Entry Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:value
   #[sdk(attr(qname = "w:value"))]
   pub value: Option<crate::simple_type::StringValue>,
 }
 /// Structured Document Tag Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtPr/w:sdtPr")]
 pub struct SdtProperties {
@@ -17974,10 +12428,6 @@ pub struct SdtProperties {
   pub xml_children: Vec<SdtPropertiesChoice>,
 }
 /// Structured Document Tag End Character Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtEndPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtEndPr/w:sdtEndPr")]
 pub struct SdtEndCharProperties {
@@ -17986,10 +12436,6 @@ pub struct SdtEndCharProperties {
   pub run_properties: Vec<RunProperties>,
 }
 /// Block-Level Structured Document Tag Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentBlock/w:sdtContent")]
 pub struct SdtContentBlock {
@@ -18035,10 +12481,6 @@ pub struct SdtContentBlock {
   pub xml_children: Vec<SdtContentBlockChoice>,
 }
 /// Inline-Level Structured Document Tag Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRun/w:sdtContent")]
 pub struct SdtContentRun {
@@ -18110,10 +12552,6 @@ pub struct SdtContentRun {
   pub xml_children: Vec<SdtContentRunChoice>,
 }
 /// Defines the SdtContentRunRuby Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRunRuby/w:sdtContent")]
 pub struct SdtContentRunRuby {
@@ -18182,10 +12620,6 @@ pub struct SdtContentRunRuby {
   pub xml_children: Vec<SdtContentRunRubyChoice>,
 }
 /// Cell-Level Structured Document Tag Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentCell/w:sdtContent")]
 pub struct SdtContentCell {
@@ -18230,10 +12664,6 @@ pub struct SdtContentCell {
   pub xml_children: Vec<SdtContentCellChoice>,
 }
 /// Row-Level Structured Document Tag Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sdtContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtContentRow/w:sdtContent")]
 pub struct SdtContentRow {
@@ -18278,10 +12708,6 @@ pub struct SdtContentRow {
   pub xml_children: Vec<SdtContentRowChoice>,
 }
 /// Custom XML Element Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:customXmlPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CustomXmlPr/w:customXmlPr")]
 pub struct CustomXmlProperties {
@@ -18293,51 +12719,27 @@ pub struct CustomXmlProperties {
   pub w_attr: Vec<CustomXmlAttribute>,
 }
 /// Custom XML Attribute.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:attr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_XmlAttr/w:attr")]
 pub struct CustomXmlAttribute {
   /// uri
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:uri
   #[sdk(attr(qname = "w:uri"))]
   pub uri: Option<crate::simple_type::StringValue>,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   #[sdk(string_format(source = 1u32, kind = "ncname"))]
   pub name: crate::simple_type::StringValue,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Grid Column Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gridCol.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblGridCol/w:gridCol")]
 pub struct GridColumn {
   /// Grid Column Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -18349,18 +12751,10 @@ pub struct GridColumn {
   pub width: Option<crate::simple_type::StringValue>,
 }
 /// Revision Information for Table Grid Column Definitions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblGridChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblGridChange/w:tblGridChange")]
 pub struct TableGridChange {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18382,41 +12776,21 @@ pub struct TableGridChange {
   pub previous_table_grid: std::boxed::Box<PreviousTableGrid>,
 }
 /// Revision Information for Table Cell Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrChange/w:tcPrChange")]
 pub struct TableCellPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18438,10 +12812,6 @@ pub struct TableCellPropertiesChange {
   pub previous_table_cell_properties: std::boxed::Box<PreviousTableCellProperties>,
 }
 /// Table Cell Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPr/w:tcPr")]
 pub struct TableCellProperties {
@@ -18497,41 +12867,21 @@ pub struct TableCellProperties {
   pub table_cell_properties_change: Option<std::boxed::Box<TableCellPropertiesChange>>,
 }
 /// Revision Information for Table Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrChange/w:tblPrChange")]
 pub struct TablePropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18553,41 +12903,21 @@ pub struct TablePropertiesChange {
   pub previous_table_properties: std::boxed::Box<PreviousTableProperties>,
 }
 /// Revision Information for Table-Level Property Exceptions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPrExChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrExChange/w:tblPrExChange")]
 pub struct TablePropertyExceptionsChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18609,10 +12939,6 @@ pub struct TablePropertyExceptionsChange {
   pub previous_table_property_exceptions: std::boxed::Box<PreviousTablePropertyExceptions>,
 }
 /// Table Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPr/w:tblPr")]
 pub struct TableProperties {
@@ -18658,20 +12984,16 @@ pub struct TableProperties {
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
   /// Defines the TableCaption Class.
-  #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
+  #[sdk(child(office2010, qname = "w:CT_String/w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
   /// Defines the TableDescription Class.
-  #[sdk(child(qname = "w:CT_String/w:tblDescription"))]
+  #[sdk(child(office2010, qname = "w:CT_String/w:tblDescription"))]
   pub table_description: Option<TableDescription>,
   /// Revision Information for Table Properties
   #[sdk(child(qname = "w:CT_TblPrChange/w:tblPrChange"))]
   pub table_properties_change: Option<std::boxed::Box<TablePropertiesChange>>,
 }
 /// Table Grid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblGrid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblGrid/w:tblGrid")]
 pub struct TableGrid {
@@ -18683,74 +13005,38 @@ pub struct TableGrid {
   pub table_grid_change: Option<std::boxed::Box<TableGridChange>>,
 }
 /// Footnote Placement.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnPos/w:pos")]
 pub struct FootnotePosition {
   /// Footnote Position Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: FootnotePositionValues,
 }
 /// Footnote Numbering Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numFmt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumFmt/w:numFmt")]
 pub struct NumberingFormat {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Numbering Format Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: NumberFormatValues,
   /// format
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:format
-  #[sdk(attr(qname = "w:format"))]
+  #[sdk(attr(office2010, qname = "w:format"))]
   pub format: Option<crate::simple_type::StringValue>,
 }
 /// Endnote Placement.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnPos/w:pos")]
 pub struct EndnotePosition {
   /// Endnote Position Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: EndnotePositionValues,
 }
 /// Special Footnote List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnSepRef/w:footnote")]
 pub struct FootnoteSpecialReference {
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18762,18 +13048,10 @@ pub struct FootnoteSpecialReference {
   pub id: crate::simple_type::IntegerValue,
 }
 /// Special Endnote List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnSepRef/w:endnote")]
 pub struct EndnoteSpecialReference {
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18785,18 +13063,10 @@ pub struct EndnoteSpecialReference {
   pub id: crate::simple_type::IntegerValue,
 }
 /// Defines the FootnoteEndnoteSeparatorReferenceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdnSepRef/")]
 pub struct FootnoteEndnoteSeparatorReferenceType {
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -18808,74 +13078,38 @@ pub struct FootnoteEndnoteSeparatorReferenceType {
   pub id: crate::simple_type::IntegerValue,
 }
 /// Index of Column Containing Unique Values for Record.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:column.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumber/w:column")]
 pub struct ColumnIndex {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Column Delimiter for Data Source.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:colDelim.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumber/w:colDelim")]
 pub struct ColumnDelimiter {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the UnsignedDecimalNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedDecimalNumber/")]
 pub struct UnsignedDecimalNumberType {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Unique Value for Record.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:uniqueTag.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Base64Binary/w:uniqueTag")]
 pub struct UniqueTag {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::Base64BinaryValue,
 }
 /// Data About Single Data Source Record.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:recipientData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RecipientData/w:recipientData")]
 pub struct RecipientData {
@@ -18890,42 +13124,22 @@ pub struct RecipientData {
   pub unique_tag: std::boxed::Box<UniqueTag>,
 }
 /// Merge Field Mapping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMergeOdsoFMDFieldType/w:type")]
 pub struct MailMergeFieldType {
   /// Merge Field Mapping Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MailMergeOdsoFieldValues,
 }
 /// ODSO Data Source Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMergeSourceType/w:type")]
 pub struct MailMergeSource {
   /// Data Source Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MailMergeSourceValues,
 }
 /// External Data Source to Merge Field Mapping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:fieldMapData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_OdsoFieldMapData/w:fieldMapData")]
 pub struct FieldMapData {
@@ -18949,58 +13163,30 @@ pub struct FieldMapData {
   pub dynamic_address: Option<DynamicAddress>,
 }
 /// Source Document Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mainDocumentType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMergeDocType/w:mainDocumentType")]
 pub struct MainDocumentType {
   /// Mail Merge Source Document Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MailMergeDocumentValues,
 }
 /// Data Source Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dataType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMergeDataType/w:dataType")]
 pub struct DataType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MailMergeDataValues,
 }
 /// Merged Document Destination.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:destination.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMergeDest/w:destination")]
 pub struct Destination {
   /// Mail Merge Merged Document Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MailMergeDestinationValues,
 }
 /// Office Data Source Object Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:odso.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Odso/w:odso")]
 pub struct DataSourceObject {
@@ -19030,120 +13216,64 @@ pub struct DataSourceObject {
   pub w_recipient_data: Option<RecipientDataReference>,
 }
 /// Single Document Variable.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docVar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocVar/w:docVar")]
 pub struct DocumentVariable {
   /// Document Variable Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, min = 1u32, max = 255u32))]
   pub name: crate::simple_type::StringValue,
   /// Document Variable Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 0u32, max = 65280u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Original Document Revision Save ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rsidRoot.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LongHexNumber/w:rsidRoot")]
 pub struct RsidRoot {
   /// Long Hexadecimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Single Session Revision Save ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rsid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LongHexNumber/w:rsid")]
 pub struct Rsid {
   /// Long Hexadecimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Abstract Numbering Definition Identifier.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:nsid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LongHexNumber/w:nsid")]
 pub struct Nsid {
   /// Long Hexadecimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Numbering Template Code.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tmpl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LongHexNumber/w:tmpl")]
 pub struct TemplateCode {
   /// Long Hexadecimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Defines the LongHexNumberType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LongHexNumber/")]
 pub struct LongHexNumberType {
   /// Long Hexadecimal Number Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrBaseStyleable/w:rPr")]
 pub struct RunPropertiesBaseStyle {
@@ -19252,10 +13382,6 @@ pub struct RunPropertiesBaseStyle {
   pub spec_vanish: Option<SpecVanish>,
 }
 /// Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrBaseStyleable/w:pPr")]
 pub struct ParagraphPropertiesBaseStyle {
@@ -19353,10 +13479,6 @@ pub struct ParagraphPropertiesBaseStyle {
   pub outline_level: Option<OutlineLevel>,
 }
 /// Default Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPrDefault.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrDefault/w:rPrDefault")]
 pub struct RunPropertiesDefault {
@@ -19367,10 +13489,6 @@ pub struct RunPropertiesDefault {
   pub run_properties_base_style: Option<std::boxed::Box<RunPropertiesBaseStyle>>,
 }
 /// Default Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPrDefault.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrDefault/w:pPrDefault")]
 pub struct ParagraphPropertiesDefault {
@@ -19379,82 +13497,42 @@ pub struct ParagraphPropertiesDefault {
   pub paragraph_properties_base_style: Option<std::boxed::Box<ParagraphPropertiesBaseStyle>>,
 }
 /// Left and Right Margin for Frame.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marW.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PixelsMeasure/w:marW")]
 pub struct MarginWidth {
   /// Measurement in Pixels
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Top and Bottom Margin for Frame.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marH.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PixelsMeasure/w:marH")]
 pub struct MarginHeight {
   /// Measurement in Pixels
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the PixelsMeasureType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PixelsMeasure/")]
 pub struct PixelsMeasureType {
   /// Measurement in Pixels
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Scrollbar Display Option.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:scrollbar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FrameScrollbar/w:scrollbar")]
 pub struct ScrollbarVisibility {
   /// Scrollbar Display Option Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: FrameScrollbarVisibilityValues,
 }
 /// Frameset Splitter Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:w.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:w")]
 pub struct Width {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19466,18 +13544,10 @@ pub struct Width {
   pub val: crate::simple_type::StringValue,
 }
 /// Hyphenation Zone.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hyphenationZone.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:hyphenationZone")]
 pub struct HyphenationZone {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19489,18 +13559,10 @@ pub struct HyphenationZone {
   pub val: crate::simple_type::StringValue,
 }
 /// Drawing Grid Horizontal Grid Unit Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:drawingGridHorizontalSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalSpacing")]
 pub struct DrawingGridHorizontalSpacing {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19512,18 +13574,10 @@ pub struct DrawingGridHorizontalSpacing {
   pub val: crate::simple_type::StringValue,
 }
 /// Drawing Grid Vertical Grid Unit Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:drawingGridVerticalSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalSpacing")]
 pub struct DrawingGridVerticalSpacing {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19535,18 +13589,10 @@ pub struct DrawingGridVerticalSpacing {
   pub val: crate::simple_type::StringValue,
 }
 /// Drawing Grid Horizontal Origin Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:drawingGridHorizontalOrigin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridHorizontalOrigin")]
 pub struct DrawingGridHorizontalOrigin {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19558,18 +13604,10 @@ pub struct DrawingGridHorizontalOrigin {
   pub val: crate::simple_type::StringValue,
 }
 /// Drawing Grid Vertical Origin Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:drawingGridVerticalOrigin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/w:drawingGridVerticalOrigin")]
 pub struct DrawingGridVerticalOrigin {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19581,18 +13619,10 @@ pub struct DrawingGridVerticalOrigin {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the TwipsMeasureType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TwipsMeasure/")]
 pub struct TwipsMeasureType {
   /// Measurement in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19604,10 +13634,6 @@ pub struct TwipsMeasureType {
   pub val: crate::simple_type::StringValue,
 }
 /// Frameset Splitter Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:framesetSplitbar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FramesetSplitbar/w:framesetSplitbar")]
 pub struct FramesetSplitbar {
@@ -19625,26 +13651,14 @@ pub struct FramesetSplitbar {
   pub flat_borders: Option<FlatBorders>,
 }
 /// Frameset Layout.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:frameLayout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FrameLayout/w:frameLayout")]
 pub struct FrameLayout {
   /// Frameset Layout Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: FrameLayoutValues,
 }
 /// Nested Frameset Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:frameset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Frameset/w:frameset")]
 pub struct Frameset {
@@ -19661,10 +13675,6 @@ pub struct Frameset {
   pub frameset_choice: Vec<FramesetChoice>,
 }
 /// Single Frame Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Frame/w:frame")]
 pub struct Frame {
@@ -19694,64 +13704,32 @@ pub struct Frame {
   pub linked_to_file: Option<LinkedToFile>,
 }
 /// Content Between Numbering Symbol and Paragraph Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:suff.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LevelSuffix/w:suff")]
 pub struct LevelSuffix {
   /// Character Type Between Numbering and Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: LevelSuffixValues,
 }
 /// Numbering Level Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvlText.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LevelText/w:lvlText")]
 pub struct LevelText {
   /// Level Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::StringValue>,
   /// Level Text Is Null Character
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:null
   #[sdk(attr(qname = "w:null"))]
   pub null: Option<crate::simple_type::OnOffValue>,
 }
 /// Legacy Numbering Level Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:legacy.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LvlLegacy/w:legacy")]
 pub struct LegacyNumbering {
   /// Use Legacy Numbering Properties
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:legacy
   #[sdk(attr(qname = "w:legacy"))]
   pub legacy: Option<crate::simple_type::OnOffValue>,
   /// Legacy Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:legacySpace
   #[sdk(attr(qname = "w:legacySpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
@@ -19762,10 +13740,6 @@ pub struct LegacyNumbering {
   ))]
   pub legacy_space: Option<crate::simple_type::StringValue>,
   /// Legacy Indent
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:legacyIndent
   #[sdk(attr(qname = "w:legacyIndent"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:integer"))]
@@ -19777,26 +13751,14 @@ pub struct LegacyNumbering {
   pub legacy_indent: Option<crate::simple_type::StringValue>,
 }
 /// Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvlJc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LevelJustification/w:lvlJc")]
 pub struct LevelJustification {
   /// Alignment Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: LevelJustificationValues,
 }
 /// Numbering Level Associated Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrBase/w:pPr")]
 pub struct PreviousParagraphProperties {
@@ -19897,10 +13859,6 @@ pub struct PreviousParagraphProperties {
   pub outline_level: Option<OutlineLevel>,
 }
 /// Numbering Symbol Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrList/w:rPr")]
 pub struct NumberingSymbolRunProperties {
@@ -20014,51 +13972,27 @@ pub struct NumberingSymbolRunProperties {
   pub spec_vanish: Option<SpecVanish>,
 }
 /// Abstract Numbering Definition Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:multiLevelType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MultiLevelType/w:multiLevelType")]
 pub struct MultiLevelType {
   /// Abstract Numbering Definition Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: MultiLevelValues,
 }
 /// Numbering Level Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Lvl/w:lvl")]
 pub struct Level {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Numbering Level
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:ilvl
   #[sdk(attr(qname = "w:ilvl"))]
   pub level_index: crate::simple_type::Int32Value,
   /// Template Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tplc
   #[sdk(attr(qname = "w:tplc"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub template_code: Option<crate::simple_type::HexBinaryValue>,
   /// Tentative Numbering
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tentative
   #[sdk(attr(qname = "w:tentative"))]
   pub tentative: Option<crate::simple_type::OnOffValue>,
   /// Starting Value
@@ -20099,19 +14033,11 @@ pub struct Level {
   pub numbering_symbol_run_properties: Option<std::boxed::Box<NumberingSymbolRunProperties>>,
 }
 /// Picture Numbering Symbol Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:numPicBullet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumPicBullet/w:numPicBullet")]
 pub struct NumberingPictureBullet {
   pub xml_other_attrs: Vec<(String, String)>,
   /// numPicBulletId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:numPicBulletId
   #[sdk(attr(qname = "w:numPicBulletId"))]
   pub numbering_picture_bullet_id: crate::simple_type::Int32Value,
   #[sdk(choice(
@@ -20121,20 +14047,12 @@ pub struct NumberingPictureBullet {
   pub xml_children: Option<NumberingPictureBulletChoice>,
 }
 /// Abstract Numbering Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:abstractNum.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AbstractNum/w:abstractNum")]
 pub struct AbstractNum {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Abstract Numbering Definition ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:abstractNumId
   #[sdk(attr(qname = "w:abstractNumId"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub abstract_number_id: crate::simple_type::Int32Value,
@@ -20161,27 +14079,15 @@ pub struct AbstractNum {
   pub w_lvl: Vec<Level>,
 }
 /// Numbering Definition Instance.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:num.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Num/w:num")]
 pub struct NumberingInstance {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// numId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:numId
   #[sdk(attr(qname = "w:numId"))]
   pub number_id: crate::simple_type::Int32Value,
   /// durableId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:durableId
   #[sdk(attr(qname = "w:durableId"))]
   pub w_durable_id: Option<crate::simple_type::Int32Value>,
   /// _
@@ -20192,10 +14098,6 @@ pub struct NumberingInstance {
   pub w_lvl_override: Vec<LevelOverride>,
 }
 /// Table Style Conditional Formatting Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPrStyle/w:pPr")]
 pub struct StyleParagraphProperties {
@@ -20296,10 +14198,6 @@ pub struct StyleParagraphProperties {
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
 }
 /// Table Style Conditional Formatting Table Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrStyleOverride/w:tblPr")]
 pub struct TableStyleConditionalFormattingTableProperties {
@@ -20323,10 +14221,6 @@ pub struct TableStyleConditionalFormattingTableProperties {
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
 }
 /// Table Style Conditional Formatting Table Row Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrBaseStyleable/w:trPr")]
 pub struct TableStyleConditionalFormattingTableRowProperties {
@@ -20340,10 +14234,6 @@ pub struct TableStyleConditionalFormattingTableRowProperties {
   pub xml_children: Vec<TableStyleConditionalFormattingTableRowPropertiesChoice>,
 }
 /// Table Style Conditional Formatting Table Cell Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrStyleOverride/w:tcPr")]
 pub struct TableStyleConditionalFormattingTableCellProperties {
@@ -20364,35 +14254,19 @@ pub struct TableStyleConditionalFormattingTableCellProperties {
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
 }
 /// Primary Style Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_StyleName/w:name")]
 pub struct StyleName {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(pattern(source = 1u32, regex = "[^,]*"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Optional User Interface Sorting Order.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:uiPriority.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UiPriority/w:uiPriority")]
 pub struct UiPriority {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -20404,10 +14278,6 @@ pub struct UiPriority {
   pub val: crate::simple_type::Int32Value,
 }
 /// Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrStyle/w:rPr")]
 pub struct StyleRunProperties {
@@ -20520,10 +14390,6 @@ pub struct StyleRunProperties {
   pub run_properties_change: Option<std::boxed::Box<RunPropertiesChange>>,
 }
 /// Style Table Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrStyle/w:tblPr")]
 pub struct StyleTableProperties {
@@ -20553,10 +14419,6 @@ pub struct StyleTableProperties {
   pub table_cell_margin_default: Option<std::boxed::Box<TableCellMarginDefault>>,
 }
 /// Style Table Cell Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TcPrStyle/w:tcPr")]
 pub struct StyleTableCellProperties {
@@ -20574,18 +14436,10 @@ pub struct StyleTableCellProperties {
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
 }
 /// Style Conditional Table Formatting Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblStylePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblStylePr/w:tblStylePr")]
 pub struct TableStyleProperties {
   /// Table Style Conditional Formatting Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: TableStyleOverrideValues,
   /// Table Style Conditional Formatting Paragraph Properties
@@ -20608,32 +14462,16 @@ pub struct TableStyleProperties {
     Option<std::boxed::Box<TableStyleConditionalFormattingTableCellProperties>>,
 }
 /// Latent Style Exception.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lsdException.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LsdException/w:lsdException")]
 pub struct LatentStyleExceptionInfo {
   /// Primary Style Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   pub name: crate::simple_type::StringValue,
   /// Latent Style Locking Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:locked
   #[sdk(attr(qname = "w:locked"))]
   pub locked: Option<crate::simple_type::OnOffValue>,
   /// Override default sorting order
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:uiPriority
   #[sdk(attr(qname = "w:uiPriority"))]
   #[sdk(number_range(
     source = 0u32,
@@ -20644,32 +14482,16 @@ pub struct LatentStyleExceptionInfo {
   ))]
   pub ui_priority: Option<crate::simple_type::Int32Value>,
   /// Semi hidden text override
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:semiHidden
   #[sdk(attr(qname = "w:semiHidden"))]
   pub semi_hidden: Option<crate::simple_type::OnOffValue>,
   /// Unhide when used
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:unhideWhenUsed
   #[sdk(attr(qname = "w:unhideWhenUsed"))]
   pub unhide_when_used: Option<crate::simple_type::OnOffValue>,
   /// Latent Style Primary Style Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:qFormat
   #[sdk(attr(qname = "w:qFormat"))]
   pub primary_style: Option<crate::simple_type::OnOffValue>,
 }
 /// Document Default Paragraph and Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docDefaults.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocDefaults/w:docDefaults")]
 pub struct DocDefaults {
@@ -20681,25 +14503,13 @@ pub struct DocDefaults {
   pub paragraph_properties_default: Option<std::boxed::Box<ParagraphPropertiesDefault>>,
 }
 /// Latent Style Information.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:latentStyles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_LatentStyles/w:latentStyles")]
 pub struct LatentStyles {
   /// Default Style Locking Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:defLockedState
   #[sdk(attr(qname = "w:defLockedState"))]
   pub default_locked_state: Option<crate::simple_type::OnOffValue>,
   /// Default User Interface Priority Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:defUIPriority
   #[sdk(attr(qname = "w:defUIPriority"))]
   #[sdk(number_range(
     source = 0u32,
@@ -20710,31 +14520,15 @@ pub struct LatentStyles {
   ))]
   pub default_ui_priority: Option<crate::simple_type::Int32Value>,
   /// Default Semi-Hidden Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:defSemiHidden
   #[sdk(attr(qname = "w:defSemiHidden"))]
   pub default_semi_hidden: Option<crate::simple_type::OnOffValue>,
   /// Default Hidden Until Used Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:defUnhideWhenUsed
   #[sdk(attr(qname = "w:defUnhideWhenUsed"))]
   pub default_unhide_when_used: Option<crate::simple_type::OnOffValue>,
   /// Default Primary Style Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:defQFormat
   #[sdk(attr(qname = "w:defQFormat"))]
   pub default_primary_style: Option<crate::simple_type::OnOffValue>,
   /// Latent Style Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:count
   #[sdk(attr(qname = "w:count"))]
   pub count: Option<crate::simple_type::Int32Value>,
   /// _
@@ -20742,40 +14536,20 @@ pub struct LatentStyles {
   pub w_lsd_exception: Vec<LatentStyleExceptionInfo>,
 }
 /// Style Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Style/w:style")]
 pub struct Style {
   /// Style Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<StyleValues>,
   /// Style ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:styleId
   #[sdk(attr(qname = "w:styleId"))]
   #[sdk(string_length(source = 0u32, max = 253u32))]
   pub style_id: Option<crate::simple_type::StringValue>,
   /// Default Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:default
   #[sdk(attr(qname = "w:default"))]
   pub default: Option<crate::simple_type::OnOffValue>,
   /// User-Defined Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:customStyle
   #[sdk(attr(qname = "w:customStyle"))]
   pub custom_style: Option<crate::simple_type::OnOffValue>,
   /// Primary Style Name
@@ -20847,18 +14621,10 @@ pub struct Style {
   pub w_tbl_style_pr: Vec<TableStyleProperties>,
 }
 /// Properties for a Single Font.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Font/w:font")]
 pub struct Font {
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   pub name: crate::simple_type::StringValue,
   /// _
@@ -20896,18 +14662,10 @@ pub struct Font {
   pub embed_bold_italic_font: Option<EmbedBoldItalicFont>,
 }
 /// Left Margin for HTML div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marLeft.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedTwipsMeasure/w:marLeft")]
 pub struct LeftMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -20919,18 +14677,10 @@ pub struct LeftMarginDiv {
   pub val: crate::simple_type::StringValue,
 }
 /// Right Margin for HTML div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marRight.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedTwipsMeasure/w:marRight")]
 pub struct RightMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -20942,18 +14692,10 @@ pub struct RightMarginDiv {
   pub val: crate::simple_type::StringValue,
 }
 /// Top Margin for HTML div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marTop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedTwipsMeasure/w:marTop")]
 pub struct TopMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -20965,18 +14707,10 @@ pub struct TopMarginDiv {
   pub val: crate::simple_type::StringValue,
 }
 /// Bottom Margin for HTML div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:marBottom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedTwipsMeasure/w:marBottom")]
 pub struct BottomMarginDiv {
   /// Positive or Negative Value in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -20988,18 +14722,10 @@ pub struct BottomMarginDiv {
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the SignedTwipsMeasureType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SignedTwipsMeasure/")]
 pub struct SignedTwipsMeasureType {
   /// Positive or Negative Value in Twentieths of a Point
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:integer"))]
@@ -21011,10 +14737,6 @@ pub struct SignedTwipsMeasureType {
   pub val: crate::simple_type::StringValue,
 }
 /// Set of Borders for HTML div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:divBdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DivBdr/w:divBdr")]
 pub struct DivBorder {
@@ -21032,10 +14754,6 @@ pub struct DivBorder {
   pub right_border: Option<RightBorder>,
 }
 /// Child div Elements Contained within Current div.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:divsChild.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Divs/w:divsChild")]
 pub struct DivsChild {
@@ -21044,10 +14762,6 @@ pub struct DivsChild {
   pub w_div: Vec<Div>,
 }
 /// Defines the Divs Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:divs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Divs/w:divs")]
 pub struct Divs {
@@ -21056,10 +14770,6 @@ pub struct Divs {
   pub w_div: Vec<Div>,
 }
 /// Defines the DivsType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Divs/")]
 pub struct DivsType {
@@ -21068,18 +14778,10 @@ pub struct DivsType {
   pub div: Vec<Div>,
 }
 /// Information About Single HTML div Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Div/w:div")]
 pub struct Div {
   /// div Data ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -21122,49 +14824,25 @@ pub struct Div {
   pub w_divs_child: Vec<DivsChild>,
 }
 /// Comment Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:comment.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Comment/w:comment")]
 pub struct Comment {
   pub xml_other_attrs: Vec<(String, String)>,
   /// initials
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:initials
   #[sdk(attr(qname = "w:initials"))]
   #[sdk(string_length(source = 0u32, max = 9u32))]
   pub initials: Option<crate::simple_type::StringValue>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -21200,26 +14878,14 @@ pub struct Comment {
   pub comment_choice: Vec<CommentChoice>,
 }
 /// Footnote Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/w:footnote")]
 pub struct Footnote {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<FootnoteEndnoteValues>,
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -21271,26 +14937,14 @@ pub struct Footnote {
   pub footnote_choice: Vec<FootnoteChoice>,
 }
 /// Endnote Content.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnote.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/w:endnote")]
 pub struct Endnote {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<FootnoteEndnoteValues>,
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -21342,26 +14996,14 @@ pub struct Endnote {
   pub endnote_choice: Vec<EndnoteChoice>,
 }
 /// Defines the FootnoteEndnoteType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnEdn/")]
 pub struct FootnoteEndnoteType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Footnote/Endnote Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<FootnoteEndnoteValues>,
   /// Footnote/Endnote ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -21413,142 +15055,70 @@ pub struct FootnoteEndnoteType {
   pub xml_children: Vec<FootnoteEndnoteTypeChoice>,
 }
 /// Entry Insertion Behavior.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:behavior.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartBehavior/w:behavior")]
 pub struct Behavior {
   /// Insertion Behavior Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: DocPartBehaviorValues,
 }
 /// Entry Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartType/w:type")]
 pub struct DocPartType {
   /// Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: DocPartValues,
 }
 /// Gallery Associated With Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:gallery.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartGallery/w:gallery")]
 pub struct Gallery {
   /// Gallery Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: DocPartGalleryValues,
 }
 /// Single Automatic Captioning Setting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoCaption.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AutoCaption/w:autoCaption")]
 pub struct AutoCaption {
   /// Identifier of Object to be Automatically Captioned
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub name: crate::simple_type::StringValue,
   /// Caption Used for Automatic Captioning
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:caption
   #[sdk(attr(qname = "w:caption"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub caption: crate::simple_type::StringValue,
 }
 /// Single Caption Type Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:caption.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Caption/w:caption")]
 pub struct Caption {
   /// Caption Type Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub name: crate::simple_type::StringValue,
   /// Automatic Caption Placement
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:pos
   #[sdk(attr(qname = "w:pos"))]
   pub position: Option<CaptionPositionValues>,
   /// Include Chapter Number in Field for Caption
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:chapNum
   #[sdk(attr(qname = "w:chapNum"))]
   pub chapter_number: Option<crate::simple_type::OnOffValue>,
   /// Style for Chapter Headings
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:heading
   #[sdk(attr(qname = "w:heading"))]
   pub heading: Option<crate::simple_type::Int32Value>,
   /// Do Not Include Name In Caption
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:noLabel
   #[sdk(attr(qname = "w:noLabel"))]
   pub no_label: Option<crate::simple_type::OnOffValue>,
   /// Caption Numbering Format
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:numFmt
   #[sdk(attr(qname = "w:numFmt"))]
   pub number_format: Option<NumberFormatValues>,
   /// Chapter Number/Item Index Separator
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:sep
   #[sdk(attr(qname = "w:sep"))]
   pub separator: Option<ChapterSeparatorValues>,
 }
 /// Automatic Captioning Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:autoCaptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_AutoCaptions/w:autoCaptions")]
 pub struct AutoCaptions {
@@ -21557,18 +15127,10 @@ pub struct AutoCaptions {
   pub w_auto_caption: Vec<AutoCaption>,
 }
 /// Document Background.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Background/w:background")]
 pub struct DocumentBackground {
   /// color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:color
   #[sdk(attr(qname = "w:color"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["auto"]))]
   #[sdk(string_length(
@@ -21580,26 +15142,14 @@ pub struct DocumentBackground {
   ))]
   pub color: Option<crate::simple_type::StringValue>,
   /// themeColor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeColor
   #[sdk(attr(qname = "w:themeColor"))]
   pub theme_color: Option<ThemeColorValues>,
   /// themeTint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeTint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// themeShade
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:themeShade
   #[sdk(attr(qname = "w:themeShade"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
@@ -21609,10 +15159,6 @@ pub struct DocumentBackground {
   pub background: Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_vml::Background>>,
 }
 /// List of Glossary Document Entries.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docParts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocParts/w:docParts")]
 pub struct DocParts {
@@ -21621,33 +15167,17 @@ pub struct DocParts {
   pub doc_part: std::boxed::Box<DocPart>,
 }
 /// Entry Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartName/w:name")]
 pub struct DocPartName {
   /// Name Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
   /// Built-In Entry
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:decorated
   #[sdk(attr(qname = "w:decorated"))]
   pub decorated: Option<crate::simple_type::OnOffValue>,
 }
 /// Entry Categorization.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:category.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartCategory/w:category")]
 pub struct Category {
@@ -21659,18 +15189,10 @@ pub struct Category {
   pub gallery: std::boxed::Box<Gallery>,
 }
 /// Entry Types.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:types.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartTypes/w:types")]
 pub struct DocPartTypes {
   /// Entry Is Of All Types
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:all
   #[sdk(attr(qname = "w:all"))]
   pub all: Option<crate::simple_type::OnOffValue>,
   /// Entry Type.
@@ -21678,10 +15200,6 @@ pub struct DocPartTypes {
   pub doc_part_type: std::boxed::Box<DocPartType>,
 }
 /// Entry Insertion Behaviors.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:behaviors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartBehaviors/w:behaviors")]
 pub struct Behaviors {
@@ -21690,18 +15208,10 @@ pub struct Behaviors {
   pub behavior: std::boxed::Box<Behavior>,
 }
 /// Entry ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:guid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Guid/w:guid")]
 pub struct DocPartId {
   /// GUID Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(pattern(
     source = 0u32,
@@ -21711,10 +15221,6 @@ pub struct DocPartId {
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Glossary Document Entry Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPartPr/w:docPartPr")]
 pub struct DocPartProperties {
@@ -21741,10 +15247,6 @@ pub struct DocPartProperties {
   pub doc_part_id: Option<DocPartId>,
 }
 /// Contents of Glossary Document Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartBody.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:docPartBody")]
 pub struct DocPartBody {
@@ -21794,10 +15296,6 @@ pub struct DocPartBody {
   pub w_sect_pr: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Defines the Body Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:body.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/w:body")]
 pub struct Body {
@@ -21847,10 +15345,6 @@ pub struct Body {
   pub w_sect_pr: Option<std::boxed::Box<SectionProperties>>,
 }
 /// Defines the BodyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Body/")]
 pub struct BodyType {
@@ -21898,10 +15392,6 @@ pub struct BodyType {
   pub xml_children: Vec<BodyTypeChoice>,
 }
 /// Glossary Document Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocPart/w:docPart")]
 pub struct DocPart {
@@ -21913,112 +15403,56 @@ pub struct DocPart {
   pub doc_part_body: Option<std::boxed::Box<DocPartBody>>,
 }
 /// Defines the CompatibilitySetting Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:compatSetting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CompatSetting/w:compatSetting")]
 pub struct CompatibilitySetting {
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   pub w_name: CompatSettingNameValues,
   /// uri
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:uri
   #[sdk(attr(qname = "w:uri"))]
   pub w_uri: crate::simple_type::StringValue,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub w_val: crate::simple_type::StringValue,
 }
 /// Table Cell Left Margin Default.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:left.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidthDxaNil/w:left")]
 pub struct TableCellLeftMargin {
   /// w
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub width: crate::simple_type::Int16Value,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: TableWidthValues,
 }
 /// Table Cell Right Margin Default.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:right.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidthDxaNil/w:right")]
 pub struct TableCellRightMargin {
   /// w
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub width: crate::simple_type::Int16Value,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: TableWidthValues,
 }
 /// Defines the TableWidthDxaNilType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblWidthDxaNil/")]
 pub struct TableWidthDxaNilType {
   /// w
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub width: crate::simple_type::Int16Value,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: TableWidthValues,
 }
 /// Table-Level Property Exceptions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblPrEx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblPrEx/w:tblPrEx")]
 pub struct TablePropertyExceptions {
@@ -22056,10 +15490,6 @@ pub struct TablePropertyExceptions {
   pub table_property_exceptions_change: Option<std::boxed::Box<TablePropertyExceptionsChange>>,
 }
 /// Table Row Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPr/w:trPr")]
 pub struct TableRowProperties {
@@ -22091,47 +15521,28 @@ pub struct TableRowProperties {
   #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
   pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
   #[sdk(choice(
+    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
   pub table_row_properties_choice2: Option<TableRowPropertiesChoice2>,
 }
 /// Revision Information for Table Row Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:trPrChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrPrChange/w:trPrChange")]
 pub struct TableRowPropertiesChange {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -22153,10 +15564,6 @@ pub struct TableRowPropertiesChange {
   pub previous_table_row_properties: std::boxed::Box<PreviousTableRowProperties>,
 }
 /// Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PPr/w:pPr")]
 pub struct ParagraphProperties {
@@ -22272,41 +15679,21 @@ pub struct ParagraphProperties {
   pub paragraph_properties_change: Option<std::boxed::Box<ParagraphPropertiesChange>>,
 }
 /// Defines the Control Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:control.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Control/w:control")]
 pub struct Control {
   /// Unique Name for Embedded Control
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:name
   #[sdk(attr(qname = "w:name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Associated VML Data Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shapeid
   #[sdk(attr(qname = "w:shapeid"))]
   #[sdk(string_length(source = 0u32, max = 254u32))]
   pub shape_id: Option<crate::simple_type::StringValue>,
   /// Embedded Control Properties Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
 }
 /// Previous Table Grid.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:tblGrid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TblGridBase/w:tblGrid")]
 pub struct PreviousTableGrid {
@@ -22315,128 +15702,60 @@ pub struct PreviousTableGrid {
   pub w_grid_col: Vec<GridColumn>,
 }
 /// Defines the ObjectEmbed Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:objectEmbed.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ObjectEmbed/w:objectEmbed")]
 pub struct ObjectEmbed {
   /// drawAspect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:drawAspect
   #[sdk(attr(qname = "w:drawAspect"))]
   pub draw_aspect: Option<ObjectDrawAspect>,
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// progId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:progId
   #[sdk(attr(qname = "w:progId"))]
   pub prog_id: Option<crate::simple_type::StringValue>,
   /// shapeId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shapeId
   #[sdk(attr(qname = "w:shapeId"))]
   pub shape_id: Option<crate::simple_type::StringValue>,
   /// fieldCodes
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fieldCodes
   #[sdk(attr(qname = "w:fieldCodes"))]
   pub field_codes: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ObjectLink Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:objectLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ObjectLink/w:objectLink")]
 pub struct ObjectLink {
   /// updateMode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:updateMode
   #[sdk(attr(qname = "w:updateMode"))]
   pub update_mode: ObjectUpdateMode,
   /// lockedField
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lockedField
   #[sdk(attr(qname = "w:lockedField"))]
   pub locked_field: Option<crate::simple_type::OnOffValue>,
   /// drawAspect
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:drawAspect
   #[sdk(attr(qname = "w:drawAspect"))]
   pub draw_aspect: Option<ObjectDrawAspect>,
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// progId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:progId
   #[sdk(attr(qname = "w:progId"))]
   pub prog_id: Option<crate::simple_type::StringValue>,
   /// shapeId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:shapeId
   #[sdk(attr(qname = "w:shapeId"))]
   pub shape_id: Option<crate::simple_type::StringValue>,
   /// fieldCodes
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fieldCodes
   #[sdk(attr(qname = "w:fieldCodes"))]
   pub field_codes: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Lock Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lock.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Lock/w:lock")]
 pub struct Lock {
   /// Locking Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<LockingValues>,
 }
 /// Defines the SdtPlaceholder Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:placeholder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Placeholder/w:placeholder")]
 pub struct SdtPlaceholder {
@@ -22445,48 +15764,24 @@ pub struct SdtPlaceholder {
   pub doc_part_reference: std::boxed::Box<DocPartReference>,
 }
 /// Defines the DataBinding Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dataBinding.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DataBinding/w:dataBinding")]
 pub struct DataBinding {
   /// XML Namespace Prefix Mappings
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:prefixMappings
   #[sdk(attr(qname = "w:prefixMappings"))]
   pub prefix_mappings: Option<crate::simple_type::StringValue>,
   /// XPath
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:xpath
   #[sdk(attr(qname = "w:xpath"))]
   pub x_path: crate::simple_type::StringValue,
   /// Custom XML Data Storage ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:storeItemID
   #[sdk(attr(qname = "w:storeItemID"))]
   pub store_item_id: crate::simple_type::StringValue,
 }
 /// Defines the SdtContentComboBox Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:comboBox.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtComboBox/w:comboBox")]
 pub struct SdtContentComboBox {
   /// Combo Box Last Saved Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastValue
   #[sdk(attr(qname = "w:lastValue"))]
   pub last_value: Option<crate::simple_type::StringValue>,
   /// _
@@ -22494,18 +15789,10 @@ pub struct SdtContentComboBox {
   pub w_list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentDate Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:date.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDate/w:date")]
 pub struct SdtContentDate {
   /// Last Known Date in XML Schema DateTime Format
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fullDate
   #[sdk(attr(qname = "w:fullDate"))]
   pub full_date: Option<crate::simple_type::DateTimeValue>,
   /// Date Display Mask
@@ -22522,10 +15809,6 @@ pub struct SdtContentDate {
   pub calendar: Option<Calendar>,
 }
 /// Defines the SdtContentDocPartObject Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartObj.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDocPart/w:docPartObj")]
 pub struct SdtContentDocPartObject {
@@ -22540,10 +15823,6 @@ pub struct SdtContentDocPartObject {
   pub doc_part_unique: Option<DocPartUnique>,
 }
 /// Defines the SdtContentDocPartList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docPartList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDocPart/w:docPartList")]
 pub struct SdtContentDocPartList {
@@ -22558,10 +15837,6 @@ pub struct SdtContentDocPartList {
   pub doc_part_unique: Option<DocPartUnique>,
 }
 /// Defines the SdtDocPartType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDocPart/")]
 pub struct SdtDocPartType {
@@ -22573,18 +15848,10 @@ pub struct SdtDocPartType {
   pub xml_children: Vec<SdtDocPartTypeChoice>,
 }
 /// Defines the SdtContentDropDownList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:dropDownList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtDropDownList/w:dropDownList")]
 pub struct SdtContentDropDownList {
   /// Drop-down List Last Saved Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lastValue
   #[sdk(attr(qname = "w:lastValue"))]
   pub last_value: Option<crate::simple_type::StringValue>,
   /// _
@@ -22592,70 +15859,34 @@ pub struct SdtContentDropDownList {
   pub w_list_item: Vec<ListItem>,
 }
 /// Defines the SdtContentText Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SdtText/w:text")]
 pub struct SdtContentText {
   /// Allow Soft Line Breaks
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:multiLine
   #[sdk(attr(qname = "w:multiLine"))]
   pub multi_line: Option<crate::simple_type::OnOffValue>,
 }
 /// Write Protection.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:writeProtection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_WriteProtection/w:writeProtection")]
 pub struct WriteProtection {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Recommend Write Protection in User Interface
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:recommended
   #[sdk(attr(qname = "w:recommended"))]
   pub recommended: Option<crate::simple_type::OnOffValue>,
   /// Cryptographic Provider Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderType
   #[sdk(attr(qname = "w:cryptProviderType"))]
   pub cryptographic_provider_type: Option<CryptProviderValues>,
   /// Cryptographic Algorithm Class
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmClass
   #[sdk(attr(qname = "w:cryptAlgorithmClass"))]
   pub cryptographic_algorithm_class: Option<CryptAlgorithmClassValues>,
   /// Cryptographic Algorithm Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmType
   #[sdk(attr(qname = "w:cryptAlgorithmType"))]
   pub cryptographic_algorithm_type: Option<CryptAlgorithmValues>,
   /// Cryptographic Hashing Algorithm
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmSid
   #[sdk(attr(qname = "w:cryptAlgorithmSid"))]
   pub cryptographic_algorithm_sid: Option<crate::simple_type::Int32Value>,
   /// Iterations to Run Hashing Algorithm
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptSpinCount
   #[sdk(attr(qname = "w:cryptSpinCount"))]
   #[sdk(number_range(
     source = 0u32,
@@ -22665,121 +15896,57 @@ pub struct WriteProtection {
   ))]
   pub cryptographic_spin_count: Option<crate::simple_type::UInt32Value>,
   /// Cryptographic Provider
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProvider
   #[sdk(attr(qname = "w:cryptProvider"))]
   pub cryptographic_provider: Option<crate::simple_type::StringValue>,
   /// Cryptographic Algorithm Extensibility
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algIdExt
   #[sdk(attr(qname = "w:algIdExt"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub algorithm_id_extensibility: Option<crate::simple_type::HexBinaryValue>,
   /// Algorithm Extensibility Source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algIdExtSource
   #[sdk(attr(qname = "w:algIdExtSource"))]
   pub algorithm_id_extensibility_source: Option<crate::simple_type::StringValue>,
   /// Cryptographic Provider Type Extensibility
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderTypeExt
   #[sdk(attr(qname = "w:cryptProviderTypeExt"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub cryptographic_provider_type_extensibility: Option<crate::simple_type::HexBinaryValue>,
   /// Provider Type Extensibility Source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderTypeExtSource
   #[sdk(attr(qname = "w:cryptProviderTypeExtSource"))]
   pub cryptographic_provider_type_ext_source: Option<crate::simple_type::StringValue>,
   /// Password Hash
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hash
   #[sdk(attr(qname = "w:hash"))]
   pub hash: Option<crate::simple_type::Base64BinaryValue>,
   /// Salt for Password Verifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:salt
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
   /// algorithmName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algorithmName
-  #[sdk(attr(qname = "w:algorithmName"))]
+  #[sdk(attr(office2010, qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hashValue
-  #[sdk(attr(qname = "w:hashValue"))]
+  #[sdk(attr(office2010, qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:saltValue
-  #[sdk(attr(qname = "w:saltValue"))]
+  #[sdk(attr(office2010, qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:spinCount
-  #[sdk(attr(qname = "w:spinCount"))]
+  #[sdk(attr(office2010, qname = "w:spinCount"))]
   pub spin_count: Option<crate::simple_type::Int32Value>,
 }
 /// Document View Setting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:view.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_View/w:view")]
 pub struct View {
   /// Document View Setting  Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: ViewValues,
 }
 /// Magnification Setting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:zoom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Zoom/w:zoom")]
 pub struct Zoom {
   /// Zoom Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<PresetZoomValues>,
   /// Zoom Percentage
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:percent
   #[sdk(attr(qname = "w:percent"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -22789,217 +15956,101 @@ pub struct Zoom {
   pub percent: Option<crate::simple_type::StringValue>,
 }
 /// Grammar Checking Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:activeWritingStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_WritingStyle/w:activeWritingStyle")]
 pub struct ActiveWritingStyle {
   /// Writing Style Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lang
   #[sdk(attr(qname = "w:lang"))]
   #[sdk(string_length(source = 1u32, max = 84u32))]
   pub language: crate::simple_type::StringValue,
   /// Grammatical Engine ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:vendorID
   #[sdk(attr(qname = "w:vendorID"))]
   pub vendor_id: crate::simple_type::UInt16Value,
   /// Grammatical Check Engine Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:dllVersion
   #[sdk(attr(qname = "w:dllVersion"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub dll_version: crate::simple_type::Int32Value,
   /// Natural Language Grammar Check
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:nlCheck
   #[sdk(attr(qname = "w:nlCheck"))]
   pub natural_language_grammar_check: Option<crate::simple_type::OnOffValue>,
   /// Check Stylistic Rules With Grammar
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:checkStyle
   #[sdk(attr(qname = "w:checkStyle"))]
   pub check_style: crate::simple_type::OnOffValue,
   /// Application Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:appName
   #[sdk(attr(qname = "w:appName"))]
   pub application_name: crate::simple_type::StringValue,
 }
 /// Spelling and Grammatical Checking State.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:proofState.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Proof/w:proofState")]
 pub struct ProofState {
   /// Spell Checking State
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:spelling
   #[sdk(attr(qname = "w:spelling"))]
   pub spelling: Option<ProofingStateValues>,
   /// Grammatical Checking State
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:grammar
   #[sdk(attr(qname = "w:grammar"))]
   pub grammar: Option<ProofingStateValues>,
 }
 /// Suggested Filtering for List of Document Styles.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:stylePaneFormatFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_StylePaneFormatFilter/w:stylePaneFormatFilter")]
 pub struct StylePaneFormatFilter {
   pub xml_other_attrs: Vec<(String, String)>,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
   /// allStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:allStyles
-  #[sdk(attr(qname = "w:allStyles"))]
+  #[sdk(attr(office2010, qname = "w:allStyles"))]
   pub all_styles: Option<crate::simple_type::OnOffValue>,
   /// customStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:customStyles
-  #[sdk(attr(qname = "w:customStyles"))]
+  #[sdk(attr(office2010, qname = "w:customStyles"))]
   pub custom_styles: Option<crate::simple_type::OnOffValue>,
   /// latentStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:latentStyles
-  #[sdk(attr(qname = "w:latentStyles"))]
+  #[sdk(attr(office2010, qname = "w:latentStyles"))]
   pub latent_styles: Option<crate::simple_type::OnOffValue>,
   /// stylesInUse
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:stylesInUse
-  #[sdk(attr(qname = "w:stylesInUse"))]
+  #[sdk(attr(office2010, qname = "w:stylesInUse"))]
   pub styles_in_use: Option<crate::simple_type::OnOffValue>,
   /// headingStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:headingStyles
-  #[sdk(attr(qname = "w:headingStyles"))]
+  #[sdk(attr(office2010, qname = "w:headingStyles"))]
   pub heading_styles: Option<crate::simple_type::OnOffValue>,
   /// numberingStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:numberingStyles
-  #[sdk(attr(qname = "w:numberingStyles"))]
+  #[sdk(attr(office2010, qname = "w:numberingStyles"))]
   pub numbering_styles: Option<crate::simple_type::OnOffValue>,
   /// tableStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:tableStyles
-  #[sdk(attr(qname = "w:tableStyles"))]
+  #[sdk(attr(office2010, qname = "w:tableStyles"))]
   pub table_styles: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnRuns
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:directFormattingOnRuns
-  #[sdk(attr(qname = "w:directFormattingOnRuns"))]
+  #[sdk(attr(office2010, qname = "w:directFormattingOnRuns"))]
   pub direct_formatting_on_runs: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnParagraphs
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:directFormattingOnParagraphs
-  #[sdk(attr(qname = "w:directFormattingOnParagraphs"))]
+  #[sdk(attr(office2010, qname = "w:directFormattingOnParagraphs"))]
   pub direct_formatting_on_paragraphs: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnNumbering
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:directFormattingOnNumbering
-  #[sdk(attr(qname = "w:directFormattingOnNumbering"))]
+  #[sdk(attr(office2010, qname = "w:directFormattingOnNumbering"))]
   pub direct_formatting_on_numbering: Option<crate::simple_type::OnOffValue>,
   /// directFormattingOnTables
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:directFormattingOnTables
-  #[sdk(attr(qname = "w:directFormattingOnTables"))]
+  #[sdk(attr(office2010, qname = "w:directFormattingOnTables"))]
   pub direct_formatting_on_tables: Option<crate::simple_type::OnOffValue>,
   /// clearFormatting
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:clearFormatting
-  #[sdk(attr(qname = "w:clearFormatting"))]
+  #[sdk(attr(office2010, qname = "w:clearFormatting"))]
   pub clear_formatting: Option<crate::simple_type::OnOffValue>,
   /// top3HeadingStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:top3HeadingStyles
-  #[sdk(attr(qname = "w:top3HeadingStyles"))]
+  #[sdk(attr(office2010, qname = "w:top3HeadingStyles"))]
   pub top3_heading_styles: Option<crate::simple_type::OnOffValue>,
   /// visibleStyles
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:visibleStyles
-  #[sdk(attr(qname = "w:visibleStyles"))]
+  #[sdk(attr(office2010, qname = "w:visibleStyles"))]
   pub visible_styles: Option<crate::simple_type::OnOffValue>,
   /// alternateStyleNames
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:alternateStyleNames
-  #[sdk(attr(qname = "w:alternateStyleNames"))]
+  #[sdk(attr(office2010, qname = "w:alternateStyleNames"))]
   pub alternate_style_names: Option<crate::simple_type::OnOffValue>,
 }
 /// Suggested Sorting for List of Document Styles.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:stylePaneSortMethod.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_StylePaneSortMethods/w:stylePaneSortMethod")]
 pub struct StylePaneSortMethods {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(
     source = 1u32,
@@ -23029,26 +16080,14 @@ pub struct StylePaneSortMethods {
   pub w_val: crate::simple_type::StringValue,
 }
 /// Document Classification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:documentType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocType/w:documentType")]
 pub struct DocumentType {
   /// Document Classification Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: DocumentTypeValues,
 }
 /// Mail Merge Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:mailMerge.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_MailMerge/w:mailMerge")]
 pub struct MailMerge {
@@ -23102,112 +16141,52 @@ pub struct MailMerge {
   pub data_source_object: Option<std::boxed::Box<DataSourceObject>>,
 }
 /// Visibility of Annotation Types.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:revisionView.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChangesView/w:revisionView")]
 pub struct RevisionView {
   /// Display Visual Indicator Of Markup Area
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:markup
   #[sdk(attr(qname = "w:markup"))]
   pub markup: Option<crate::simple_type::OnOffValue>,
   /// Display Comments
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:comments
   #[sdk(attr(qname = "w:comments"))]
   pub comments: Option<crate::simple_type::OnOffValue>,
   /// Display Content Revisions
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:insDel
   #[sdk(attr(qname = "w:insDel"))]
   pub display_revision: Option<crate::simple_type::OnOffValue>,
   /// Display Formatting Revisions
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:formatting
   #[sdk(attr(qname = "w:formatting"))]
   pub formatting: Option<crate::simple_type::OnOffValue>,
   /// Display Ink Annotations
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:inkAnnotations
   #[sdk(attr(qname = "w:inkAnnotations"))]
   pub ink_annotations: Option<crate::simple_type::OnOffValue>,
 }
 /// Document Editing Restrictions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:documentProtection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocProtect/w:documentProtection")]
 pub struct DocumentProtection {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Document Editing Restrictions
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:edit
   #[sdk(attr(qname = "w:edit"))]
   pub edit: Option<DocumentProtectionValues>,
   /// Only Allow Formatting With Unlocked Styles
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:formatting
   #[sdk(attr(qname = "w:formatting"))]
   pub formatting: Option<crate::simple_type::OnOffValue>,
   /// Enforce Document Protection Settings
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:enforcement
   #[sdk(attr(qname = "w:enforcement"))]
   pub enforcement: Option<crate::simple_type::OnOffValue>,
   /// Cryptographic Provider Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderType
   #[sdk(attr(qname = "w:cryptProviderType"))]
   pub cryptographic_provider_type: Option<CryptProviderValues>,
   /// Cryptographic Algorithm Class
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmClass
   #[sdk(attr(qname = "w:cryptAlgorithmClass"))]
   pub cryptographic_algorithm_class: Option<CryptAlgorithmClassValues>,
   /// Cryptographic Algorithm Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmType
   #[sdk(attr(qname = "w:cryptAlgorithmType"))]
   pub cryptographic_algorithm_type: Option<CryptAlgorithmValues>,
   /// Cryptographic Hashing Algorithm
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptAlgorithmSid
   #[sdk(attr(qname = "w:cryptAlgorithmSid"))]
   pub cryptographic_algorithm_sid: Option<crate::simple_type::Int32Value>,
   /// Iterations to Run Hashing Algorithm
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptSpinCount
   #[sdk(attr(qname = "w:cryptSpinCount"))]
   #[sdk(number_range(
     source = 0u32,
@@ -23217,165 +16196,81 @@ pub struct DocumentProtection {
   ))]
   pub cryptographic_spin_count: Option<crate::simple_type::UInt32Value>,
   /// Cryptographic Provider
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProvider
   #[sdk(attr(qname = "w:cryptProvider"))]
   pub cryptographic_provider: Option<crate::simple_type::StringValue>,
   /// Cryptographic Algorithm Extensibility
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algIdExt
   #[sdk(attr(qname = "w:algIdExt"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub algorithm_id_extensibility: Option<crate::simple_type::HexBinaryValue>,
   /// Algorithm Extensibility Source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algIdExtSource
   #[sdk(attr(qname = "w:algIdExtSource"))]
   pub algorithm_id_extensibility_source: Option<crate::simple_type::StringValue>,
   /// Cryptographic Provider Type Extensibility
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderTypeExt
   #[sdk(attr(qname = "w:cryptProviderTypeExt"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub cryptographic_provider_type_extensibility: Option<crate::simple_type::HexBinaryValue>,
   /// Provider Type Extensibility Source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:cryptProviderTypeExtSource
   #[sdk(attr(qname = "w:cryptProviderTypeExtSource"))]
   pub cryptographic_provider_type_ext_source: Option<crate::simple_type::StringValue>,
   /// Password Hash
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hash
   #[sdk(attr(qname = "w:hash"))]
   pub hash: Option<crate::simple_type::Base64BinaryValue>,
   /// Salt for Password Verifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:salt
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
   /// algorithmName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:algorithmName
-  #[sdk(attr(qname = "w:algorithmName"))]
+  #[sdk(attr(office2010, qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hashValue
-  #[sdk(attr(qname = "w:hashValue"))]
+  #[sdk(attr(office2010, qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:saltValue
-  #[sdk(attr(qname = "w:saltValue"))]
+  #[sdk(attr(office2010, qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w:spinCount
-  #[sdk(attr(qname = "w:spinCount"))]
+  #[sdk(attr(office2010, qname = "w:spinCount"))]
   pub spin_count: Option<crate::simple_type::Int32Value>,
 }
 /// Distance Between Automatic Tab Stops.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:defaultTabStop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeShort/w:defaultTabStop")]
 pub struct DefaultTabStop {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int16Value,
 }
 /// Number of Pages Per Booklet.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:bookFoldPrintingSheets.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeShort/w:bookFoldPrintingSheets")]
 pub struct BookFoldPrintingSheets {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int16Value,
 }
 /// Defines the NonNegativeShortType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NonNegativeShort/")]
 pub struct NonNegativeShortType {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int16Value,
 }
 /// Maximum Number of Consecutively Hyphenated Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:consecutiveHyphenLimit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedShortNumber/w:consecutiveHyphenLimit")]
 pub struct ConsecutiveHyphenLimit {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::UInt16Value,
 }
 /// Percentage of Document to Use When Generating Summary.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:summaryLength.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedInt100/w:summaryLength")]
 pub struct SummaryLength {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -23387,18 +16282,10 @@ pub struct SummaryLength {
   pub val: crate::simple_type::Int32Value,
 }
 /// Distance between Horizontal Gridlines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:displayHorizontalDrawingGridEvery.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedInt7/w:displayHorizontalDrawingGridEvery")]
 pub struct DisplayHorizontalDrawingGrid {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -23410,18 +16297,10 @@ pub struct DisplayHorizontalDrawingGrid {
   pub val: crate::simple_type::Int32Value,
 }
 /// Distance between Vertical Gridlines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:displayVerticalDrawingGridEvery.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedInt7/w:displayVerticalDrawingGridEvery")]
 pub struct DisplayVerticalDrawingGrid {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -23433,18 +16312,10 @@ pub struct DisplayVerticalDrawingGrid {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the UnsignedInt7Type Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_UnsignedInt7/")]
 pub struct UnsignedInt7Type {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -23456,99 +16327,51 @@ pub struct UnsignedInt7Type {
   pub val: crate::simple_type::Int32Value,
 }
 /// Character-Level Whitespace Compression.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:characterSpacingControl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CharacterSpacing/w:characterSpacingControl")]
 pub struct CharacterSpacingControl {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: CharacterSpacingValues,
 }
 /// Custom Set of Characters Which Cannot End a Line.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noLineBreaksAfter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_KinsokuAfter/w:noLineBreaksAfter")]
 pub struct NoLineBreaksAfterKinsoku {
   /// lang
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lang
   #[sdk(attr(qname = "w:lang"))]
   #[sdk(string_length(source = 1u32, max = 84u32))]
   pub language: crate::simple_type::StringValue,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 50u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Custom Set Of Characters Which Cannot Begin A Line.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:noLineBreaksBefore.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_KinsokuBefore/w:noLineBreaksBefore")]
 pub struct NoLineBreaksBeforeKinsoku {
   /// lang
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:lang
   #[sdk(attr(qname = "w:lang"))]
   #[sdk(string_length(source = 1u32, max = 84u32))]
   pub language: crate::simple_type::StringValue,
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, max = 100u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Custom XSL Transform To Use When Saving As XML File.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:saveThroughXslt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_SaveThroughXslt/w:saveThroughXslt")]
 pub struct SaveThroughXslt {
   /// XSL Transformation Location
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Local Identifier for XSL Transform
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:solutionID
   #[sdk(attr(qname = "w:solutionID"))]
   pub solution_id: Option<crate::simple_type::StringValue>,
 }
 /// Default Properties for VML Objects in Header and Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:hdrShapeDefaults.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:hdrShapeDefaults")]
 pub struct HeaderShapeDefaults {
@@ -23559,10 +16382,6 @@ pub struct HeaderShapeDefaults {
   pub xml_children: Vec<HeaderShapeDefaultsChoice>,
 }
 /// Default Properties for VML Objects in Main Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:shapeDefaults.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/w:shapeDefaults")]
 pub struct ShapeDefaults {
@@ -23573,10 +16392,6 @@ pub struct ShapeDefaults {
   pub xml_children: Vec<ShapeDefaultsChoice>,
 }
 /// Defines the ShapeDefaultsType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ShapeDefaults/")]
 pub struct ShapeDefaultsType {
@@ -23587,10 +16402,6 @@ pub struct ShapeDefaultsType {
   pub xml_children: Vec<ShapeDefaultsTypeChoice>,
 }
 /// Document-Wide Footnote Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:footnotePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FtnDocProps/w:footnotePr")]
 pub struct FootnoteDocumentWideProperties {
@@ -23613,10 +16424,6 @@ pub struct FootnoteDocumentWideProperties {
   pub footnote_special_reference: Vec<FootnoteSpecialReference>,
 }
 /// Document-Wide Endnote Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:endnotePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_EdnDocProps/w:endnotePr")]
 pub struct EndnoteDocumentWideProperties {
@@ -23639,10 +16446,6 @@ pub struct EndnoteDocumentWideProperties {
   pub endnote_special_reference: Vec<EndnoteSpecialReference>,
 }
 /// Compatibility Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:compat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Compat/w:compat")]
 pub struct Compatibility {
@@ -23846,10 +16649,6 @@ pub struct Compatibility {
   pub w_compat_setting: Vec<CompatibilitySetting>,
 }
 /// Document Variables.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:docVars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocVars/w:docVars")]
 pub struct DocumentVariables {
@@ -23858,10 +16657,6 @@ pub struct DocumentVariables {
   pub w_doc_var: Vec<DocumentVariable>,
 }
 /// Listing of All Revision Save ID Values.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:rsids.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_DocRsids/w:rsids")]
 pub struct Rsids {
@@ -23873,103 +16668,47 @@ pub struct Rsids {
   pub w_rsid: Vec<Rsid>,
 }
 /// Theme Color Mappings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:clrSchemeMapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ColorSchemeMapping/w:clrSchemeMapping")]
 pub struct ColorSchemeMapping {
   /// Background 1 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bg1
   #[sdk(attr(qname = "w:bg1"))]
   pub background1: Option<ColorSchemeIndexValues>,
   /// Text 1 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:t1
   #[sdk(attr(qname = "w:t1"))]
   pub text1: Option<ColorSchemeIndexValues>,
   /// Background 2 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:bg2
   #[sdk(attr(qname = "w:bg2"))]
   pub background2: Option<ColorSchemeIndexValues>,
   /// Text 2 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:t2
   #[sdk(attr(qname = "w:t2"))]
   pub text2: Option<ColorSchemeIndexValues>,
   /// Accent 1 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent1
   #[sdk(attr(qname = "w:accent1"))]
   pub accent1: Option<ColorSchemeIndexValues>,
   /// Accent 2 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent2
   #[sdk(attr(qname = "w:accent2"))]
   pub accent2: Option<ColorSchemeIndexValues>,
   /// Accent3 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent3
   #[sdk(attr(qname = "w:accent3"))]
   pub accent3: Option<ColorSchemeIndexValues>,
   /// Accent4 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent4
   #[sdk(attr(qname = "w:accent4"))]
   pub accent4: Option<ColorSchemeIndexValues>,
   /// Accent5 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent5
   #[sdk(attr(qname = "w:accent5"))]
   pub accent5: Option<ColorSchemeIndexValues>,
   /// Accent6 Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:accent6
   #[sdk(attr(qname = "w:accent6"))]
   pub accent6: Option<ColorSchemeIndexValues>,
   /// Hyperlink Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:hyperlink
   #[sdk(attr(qname = "w:hyperlink"))]
   pub hyperlink: Option<ColorSchemeIndexValues>,
   /// Followed Hyperlink Theme Color Mapping
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:followedHyperlink
   #[sdk(attr(qname = "w:followedHyperlink"))]
   pub followed_hyperlink: Option<ColorSchemeIndexValues>,
 }
 /// Caption Settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:captions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Captions/w:captions")]
 pub struct Captions {
@@ -23981,39 +16720,19 @@ pub struct Captions {
   pub w_auto_captions: Option<AutoCaptions>,
 }
 /// Freeze Document Layout.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:readModeInkLockDown.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_ReadingModeInkLockDown/w:readModeInkLockDown")]
 pub struct ReadModeInkLockDown {
   /// Use Actual Pages, Not Virtual Pages
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:actualPg
   #[sdk(attr(qname = "w:actualPg"))]
   pub use_actual_pages: Option<crate::simple_type::OnOffValue>,
   /// Virtual Page Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:w
   #[sdk(attr(qname = "w:w"))]
   pub width: crate::simple_type::UInt32Value,
   /// Virtual Page Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:h
   #[sdk(attr(qname = "w:h"))]
   pub height: crate::simple_type::UInt32Value,
   /// Font Size Scaling
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontSz
   #[sdk(attr(qname = "w:fontSz"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 2u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
@@ -24023,26 +16742,14 @@ pub struct ReadModeInkLockDown {
   pub font_size: crate::simple_type::StringValue,
 }
 /// Defines the TargetScreenSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:targetScreenSz.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TargetScreenSz/w:targetScreenSz")]
 pub struct TargetScreenSize {
   /// Target Screen Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: TargetScreenSizeValues,
 }
 /// Defines the PictureBulletBase Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pict.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PictureBulletBase/w:pict")]
 pub struct PictureBulletBase {
@@ -24060,149 +16767,77 @@ pub struct PictureBulletBase {
   pub xml_children: Vec<PictureBulletBaseChoice>,
 }
 /// Defines the Panose1Number Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:panose1.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Panose/w:panose1")]
 pub struct Panose1Number {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 1u32, min = 10u32, max = 10u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Defines the FontCharSet Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:charset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_CharacterSet/w:charset")]
 pub struct FontCharSet {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
   pub val: Option<crate::simple_type::StringValue>,
   /// characterSet
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:characterSet
   #[sdk(attr(qname = "w:characterSet"))]
   pub strict_character_set: Option<StrictCharacterSet>,
 }
 /// Defines the FontFamily Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:family.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontFamily/w:family")]
 pub struct FontFamily {
   /// Font Family Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: FontFamilyValues,
 }
 /// Defines the Pitch Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:pitch.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Pitch/w:pitch")]
 pub struct Pitch {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: FontPitchValues,
 }
 /// Defines the FontSignature Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:sig.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontSig/w:sig")]
 pub struct FontSignature {
   /// First 32 Bits of Unicode Subset Bitfield
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:usb0
   #[sdk(attr(qname = "w:usb0"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub unicode_signature0: crate::simple_type::HexBinaryValue,
   /// Second 32 Bits of Unicode Subset Bitfield
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:usb1
   #[sdk(attr(qname = "w:usb1"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub unicode_signature1: crate::simple_type::HexBinaryValue,
   /// Third 32 Bits of Unicode Subset Bitfield
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:usb2
   #[sdk(attr(qname = "w:usb2"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub unicode_signature2: crate::simple_type::HexBinaryValue,
   /// Fourth 32 Bits of Unicode Subset Bitfield
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:usb3
   #[sdk(attr(qname = "w:usb3"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub unicode_signature3: crate::simple_type::HexBinaryValue,
   /// Lower 32 Bits of Code Page Bit Field
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:csb0
   #[sdk(attr(qname = "w:csb0"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub code_page_signature0: crate::simple_type::HexBinaryValue,
   /// Upper 32 Bits of Code Page Bit Field
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:csb1
   #[sdk(attr(qname = "w:csb1"))]
   #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
   pub code_page_signature1: crate::simple_type::HexBinaryValue,
 }
 /// Defines the EmbedRegularFont Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedRegular.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontRel/w:embedRegular")]
 pub struct EmbedRegularFont {
   /// fontKey
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontKey
   #[sdk(attr(qname = "w:fontKey"))]
   #[sdk(pattern(
     source = 0u32,
@@ -24211,33 +16846,17 @@ pub struct EmbedRegularFont {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_key: Option<crate::simple_type::StringValue>,
   /// subsetted
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:subsetted
   #[sdk(attr(qname = "w:subsetted"))]
   pub subsetted: Option<crate::simple_type::OnOffValue>,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the EmbedBoldFont Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedBold.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontRel/w:embedBold")]
 pub struct EmbedBoldFont {
   /// fontKey
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontKey
   #[sdk(attr(qname = "w:fontKey"))]
   #[sdk(pattern(
     source = 0u32,
@@ -24246,33 +16865,17 @@ pub struct EmbedBoldFont {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_key: Option<crate::simple_type::StringValue>,
   /// subsetted
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:subsetted
   #[sdk(attr(qname = "w:subsetted"))]
   pub subsetted: Option<crate::simple_type::OnOffValue>,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the EmbedItalicFont Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedItalic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontRel/w:embedItalic")]
 pub struct EmbedItalicFont {
   /// fontKey
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontKey
   #[sdk(attr(qname = "w:fontKey"))]
   #[sdk(pattern(
     source = 0u32,
@@ -24281,33 +16884,17 @@ pub struct EmbedItalicFont {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_key: Option<crate::simple_type::StringValue>,
   /// subsetted
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:subsetted
   #[sdk(attr(qname = "w:subsetted"))]
   pub subsetted: Option<crate::simple_type::OnOffValue>,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the EmbedBoldItalicFont Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:embedBoldItalic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontRel/w:embedBoldItalic")]
 pub struct EmbedBoldItalicFont {
   /// fontKey
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontKey
   #[sdk(attr(qname = "w:fontKey"))]
   #[sdk(pattern(
     source = 0u32,
@@ -24316,33 +16903,17 @@ pub struct EmbedBoldItalicFont {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_key: Option<crate::simple_type::StringValue>,
   /// subsetted
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:subsetted
   #[sdk(attr(qname = "w:subsetted"))]
   pub subsetted: Option<crate::simple_type::OnOffValue>,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the FontRelationshipType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_FontRel/")]
 pub struct FontRelationshipType {
   /// fontKey
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:fontKey
   #[sdk(attr(qname = "w:fontKey"))]
   #[sdk(pattern(
     source = 0u32,
@@ -24351,33 +16922,17 @@ pub struct FontRelationshipType {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_key: Option<crate::simple_type::StringValue>,
   /// subsetted
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:subsetted
   #[sdk(attr(qname = "w:subsetted"))]
   pub subsetted: Option<crate::simple_type::OnOffValue>,
   /// Relationship to Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the LevelOverride Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w:lvlOverride.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_NumLvl/w:lvlOverride")]
 pub struct LevelOverride {
   /// Numbering Level ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:ilvl
   #[sdk(attr(qname = "w:ilvl"))]
   pub level_index: crate::simple_type::Int32Value,
   /// Numbering Level Starting Value Override
@@ -24614,28 +17169,32 @@ pub enum CustomXmlRubyChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -24654,20 +17213,20 @@ pub enum CustomXmlRubyChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -24916,28 +17475,32 @@ pub enum SimpleFieldRubyChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -24956,20 +17519,20 @@ pub enum SimpleFieldRubyChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -25208,25 +17771,29 @@ pub enum HyperlinkRubyChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -25240,20 +17807,20 @@ pub enum HyperlinkRubyChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -25540,28 +18107,32 @@ pub enum SdtRunRubyChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -25634,28 +18205,32 @@ pub enum InsertedRunChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -25674,20 +18249,20 @@ pub enum InsertedRunChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -25861,10 +18436,10 @@ pub enum InsertedRunChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -25933,28 +18508,32 @@ pub enum DeletedRunChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -25973,20 +18552,20 @@ pub enum DeletedRunChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -26160,10 +18739,10 @@ pub enum DeletedRunChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -26232,28 +18811,32 @@ pub enum MoveFromRunChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -26272,20 +18855,20 @@ pub enum MoveFromRunChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -26459,10 +19042,10 @@ pub enum MoveFromRunChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -26531,28 +19114,32 @@ pub enum MoveToRunChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -26571,20 +19158,20 @@ pub enum MoveToRunChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -26758,10 +19345,10 @@ pub enum MoveToRunChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Unknown XML child.
   #[sdk(any)]
@@ -26833,28 +19420,32 @@ pub enum RunTrackChangeTypeChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -26873,17 +19464,17 @@ pub enum RunTrackChangeTypeChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -27047,10 +19638,10 @@ pub enum RunTrackChangeTypeChoice {
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
     /// Defines the BidirectionalOverride Class.
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
     /// Defines the BidirectionalEmbedding Class.
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -27104,28 +19695,32 @@ pub enum SdtRunChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27210,28 +19805,32 @@ pub enum CustomXmlBlockChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27250,20 +19849,20 @@ pub enum CustomXmlBlockChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -27328,28 +19927,32 @@ pub enum SdtBlockChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27422,28 +20025,32 @@ pub enum ParagraphChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27462,20 +20069,20 @@ pub enum ParagraphChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -27658,10 +20265,10 @@ pub enum ParagraphChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
@@ -27724,28 +20331,32 @@ pub enum TableChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27821,28 +20432,32 @@ pub enum TableChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27861,20 +20476,20 @@ pub enum TableChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -27951,28 +20566,32 @@ pub enum TableRowChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -27991,20 +20610,20 @@ pub enum TableRowChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -28087,28 +20706,32 @@ pub enum CustomXmlRowChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28127,20 +20750,20 @@ pub enum CustomXmlRowChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -28205,28 +20828,32 @@ pub enum SdtRowChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28314,28 +20941,32 @@ pub enum TableCellChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28354,20 +20985,20 @@ pub enum TableCellChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -28450,28 +21081,32 @@ pub enum CustomXmlCellChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28490,20 +21125,20 @@ pub enum CustomXmlCellChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -28568,28 +21203,32 @@ pub enum SdtCellChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28662,28 +21301,32 @@ pub enum CustomXmlRunChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -28702,20 +21345,20 @@ pub enum CustomXmlRunChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -28898,10 +21541,10 @@ pub enum CustomXmlRunChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
@@ -28973,28 +21616,32 @@ pub enum SimpleFieldChoice2 {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -29013,20 +21660,20 @@ pub enum SimpleFieldChoice2 {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -29209,10 +21856,10 @@ pub enum SimpleFieldChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
   /// Anchor for Subdocument Location.
   #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
@@ -29272,25 +21919,29 @@ pub enum HyperlinkChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -29304,20 +21955,20 @@ pub enum HyperlinkChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -29458,9 +22109,9 @@ pub enum HyperlinkChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
@@ -29519,25 +22170,29 @@ pub enum BidirectionalOverrideChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -29551,20 +22206,20 @@ pub enum BidirectionalOverrideChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -29705,9 +22360,9 @@ pub enum BidirectionalOverrideChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
@@ -29760,25 +22415,29 @@ pub enum BidirectionalEmbeddingChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -29792,20 +22451,20 @@ pub enum BidirectionalEmbeddingChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -29946,9 +22605,9 @@ pub enum BidirectionalEmbeddingChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
@@ -30003,25 +22662,29 @@ pub enum TextBoxContentChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30035,20 +22698,20 @@ pub enum TextBoxContentChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -30112,25 +22775,29 @@ pub enum HeaderChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30144,20 +22811,20 @@ pub enum HeaderChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -30221,25 +22888,29 @@ pub enum FooterChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30253,20 +22924,20 @@ pub enum FooterChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -30355,28 +23026,32 @@ pub enum HeaderFooterTypeChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30395,17 +23070,17 @@ pub enum HeaderFooterTypeChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -30462,13 +23137,13 @@ pub enum PreviousTableRowPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousParagraphMarkRunPropertiesChoice {
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictIns"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictIns"))]
   W14ConflictIns(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictInsertion,
     >,
   ),
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictDel"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictDel"))]
   W14ConflictDel(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictDeletion,
@@ -30477,13 +23152,13 @@ pub enum PreviousParagraphMarkRunPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphMarkRunPropertiesChoice {
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictIns"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictIns"))]
   W14ConflictIns(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictInsertion,
     >,
   ),
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictDel"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictDel"))]
   W14ConflictDel(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictDeletion,
@@ -30583,25 +23258,29 @@ pub enum RubyContentChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30615,20 +23294,20 @@ pub enum RubyContentChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -30824,25 +23503,29 @@ pub enum RubyBaseChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -30856,20 +23539,20 @@ pub enum RubyBaseChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -31090,28 +23773,32 @@ pub enum RubyContentTypeChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -31130,17 +23817,17 @@ pub enum RubyContentTypeChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -31315,7 +24002,7 @@ pub enum SdtPropertiesChoice {
   WShowingPlcHdr(std::boxed::Box<ShowingPlaceholder>),
   #[sdk(child(qname = "w:CT_DataBinding/w:dataBinding"))]
   WDataBinding(std::boxed::Box<DataBinding>),
-  #[sdk(child(qname = "w:CT_DataBinding/w15:dataBinding"))]
+  #[sdk(child(office2013, qname = "w:CT_DataBinding/w15:dataBinding"))]
   W15DataBinding(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::DataBinding>,
   ),
@@ -31325,19 +24012,19 @@ pub enum SdtPropertiesChoice {
   WId(std::boxed::Box<SdtId>),
   #[sdk(child(qname = "w:CT_String/w:tag"))]
   WTag(std::boxed::Box<Tag>),
-  #[sdk(child(qname = "w:CT_Color/w15:color"))]
+  #[sdk(child(office2013, qname = "w:CT_Color/w15:color"))]
   W15Color(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::Color>),
-  #[sdk(child(qname = "w15:CT_SdtAppearance/w15:appearance"))]
+  #[sdk(child(office2013, qname = "w15:CT_SdtAppearance/w15:appearance"))]
   W15Appearance(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::Appearance>,
   ),
-  #[sdk(child(qname = "w:CT_OnOff/w15:webExtensionLinked"))]
+  #[sdk(child(office2013, qname = "w:CT_OnOff/w15:webExtensionLinked"))]
   W15WebExtensionLinked(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2012_wordml::WebExtensionLinked,
     >,
   ),
-  #[sdk(child(qname = "w:CT_OnOff/w15:webExtensionCreated"))]
+  #[sdk(child(office2013, qname = "w:CT_OnOff/w15:webExtensionCreated"))]
   W15WebExtensionCreated(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2012_wordml::WebExtensionCreated,
@@ -31374,22 +24061,22 @@ pub enum SdtPropertiesChoice {
   #[sdk(empty_child(qname = "w:CT_Empty/w:bibliography"))]
   WBibliography,
   /// Defines the EntityPickerEmpty Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w14:entityPicker"))]
+  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:entityPicker"))]
   W14EntityPicker,
-  #[sdk(child(qname = "w14:CT_SdtCheckbox/w14:checkbox"))]
+  #[sdk(child(office2010, qname = "w14:CT_SdtCheckbox/w14:checkbox"))]
   W14Checkbox(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::SdtContentCheckBox,
     >,
   ),
-  #[sdk(child(qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection"))]
+  #[sdk(child(office2013, qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection"))]
   W15RepeatingSection(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2012_wordml::SdtRepeatedSection,
     >,
   ),
   /// Defines the SdtRepeatedSectionItem Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w15:repeatingSectionItem"))]
+  #[sdk(empty_child(office2013, qname = "w:CT_Empty/w15:repeatingSectionItem"))]
   W15RepeatingSectionItem,
   /// Unknown XML child.
   #[sdk(any)]
@@ -31446,25 +24133,29 @@ pub enum SdtContentBlockChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -31478,20 +24169,20 @@ pub enum SdtContentBlockChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -31559,25 +24250,29 @@ pub enum SdtContentRunChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -31591,20 +24286,20 @@ pub enum SdtContentRunChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -31739,9 +24434,9 @@ pub enum SdtContentRunChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
@@ -31802,25 +24497,29 @@ pub enum SdtContentRunRubyChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -31834,20 +24533,20 @@ pub enum SdtContentRunRubyChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32039,25 +24738,29 @@ pub enum SdtContentCellChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32071,20 +24774,20 @@ pub enum SdtContentCellChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32144,25 +24847,29 @@ pub enum SdtContentRowChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32176,20 +24883,20 @@ pub enum SdtContentRowChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32361,28 +25068,32 @@ pub enum FootnoteChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32401,20 +25112,20 @@ pub enum FootnoteChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32503,28 +25214,32 @@ pub enum EndnoteChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32543,20 +25258,20 @@ pub enum EndnoteChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32645,28 +25360,32 @@ pub enum FootnoteEndnoteTypeChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32685,17 +25404,17 @@ pub enum FootnoteEndnoteTypeChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32783,28 +25502,32 @@ pub enum DocPartBodyChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32823,20 +25546,20 @@ pub enum DocPartBodyChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -32925,28 +25648,32 @@ pub enum BodyChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -32965,20 +25692,20 @@ pub enum BodyChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -33067,28 +25794,32 @@ pub enum BodyTypeChoice {
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -33107,17 +25838,17 @@ pub enum BodyTypeChoice {
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -33181,14 +25912,14 @@ pub enum TableRowPropertiesChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowPropertiesChoice2 {
   /// Defines the ConflictInsertion Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictIns"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictIns"))]
   W14ConflictIns(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictInsertion,
     >,
   ),
   /// Defines the ConflictDeletion Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w14:conflictDel"))]
+  #[sdk(child(office2010, qname = "w:CT_TrackChange/w14:conflictDel"))]
   W14ConflictDel(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictDeletion,

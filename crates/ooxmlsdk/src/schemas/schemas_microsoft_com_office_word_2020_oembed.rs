@@ -5,32 +5,16 @@
 //
 
 /// Defines the OEmbed Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is woe:oembed.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "woe:CT_OEmbed/woe:oembed")]
+#[sdk(microsoft365, qname = "woe:CT_OEmbed/woe:oembed")]
 pub struct OEmbed {
   /// oEmbedUrl
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: :oEmbedUrl
-  #[sdk(attr(qname = ":oEmbedUrl"))]
+  #[sdk(attr(microsoft365, qname = ":oEmbedUrl"))]
   pub o_embed_url: crate::simple_type::StringValue,
   /// mediaType
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: :mediaType
-  #[sdk(attr(qname = ":mediaType"))]
+  #[sdk(attr(microsoft365, qname = ":mediaType"))]
   pub media_type: crate::simple_type::StringValue,
   /// picLocksAutoForOEmbed
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: :picLocksAutoForOEmbed
-  #[sdk(attr(qname = ":picLocksAutoForOEmbed"))]
+  #[sdk(attr(microsoft365, qname = ":picLocksAutoForOEmbed"))]
   pub pic_locks_auto_for_o_embed: Option<crate::simple_type::BooleanValue>,
 }

@@ -363,10 +363,6 @@ pub enum TableInterpolationValues {
   Cubic,
 }
 /// Defines the Ink Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:ink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Ink/inkml:ink")]
 pub struct Ink {
@@ -374,10 +370,6 @@ pub struct Ink {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// documentID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :documentID
   #[sdk(attr(qname = ":documentID"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub document_id: Option<crate::simple_type::StringValue>,
@@ -393,119 +385,59 @@ pub struct Ink {
   pub xml_children: Vec<InkChoice>,
 }
 /// Defines the Bind Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:bind.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Bind/inkml:bind")]
 pub struct Bind {
   /// source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :source
   #[sdk(attr(qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// target
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :target
   #[sdk(attr(qname = ":target"))]
   pub target: Option<crate::simple_type::StringValue>,
   /// column
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :column
   #[sdk(attr(qname = ":column"))]
   pub column: Option<crate::simple_type::StringValue>,
   /// variable
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :variable
   #[sdk(attr(qname = ":variable"))]
   pub variable: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Table Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:table.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Table/inkml:table")]
 pub struct Table {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// apply
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :apply
   #[sdk(attr(qname = ":apply"))]
   pub apply: Option<TableApplyValues>,
   /// interpolation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :interpolation
   #[sdk(attr(qname = ":interpolation"))]
   pub interpolation: Option<TableInterpolationValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Matrix Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:matrix.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Matrix/inkml:matrix")]
 pub struct Matrix {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Mapping Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:mapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Mapping/inkml:mapping")]
 pub struct Mapping {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<MappingTypeValues>,
   /// mappingRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :mappingRef
   #[sdk(attr(qname = ":mappingRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub mapping_ref: Option<crate::simple_type::StringValue>,
@@ -522,25 +454,13 @@ pub struct Mapping {
   pub mapping: Vec<Mapping>,
 }
 /// Defines the Channel Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:channel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Channel/inkml:channel")]
 pub struct Channel {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   #[sdk(
         string_set(
@@ -585,55 +505,27 @@ pub struct Channel {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub name: crate::simple_type::StringValue,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<ChannelDataTypeValues>,
   /// default
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :default
   #[sdk(attr(qname = ":default"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:decimal"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:boolean"))]
   pub default: Option<crate::simple_type::StringValue>,
   /// min
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :min
   #[sdk(attr(qname = ":min"))]
   pub min: Option<crate::simple_type::DecimalValue>,
   /// max
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :max
   #[sdk(attr(qname = ":max"))]
   pub max: Option<crate::simple_type::DecimalValue>,
   /// orientation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :orientation
   #[sdk(attr(qname = ":orientation"))]
   pub orientation: Option<ChannelValueOrientationValues>,
   /// respectTo
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :respectTo
   #[sdk(attr(qname = ":respectTo"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub respect_to: Option<crate::simple_type::StringValue>,
   /// units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :units
   #[sdk(attr(qname = ":units"))]
   #[sdk(
         string_set(
@@ -690,10 +582,6 @@ pub struct Channel {
   pub inkml_mapping: Vec<Mapping>,
 }
 /// Defines the IntermittentChannels Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:intermittentChannels.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_IntermittentChannels/inkml:intermittentChannels")]
 pub struct IntermittentChannels {
@@ -702,18 +590,10 @@ pub struct IntermittentChannels {
   pub inkml_channel: Vec<Channel>,
 }
 /// Defines the ChannelProperty Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:channelProperty.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ChannelProperty/inkml:channelProperty")]
 pub struct ChannelProperty {
   /// channel
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :channel
   #[sdk(attr(qname = ":channel"))]
   #[sdk(
         string_set(
@@ -758,10 +638,6 @@ pub struct ChannelProperty {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub channel: crate::simple_type::StringValue,
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   #[sdk(
         string_set(
@@ -782,17 +658,9 @@ pub struct ChannelProperty {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub name: crate::simple_type::StringValue,
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::DecimalValue,
   /// units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :units
   #[sdk(attr(qname = ":units"))]
   #[sdk(
         string_set(
@@ -846,18 +714,10 @@ pub struct ChannelProperty {
   pub units: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TraceFormat Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:traceFormat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceFormat/inkml:traceFormat")]
 pub struct TraceFormat {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// _
@@ -868,78 +728,38 @@ pub struct TraceFormat {
   pub inkml_intermittent_channels: Option<IntermittentChannels>,
 }
 /// Defines the SampleRate Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:sampleRate.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_SampleRate/inkml:sampleRate")]
 pub struct SampleRate {
   /// uniform
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniform
   #[sdk(attr(qname = ":uniform"))]
   pub uniform: Option<crate::simple_type::BooleanValue>,
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::DecimalValue,
 }
 /// Defines the Latency Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:latency.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Latency/inkml:latency")]
 pub struct Latency {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::DecimalValue,
 }
 /// Defines the ActiveArea Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:activeArea.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ActiveArea/inkml:activeArea")]
 pub struct ActiveArea {
   /// size
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :size
   #[sdk(attr(qname = ":size"))]
   pub size: Option<crate::simple_type::StringValue>,
   /// height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :height
   #[sdk(attr(qname = ":height"))]
   pub height: Option<crate::simple_type::DecimalValue>,
   /// width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   pub width: Option<crate::simple_type::DecimalValue>,
   /// units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :units
   #[sdk(attr(qname = ":units"))]
   #[sdk(
         string_set(
@@ -993,32 +813,16 @@ pub struct ActiveArea {
   pub units: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SourceProperty Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:srcProperty.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_SrcProperty/inkml:srcProperty")]
 pub struct SourceProperty {
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
   #[sdk(attr(qname = ":value"))]
   pub value: crate::simple_type::DecimalValue,
   /// units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :units
   #[sdk(attr(qname = ":units"))]
   #[sdk(
         string_set(
@@ -1072,10 +876,6 @@ pub struct SourceProperty {
   pub units: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ChannelProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:channelProperties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_ChannelProperties/inkml:channelProperties")]
 pub struct ChannelProperties {
@@ -1084,57 +884,29 @@ pub struct ChannelProperties {
   pub inkml_channel_property: Vec<ChannelProperty>,
 }
 /// Defines the Annotation Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:annotation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Annotation/inkml:annotation")]
 pub struct Annotation {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<crate::simple_type::StringValue>,
   /// encoding
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :encoding
   #[sdk(attr(qname = ":encoding"))]
   pub encoding: Option<crate::simple_type::StringValue>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the AnnotationXml Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:annotationXML.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_AnnotationXML/inkml:annotationXML")]
 pub struct AnnotationXml {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<crate::simple_type::StringValue>,
   /// encoding
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :encoding
   #[sdk(attr(qname = ":encoding"))]
   pub encoding: Option<crate::simple_type::StringValue>,
   /// href
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :href
   #[sdk(attr(qname = ":href"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -1143,18 +915,10 @@ pub struct AnnotationXml {
   pub emma: Option<crate::schemas::www_w3_org_2003_04_emma::Emma>,
 }
 /// Defines the BrushProperty Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:brushProperty.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_BrushProperty/inkml:brushProperty")]
 pub struct BrushProperty {
   /// name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   #[sdk(
         string_set(
@@ -1174,10 +938,6 @@ pub struct BrushProperty {
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub name: crate::simple_type::StringValue,
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
   #[sdk(attr(qname = ":value"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:decimal"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:boolean"))]
@@ -1215,10 +975,6 @@ pub struct BrushProperty {
   #[sdk(string_format(source = 5u32, union = 0u64, kind = "token"))]
   pub value: crate::simple_type::StringValue,
   /// units
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :units
   #[sdk(attr(qname = ":units"))]
   #[sdk(
         string_set(
@@ -1278,25 +1034,13 @@ pub struct BrushProperty {
   pub inkml_annotation_xml: Vec<AnnotationXml>,
 }
 /// Defines the Canvas Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:canvas.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Canvas/inkml:canvas")]
 pub struct Canvas {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// traceFormatRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :traceFormatRef
   #[sdk(attr(qname = ":traceFormatRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub trace_format_ref: Option<crate::simple_type::StringValue>,
@@ -1305,25 +1049,13 @@ pub struct Canvas {
   pub trace_format: Option<std::boxed::Box<TraceFormat>>,
 }
 /// Defines the CanvasTransform Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:canvasTransform.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_CanvasTransform/inkml:canvasTransform")]
 pub struct CanvasTransform {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// invertible
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :invertible
   #[sdk(attr(qname = ":invertible"))]
   pub invertible: Option<crate::simple_type::BooleanValue>,
   /// _
@@ -1331,54 +1063,26 @@ pub struct CanvasTransform {
   pub inkml_mapping: Vec<Mapping>,
 }
 /// Defines the InkSource Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:inkSource.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_InkSource/inkml:inkSource")]
 pub struct InkSource {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: crate::simple_type::StringValue,
   /// manufacturer
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :manufacturer
   #[sdk(attr(qname = ":manufacturer"))]
   pub manufacturer: Option<crate::simple_type::StringValue>,
   /// model
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :model
   #[sdk(attr(qname = ":model"))]
   pub model: Option<crate::simple_type::StringValue>,
   /// serialNo
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :serialNo
   #[sdk(attr(qname = ":serialNo"))]
   pub serial_no: Option<crate::simple_type::StringValue>,
   /// specificationRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :specificationRef
   #[sdk(attr(qname = ":specificationRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub specification_ref: Option<crate::simple_type::StringValue>,
   /// description
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :description
   #[sdk(attr(qname = ":description"))]
   pub description: Option<crate::simple_type::StringValue>,
   /// _
@@ -1401,25 +1105,13 @@ pub struct InkSource {
   pub inkml_channel_properties: Option<ChannelProperties>,
 }
 /// Defines the Brush Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:brush.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Brush/inkml:brush")]
 pub struct Brush {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// brushRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :brushRef
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
@@ -1434,148 +1126,72 @@ pub struct Brush {
   pub inkml_brush_property: Vec<BrushProperty>,
 }
 /// Defines the Timestamp Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:timestamp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Timestamp/inkml:timestamp")]
 pub struct Timestamp {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: crate::simple_type::StringValue,
   /// time
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :time
   #[sdk(attr(qname = ":time"))]
   pub time: Option<crate::simple_type::DecimalValue>,
   /// timestampRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :timestampRef
   #[sdk(attr(qname = ":timestampRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub timestamp_ref: Option<crate::simple_type::StringValue>,
   /// timeString
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :timeString
   #[sdk(attr(qname = ":timeString"))]
   pub time_string: Option<crate::simple_type::DateTimeValue>,
   /// timeOffset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :timeOffset
   #[sdk(attr(qname = ":timeOffset"))]
   pub time_offset: Option<crate::simple_type::DecimalValue>,
 }
 /// Defines the Trace Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:trace.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Trace/inkml:trace")]
 pub struct Trace {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<TraceTypeValues>,
   /// continuation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :continuation
   #[sdk(attr(qname = ":continuation"))]
   pub continuation: Option<TraceContinuationValues>,
   /// priorRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :priorRef
   #[sdk(attr(qname = ":priorRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub prior_ref: Option<crate::simple_type::StringValue>,
   /// contextRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contextRef
   #[sdk(attr(qname = ":contextRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :brushRef
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// duration
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :duration
   #[sdk(attr(qname = ":duration"))]
   pub duration: Option<crate::simple_type::DecimalValue>,
   /// timeOffset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :timeOffset
   #[sdk(attr(qname = ":timeOffset"))]
   pub time_offset: Option<crate::simple_type::DecimalValue>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TraceGroup Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:traceGroup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceGroup/inkml:traceGroup")]
 pub struct TraceGroup {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contextRef
   #[sdk(attr(qname = ":contextRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :brushRef
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
@@ -1588,48 +1204,24 @@ pub struct TraceGroup {
   pub xml_children: Vec<TraceGroupChoice>,
 }
 /// Defines the TraceView Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:traceView.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_TraceView/inkml:traceView")]
 pub struct TraceView {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contextRef
   #[sdk(attr(qname = ":contextRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// traceDataRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :traceDataRef
   #[sdk(attr(qname = ":traceDataRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub trace_data_ref: Option<crate::simple_type::StringValue>,
   /// from
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :from
   #[sdk(attr(qname = ":from"))]
   pub from: Option<crate::simple_type::StringValue>,
   /// to
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
@@ -1640,73 +1232,37 @@ pub struct TraceView {
   pub xml_children: Vec<TraceViewChoice>,
 }
 /// Defines the Context Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:context.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Context/inkml:context")]
 pub struct Context {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:id
   #[sdk(attr(qname = "xml:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contextRef
   #[sdk(attr(qname = ":contextRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// canvasRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :canvasRef
   #[sdk(attr(qname = ":canvasRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub canvas_ref: Option<crate::simple_type::StringValue>,
   /// canvasTransformRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :canvasTransformRef
   #[sdk(attr(qname = ":canvasTransformRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub canvas_transform_ref: Option<crate::simple_type::StringValue>,
   /// traceFormatRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :traceFormatRef
   #[sdk(attr(qname = ":traceFormatRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub trace_fromat_ref: Option<crate::simple_type::StringValue>,
   /// inkSourceRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :inkSourceRef
   #[sdk(attr(qname = ":inkSourceRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub ink_source_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :brushRef
   #[sdk(attr(qname = ":brushRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// timestampRef
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :timestampRef
   #[sdk(attr(qname = ":timestampRef"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub timestamp_ref: Option<crate::simple_type::StringValue>,
@@ -1730,10 +1286,6 @@ pub struct Context {
   pub timestamp: Option<Timestamp>,
 }
 /// Defines the Definitions Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is inkml:definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "inkml:CT_Definitions/inkml:definitions")]
 pub struct Definitions {

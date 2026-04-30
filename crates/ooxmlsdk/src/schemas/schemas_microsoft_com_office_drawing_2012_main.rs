@@ -31,116 +31,63 @@ pub enum TargetScreenSize {
   Sz1920x1200,
 }
 /// Defines the BackgroundProperties Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a15:backgroundPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a15:CT_BackgroundPr/a15:backgroundPr")]
+#[sdk(office2013, qname = "a15:CT_BackgroundPr/a15:backgroundPr")]
 pub struct BackgroundProperties {
   /// bwMode
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
-  #[sdk(attr(qname = ":bwMode"))]
+  #[sdk(attr(office2013, qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// bwPure
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwPure
-  #[sdk(attr(qname = ":bwPure"))]
+  #[sdk(attr(office2013, qname = ":bwPure"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub pure:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// bwNormal
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwNormal
-  #[sdk(attr(qname = ":bwNormal"))]
+  #[sdk(attr(office2013, qname = ":bwNormal"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub normal:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// targetScreenSize
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :targetScreenSize
-  #[sdk(attr(qname = ":targetScreenSize"))]
+  #[sdk(attr(office2013, qname = ":targetScreenSize"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub target_screen_size: Option<TargetScreenSize>,
 }
 /// Defines the NonVisualGroupProperties Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a15:nonVisualGroupProps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps")]
+#[sdk(
+  office2013,
+  qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"
+)]
 pub struct NonVisualGroupProperties {
   /// isLegacyGroup
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :isLegacyGroup
-  #[sdk(attr(qname = ":isLegacyGroup"))]
+  #[sdk(attr(office2013, qname = ":isLegacyGroup"))]
   pub is_legacy_group: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ObjectProperties Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a15:objectPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a15:CT_ObjectPr/a15:objectPr")]
+#[sdk(office2013, qname = "a15:CT_ObjectPr/a15:objectPr")]
 pub struct ObjectProperties {
   /// objectId
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :objectId
-  #[sdk(attr(qname = ":objectId"))]
+  #[sdk(attr(office2013, qname = ":objectId"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// isActiveX
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :isActiveX
-  #[sdk(attr(qname = ":isActiveX"))]
+  #[sdk(attr(office2013, qname = ":isActiveX"))]
   pub is_active_x: Option<crate::simple_type::BooleanValue>,
   /// linkType
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :linkType
-  #[sdk(attr(qname = ":linkType"))]
+  #[sdk(attr(office2013, qname = ":linkType"))]
   pub link_type: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SignatureLine Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is a15:signatureLine.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a15:CT_SignatureLine/a15:signatureLine")]
+#[sdk(office2013, qname = "a15:CT_SignatureLine/a15:signatureLine")]
 pub struct SignatureLine {
   /// isSignatureLine
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :isSignatureLine
-  #[sdk(attr(qname = ":isSignatureLine"))]
+  #[sdk(attr(office2013, qname = ":isSignatureLine"))]
   pub is_signature_line: Option<crate::simple_type::BooleanValue>,
   /// id
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2013, qname = ":id"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -148,11 +95,7 @@ pub struct SignatureLine {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// provId
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :provId
-  #[sdk(attr(qname = ":provId"))]
+  #[sdk(attr(office2013, qname = ":provId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -160,66 +103,30 @@ pub struct SignatureLine {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub provider_id: Option<crate::simple_type::StringValue>,
   /// signingInstructionsSet
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :signingInstructionsSet
-  #[sdk(attr(qname = ":signingInstructionsSet"))]
+  #[sdk(attr(office2013, qname = ":signingInstructionsSet"))]
   pub signing_instructions_set: Option<crate::simple_type::BooleanValue>,
   /// allowComments
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :allowComments
-  #[sdk(attr(qname = ":allowComments"))]
+  #[sdk(attr(office2013, qname = ":allowComments"))]
   pub allow_comments: Option<crate::simple_type::BooleanValue>,
   /// showSignDate
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :showSignDate
-  #[sdk(attr(qname = ":showSignDate"))]
+  #[sdk(attr(office2013, qname = ":showSignDate"))]
   pub show_sign_date: Option<crate::simple_type::BooleanValue>,
   /// suggestedSigner
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :suggestedSigner
-  #[sdk(attr(qname = ":suggestedSigner"))]
+  #[sdk(attr(office2013, qname = ":suggestedSigner"))]
   pub suggested_signer: Option<crate::simple_type::StringValue>,
   /// suggestedSigner2
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :suggestedSigner2
-  #[sdk(attr(qname = ":suggestedSigner2"))]
+  #[sdk(attr(office2013, qname = ":suggestedSigner2"))]
   pub suggested_signer2: Option<crate::simple_type::StringValue>,
   /// suggestedSignerEmail
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :suggestedSignerEmail
-  #[sdk(attr(qname = ":suggestedSignerEmail"))]
+  #[sdk(attr(office2013, qname = ":suggestedSignerEmail"))]
   pub suggested_signer_email: Option<crate::simple_type::StringValue>,
   /// signingInstructions
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :signingInstructions
-  #[sdk(attr(qname = ":signingInstructions"))]
+  #[sdk(attr(office2013, qname = ":signingInstructions"))]
   pub signing_instructions: Option<crate::simple_type::StringValue>,
   /// addlXml
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :addlXml
-  #[sdk(attr(qname = ":addlXml"))]
+  #[sdk(attr(office2013, qname = ":addlXml"))]
   pub additional_xml: Option<crate::simple_type::StringValue>,
   /// sigProvUrl
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :sigProvUrl
-  #[sdk(attr(qname = ":sigProvUrl"))]
+  #[sdk(attr(office2013, qname = ":sigProvUrl"))]
   pub signature_provider_url: Option<crate::simple_type::StringValue>,
 }

@@ -865,6 +865,15 @@ fn parse_sdk_qname(attrs: &[Attribute]) -> syn::Result<Option<String>> {
   Ok(None)
 }
 
+fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
+  path.is_ident("office2010")
+    || path.is_ident("office2013")
+    || path.is_ident("office2016")
+    || path.is_ident("office2019")
+    || path.is_ident("office2021")
+    || path.is_ident("microsoft365")
+}
+
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
   let mut kind = None;
@@ -888,6 +897,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let value: LitStr = nested.value()?.parse()?;
               attr_name = Some(normalize_attr_qname(&value.value()));
               Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk attr attribute"))
             }
@@ -899,6 +910,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
               Err(nested.error("unsupported sdk child attribute"))
@@ -920,6 +933,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
               Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk empty_child attribute"))
             }
@@ -934,6 +949,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
               Err(nested.error("unsupported sdk text_child attribute"))
@@ -959,6 +976,8 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             } else if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               choice_qnames.push(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
               Err(nested.error("unsupported sdk choice attribute"))
@@ -996,6 +1015,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         Meta::Path(path) if path.is_ident("any") => {
           kind = Some(SdkTypeFieldKind::Any);
         }
+        Meta::Path(path) if is_sdk_version_marker_path(&path) => {}
         Meta::NameValue(meta) if meta.path.is_ident("bit") => {}
         Meta::Path(path)
           if path.is_ident("xmlns") || path.is_ident("mce") || path.is_ident("xml_header") =>
@@ -1283,6 +1303,8 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
               Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk choice child attribute"))
             }
@@ -1296,6 +1318,8 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
               Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
             } else {
               Err(nested.error("unsupported sdk choice empty_child attribute"))
             }
@@ -1308,6 +1332,8 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
               Err(nested.error("unsupported sdk choice text_child attribute"))

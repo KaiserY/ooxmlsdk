@@ -5,10 +5,6 @@
 //
 
 /// Custom File Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is op:Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "op:CT_Properties/op:Properties")]
 pub struct Properties {
@@ -20,18 +16,10 @@ pub struct Properties {
   pub op_property: Vec<CustomDocumentProperty>,
 }
 /// Custom File Property.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is op:property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "op:CT_Property/op:property")]
 pub struct CustomDocumentProperty {
   /// Format ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fmtid
   #[sdk(attr(qname = ":fmtid"))]
   #[sdk(pattern(
     source = 1u32,
@@ -39,24 +27,12 @@ pub struct CustomDocumentProperty {
   ))]
   pub format_id: crate::simple_type::StringValue,
   /// Property ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :pid
   #[sdk(attr(qname = ":pid"))]
   pub property_id: crate::simple_type::Int32Value,
   /// Custom File Property Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Bookmark Link Target
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :linkTarget
   #[sdk(attr(qname = ":linkTarget"))]
   pub link_target: Option<crate::simple_type::StringValue>,
   #[sdk(choice(

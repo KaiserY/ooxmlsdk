@@ -5,12 +5,8 @@
 //
 
 /// Defines the ShapeStyle Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic14:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeStyle/pic14:style")]
+#[sdk(office2010, qname = "a:CT_ShapeStyle/pic14:style")]
 pub struct ShapeStyle {
   /// _
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
@@ -31,12 +27,8 @@ pub struct ShapeStyle {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic14:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
+#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/pic14:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.

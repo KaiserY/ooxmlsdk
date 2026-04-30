@@ -5,47 +5,23 @@
 //
 
 /// Defines the NonVisualDrawingProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm14:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr")]
 pub struct NonVisualDrawingProperties {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -69,18 +45,10 @@ pub struct NonVisualDrawingProperties {
     >,
 }
 /// Defines the RecolorImages Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm14:recolorImg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm14:CT_Boolean/dgm14:recolorImg")]
+#[sdk(office2010, qname = "dgm14:CT_Boolean/dgm14:recolorImg")]
 pub struct RecolorImages {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }

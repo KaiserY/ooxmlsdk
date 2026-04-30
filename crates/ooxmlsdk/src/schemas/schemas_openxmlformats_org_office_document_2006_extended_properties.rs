@@ -5,10 +5,6 @@
 //
 
 /// Application Specific File Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_Properties/ap:Properties")]
 pub struct Properties {
@@ -98,148 +94,52 @@ pub struct Properties {
   pub document_security: Option<crate::simple_type::Int32Value>,
 }
 /// Name of Document Template.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Template.
 pub type Template = crate::simple_type::StringValue;
 /// Name of Manager.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Manager.
 pub type Manager = crate::simple_type::StringValue;
 /// Name of Company.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Company.
 pub type Company = crate::simple_type::StringValue;
 /// Intended Format of Presentation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:PresentationFormat.
 pub type PresentationFormat = crate::simple_type::StringValue;
 /// Relative Hyperlink Base.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:HyperlinkBase.
 pub type HyperlinkBase = crate::simple_type::StringValue;
 /// Application Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Application.
 pub type Application = crate::simple_type::StringValue;
 /// Application Version.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:AppVersion.
 pub type ApplicationVersion = crate::simple_type::StringValue;
 /// Total Number of Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Pages.
 pub type Pages = crate::simple_type::Int32Value;
 /// Word Count.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Words.
 pub type Words = crate::simple_type::Int32Value;
 /// Total Number of Characters.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Characters.
 pub type Characters = crate::simple_type::Int32Value;
 /// Number of Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Lines.
 pub type Lines = crate::simple_type::Int32Value;
 /// Total Number of Paragraphs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Paragraphs.
 pub type Paragraphs = crate::simple_type::Int32Value;
 /// Slides Metadata Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Slides.
 pub type Slides = crate::simple_type::Int32Value;
 /// Number of Slides Containing Notes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:Notes.
 pub type Notes = crate::simple_type::Int32Value;
 /// Total Edit Time Metadata Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:TotalTime.
 pub type TotalTime = crate::simple_type::Int32Value;
 /// Number of Hidden Slides.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:HiddenSlides.
 pub type HiddenSlides = crate::simple_type::Int32Value;
 /// Total Number of Multimedia Clips.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:MMClips.
 pub type MultimediaClips = crate::simple_type::Int32Value;
 /// Number of Characters (With Spaces).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:CharactersWithSpaces.
 pub type CharactersWithSpaces = crate::simple_type::Int32Value;
 /// Document Security.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:DocSecurity.
 pub type DocumentSecurity = crate::simple_type::Int32Value;
 /// Thumbnail Display Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:ScaleCrop.
 pub type ScaleCrop = crate::simple_type::BooleanValue;
 /// Links Up-to-Date.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:LinksUpToDate.
 pub type LinksUpToDate = crate::simple_type::BooleanValue;
 /// Shared Document.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:SharedDoc.
 pub type SharedDocument = crate::simple_type::BooleanValue;
 /// Hyperlinks Changed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:HyperlinksChanged.
 pub type HyperlinksChanged = crate::simple_type::BooleanValue;
 /// Heading Pairs.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:HeadingPairs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/ap:HeadingPairs")]
 pub struct HeadingPairs {
@@ -250,10 +150,6 @@ pub struct HeadingPairs {
   >,
 }
 /// Hyperlink List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:HLinks.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/ap:HLinks")]
 pub struct HyperlinkList {
@@ -264,10 +160,6 @@ pub struct HyperlinkList {
   >,
 }
 /// Defines the VectorVariantType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorVariant/")]
 pub struct VectorVariantType {
@@ -278,10 +170,6 @@ pub struct VectorVariantType {
   >,
 }
 /// Part Titles.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:TitlesOfParts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorLpstr/ap:TitlesOfParts")]
 pub struct TitlesOfParts {
@@ -292,10 +180,6 @@ pub struct TitlesOfParts {
   >,
 }
 /// Digital Signature.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ap:DigSig.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_DigSigBlob/ap:DigSig")]
 pub struct DigitalSignature {

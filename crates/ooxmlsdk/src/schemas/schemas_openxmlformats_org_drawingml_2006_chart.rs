@@ -365,41 +365,21 @@ pub enum SplitValues {
   Value,
 }
 /// Number Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:numFmt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumFmt/c:numFmt")]
 pub struct NumberingFormat {
   /// Number Format Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :formatCode
   #[sdk(attr(qname = ":formatCode"))]
   pub format_code: crate::simple_type::StringValue,
   /// Linked to Source
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :sourceLinked
   #[sdk(attr(qname = ":sourceLinked"))]
   pub source_linked: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ChartShapeProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ChartShapeProperties/c:spPr")]
 pub struct ChartShapeProperties {
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -448,10 +428,6 @@ pub struct ChartShapeProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the TextProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:txPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:txPr")]
 pub struct TextProperties {
@@ -470,10 +446,6 @@ pub struct TextProperties {
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
 /// Rich Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:rich.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/c:rich")]
 pub struct RichText {
@@ -492,10 +464,6 @@ pub struct RichText {
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
 /// Defines the TextBodyType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/")]
 pub struct TextBodyType {
@@ -508,700 +476,348 @@ pub struct TextBodyType {
   pub xml_children: Vec<TextBodyTypeChoice>,
 }
 /// Data Label Position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dLblPos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblPos/c:dLblPos")]
 pub struct DataLabelPosition {
   /// Data Label Position Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: DataLabelPositionValues,
 }
 /// Show Legend Key.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showLegendKey.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showLegendKey")]
 pub struct ShowLegendKey {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showVal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showVal")]
 pub struct ShowValue {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Category Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showCatName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showCatName")]
 pub struct ShowCategoryName {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Series Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showSerName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showSerName")]
 pub struct ShowSeriesName {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Percent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showPercent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showPercent")]
 pub struct ShowPercent {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Bubble Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showBubbleSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showBubbleSize")]
 pub struct ShowBubbleSize {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Leader Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showLeaderLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showLeaderLines")]
 pub struct ShowLeaderLines {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the VaryColors Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:varyColors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:varyColors")]
 pub struct VaryColors {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Wireframe.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:wireframe.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:wireframe")]
 pub struct Wireframe {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Delete.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:delete.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:delete")]
 pub struct Delete {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Overlay.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:overlay.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:overlay")]
 pub struct Overlay {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Right Angle Axes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:rAngAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:rAngAx")]
 pub struct RightAngleAxes {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Horizontal Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showHorzBorder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showHorzBorder")]
 pub struct ShowHorizontalBorder {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Vertical Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showVertBorder.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showVertBorder")]
 pub struct ShowVerticalBorder {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Outline Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showOutline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showOutline")]
 pub struct ShowOutlineBorder {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Show Legend Keys.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showKeys.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showKeys")]
 pub struct ShowKeys {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Invert if Negative.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:invertIfNegative.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:invertIfNegative")]
 pub struct InvertIfNegative {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// 3D Bubble.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bubble3D.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:bubble3D")]
 pub struct Bubble3D {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Display R Squared Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dispRSqr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:dispRSqr")]
 pub struct DisplayRSquaredValue {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Display Equation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dispEq.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:dispEq")]
 pub struct DisplayEquation {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// No End Cap.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:noEndCap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:noEndCap")]
 pub struct NoEndCap {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Apply To Front.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:applyToFront.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:applyToFront")]
 pub struct ApplyToFront {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Apply To Sides.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:applyToSides.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:applyToSides")]
 pub struct ApplyToSides {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Apply to End.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:applyToEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:applyToEnd")]
 pub struct ApplyToEnd {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Chart Object.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:chartObject.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:chartObject")]
 pub struct ChartObject {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Data Cannot Be Changed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:data")]
 pub struct Data {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:formatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:formatting")]
 pub struct Formatting {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Selection.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:selection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:selection")]
 pub struct Selection {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// User Interface.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:userInterface.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:userInterface")]
 pub struct UserInterface {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Update Automatically.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:autoUpdate.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:autoUpdate")]
 pub struct AutoUpdate {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShowMarker Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:marker.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:marker")]
 pub struct ShowMarker {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Smooth Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:smooth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:smooth")]
 pub struct Smooth {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShowNegativeBubbles Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showNegBubbles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showNegBubbles")]
 pub struct ShowNegativeBubbles {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the AutoLabeled Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:auto.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:auto")]
 pub struct AutoLabeled {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the NoMultiLevelLabels Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:noMultiLvlLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:noMultiLvlLbl")]
 pub struct NoMultiLevelLabels {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// True if the chart automatic title has been deleted..
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:autoTitleDeleted.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:autoTitleDeleted")]
 pub struct AutoTitleDeleted {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// True if only visible cells are plotted..
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:plotVisOnly.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:plotVisOnly")]
 pub struct PlotVisibleOnly {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// True if we should render datalabels over the maximum scale.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:showDLblsOverMax.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:showDLblsOverMax")]
 pub struct ShowDataLabelsOverMaximum {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Date1904 Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:date1904.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:date1904")]
 pub struct Date1904 {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the RoundedCorners Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:roundedCorners.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/c:roundedCorners")]
 pub struct RoundedCorners {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the BooleanType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/")]
 pub struct BooleanType {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Separator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:separator.
 pub type Separator = crate::simple_type::StringValue;
 /// Trendline Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:name.
 pub type TrendlineName = crate::simple_type::StringValue;
 /// Defines the Formula Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:f.
 pub type Formula = crate::simple_type::StringValue;
 /// Layout.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:layout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Layout/c:layout")]
 pub struct Layout {
@@ -1213,10 +829,6 @@ pub struct Layout {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ChartText Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:tx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Tx/c:tx")]
 pub struct ChartText {
@@ -1228,10 +840,6 @@ pub struct ChartText {
   pub xml_children: Option<ChartTextChoice>,
 }
 /// Leader Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:leaderLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:leaderLines")]
 pub struct LeaderLines {
@@ -1240,10 +848,6 @@ pub struct LeaderLines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Drop Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dropLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:dropLines")]
 pub struct DropLines {
@@ -1252,10 +856,6 @@ pub struct DropLines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Major Gridlines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:majorGridlines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:majorGridlines")]
 pub struct MajorGridlines {
@@ -1264,10 +864,6 @@ pub struct MajorGridlines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Minor Gridlines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:minorGridlines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:minorGridlines")]
 pub struct MinorGridlines {
@@ -1276,10 +872,6 @@ pub struct MinorGridlines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Defines the SeriesLines Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:serLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:serLines")]
 pub struct SeriesLines {
@@ -1288,10 +880,6 @@ pub struct SeriesLines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Defines the HighLowLines Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:hiLowLines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:hiLowLines")]
 pub struct HighLowLines {
@@ -1300,10 +888,6 @@ pub struct HighLowLines {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Defines the ChartLinesType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/")]
 pub struct ChartLinesType {
@@ -1312,154 +896,78 @@ pub struct ChartLinesType {
   pub chart_shape_properties: Vec<ChartShapeProperties>,
 }
 /// Index.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:idx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:idx")]
 pub struct Index {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Order.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:order.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:order")]
 pub struct Order {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Axis ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:axId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:axId")]
 pub struct AxisId {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Crossing Axis ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:crossAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:crossAx")]
 pub struct CrossingAxis {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Point Count.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ptCount.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:ptCount")]
 pub struct PointCount {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Second Pie Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:secondPiePt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:secondPiePt")]
 pub struct SecondPiePoint {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Explosion.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:explosion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:explosion")]
 pub struct Explosion {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Format ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:fmtId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:fmtId")]
 pub struct FormatId {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the UnsignedIntegerType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/")]
 pub struct UnsignedIntegerType {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Series Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:tx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerTx/c:tx")]
 pub struct SeriesText {
@@ -1467,26 +975,14 @@ pub struct SeriesText {
   pub xml_children: Option<SeriesTextChoice>,
 }
 /// Grouping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:grouping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Grouping/c:grouping")]
 pub struct Grouping {
   /// Grouping Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<GroupingValues>,
 }
 /// Defines the LineChartSeries Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSer/c:ser")]
 pub struct LineChartSeries {
@@ -1534,10 +1030,6 @@ pub struct LineChartSeries {
   pub c_ext_lst: Option<LineSerExtensionList>,
 }
 /// Data Labels.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dLbls.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLbls/c:dLbls")]
 pub struct DataLabels {
@@ -1566,42 +1058,22 @@ pub struct DataLabels {
   pub c_ext_lst: Option<DLblsExtensionList>,
 }
 /// Bar Direction.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:barDir.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarDir/c:barDir")]
 pub struct BarDirection {
   /// Bar Direction Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: BarDirectionValues,
 }
 /// Bar Grouping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:grouping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarGrouping/c:grouping")]
 pub struct BarGrouping {
   /// Bar Grouping Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<BarGroupingValues>,
 }
 /// Bar Chart Series.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSer/c:ser")]
 pub struct BarChartSeries {
@@ -1649,10 +1121,6 @@ pub struct BarChartSeries {
   pub c_ext_lst: Option<BarSerExtensionList>,
 }
 /// Area Chart Series.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSer/c:ser")]
 pub struct AreaChartSeries {
@@ -1694,10 +1162,6 @@ pub struct AreaChartSeries {
   pub c_ext_lst: Option<AreaSerExtensionList>,
 }
 /// Pie Chart Series.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSer/c:ser")]
 pub struct PieChartSeries {
@@ -1736,10 +1200,6 @@ pub struct PieChartSeries {
   pub c_ext_lst: Option<PieSerExtensionList>,
 }
 /// Surface Chart Series.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSer/c:ser")]
 pub struct SurfaceChartSeries {
@@ -1772,10 +1232,6 @@ pub struct SurfaceChartSeries {
   pub surface_ser_extension_list: Option<SurfaceSerExtensionList>,
 }
 /// Band Formats.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bandFmts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BandFmts/c:bandFmts")]
 pub struct BandFormats {
@@ -1784,10 +1240,6 @@ pub struct BandFormats {
   pub c_band_fmt: Vec<BandFormat>,
 }
 /// Scaling.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:scaling.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Scaling/c:scaling")]
 pub struct Scaling {
@@ -1808,26 +1260,14 @@ pub struct Scaling {
   pub extension_list: Option<ExtensionList>,
 }
 /// Axis Position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:axPos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxPos/c:axPos")]
 pub struct AxisPosition {
   /// Axis Position Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: AxisPositionValues,
 }
 /// Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:title.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Title/c:title")]
 pub struct Title {
@@ -1851,314 +1291,158 @@ pub struct Title {
   pub extension_list: Option<ExtensionList>,
 }
 /// Major Tick Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:majorTickMark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TickMark/c:majorTickMark")]
 pub struct MajorTickMark {
   /// Tick Mark Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TickMarkValues>,
 }
 /// Minor Tick Mark.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:minorTickMark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TickMark/c:minorTickMark")]
 pub struct MinorTickMark {
   /// Tick Mark Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TickMarkValues>,
 }
 /// Defines the TickMarkType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TickMark/")]
 pub struct TickMarkType {
   /// Tick Mark Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TickMarkValues>,
 }
 /// Tick Label Position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:tickLblPos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TickLblPos/c:tickLblPos")]
 pub struct TickLabelPosition {
   /// Tick Label Position Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TickLabelPositionValues>,
 }
 /// Crosses.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:crosses.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Crosses/c:crosses")]
 pub struct Crosses {
   /// Crosses Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: CrossesValues,
 }
 /// Crossing Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:crossesAt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:crossesAt")]
 pub struct CrossesAt {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Left.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:x.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:x")]
 pub struct Left {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Top.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:y.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:y")]
 pub struct Top {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:w.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:w")]
 pub struct Width {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Height.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:h.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:h")]
 pub struct Height {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Forward.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:forward.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:forward")]
 pub struct Forward {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Backward.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:backward.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:backward")]
 pub struct Backward {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Intercept.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:intercept.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:intercept")]
 pub struct Intercept {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Error Bar Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:val.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:val")]
 pub struct ErrorBarValue {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Split Position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:splitPos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:splitPos")]
 pub struct SplitPosition {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Custom Display Unit.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:custUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:custUnit")]
 pub struct CustomDisplayUnit {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Maximum.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:max.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:max")]
 pub struct MaxAxisValue {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Minimum.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:min.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/c:min")]
 pub struct MinAxisValue {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the DoubleType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Double/")]
 pub struct DoubleType {
   /// Floating Point Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Chart Space.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:chartSpace.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpace/c:chartSpace")]
 pub struct ChartSpace {
@@ -2167,24 +1451,12 @@ pub struct ChartSpace {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Version number of the file, as determined by the features used by this chart
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :version
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,
   /// A space-delimited list of additional features used in this chart but not captured in the version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :featureList
   #[sdk(attr(qname = ":featureList"))]
   pub feature_list: Option<crate::simple_type::StringValue>,
   /// A reference (in the form of a relationship ID) to a fallback image to be used if the chart cannot be loaded
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fallbackImg
   #[sdk(attr(qname = ":fallbackImg"))]
   pub fallback_img: Option<crate::simple_type::StringValue>,
   /// _
@@ -2230,10 +1502,6 @@ pub struct ChartSpace {
   pub c_ext_lst: Option<ChartSpaceExtensionList>,
 }
 /// User Shapes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:userShapes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_Drawing/c:userShapes")]
 pub struct UserShapes {
@@ -2247,83 +1515,43 @@ pub struct UserShapes {
   pub user_shapes_choice: Vec<UserShapesChoice>,
 }
 /// Reference to Chart Part.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:chart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:chart")]
 pub struct ChartReference {
   /// Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Legacy Drawing for Headers and Footers.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:legacyDrawingHF.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:legacyDrawingHF")]
 pub struct LegacyDrawingHeaderFooter {
   /// Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the UserShapesReference Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:userShapes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:userShapes")]
 pub struct UserShapesReference {
   /// Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the RelationshipIdType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/")]
 pub struct RelationshipIdType {
   /// Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Extension.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Extension/c:ext")]
 pub struct Extension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Uniform Resource Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
@@ -2331,79 +1559,31 @@ pub struct Extension {
   pub xml_children: Vec<String>,
 }
 /// Numeric Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:v.
 pub type NumericValue = crate::simple_type::StringValue;
 /// Format Code.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:formatCode.
 pub type FormatCode = crate::simple_type::StringValue;
 /// Odd Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:oddHeader.
 pub type OddHeader = crate::simple_type::StringValue;
 /// Odd Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:oddFooter.
 pub type OddFooter = crate::simple_type::StringValue;
 /// Even Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:evenHeader.
 pub type EvenHeader = crate::simple_type::StringValue;
 /// Even Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:evenFooter.
 pub type EvenFooter = crate::simple_type::StringValue;
 /// First Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:firstHeader.
 pub type FirstHeader = crate::simple_type::StringValue;
 /// First Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:firstFooter.
 pub type FirstFooter = crate::simple_type::StringValue;
 /// Pivot Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:name.
 pub type PivotTableName = crate::simple_type::StringValue;
 /// Numeric Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumVal/c:pt")]
 pub struct NumericPoint {
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// Number Format
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :formatCode
   #[sdk(attr(qname = ":formatCode"))]
   pub format_code: Option<crate::simple_type::StringValue>,
   /// Numeric Value
@@ -2411,10 +1591,6 @@ pub struct NumericPoint {
   pub numeric_value: crate::simple_type::StringValue,
 }
 /// Defines the ExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ExtensionList/c:extLst")]
 pub struct ExtensionList {
@@ -2424,10 +1600,6 @@ pub struct ExtensionList {
   pub c_ext: Vec<Extension>,
 }
 /// Number Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:numRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRef/c:numRef")]
 pub struct NumberReference {
@@ -2442,10 +1614,6 @@ pub struct NumberReference {
   pub num_ref_extension_list: Option<NumRefExtensionList>,
 }
 /// Number Literal.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:numLit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumData/c:numLit")]
 pub struct NumberLiteral {
@@ -2463,10 +1631,6 @@ pub struct NumberLiteral {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Defines the NumberingCache Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:numCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumData/c:numCache")]
 pub struct NumberingCache {
@@ -2484,10 +1648,6 @@ pub struct NumberingCache {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Defines the NumberDataType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumData/")]
 pub struct NumberDataType {
@@ -2500,10 +1660,6 @@ pub struct NumberDataType {
   pub xml_children: Vec<NumberDataTypeChoice>,
 }
 /// Level.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:lvl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Lvl/c:lvl")]
 pub struct Level {
@@ -2512,10 +1668,6 @@ pub struct Level {
   pub c_pt: Vec<StringPoint>,
 }
 /// Multi Level String Reference.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:multiLvlStrRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef")]
 pub struct MultiLevelStringReference {
@@ -2530,10 +1682,6 @@ pub struct MultiLevelStringReference {
   pub multi_lvl_str_ref_extension_list: Option<MultiLvlStrRefExtensionList>,
 }
 /// Defines the StringReference Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:strRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRef/c:strRef")]
 pub struct StringReference {
@@ -2548,10 +1696,6 @@ pub struct StringReference {
   pub str_ref_extension_list: Option<StrRefExtensionList>,
 }
 /// String Literal.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:strLit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/c:strLit")]
 pub struct StringLiteral {
@@ -2566,10 +1710,6 @@ pub struct StringLiteral {
   pub c_ext_lst: Option<StrDataExtensionList>,
 }
 /// Defines the StringCache Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:strCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/c:strCache")]
 pub struct StringCache {
@@ -2584,10 +1724,6 @@ pub struct StringCache {
   pub c_ext_lst: Option<StrDataExtensionList>,
 }
 /// Defines the StringDataType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/")]
 pub struct StringDataType {
@@ -2599,106 +1735,54 @@ pub struct StringDataType {
   pub xml_children: Vec<StringDataTypeChoice>,
 }
 /// Layout Target.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:layoutTarget.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutTarget/c:layoutTarget")]
 pub struct LayoutTarget {
   /// Layout Target Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutTargetValues>,
 }
 /// Left Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:xMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/c:xMode")]
 pub struct LeftMode {
   /// Layout Mode Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
 }
 /// Top Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:yMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/c:yMode")]
 pub struct TopMode {
   /// Layout Mode Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
 }
 /// Width Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:wMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/c:wMode")]
 pub struct WidthMode {
   /// Layout Mode Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
 }
 /// Height Mode.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:hMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/c:hMode")]
 pub struct HeightMode {
   /// Layout Mode Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
 }
 /// Defines the LayoutModeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/")]
 pub struct LayoutModeType {
   /// Layout Mode Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
 }
 /// Manual Layout.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:manualLayout.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ManualLayout/c:manualLayout")]
 pub struct ManualLayout {
@@ -2734,18 +1818,10 @@ pub struct ManualLayout {
   pub extension_list: Option<ExtensionList>,
 }
 /// X Rotation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:rotX.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RotX/c:rotX")]
 pub struct RotateX {
   /// X Rotation Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2757,18 +1833,10 @@ pub struct RotateX {
   pub val: Option<crate::simple_type::SByteValue>,
 }
 /// Height Percent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:hPercent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_HPercent/c:hPercent")]
 pub struct HeightPercent {
   /// Height Percent Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2780,18 +1848,10 @@ pub struct HeightPercent {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Y Rotation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:rotY.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RotY/c:rotY")]
 pub struct RotateY {
   /// Y Rotation Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2803,18 +1863,10 @@ pub struct RotateY {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Depth Percent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:depthPercent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DepthPercent/c:depthPercent")]
 pub struct DepthPercent {
   /// Depth Percent Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2826,18 +1878,10 @@ pub struct DepthPercent {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Perspective.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:perspective.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Perspective/c:perspective")]
 pub struct Perspective {
   /// Perspective Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2849,34 +1893,18 @@ pub struct Perspective {
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Symbol.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:symbol.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MarkerStyle/c:symbol")]
 pub struct Symbol {
   /// Marker Style Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: MarkerStyleValues,
 }
 /// Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MarkerSize/c:size")]
 pub struct Size {
   /// Marker Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2888,10 +1916,6 @@ pub struct Size {
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Marker.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:marker.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Marker/c:marker")]
 pub struct Marker {
@@ -2910,10 +1934,6 @@ pub struct Marker {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PictureOptions Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pictureOptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PictureOptions/c:pictureOptions")]
 pub struct PictureOptions {
@@ -2934,34 +1954,18 @@ pub struct PictureOptions {
   pub picture_stack_unit: Option<PictureStackUnit>,
 }
 /// Trendline Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:trendlineType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TrendlineType/c:trendlineType")]
 pub struct TrendlineType {
   /// Trendline Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TrendlineValues>,
 }
 /// Polynomial Trendline Order.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:order.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Order/c:order")]
 pub struct PolynomialOrder {
   /// Order Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2973,27 +1977,15 @@ pub struct PolynomialOrder {
   pub val: crate::simple_type::ByteValue,
 }
 /// Period.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:period.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Period/c:period")]
 pub struct Period {
   /// Period Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "2", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Trendline Label.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:trendlineLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TrendlineLbl/c:trendlineLbl")]
 pub struct TrendlineLabel {
@@ -3017,58 +2009,30 @@ pub struct TrendlineLabel {
   pub extension_list: Option<ExtensionList>,
 }
 /// Error Bar Direction.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:errDir.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ErrDir/c:errDir")]
 pub struct ErrorDirection {
   /// Error Bar Direction Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: ErrorBarDirectionValues,
 }
 /// Error Bar Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:errBarType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ErrBarType/c:errBarType")]
 pub struct ErrorBarType {
   /// Error Bar Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: ErrorBarValues,
 }
 /// Error Bar Value Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:errValType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ErrValType/c:errValType")]
 pub struct ErrorBarValueType {
   /// Error Bar Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: ErrorValues,
 }
 /// Plus.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:plus.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:plus")]
 pub struct Plus {
@@ -3076,10 +2040,6 @@ pub struct Plus {
   pub xml_children: Option<PlusChoice>,
 }
 /// Minus.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:minus.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:minus")]
 pub struct Minus {
@@ -3087,10 +2047,6 @@ pub struct Minus {
   pub xml_children: Option<MinusChoice>,
 }
 /// Defines the Values Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:val.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:val")]
 pub struct Values {
@@ -3098,10 +2054,6 @@ pub struct Values {
   pub xml_children: Option<ValuesChoice>,
 }
 /// Defines the YValues Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:yVal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:yVal")]
 pub struct YValues {
@@ -3109,10 +2061,6 @@ pub struct YValues {
   pub xml_children: Option<YValuesChoice>,
 }
 /// Defines the BubbleSize Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bubbleSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:bubbleSize")]
 pub struct BubbleSize {
@@ -3120,10 +2068,6 @@ pub struct BubbleSize {
   pub xml_children: Option<BubbleSizeChoice>,
 }
 /// Defines the NumberDataSourceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/")]
 pub struct NumberDataSourceType {
@@ -3131,18 +2075,10 @@ pub struct NumberDataSourceType {
   pub xml_children: Option<NumberDataSourceTypeChoice>,
 }
 /// Gap Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:gapWidth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_GapAmount/c:gapWidth")]
 pub struct GapWidth {
   /// Gap Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3154,18 +2090,10 @@ pub struct GapWidth {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the GapDepth Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:gapDepth.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_GapAmount/c:gapDepth")]
 pub struct GapDepth {
   /// Gap Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3177,18 +2105,10 @@ pub struct GapDepth {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the GapAmountType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_GapAmount/")]
 pub struct GapAmountType {
   /// Gap Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3200,10 +2120,6 @@ pub struct GapAmountType {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Up Bars.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:upBars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/c:upBars")]
 pub struct UpBars {
@@ -3212,10 +2128,6 @@ pub struct UpBars {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Down Bars.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:downBars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/c:downBars")]
 pub struct DownBars {
@@ -3224,10 +2136,6 @@ pub struct DownBars {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Defines the UpDownBarType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/")]
 pub struct UpDownBarType {
@@ -3236,42 +2144,22 @@ pub struct UpDownBarType {
   pub chart_shape_properties: Vec<ChartShapeProperties>,
 }
 /// Pie of Pie or Bar of Pie Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ofPieType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_OfPieType/c:ofPieType")]
 pub struct OfPieType {
   /// Pie of Pie or Bar of Pie Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: OfPieValues,
 }
 /// Split Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:splitType.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SplitType/c:splitType")]
 pub struct SplitType {
   /// Split Type Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: SplitValues,
 }
 /// Custom Split.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:custSplit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CustSplit/c:custSplit")]
 pub struct CustomSplit {
@@ -3280,18 +2168,10 @@ pub struct CustomSplit {
   pub c_second_pie_pt: Vec<SecondPiePoint>,
 }
 /// Second Pie Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:secondPieSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SecondPieSize/c:secondPieSize")]
 pub struct SecondPieSize {
   /// Second Pie Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3303,10 +2183,6 @@ pub struct SecondPieSize {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Band Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bandFmt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BandFmt/c:bandFmt")]
 pub struct BandFormat {
@@ -3318,59 +2194,31 @@ pub struct BandFormat {
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
 /// Picture Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pictureFormat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PictureFormat/c:pictureFormat")]
 pub struct PictureFormat {
   /// Picture Format Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: PictureFormatValues,
 }
 /// Picture Stack Unit.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pictureStackUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PictureStackUnit/c:pictureStackUnit")]
 pub struct PictureStackUnit {
   /// Picture Stack Unit
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Built in Display Unit Value.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:builtInUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BuiltInUnit/c:builtInUnit")]
 pub struct BuiltInUnit {
   /// Built In Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<BuiltInUnitValues>,
 }
 /// Display Units Label.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dispUnitsLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DispUnitsLbl/c:dispUnitsLbl")]
 pub struct DisplayUnitsLabel {
@@ -3388,18 +2236,10 @@ pub struct DisplayUnitsLabel {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
 }
 /// Logarithmic Base.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:logBase.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LogBase/c:logBase")]
 pub struct LogBase {
   /// Logarithmic Base Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3411,26 +2251,14 @@ pub struct LogBase {
   pub val: crate::simple_type::DoubleValue,
 }
 /// Axis Orientation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:orientation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Orientation/c:orientation")]
 pub struct Orientation {
   /// Orientation Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<OrientationValues>,
 }
 /// Pivot Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pivotFmt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PivotFmt/c:pivotFmt")]
 pub struct PivotFormat {
@@ -3451,26 +2279,14 @@ pub struct PivotFormat {
   pub extension_list: Option<ExtensionList>,
 }
 /// Legend Position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:legendPos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LegendPos/c:legendPos")]
 pub struct LegendPosition {
   /// Legend Position Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LegendPositionValues>,
 }
 /// Legend Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:legendEntry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LegendEntry/c:legendEntry")]
 pub struct LegendEntry {
@@ -3484,32 +2300,16 @@ pub struct LegendEntry {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Header and Footer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:headerFooter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_HeaderFooter/c:headerFooter")]
 pub struct HeaderFooter {
   /// Align With Margins
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :alignWithMargins
   #[sdk(attr(qname = ":alignWithMargins"))]
   pub align_with_margins: Option<crate::simple_type::BooleanValue>,
   /// Different Odd Even
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :differentOddEven
   #[sdk(attr(qname = ":differentOddEven"))]
   pub different_odd_even: Option<crate::simple_type::BooleanValue>,
   /// Different First
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :differentFirst
   #[sdk(attr(qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Odd Header
@@ -3532,142 +2332,66 @@ pub struct HeaderFooter {
   pub first_footer: Option<crate::simple_type::StringValue>,
 }
 /// Page Margins.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pageMargins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PageMargins/c:pageMargins")]
 pub struct PageMargins {
   /// Left
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :l
   #[sdk(attr(qname = ":l"))]
   pub left: crate::simple_type::DoubleValue,
   /// Right
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
   #[sdk(attr(qname = ":r"))]
   pub right: crate::simple_type::DoubleValue,
   /// Top
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
   #[sdk(attr(qname = ":t"))]
   pub top: crate::simple_type::DoubleValue,
   /// Bottom
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :b
   #[sdk(attr(qname = ":b"))]
   pub bottom: crate::simple_type::DoubleValue,
   /// Header
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :header
   #[sdk(attr(qname = ":header"))]
   pub header: crate::simple_type::DoubleValue,
   /// Footer
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :footer
   #[sdk(attr(qname = ":footer"))]
   pub footer: crate::simple_type::DoubleValue,
 }
 /// Page Setup.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pageSetup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PageSetup/c:pageSetup")]
 pub struct PageSetup {
   /// Page Size
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :paperSize
   #[sdk(attr(qname = ":paperSize"))]
   pub paper_size: Option<crate::simple_type::UInt32Value>,
   /// First Page Number
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :firstPageNumber
   #[sdk(attr(qname = ":firstPageNumber"))]
   pub first_page_number: Option<crate::simple_type::Int32Value>,
   /// Orientation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :orientation
   #[sdk(attr(qname = ":orientation"))]
   pub orientation: Option<PageSetupOrientationValues>,
   /// Black and White
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :blackAndWhite
   #[sdk(attr(qname = ":blackAndWhite"))]
   pub black_and_white: Option<crate::simple_type::BooleanValue>,
   /// Draft
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :draft
   #[sdk(attr(qname = ":draft"))]
   pub draft: Option<crate::simple_type::BooleanValue>,
   /// Use First Page Number
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :useFirstPageNumber
   #[sdk(attr(qname = ":useFirstPageNumber"))]
   pub use_first_page_number: Option<crate::simple_type::BooleanValue>,
   /// Horizontal DPI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :horizontalDpi
   #[sdk(attr(qname = ":horizontalDpi"))]
   pub horizontal_dpi: Option<crate::simple_type::Int32Value>,
   /// Vertical DPI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :verticalDpi
   #[sdk(attr(qname = ":verticalDpi"))]
   pub vertical_dpi: Option<crate::simple_type::Int32Value>,
   /// Copies
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :copies
   #[sdk(attr(qname = ":copies"))]
   pub copies: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/c:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -3718,10 +2442,6 @@ pub struct ShapeProperties {
   >,
 }
 /// Data Label.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLbl/c:dLbl")]
 pub struct DataLabel {
@@ -3750,10 +2470,6 @@ pub struct DataLabel {
   pub c_ext_lst: Option<DLblExtensionList>,
 }
 /// Area Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:areaChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChart/c:areaChart")]
 pub struct AreaChart {
@@ -3780,10 +2496,6 @@ pub struct AreaChart {
   pub c_ext_lst: Option<AreaChartExtensionList>,
 }
 /// 3D Area Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:area3DChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChart/c:area3DChart")]
 pub struct Area3DChart {
@@ -3813,10 +2525,6 @@ pub struct Area3DChart {
   pub c_ext_lst: Option<Area3DChartExtensionList>,
 }
 /// Line Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:lineChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChart/c:lineChart")]
 pub struct LineChart {
@@ -3855,10 +2563,6 @@ pub struct LineChart {
   pub c_ext_lst: Option<LineChartExtensionList>,
 }
 /// 3D Line Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:line3DChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChart/c:line3DChart")]
 pub struct Line3DChart {
@@ -3888,10 +2592,6 @@ pub struct Line3DChart {
   pub c_ext_lst: Option<Line3DChartExtensionList>,
 }
 /// Stock Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:stockChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChart/c:stockChart")]
 pub struct StockChart {
@@ -3918,10 +2618,6 @@ pub struct StockChart {
   pub c_ext_lst: Option<StockChartExtensionList>,
 }
 /// Radar Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:radarChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChart/c:radarChart")]
 pub struct RadarChart {
@@ -3945,10 +2641,6 @@ pub struct RadarChart {
   pub c_ext_lst: Option<RadarChartExtensionList>,
 }
 /// Scatter Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:scatterChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChart/c:scatterChart")]
 pub struct ScatterChart {
@@ -3972,10 +2664,6 @@ pub struct ScatterChart {
   pub c_ext_lst: Option<ScatterChartExtensionList>,
 }
 /// Pie Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pieChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChart/c:pieChart")]
 pub struct PieChart {
@@ -3996,10 +2684,6 @@ pub struct PieChart {
   pub c_ext_lst: Option<PieChartExtensionList>,
 }
 /// 3D Pie Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pie3DChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChart/c:pie3DChart")]
 pub struct Pie3DChart {
@@ -4017,10 +2701,6 @@ pub struct Pie3DChart {
   pub c_ext_lst: Option<Pie3DChartExtensionList>,
 }
 /// Doughnut Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:doughnutChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DoughnutChart/c:doughnutChart")]
 pub struct DoughnutChart {
@@ -4044,10 +2724,6 @@ pub struct DoughnutChart {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Bar Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:barChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChart/c:barChart")]
 pub struct BarChart {
@@ -4083,10 +2759,6 @@ pub struct BarChart {
   pub c_ext_lst: Option<BarChartExtensionList>,
 }
 /// 3D Bar Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bar3DChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChart/c:bar3DChart")]
 pub struct Bar3DChart {
@@ -4122,10 +2794,6 @@ pub struct Bar3DChart {
   pub c_ext_lst: Option<Bar3DChartExtensionList>,
 }
 /// Pie of Pie or Bar of Pie Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ofPieChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_OfPieChart/c:ofPieChart")]
 pub struct OfPieChart {
@@ -4164,10 +2832,6 @@ pub struct OfPieChart {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Surface Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:surfaceChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChart/c:surfaceChart")]
 pub struct SurfaceChart {
@@ -4188,10 +2852,6 @@ pub struct SurfaceChart {
   pub c_ext_lst: Option<SurfaceChartExtensionList>,
 }
 /// 3D Surface Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:surface3DChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChart/c:surface3DChart")]
 pub struct Surface3DChart {
@@ -4215,10 +2875,6 @@ pub struct Surface3DChart {
   pub c_ext_lst: Option<Surface3DChartExtensionList>,
 }
 /// Bubble Charts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bubbleChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChart/c:bubbleChart")]
 pub struct BubbleChart {
@@ -4251,10 +2907,6 @@ pub struct BubbleChart {
   pub c_ext_lst: Option<BubbleChartExtensionList>,
 }
 /// Value Axis.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:valAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAx/c:valAx")]
 pub struct ValueAxis {
@@ -4319,10 +2971,6 @@ pub struct ValueAxis {
   pub c_ext_lst: Option<ValAxExtensionList>,
 }
 /// Category Axis Data.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:catAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAx/c:catAx")]
 pub struct CategoryAxis {
@@ -4393,10 +3041,6 @@ pub struct CategoryAxis {
   pub c_ext_lst: Option<CatAxExtensionList>,
 }
 /// Date Axis.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dateAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAx/c:dateAx")]
 pub struct DateAxis {
@@ -4470,10 +3114,6 @@ pub struct DateAxis {
   pub c_ext_lst: Option<DateAxExtensionList>,
 }
 /// Series Axis.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:serAx.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAx/c:serAx")]
 pub struct SeriesAxis {
@@ -4532,10 +3172,6 @@ pub struct SeriesAxis {
   pub c_ext_lst: Option<SerAxExtensionList>,
 }
 /// Data Table.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dTable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DTable/c:dTable")]
 pub struct DataTable {
@@ -4562,18 +3198,10 @@ pub struct DataTable {
   pub extension_list: Option<ExtensionList>,
 }
 /// First Slice Angle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:firstSliceAng.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_FirstSliceAng/c:firstSliceAng")]
 pub struct FirstSliceAngle {
   /// First Slice Angle Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -4585,18 +3213,10 @@ pub struct FirstSliceAngle {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Hole Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:holeSize.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_HoleSize/c:holeSize")]
 pub struct HoleSize {
   /// Hole Size Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -4608,18 +3228,10 @@ pub struct HoleSize {
   pub val: crate::simple_type::ByteValue,
 }
 /// String Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrVal/c:pt")]
 pub struct StringPoint {
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// Text Value
@@ -4627,18 +3239,10 @@ pub struct StringPoint {
   pub numeric_value: crate::simple_type::StringValue,
 }
 /// Thickness.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:thickness.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_WallThickness/c:thickness")]
 pub struct Thickness {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -4650,10 +3254,6 @@ pub struct Thickness {
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Defines the StockChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtension/c:ext")]
 pub struct StockChartExtension {
@@ -4661,10 +3261,6 @@ pub struct StockChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4672,10 +3268,6 @@ pub struct StockChartExtension {
   pub xml_children: Option<StockChartExtensionChoice>,
 }
 /// Defines the PieChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtension/c:ext")]
 pub struct PieChartExtension {
@@ -4683,10 +3275,6 @@ pub struct PieChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4694,10 +3282,6 @@ pub struct PieChartExtension {
   pub xml_children: Option<PieChartExtensionChoice>,
 }
 /// Defines the Pie3DChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtension/c:ext")]
 pub struct Pie3DChartExtension {
@@ -4705,10 +3289,6 @@ pub struct Pie3DChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4716,10 +3296,6 @@ pub struct Pie3DChartExtension {
   pub xml_children: Option<Pie3DChartExtensionChoice>,
 }
 /// Defines the NumRefExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtension/c:ext")]
 pub struct NumRefExtension {
@@ -4727,10 +3303,6 @@ pub struct NumRefExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4743,10 +3315,6 @@ pub struct NumRefExtension {
   pub xml_children: Option<NumRefExtensionChoice>,
 }
 /// Defines the StrDataExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtension/c:ext")]
 pub struct StrDataExtension {
@@ -4754,10 +3322,6 @@ pub struct StrDataExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4765,10 +3329,6 @@ pub struct StrDataExtension {
   pub xml_children: Option<StrDataExtensionChoice>,
 }
 /// Defines the StrRefExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtension/c:ext")]
 pub struct StrRefExtension {
@@ -4776,10 +3336,6 @@ pub struct StrRefExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4792,10 +3348,6 @@ pub struct StrRefExtension {
   pub xml_children: Option<StrRefExtensionChoice>,
 }
 /// Defines the MultiLvlStrRefExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtension/c:ext")]
 pub struct MultiLvlStrRefExtension {
@@ -4803,10 +3355,6 @@ pub struct MultiLvlStrRefExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4819,10 +3367,6 @@ pub struct MultiLvlStrRefExtension {
   pub xml_children: Option<MultiLvlStrRefExtensionChoice>,
 }
 /// Defines the DLblsExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtension/c:ext")]
 pub struct DLblsExtension {
@@ -4830,10 +3374,6 @@ pub struct DLblsExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4850,10 +3390,6 @@ pub struct DLblsExtension {
   pub xml_children: Option<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtension/c:ext")]
 pub struct LineChartExtension {
@@ -4861,10 +3397,6 @@ pub struct LineChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4872,10 +3404,6 @@ pub struct LineChartExtension {
   pub xml_children: Option<LineChartExtensionChoice>,
 }
 /// Defines the Line3DChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtension/c:ext")]
 pub struct Line3DChartExtension {
@@ -4883,10 +3411,6 @@ pub struct Line3DChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4894,10 +3418,6 @@ pub struct Line3DChartExtension {
   pub xml_children: Option<Line3DChartExtensionChoice>,
 }
 /// Defines the ScatterChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtension/c:ext")]
 pub struct ScatterChartExtension {
@@ -4905,10 +3425,6 @@ pub struct ScatterChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4916,10 +3432,6 @@ pub struct ScatterChartExtension {
   pub xml_children: Option<ScatterChartExtensionChoice>,
 }
 /// Defines the RadarChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtension/c:ext")]
 pub struct RadarChartExtension {
@@ -4927,10 +3439,6 @@ pub struct RadarChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4938,10 +3446,6 @@ pub struct RadarChartExtension {
   pub xml_children: Option<RadarChartExtensionChoice>,
 }
 /// Defines the BarChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtension/c:ext")]
 pub struct BarChartExtension {
@@ -4949,10 +3453,6 @@ pub struct BarChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4960,10 +3460,6 @@ pub struct BarChartExtension {
   pub xml_children: Option<BarChartExtensionChoice>,
 }
 /// Defines the Bar3DChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtension/c:ext")]
 pub struct Bar3DChartExtension {
@@ -4971,10 +3467,6 @@ pub struct Bar3DChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -4982,10 +3474,6 @@ pub struct Bar3DChartExtension {
   pub xml_children: Option<Bar3DChartExtensionChoice>,
 }
 /// Defines the AreaChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtension/c:ext")]
 pub struct AreaChartExtension {
@@ -4993,10 +3481,6 @@ pub struct AreaChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5004,10 +3488,6 @@ pub struct AreaChartExtension {
   pub xml_children: Option<AreaChartExtensionChoice>,
 }
 /// Defines the Area3DChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtension/c:ext")]
 pub struct Area3DChartExtension {
@@ -5015,10 +3495,6 @@ pub struct Area3DChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5026,10 +3502,6 @@ pub struct Area3DChartExtension {
   pub xml_children: Option<Area3DChartExtensionChoice>,
 }
 /// Defines the BubbleChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtension/c:ext")]
 pub struct BubbleChartExtension {
@@ -5037,10 +3509,6 @@ pub struct BubbleChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5048,10 +3516,6 @@ pub struct BubbleChartExtension {
   pub xml_children: Option<BubbleChartExtensionChoice>,
 }
 /// Defines the SurfaceChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtension/c:ext")]
 pub struct SurfaceChartExtension {
@@ -5059,10 +3523,6 @@ pub struct SurfaceChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5070,10 +3530,6 @@ pub struct SurfaceChartExtension {
   pub xml_children: Option<SurfaceChartExtensionChoice>,
 }
 /// Defines the Surface3DChartExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtension/c:ext")]
 pub struct Surface3DChartExtension {
@@ -5081,10 +3537,6 @@ pub struct Surface3DChartExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5092,10 +3544,6 @@ pub struct Surface3DChartExtension {
   pub xml_children: Option<Surface3DChartExtensionChoice>,
 }
 /// Defines the CatAxExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtension/c:ext")]
 pub struct CatAxExtension {
@@ -5103,10 +3551,6 @@ pub struct CatAxExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5114,10 +3558,6 @@ pub struct CatAxExtension {
   pub xml_children: Option<CatAxExtensionChoice>,
 }
 /// Defines the DateAxExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtension/c:ext")]
 pub struct DateAxExtension {
@@ -5125,10 +3565,6 @@ pub struct DateAxExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5136,10 +3572,6 @@ pub struct DateAxExtension {
   pub xml_children: Option<DateAxExtensionChoice>,
 }
 /// Defines the SerAxExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtension/c:ext")]
 pub struct SerAxExtension {
@@ -5147,10 +3579,6 @@ pub struct SerAxExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5158,10 +3586,6 @@ pub struct SerAxExtension {
   pub xml_children: Option<SerAxExtensionChoice>,
 }
 /// Defines the ValAxExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtension/c:ext")]
 pub struct ValAxExtension {
@@ -5169,10 +3593,6 @@ pub struct ValAxExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -5180,10 +3600,6 @@ pub struct ValAxExtension {
   pub xml_children: Option<ValAxExtensionChoice>,
 }
 /// Defines the UpDownBars Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:upDownBars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBars/c:upDownBars")]
 pub struct UpDownBars {
@@ -5201,10 +3617,6 @@ pub struct UpDownBars {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the StockChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChartExtensionList/c:extLst")]
 pub struct StockChartExtensionList {
@@ -5214,10 +3626,6 @@ pub struct StockChartExtensionList {
   pub c_ext: Vec<StockChartExtension>,
 }
 /// Defines the PieChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieChartExtensionList/c:extLst")]
 pub struct PieChartExtensionList {
@@ -5227,10 +3635,6 @@ pub struct PieChartExtensionList {
   pub c_ext: Vec<PieChartExtension>,
 }
 /// Defines the Pie3DChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Pie3DChartExtensionList/c:extLst")]
 pub struct Pie3DChartExtensionList {
@@ -5240,10 +3644,6 @@ pub struct Pie3DChartExtensionList {
   pub c_ext: Vec<Pie3DChartExtension>,
 }
 /// Defines the NumRefExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRefExtensionList/c:extLst")]
 pub struct NumRefExtensionList {
@@ -5253,10 +3653,6 @@ pub struct NumRefExtensionList {
   pub c_ext: Vec<NumRefExtension>,
 }
 /// Defines the StrDataExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrDataExtensionList/c:extLst")]
 pub struct StrDataExtensionList {
@@ -5266,10 +3662,6 @@ pub struct StrDataExtensionList {
   pub c_ext: Vec<StrDataExtension>,
 }
 /// Defines the StrRefExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRefExtensionList/c:extLst")]
 pub struct StrRefExtensionList {
@@ -5279,10 +3671,6 @@ pub struct StrRefExtensionList {
   pub c_ext: Vec<StrRefExtension>,
 }
 /// Defines the MultiLevelStringCache Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:multiLvlStrCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrData/c:multiLvlStrCache")]
 pub struct MultiLevelStringCache {
@@ -5297,10 +3685,6 @@ pub struct MultiLevelStringCache {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Defines the MultiLvlStrRefExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRefExtensionList/c:extLst")]
 pub struct MultiLvlStrRefExtensionList {
@@ -5310,10 +3694,6 @@ pub struct MultiLvlStrRefExtensionList {
   pub c_ext: Vec<MultiLvlStrRefExtension>,
 }
 /// Defines the DLblsExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblsExtensionList/c:extLst")]
 pub struct DLblsExtensionList {
@@ -5323,10 +3703,6 @@ pub struct DLblsExtensionList {
   pub c_ext: Vec<DLblsExtension>,
 }
 /// Defines the LineChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineChartExtensionList/c:extLst")]
 pub struct LineChartExtensionList {
@@ -5336,10 +3712,6 @@ pub struct LineChartExtensionList {
   pub c_ext: Vec<LineChartExtension>,
 }
 /// Defines the Line3DChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Line3DChartExtensionList/c:extLst")]
 pub struct Line3DChartExtensionList {
@@ -5349,26 +3721,14 @@ pub struct Line3DChartExtensionList {
   pub c_ext: Vec<Line3DChartExtension>,
 }
 /// Defines the ScatterStyle Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:scatterStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterStyle/c:scatterStyle")]
 pub struct ScatterStyle {
   /// Scatter Style Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<ScatterStyleValues>,
 }
 /// Defines the ScatterChartSeries Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSer/c:ser")]
 pub struct ScatterChartSeries {
@@ -5413,10 +3773,6 @@ pub struct ScatterChartSeries {
   pub c_ext_lst: Option<ScatterSerExtensionList>,
 }
 /// Defines the ScatterChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChartExtensionList/c:extLst")]
 pub struct ScatterChartExtensionList {
@@ -5426,26 +3782,14 @@ pub struct ScatterChartExtensionList {
   pub c_ext: Vec<ScatterChartExtension>,
 }
 /// Defines the RadarStyle Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:radarStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarStyle/c:radarStyle")]
 pub struct RadarStyle {
   /// Radar Style Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: RadarStyleValues,
 }
 /// Defines the RadarChartSeries Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSer/c:ser")]
 pub struct RadarChartSeries {
@@ -5484,10 +3828,6 @@ pub struct RadarChartSeries {
   pub c_ext_lst: Option<RadarSerExtensionList>,
 }
 /// Defines the RadarChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChartExtensionList/c:extLst")]
 pub struct RadarChartExtensionList {
@@ -5497,18 +3837,10 @@ pub struct RadarChartExtensionList {
   pub c_ext: Vec<RadarChartExtension>,
 }
 /// Defines the Overlap Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:overlap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Overlap/c:overlap")]
 pub struct Overlap {
   /// Overlap Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -5520,10 +3852,6 @@ pub struct Overlap {
   pub val: Option<crate::simple_type::SByteValue>,
 }
 /// Defines the BarChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarChartExtensionList/c:extLst")]
 pub struct BarChartExtensionList {
@@ -5533,27 +3861,15 @@ pub struct BarChartExtensionList {
   pub c_ext: Vec<BarChartExtension>,
 }
 /// Defines the Shape Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Shape/c:shape")]
 pub struct Shape {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Shape Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<ShapeValues>,
 }
 /// Defines the Bar3DChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Bar3DChartExtensionList/c:extLst")]
 pub struct Bar3DChartExtensionList {
@@ -5563,10 +3879,6 @@ pub struct Bar3DChartExtensionList {
   pub c_ext: Vec<Bar3DChartExtension>,
 }
 /// Defines the AreaChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaChartExtensionList/c:extLst")]
 pub struct AreaChartExtensionList {
@@ -5576,10 +3888,6 @@ pub struct AreaChartExtensionList {
   pub c_ext: Vec<AreaChartExtension>,
 }
 /// Defines the Area3DChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Area3DChartExtensionList/c:extLst")]
 pub struct Area3DChartExtensionList {
@@ -5589,10 +3897,6 @@ pub struct Area3DChartExtensionList {
   pub c_ext: Vec<Area3DChartExtension>,
 }
 /// Defines the BubbleChartSeries Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ser.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSer/c:ser")]
 pub struct BubbleChartSeries {
@@ -5643,18 +3947,10 @@ pub struct BubbleChartSeries {
   pub c_ext_lst: Option<BubbleSerExtensionList>,
 }
 /// Defines the BubbleScale Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:bubbleScale.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleScale/c:bubbleScale")]
 pub struct BubbleScale {
   /// Bubble Scale Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -5666,26 +3962,14 @@ pub struct BubbleScale {
   pub val: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the SizeRepresents Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:sizeRepresents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SizeRepresents/c:sizeRepresents")]
 pub struct SizeRepresents {
   /// Size Represents Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<SizeRepresentsValues>,
 }
 /// Defines the BubbleChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChartExtensionList/c:extLst")]
 pub struct BubbleChartExtensionList {
@@ -5695,10 +3979,6 @@ pub struct BubbleChartExtensionList {
   pub c_ext: Vec<BubbleChartExtension>,
 }
 /// Defines the SurfaceChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceChartExtensionList/c:extLst")]
 pub struct SurfaceChartExtensionList {
@@ -5708,10 +3988,6 @@ pub struct SurfaceChartExtensionList {
   pub c_ext: Vec<SurfaceChartExtension>,
 }
 /// Defines the Surface3DChartExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChartExtensionList/c:extLst")]
 pub struct Surface3DChartExtensionList {
@@ -5721,34 +3997,18 @@ pub struct Surface3DChartExtensionList {
   pub c_ext: Vec<Surface3DChartExtension>,
 }
 /// Defines the LabelAlignment Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:lblAlgn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LblAlgn/c:lblAlgn")]
 pub struct LabelAlignment {
   /// Label Alignment Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: LabelAlignmentValues,
 }
 /// Defines the LabelOffset Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:lblOffset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LblOffset/c:lblOffset")]
 pub struct LabelOffset {
   /// Label Offset Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -5760,61 +4020,33 @@ pub struct LabelOffset {
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the TickLabelSkip Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:tickLblSkip.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Skip/c:tickLblSkip")]
 pub struct TickLabelSkip {
   /// Tick Skip Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the TickMarkSkip Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:tickMarkSkip.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Skip/c:tickMarkSkip")]
 pub struct TickMarkSkip {
   /// Tick Skip Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the SkipType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Skip/")]
 pub struct SkipType {
   /// Tick Skip Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the CatAxExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtensionList/c:extLst")]
 pub struct CatAxExtensionList {
@@ -5824,125 +4056,65 @@ pub struct CatAxExtensionList {
   pub c_ext: Vec<CatAxExtension>,
 }
 /// Defines the BaseTimeUnit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:baseTimeUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TimeUnit/c:baseTimeUnit")]
 pub struct BaseTimeUnit {
   /// Time Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TimeUnitValues>,
 }
 /// Defines the MajorTimeUnit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:majorTimeUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TimeUnit/c:majorTimeUnit")]
 pub struct MajorTimeUnit {
   /// Time Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TimeUnitValues>,
 }
 /// Defines the MinorTimeUnit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:minorTimeUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TimeUnit/c:minorTimeUnit")]
 pub struct MinorTimeUnit {
   /// Time Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TimeUnitValues>,
 }
 /// Defines the TimeUnitType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TimeUnit/")]
 pub struct TimeUnitType {
   /// Time Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TimeUnitValues>,
 }
 /// Defines the MajorUnit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:majorUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxisUnit/c:majorUnit")]
 pub struct MajorUnit {
   /// Major Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the MinorUnit Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:minorUnit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxisUnit/c:minorUnit")]
 pub struct MinorUnit {
   /// Major Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the AxisUnitType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxisUnit/")]
 pub struct AxisUnitType {
   /// Major Unit Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the DateAxExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DateAxExtensionList/c:extLst")]
 pub struct DateAxExtensionList {
@@ -5952,10 +4124,6 @@ pub struct DateAxExtensionList {
   pub c_ext: Vec<DateAxExtension>,
 }
 /// Defines the SerAxExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SerAxExtensionList/c:extLst")]
 pub struct SerAxExtensionList {
@@ -5965,26 +4133,14 @@ pub struct SerAxExtensionList {
   pub c_ext: Vec<SerAxExtension>,
 }
 /// Defines the CrossBetween Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:crossBetween.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CrossBetween/c:crossBetween")]
 pub struct CrossBetween {
   /// Cross Between Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: CrossBetweenValues,
 }
 /// Defines the DisplayUnits Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dispUnits.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DispUnits/c:dispUnits")]
 pub struct DisplayUnits {
@@ -6001,10 +4157,6 @@ pub struct DisplayUnits {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ValAxExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ValAxExtensionList/c:extLst")]
 pub struct ValAxExtensionList {
@@ -6014,10 +4166,6 @@ pub struct ValAxExtensionList {
   pub c_ext: Vec<ValAxExtension>,
 }
 /// Defines the DLblExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtensionList/c:extLst")]
 pub struct DLblExtensionList {
@@ -6027,10 +4175,6 @@ pub struct DLblExtensionList {
   pub c_ext: Vec<DLblExtension>,
 }
 /// Defines the DLblExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblExtension/c:ext")]
 pub struct DLblExtension {
@@ -6038,10 +4182,6 @@ pub struct DLblExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6057,10 +4197,6 @@ pub struct DLblExtension {
   pub xml_children: Option<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dPt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DPt/c:dPt")]
 pub struct DataPoint {
@@ -6090,10 +4226,6 @@ pub struct DataPoint {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Trendline Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:trendline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Trendline/c:trendline")]
 pub struct Trendline {
@@ -6135,10 +4267,6 @@ pub struct Trendline {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ErrorBars Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:errBars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ErrBars/c:errBars")]
 pub struct ErrorBars {
@@ -6171,10 +4299,6 @@ pub struct ErrorBars {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the CategoryAxisData Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:cat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/c:cat")]
 pub struct CategoryAxisData {
@@ -6188,10 +4312,6 @@ pub struct CategoryAxisData {
   pub xml_children: Option<CategoryAxisDataChoice>,
 }
 /// Defines the XValues Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:xVal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/c:xVal")]
 pub struct XValues {
@@ -6205,10 +4325,6 @@ pub struct XValues {
   pub xml_children: Option<XValuesChoice>,
 }
 /// Defines the AxisDataSourceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxDataSource/")]
 pub struct AxisDataSourceType {
@@ -6222,10 +4338,6 @@ pub struct AxisDataSourceType {
   pub xml_children: Option<AxisDataSourceTypeChoice>,
 }
 /// Defines the LineSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtensionList/c:extLst")]
 pub struct LineSerExtensionList {
@@ -6235,10 +4347,6 @@ pub struct LineSerExtensionList {
   pub c_ext: Vec<LineSerExtension>,
 }
 /// Defines the LineSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtension/c:ext")]
 pub struct LineSerExtension {
@@ -6246,10 +4354,6 @@ pub struct LineSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6266,10 +4370,6 @@ pub struct LineSerExtension {
   pub xml_children: Option<LineSerExtensionChoice>,
 }
 /// Defines the ScatterSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtensionList/c:extLst")]
 pub struct ScatterSerExtensionList {
@@ -6279,10 +4379,6 @@ pub struct ScatterSerExtensionList {
   pub c_ext: Vec<ScatterSerExtension>,
 }
 /// Defines the ScatterSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtension/c:ext")]
 pub struct ScatterSerExtension {
@@ -6290,10 +4386,6 @@ pub struct ScatterSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6310,10 +4402,6 @@ pub struct ScatterSerExtension {
   pub xml_children: Option<ScatterSerExtensionChoice>,
 }
 /// Defines the RadarSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtensionList/c:extLst")]
 pub struct RadarSerExtensionList {
@@ -6323,10 +4411,6 @@ pub struct RadarSerExtensionList {
   pub c_ext: Vec<RadarSerExtension>,
 }
 /// Defines the RadarSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtension/c:ext")]
 pub struct RadarSerExtension {
@@ -6334,10 +4418,6 @@ pub struct RadarSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6354,10 +4434,6 @@ pub struct RadarSerExtension {
   pub xml_children: Option<RadarSerExtensionChoice>,
 }
 /// Defines the BarSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtensionList/c:extLst")]
 pub struct BarSerExtensionList {
@@ -6367,10 +4443,6 @@ pub struct BarSerExtensionList {
   pub c_ext: Vec<BarSerExtension>,
 }
 /// Defines the BarSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtension/c:ext")]
 pub struct BarSerExtension {
@@ -6378,10 +4450,6 @@ pub struct BarSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6399,10 +4467,6 @@ pub struct BarSerExtension {
   pub xml_children: Option<BarSerExtensionChoice>,
 }
 /// Defines the AreaSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtensionList/c:extLst")]
 pub struct AreaSerExtensionList {
@@ -6412,10 +4476,6 @@ pub struct AreaSerExtensionList {
   pub c_ext: Vec<AreaSerExtension>,
 }
 /// Defines the AreaSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtension/c:ext")]
 pub struct AreaSerExtension {
@@ -6423,10 +4483,6 @@ pub struct AreaSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6443,10 +4499,6 @@ pub struct AreaSerExtension {
   pub xml_children: Option<AreaSerExtensionChoice>,
 }
 /// Defines the PieSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtensionList/c:extLst")]
 pub struct PieSerExtensionList {
@@ -6456,10 +4508,6 @@ pub struct PieSerExtensionList {
   pub c_ext: Vec<PieSerExtension>,
 }
 /// Defines the PieSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtension/c:ext")]
 pub struct PieSerExtension {
@@ -6467,10 +4515,6 @@ pub struct PieSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6487,10 +4531,6 @@ pub struct PieSerExtension {
   pub xml_children: Option<PieSerExtensionChoice>,
 }
 /// Defines the BubbleSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtensionList/c:extLst")]
 pub struct BubbleSerExtensionList {
@@ -6500,10 +4540,6 @@ pub struct BubbleSerExtensionList {
   pub c_ext: Vec<BubbleSerExtension>,
 }
 /// Defines the BubbleSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtension/c:ext")]
 pub struct BubbleSerExtension {
@@ -6511,10 +4547,6 @@ pub struct BubbleSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6531,10 +4563,6 @@ pub struct BubbleSerExtension {
   pub xml_children: Option<BubbleSerExtensionChoice>,
 }
 /// Defines the SurfaceSerExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtensionList/c:extLst")]
 pub struct SurfaceSerExtensionList {
@@ -6544,10 +4572,6 @@ pub struct SurfaceSerExtensionList {
   pub c_ext: Vec<SurfaceSerExtension>,
 }
 /// Defines the SurfaceSerExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtension/c:ext")]
 pub struct SurfaceSerExtension {
@@ -6555,10 +4579,6 @@ pub struct SurfaceSerExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -6574,23 +4594,15 @@ pub struct SurfaceSerExtension {
   pub xml_children: Option<SurfaceSerExtensionChoice>,
 }
 /// Defines the DataDisplayOptions16 Class.
-///
-/// Available in Office2019 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
+#[sdk(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
 pub struct DataDisplayOptions16 {
   /// _
-  #[sdk(child(qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
+  #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
   pub boolean_false:
     Option<crate::schemas::schemas_microsoft_com_office_drawing_2017_03_chart::BooleanFalse>,
 }
 /// pivot chart format persistence data.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pivotFmts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PivotFmts/c:pivotFmts")]
 pub struct PivotFormats {
@@ -6599,10 +4611,6 @@ pub struct PivotFormats {
   pub c_pivot_fmt: Vec<PivotFormat>,
 }
 /// 3D view settings.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:view3D.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_View3D/c:view3D")]
 pub struct View3D {
@@ -6629,10 +4637,6 @@ pub struct View3D {
   pub extension_list: Option<ExtensionList>,
 }
 /// 3D floor formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:floor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface/c:floor")]
 pub struct Floor {
@@ -6650,10 +4654,6 @@ pub struct Floor {
   pub extension_list: Option<ExtensionList>,
 }
 /// 3D side wall formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:sideWall.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface/c:sideWall")]
 pub struct SideWall {
@@ -6671,10 +4671,6 @@ pub struct SideWall {
   pub extension_list: Option<ExtensionList>,
 }
 /// 3D back wall formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:backWall.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface/c:backWall")]
 pub struct BackWall {
@@ -6692,10 +4688,6 @@ pub struct BackWall {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SurfaceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface/")]
 pub struct SurfaceType {
@@ -6708,10 +4700,6 @@ pub struct SurfaceType {
   pub xml_children: Vec<SurfaceTypeChoice>,
 }
 /// Plot data and formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:plotArea.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PlotArea/c:plotArea")]
 pub struct PlotArea {
@@ -6755,10 +4743,6 @@ pub struct PlotArea {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// Legend data and formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:legend.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Legend/c:legend")]
 pub struct Legend {
@@ -6785,26 +4769,14 @@ pub struct Legend {
   pub c_ext_lst: Option<ExtensionList>,
 }
 /// The way that blank cells are plotted on a chart..
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:dispBlanksAs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DispBlanksAs/c:dispBlanksAs")]
 pub struct DisplayBlanksAs {
   /// Display Blanks As Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<DisplayBlanksAsValues>,
 }
 /// Extensibility container.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
@@ -6812,38 +4784,22 @@ pub struct ChartExtensionList {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// _
-  #[sdk(child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
+  #[sdk(child(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
 }
 /// Defines the EditingLanguage Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:lang.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TextLanguageID/c:lang")]
 pub struct EditingLanguage {
   /// Language Code
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the Style Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Style/c:style")]
 pub struct Style {
   /// Style Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -6855,115 +4811,63 @@ pub struct Style {
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Defines the ColorMapOverride Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:clrMapOvr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMapping/c:clrMapOvr")]
 pub struct ColorMapOverride {
   /// Background 1
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bg1
   #[sdk(attr(qname = ":bg1"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub background1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 1
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tx1
   #[sdk(attr(qname = ":tx1"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub text1: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Background 2
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bg2
   #[sdk(attr(qname = ":bg2"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub background2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 2
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tx2
   #[sdk(attr(qname = ":tx2"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub text2: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 1
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent1
   #[sdk(attr(qname = ":accent1"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 2
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent2
   #[sdk(attr(qname = ":accent2"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 3
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent3
   #[sdk(attr(qname = ":accent3"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent3:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 4
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent4
   #[sdk(attr(qname = ":accent4"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent4:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 5
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent5
   #[sdk(attr(qname = ":accent5"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent5:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 6
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :accent6
   #[sdk(attr(qname = ":accent6"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub accent6:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Hyperlink
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hlink
   #[sdk(attr(qname = ":hlink"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Followed Hyperlink
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :folHlink
   #[sdk(attr(qname = ":folHlink"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub followed_hyperlink:
@@ -6974,10 +4878,6 @@ pub struct ColorMapOverride {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the PivotSource Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:pivotSource.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PivotSource/c:pivotSource")]
 pub struct PivotSource {
@@ -6992,10 +4892,6 @@ pub struct PivotSource {
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Protection Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:protection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Protection/c:protection")]
 pub struct Protection {
@@ -7016,10 +4912,6 @@ pub struct Protection {
   pub user_interface: Option<UserInterface>,
 }
 /// Defines the Chart Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:chart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Chart/c:chart")]
 pub struct Chart {
@@ -7064,18 +4956,10 @@ pub struct Chart {
   pub chart_extension_list: Option<ChartExtensionList>,
 }
 /// Defines the ExternalData Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:externalData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ExternalData/c:externalData")]
 pub struct ExternalData {
   /// Relationship Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
   /// Update Automatically
@@ -7083,10 +4967,6 @@ pub struct ExternalData {
   pub auto_update: Option<AutoUpdate>,
 }
 /// Defines the PrintSettings Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:printSettings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PrintSettings/c:printSettings")]
 pub struct PrintSettings {
@@ -7104,10 +4984,6 @@ pub struct PrintSettings {
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
 }
 /// Defines the ChartSpaceExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpaceExtensionList/c:extLst")]
 pub struct ChartSpaceExtensionList {
@@ -7117,10 +4993,6 @@ pub struct ChartSpaceExtensionList {
   pub c_ext: Vec<ChartSpaceExtension>,
 }
 /// Defines the ChartSpaceExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpaceExtension/c:ext")]
 pub struct ChartSpaceExtension {
@@ -7128,10 +5000,6 @@ pub struct ChartSpaceExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -7275,7 +5143,7 @@ pub enum DataLabelsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceChoice {
-  #[sdk(child(qname = "c14:CT_Style/c14:style"))]
+  #[sdk(child(office2010, qname = "c14:CT_Style/c14:style"))]
   C14Style(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::Style>,
   ),
@@ -7509,7 +5377,7 @@ pub enum SeriesAxisChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StockChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
@@ -7520,7 +5388,7 @@ pub enum StockChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredPieSeries,
@@ -7531,7 +5399,7 @@ pub enum PieChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredPieSeries,
@@ -7542,17 +5410,17 @@ pub enum Pie3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
@@ -7563,7 +5431,7 @@ pub enum NumRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
-  #[sdk(child(qname = "c:CT_Boolean/c15:autoCat"))]
+  #[sdk(child(office2013, qname = "c:CT_Boolean/c15:autoCat"))]
   C15AutoCat(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::AutoGeneneratedCategories,
@@ -7574,17 +5442,17 @@ pub enum StrDataExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
@@ -7595,17 +5463,17 @@ pub enum StrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
+  #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
@@ -7616,39 +5484,39 @@ pub enum MultiLvlStrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
-  #[sdk(child(qname = "c:CT_Tx/c15:tx"))]
+  #[sdk(child(office2013, qname = "c:CT_Tx/c15:tx"))]
   C15Tx(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ChartText>,
   ),
-  #[sdk(child(qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
+  #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
-  #[sdk(child(qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
+  #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "a:CT_ShapeProperties/c15:spPr"))]
+  #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
-  #[sdk(child(qname = "c:CT_Layout/c15:layout"))]
+  #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
-  #[sdk(child(qname = "c:CT_Boolean/c15:showLeaderLines"))]
+  #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showLeaderLines"))]
   C15ShowLeaderLines(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowLeaderLines,
     >,
   ),
-  #[sdk(child(qname = "c:CT_ChartLines/c15:leaderLines"))]
+  #[sdk(child(office2013, qname = "c:CT_ChartLines/c15:leaderLines"))]
   C15LeaderLines(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LeaderLines>,
   ),
@@ -7657,7 +5525,7 @@ pub enum DLblsExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
@@ -7668,7 +5536,7 @@ pub enum LineChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
@@ -7679,7 +5547,10 @@ pub enum Line3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"
+  ))]
   C15FilteredScatterSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredScatterSeries,
@@ -7690,7 +5561,7 @@ pub enum ScatterChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
   C15FilteredRadarSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredRadarSeries,
@@ -7701,7 +5572,7 @@ pub enum RadarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBarSeries,
@@ -7712,7 +5583,7 @@ pub enum BarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBarSeries,
@@ -7723,7 +5594,7 @@ pub enum Bar3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredAreaSeries,
@@ -7734,7 +5605,7 @@ pub enum AreaChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
+  #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredAreaSeries,
@@ -7745,7 +5616,10 @@ pub enum Area3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"
+  ))]
   C15FilteredBubbleSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBubbleSeries,
@@ -7756,7 +5630,10 @@ pub enum BubbleChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
+  ))]
   C15FilteredSurfaceSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSurfaceSeries,
@@ -7767,7 +5644,10 @@ pub enum SurfaceChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
+  ))]
   C15FilteredSurfaceSeries(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSurfaceSeries,
@@ -7778,7 +5658,7 @@ pub enum Surface3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
-  #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
+  #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
@@ -7789,7 +5669,7 @@ pub enum CatAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
-  #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
+  #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
@@ -7800,7 +5680,7 @@ pub enum DateAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
-  #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
+  #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
@@ -7811,7 +5691,7 @@ pub enum SerAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
-  #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
+  #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
@@ -7829,35 +5709,35 @@ pub enum DisplayUnitsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblExtensionChoice {
-  #[sdk(child(qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
+  #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
-  #[sdk(child(qname = "c:CT_Boolean/c15:xForSave"))]
+  #[sdk(child(office2013, qname = "c:CT_Boolean/c15:xForSave"))]
   C15XForSave(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ExceptionForSave,
     >,
   ),
-  #[sdk(child(qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
+  #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "a:CT_ShapeProperties/c15:spPr"))]
+  #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
-  #[sdk(child(qname = "c:CT_Layout/c15:layout"))]
+  #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -7922,43 +5802,58 @@ pub enum AxisDataSourceTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -7969,43 +5864,58 @@ pub enum LineSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8016,43 +5926,58 @@ pub enum ScatterSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8063,49 +5988,64 @@ pub enum RadarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
-  #[sdk(child(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
+  #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8116,43 +6056,58 @@ pub enum BarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8163,43 +6118,58 @@ pub enum AreaSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8210,43 +6180,55 @@ pub enum PieSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
-  #[sdk(child(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
+  #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
+  #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8257,37 +6239,52 @@ pub enum BubbleSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
-  #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
+  ))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
+  ))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2013,
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
+  ))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+  ))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+  ))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
@@ -8358,19 +6355,19 @@ pub enum PlotAreaChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceExtensionChoice {
-  #[sdk(child(qname = "c14:CT_PivotOptions/c14:pivotOptions"))]
+  #[sdk(child(office2010, qname = "c14:CT_PivotOptions/c14:pivotOptions"))]
   C14PivotOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::PivotOptions,
     >,
   ),
-  #[sdk(child(qname = "c14:CT_SketchOptions/c14:sketchOptions"))]
+  #[sdk(child(office2010, qname = "c14:CT_SketchOptions/c14:sketchOptions"))]
   C14SketchOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::SketchOptions,
     >,
   ),
-  #[sdk(child(qname = "c:CT_PivotSource/c15:pivotSource"))]
+  #[sdk(child(office2013, qname = "c:CT_PivotSource/c15:pivotSource"))]
   C15PivotSource(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::PivotSource>,
   ),

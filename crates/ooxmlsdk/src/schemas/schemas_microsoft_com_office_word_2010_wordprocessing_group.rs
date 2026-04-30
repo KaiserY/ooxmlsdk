@@ -5,22 +5,21 @@
 //
 
 /// Defines the WordprocessingGroup Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:wgp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wpg:CT_WordprocessingGroup/wpg:wgp")]
+#[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:wgp")]
 pub struct WordprocessingGroup {
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"))]
+  #[sdk(child(
+    office2010,
+    qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
+  ))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
@@ -31,26 +30,25 @@ pub struct WordprocessingGroup {
   ))]
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:grpSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wpg:CT_WordprocessingGroup/wpg:grpSp")]
+#[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp")]
 pub struct GroupShape {
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"))]
+  #[sdk(child(
+    office2010,
+    qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
+  ))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
@@ -61,16 +59,12 @@ pub struct GroupShape {
   ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
 }
 /// Defines the WordprocessingGroupType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wpg:CT_WordprocessingGroup/")]
+#[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/")]
 pub struct WordprocessingGroupType {
   #[sdk(choice(
     qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr",
@@ -86,47 +80,23 @@ pub struct WordprocessingGroupType {
   pub xml_children: Vec<WordprocessingGroupTypeChoice>,
 }
 /// Defines the NonVisualDrawingProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr")]
 pub struct NonVisualDrawingProperties {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -150,12 +120,8 @@ pub struct NonVisualDrawingProperties {
     >,
 }
 /// Defines the NonVisualGraphicFrameProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:cNvFrPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr")]
 pub struct NonVisualGraphicFrameProperties {
   /// Graphic Frame Locks
   #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
@@ -170,33 +136,17 @@ pub struct NonVisualGraphicFrameProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the Transform2D Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:xfrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Transform2D/wpg:xfrm")]
+#[sdk(office2010, qname = "a:CT_Transform2D/wpg:xfrm")]
 pub struct Transform2D {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Horizontal Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipH
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
   /// Vertical Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
@@ -207,12 +157,8 @@ pub struct Transform2D {
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/wpg:extLst")]
+#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -220,12 +166,11 @@ pub struct OfficeArtExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:cNvGrpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr")]
+#[sdk(
+  office2010,
+  qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
+)]
 pub struct NonVisualGroupDrawingShapeProperties {
     /// _
     #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
@@ -241,18 +186,10 @@ pub struct NonVisualGroupDrawingShapeProperties {
     >,
 }
 /// Defines the GroupShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:grpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr")]
+#[sdk(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -287,41 +224,37 @@ pub struct GroupShapeProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the GraphicFrame Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wpg:graphicFrame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wpg:CT_GraphicFrame/wpg:graphicFrame")]
+#[sdk(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame")]
 pub struct GraphicFrame {
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_Transform2D/wpg:xfrm"))]
+  #[sdk(child(office2010, qname = "a:CT_Transform2D/wpg:xfrm"))]
   pub transform2_d: std::boxed::Box<Transform2D>,
   /// _
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingGroupChoice {
-  #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
+  #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_shape::WordprocessingShape,
         >,
     ),
-    #[sdk(child(qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
+    #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
     WpgGrpSp(std::boxed::Box<GroupShape>),
-    #[sdk(child(qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
+    #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
     WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
     #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
     PicPic(
@@ -329,7 +262,7 @@ pub enum WordprocessingGroupChoice {
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_picture::Picture,
         >,
     ),
-    #[sdk(child(qname = "w14:CT_WordContentPart/w14:contentPart"))]
+    #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
     W14ContentPart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContentPart,
@@ -338,15 +271,15 @@ pub enum WordprocessingGroupChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
+  #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_shape::WordprocessingShape,
         >,
     ),
-    #[sdk(child(qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
+    #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
     WpgGrpSp(std::boxed::Box<GroupShape>),
-    #[sdk(child(qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
+    #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
     WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
     #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
     PicPic(
@@ -354,7 +287,7 @@ pub enum GroupShapeChoice {
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_picture::Picture,
         >,
     ),
-    #[sdk(child(qname = "w14:CT_WordContentPart/w14:contentPart"))]
+    #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
     W14ContentPart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContentPart,
@@ -363,21 +296,23 @@ pub enum GroupShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingGroupTypeChoice {
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
     WpgCNvPr(std::boxed::Box<NonVisualDrawingProperties>),
-    #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"))]
+    #[sdk(
+        child(office2010, qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr")
+    )]
     WpgCNvGrpSpPr(std::boxed::Box<NonVisualGroupDrawingShapeProperties>),
-    #[sdk(child(qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
+    #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
     WpgGrpSpPr(std::boxed::Box<GroupShapeProperties>),
-    #[sdk(child(qname = "wps:CT_WordprocessingShape/wps:wsp"))]
+    #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
     WpsWsp(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_shape::WordprocessingShape,
         >,
     ),
-    #[sdk(child(qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
+    #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
     WpgGrpSp(std::boxed::Box<GroupShape>),
-    #[sdk(child(qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
+    #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
     WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
     #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
     PicPic(
@@ -385,13 +320,13 @@ pub enum WordprocessingGroupTypeChoice {
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_picture::Picture,
         >,
     ),
-    #[sdk(child(qname = "w14:CT_WordContentPart/w14:contentPart"))]
+    #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
     W14ContentPart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContentPart,
         >,
     ),
-    #[sdk(child(qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
+    #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
     WpgExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

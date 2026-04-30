@@ -157,52 +157,28 @@ pub enum OartAnchorType {
   Absolute,
 }
 /// Defines the RevExHeaders Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:revHdrs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExHeaders/xr:revHdrs")]
+#[sdk(office2016, qname = "xr:CT_RevExHeaders/xr:revHdrs")]
 pub struct RevExHeaders {
   /// minRev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :minRev
-  #[sdk(attr(qname = ":minRev"))]
+  #[sdk(attr(office2016, qname = ":minRev"))]
   pub min_rev: crate::simple_type::UInt64Value,
   /// maxRev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :maxRev
-  #[sdk(attr(qname = ":maxRev"))]
+  #[sdk(attr(office2016, qname = ":maxRev"))]
   pub max_rev: crate::simple_type::UInt64Value,
   /// docId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :docId
-  #[sdk(attr(qname = ":docId"))]
+  #[sdk(attr(office2016, qname = ":docId"))]
   pub doc_id: crate::simple_type::StringValue,
   /// endpointId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :endpointId
-  #[sdk(attr(qname = ":endpointId"))]
+  #[sdk(attr(office2016, qname = ":endpointId"))]
   pub endpoint_id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "xr:CT_RevExHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExHeader/xr:hdr"))]
   pub xr_hdr: Vec<RevExHeader>,
 }
 /// Defines the RevExStream Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:revStream.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExStream/xr:revStream")]
+#[sdk(office2016, qname = "xr:CT_RevExStream/xr:revStream")]
 pub struct RevExStream {
   #[sdk(choice(
     qname = "xr:CT_RevExFuture/xr:xrrftr",
@@ -223,12 +199,8 @@ pub struct RevExStream {
   pub xml_children: Vec<RevExStreamChoice>,
 }
 /// Defines the DifferentialFormatType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:dxf.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Dxf/xr:dxf")]
+#[sdk(office2016, qname = "x:CT_Dxf/xr:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
@@ -263,35 +235,19 @@ pub struct DifferentialFormatType {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Defines the RevisionPtr Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:revisionPtr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevisionPtr/xr:revisionPtr")]
+#[sdk(office2016, qname = "xr:CT_RevisionPtr/xr:revisionPtr")]
 pub struct RevisionPtr {
   /// revIDLastSave
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :revIDLastSave
-  #[sdk(attr(qname = ":revIDLastSave"))]
+  #[sdk(attr(office2016, qname = ":revIDLastSave"))]
   pub rev_id_last_save: crate::simple_type::UInt64Value,
   /// documentId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :documentId
-  #[sdk(attr(qname = ":documentId"))]
+  #[sdk(attr(office2016, qname = ":documentId"))]
   pub document_id: crate::simple_type::StringValue,
 }
 /// Defines the StateBasedObject Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:objectState.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_StateBasedObject/xr:objectState")]
+#[sdk(office2016, qname = "xr:CT_StateBasedObject/xr:objectState")]
 pub struct StateBasedObject {
   #[sdk(choice(
     qname = "x:CT_DataValidation/xr:dataValidation",
@@ -304,63 +260,31 @@ pub struct StateBasedObject {
   pub xml_children: Option<StateBasedObjectChoice>,
 }
 /// Defines the RevExHeader Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:hdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExHeader/xr:hdr")]
+#[sdk(office2016, qname = "xr:CT_RevExHeader/xr:hdr")]
 pub struct RevExHeader {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2016, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
   /// minRev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :minRev
-  #[sdk(attr(qname = ":minRev"))]
+  #[sdk(attr(office2016, qname = ":minRev"))]
   pub min_rev: Option<crate::simple_type::UInt64Value>,
   /// maxRev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :maxRev
-  #[sdk(attr(qname = ":maxRev"))]
+  #[sdk(attr(office2016, qname = ":maxRev"))]
   pub max_rev: Option<crate::simple_type::UInt64Value>,
   /// time
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :time
-  #[sdk(attr(qname = ":time"))]
+  #[sdk(attr(office2016, qname = ":time"))]
   pub time: crate::simple_type::DateTimeValue,
 }
 /// Defines the RevExFuture Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrftr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExFuture/xr:xrrftr")]
+#[sdk(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr")]
 pub struct RevExFuture {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -368,11 +292,7 @@ pub struct RevExFuture {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -380,11 +300,7 @@ pub struct RevExFuture {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -392,44 +308,24 @@ pub struct RevExFuture {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// sti
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sti
-  #[sdk(attr(qname = ":sti"))]
+  #[sdk(attr(office2016, qname = ":sti"))]
   pub sti: Option<crate::simple_type::BooleanValue>,
   /// Defines the RevExTest Class.
-  #[sdk(empty_child(qname = "xr:CT_RevExTest/xr:xrrtest"))]
+  #[sdk(empty_child(office2016, qname = "xr:CT_RevExTest/xr:xrrtest"))]
   pub rev_ex_test: Option<()>,
 }
 /// Defines the RevExUnsupported Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrUspt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExUnsupported/xr:xrrUspt")]
+#[sdk(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt")]
 pub struct RevExUnsupported {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -437,11 +333,7 @@ pub struct RevExUnsupported {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -449,11 +341,7 @@ pub struct RevExUnsupported {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -461,34 +349,18 @@ pub struct RevExUnsupported {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
 }
 /// Defines the RevExTrimmed Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrTrim.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExTrimmed/xr:xrrTrim")]
+#[sdk(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim")]
 pub struct RevExTrimmed {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -496,11 +368,7 @@ pub struct RevExTrimmed {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -508,11 +376,7 @@ pub struct RevExTrimmed {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -520,34 +384,18 @@ pub struct RevExTrimmed {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
 }
 /// Defines the RevExRowColumn Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrrc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExRowColumn/xr:xrrrc")]
+#[sdk(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc")]
 pub struct RevExRowColumn {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -555,11 +403,7 @@ pub struct RevExRowColumn {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -567,11 +411,7 @@ pub struct RevExRowColumn {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -579,55 +419,27 @@ pub struct RevExRowColumn {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// eol
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :eol
-  #[sdk(attr(qname = ":eol"))]
+  #[sdk(attr(office2016, qname = ":eol"))]
   pub eol: Option<crate::simple_type::BooleanValue>,
   /// ref
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2016, qname = ":ref"))]
   pub r#ref: crate::simple_type::StringValue,
   /// action
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :action
-  #[sdk(attr(qname = ":action"))]
+  #[sdk(attr(office2016, qname = ":action"))]
   pub action: RwColAction,
 }
 /// Defines the RevExMove Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExMove/xr:xrrm")]
+#[sdk(office2016, qname = "xr:CT_RevExMove/xr:xrrm")]
 pub struct RevExMove {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -635,11 +447,7 @@ pub struct RevExMove {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -647,11 +455,7 @@ pub struct RevExMove {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -659,32 +463,16 @@ pub struct RevExMove {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// src
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :src
-  #[sdk(attr(qname = ":src"))]
+  #[sdk(attr(office2016, qname = ":src"))]
   pub src: crate::simple_type::StringValue,
   /// dst
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :dst
-  #[sdk(attr(qname = ":dst"))]
+  #[sdk(attr(office2016, qname = ":dst"))]
   pub dst: crate::simple_type::StringValue,
   /// srcSh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :srcSh
-  #[sdk(attr(qname = ":srcSh"))]
+  #[sdk(attr(office2016, qname = ":srcSh"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -693,19 +481,11 @@ pub struct RevExMove {
   pub src_sh: Option<crate::simple_type::StringValue>,
 }
 /// Defines the RevExChangeCell Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExChangeCell/xr:xrrc")]
+#[sdk(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc")]
 pub struct RevExChangeCell {
   /// listUid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :listUid
-  #[sdk(attr(qname = ":listUid"))]
+  #[sdk(attr(office2016, qname = ":listUid"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -713,18 +493,10 @@ pub struct RevExChangeCell {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub list_uid: Option<crate::simple_type::StringValue>,
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -732,11 +504,7 @@ pub struct RevExChangeCell {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -744,11 +512,7 @@ pub struct RevExChangeCell {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -756,68 +520,36 @@ pub struct RevExChangeCell {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: crate::simple_type::StringValue,
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<FillType>,
   /// x
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
-  #[sdk(attr(qname = ":x"))]
+  #[sdk(attr(office2016, qname = ":x"))]
   pub x: Option<FillTypeExt>,
   /// w
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :w
-  #[sdk(attr(qname = ":w"))]
+  #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "xr:CT_RevCell/xr:c"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
   pub xr_c: Vec<RevCell>,
   /// _
-  #[sdk(child(qname = "xr:CT_ChangeCellSubEdit/xr:ccse"))]
+  #[sdk(child(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse"))]
   pub xr_ccse: Vec<ChangeCellSubEdit>,
 }
 /// Defines the RevExFormatting Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrf.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExFormatting/xr:xrrf")]
+#[sdk(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf")]
 pub struct RevExFormatting {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -825,11 +557,7 @@ pub struct RevExFormatting {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -837,11 +565,7 @@ pub struct RevExFormatting {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -849,60 +573,28 @@ pub struct RevExFormatting {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// numFmtId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :numFmtId
-  #[sdk(attr(qname = ":numFmtId"))]
+  #[sdk(attr(office2016, qname = ":numFmtId"))]
   pub num_fmt_id: Option<crate::simple_type::UInt32Value>,
   /// xfDxf
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :xfDxf
-  #[sdk(attr(qname = ":xfDxf"))]
+  #[sdk(attr(office2016, qname = ":xfDxf"))]
   pub xf_dxf: Option<crate::simple_type::BooleanValue>,
   /// style
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :style
-  #[sdk(attr(qname = ":style"))]
+  #[sdk(attr(office2016, qname = ":style"))]
   pub style: Option<crate::simple_type::BooleanValue>,
   /// sqref
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sqref
-  #[sdk(attr(qname = ":sqref"))]
+  #[sdk(attr(office2016, qname = ":sqref"))]
   pub sqref: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// start
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :start
-  #[sdk(attr(qname = ":start"))]
+  #[sdk(attr(office2016, qname = ":start"))]
   pub start: Option<crate::simple_type::UInt32Value>,
   /// length
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :length
-  #[sdk(attr(qname = ":length"))]
+  #[sdk(attr(office2016, qname = ":length"))]
   pub length: Option<crate::simple_type::UInt32Value>,
   /// styleUid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :styleUid
-  #[sdk(attr(qname = ":styleUid"))]
+  #[sdk(attr(office2016, qname = ":styleUid"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -910,82 +602,42 @@ pub struct RevExFormatting {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub style_uid: Option<crate::simple_type::StringValue>,
   /// fBlankCell
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :fBlankCell
-  #[sdk(attr(qname = ":fBlankCell"))]
+  #[sdk(attr(office2016, qname = ":fBlankCell"))]
   pub f_blank_cell: Option<crate::simple_type::BooleanValue>,
   /// applyNumberFormat
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyNumberFormat
-  #[sdk(attr(qname = ":applyNumberFormat"))]
+  #[sdk(attr(office2016, qname = ":applyNumberFormat"))]
   pub apply_number_format: Option<crate::simple_type::BooleanValue>,
   /// applyFont
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyFont
-  #[sdk(attr(qname = ":applyFont"))]
+  #[sdk(attr(office2016, qname = ":applyFont"))]
   pub apply_font: Option<crate::simple_type::BooleanValue>,
   /// applyFill
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyFill
-  #[sdk(attr(qname = ":applyFill"))]
+  #[sdk(attr(office2016, qname = ":applyFill"))]
   pub apply_fill: Option<crate::simple_type::BooleanValue>,
   /// applyBorder
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyBorder
-  #[sdk(attr(qname = ":applyBorder"))]
+  #[sdk(attr(office2016, qname = ":applyBorder"))]
   pub apply_border: Option<crate::simple_type::BooleanValue>,
   /// applyAlignment
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyAlignment
-  #[sdk(attr(qname = ":applyAlignment"))]
+  #[sdk(attr(office2016, qname = ":applyAlignment"))]
   pub apply_alignment: Option<crate::simple_type::BooleanValue>,
   /// applyProtection
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :applyProtection
-  #[sdk(attr(qname = ":applyProtection"))]
+  #[sdk(attr(office2016, qname = ":applyProtection"))]
   pub apply_protection: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x:CT_Dxf/xr:dxf"))]
+  #[sdk(child(office2016, qname = "x:CT_Dxf/xr:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xr:extLst"))]
+  #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDefinedName Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrDefName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExDefinedName/xr:xrrDefName")]
+#[sdk(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName")]
 pub struct RevExDefinedName {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -993,11 +645,7 @@ pub struct RevExDefinedName {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1005,11 +653,7 @@ pub struct RevExDefinedName {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1017,117 +661,57 @@ pub struct RevExDefinedName {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// customView
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :customView
-  #[sdk(attr(qname = ":customView"))]
+  #[sdk(attr(office2016, qname = ":customView"))]
   pub custom_view: Option<crate::simple_type::BooleanValue>,
   /// name
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2016, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// function
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :function
-  #[sdk(attr(qname = ":function"))]
+  #[sdk(attr(office2016, qname = ":function"))]
   pub function: Option<crate::simple_type::BooleanValue>,
   /// functionGroupId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :functionGroupId
-  #[sdk(attr(qname = ":functionGroupId"))]
+  #[sdk(attr(office2016, qname = ":functionGroupId"))]
   pub function_group_id: Option<crate::simple_type::ByteValue>,
   /// shortcutKey
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :shortcutKey
-  #[sdk(attr(qname = ":shortcutKey"))]
+  #[sdk(attr(office2016, qname = ":shortcutKey"))]
   pub shortcut_key: Option<crate::simple_type::ByteValue>,
   /// hidden
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :hidden
-  #[sdk(attr(qname = ":hidden"))]
+  #[sdk(attr(office2016, qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
   /// customMenu
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :customMenu
-  #[sdk(attr(qname = ":customMenu"))]
+  #[sdk(attr(office2016, qname = ":customMenu"))]
   pub custom_menu: Option<crate::simple_type::StringValue>,
   /// description
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :description
-  #[sdk(attr(qname = ":description"))]
+  #[sdk(attr(office2016, qname = ":description"))]
   pub description: Option<crate::simple_type::StringValue>,
   /// help
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :help
-  #[sdk(attr(qname = ":help"))]
+  #[sdk(attr(office2016, qname = ":help"))]
   pub help: Option<crate::simple_type::StringValue>,
   /// statusBar
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :statusBar
-  #[sdk(attr(qname = ":statusBar"))]
+  #[sdk(attr(office2016, qname = ":statusBar"))]
   pub status_bar: Option<crate::simple_type::StringValue>,
   /// comment
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :comment
-  #[sdk(attr(qname = ":comment"))]
+  #[sdk(attr(office2016, qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xr:formula"))]
+  #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:formula"))]
   pub formula_formula: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xr:extLst"))]
+  #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the RevExDelObj Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrdo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExDelObj/xr:xrrdo")]
+#[sdk(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo")]
 pub struct RevExDelObj {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1135,11 +719,7 @@ pub struct RevExDelObj {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1147,11 +727,7 @@ pub struct RevExDelObj {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1159,37 +735,21 @@ pub struct RevExDelObj {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// _
-  #[sdk(child(qname = "xr:CT_StateBasedHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
 }
 /// Defines the RevExChgObj Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrco.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExChgObj/xr:xrrco")]
+#[sdk(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco")]
 pub struct RevExChgObj {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1197,11 +757,7 @@ pub struct RevExChgObj {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1209,11 +765,7 @@ pub struct RevExChgObj {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1221,42 +773,27 @@ pub struct RevExChgObj {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// _
-  #[sdk(child(qname = "xr:CT_StateBasedHeader/xr:hdr"))]
+  #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
   #[sdk(choice(
+    microsoft365,
     qname = "xr:CT_RevisionStateLink/xr:link",
     qname = "xr:CT_RevisionState/xr:body"
   ))]
   pub rev_ex_chg_obj_choice: Option<RevExChgObjChoice>,
 }
 /// Defines the RevExSheetOp Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrSheet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevExSheetOp/xr:xrrSheet")]
+#[sdk(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet")]
 pub struct RevExSheetOp {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1264,11 +801,7 @@ pub struct RevExSheetOp {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1276,11 +809,7 @@ pub struct RevExSheetOp {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1288,62 +817,30 @@ pub struct RevExSheetOp {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// op
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :op
-  #[sdk(attr(qname = ":op"))]
+  #[sdk(attr(office2016, qname = ":op"))]
   pub op: SheetOp,
   /// name
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2016, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// idOrig
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :idOrig
-  #[sdk(attr(qname = ":idOrig"))]
+  #[sdk(attr(office2016, qname = ":idOrig"))]
   pub id_orig: Option<crate::simple_type::UInt32Value>,
   /// idNew
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :idNew
-  #[sdk(attr(qname = ":idNew"))]
+  #[sdk(attr(office2016, qname = ":idNew"))]
   pub id_new: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the RevisionList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevisionList/xr:xrrList")]
+#[sdk(office2016, qname = "xr:CT_RevisionList/xr:xrrList")]
 pub struct RevisionList {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1351,11 +848,7 @@ pub struct RevisionList {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1363,11 +856,7 @@ pub struct RevisionList {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1375,90 +864,42 @@ pub struct RevisionList {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// Data
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :Data
-  #[sdk(attr(qname = ":Data"))]
+  #[sdk(attr(office2016, qname = ":Data"))]
   pub data: Option<crate::simple_type::BooleanValue>,
   /// Formatting
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :Formatting
-  #[sdk(attr(qname = ":Formatting"))]
+  #[sdk(attr(office2016, qname = ":Formatting"))]
   pub formatting: Option<crate::simple_type::BooleanValue>,
   /// RangeBased
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :RangeBased
-  #[sdk(attr(qname = ":RangeBased"))]
+  #[sdk(attr(office2016, qname = ":RangeBased"))]
   pub range_based: Option<crate::simple_type::BooleanValue>,
   /// Fake
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :Fake
-  #[sdk(attr(qname = ":Fake"))]
+  #[sdk(attr(office2016, qname = ":Fake"))]
   pub fake: Option<crate::simple_type::BooleanValue>,
   /// ref
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2016, qname = ":ref"))]
   pub r#ref: crate::simple_type::StringValue,
   /// Headers
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :Headers
-  #[sdk(attr(qname = ":Headers"))]
+  #[sdk(attr(office2016, qname = ":Headers"))]
   pub headers: Option<crate::simple_type::BooleanValue>,
   /// InsDelHeaders
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :InsDelHeaders
-  #[sdk(attr(qname = ":InsDelHeaders"))]
+  #[sdk(attr(office2016, qname = ":InsDelHeaders"))]
   pub ins_del_headers: Option<crate::simple_type::BooleanValue>,
   /// rId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rId
-  #[sdk(attr(qname = ":rId"))]
+  #[sdk(attr(office2016, qname = ":rId"))]
   pub r_id: crate::simple_type::UInt32Value,
 }
 /// Defines the RevListAutoExpandRw Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrListExpR.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR")]
+#[sdk(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR")]
 pub struct RevListAutoExpandRw {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1466,11 +907,7 @@ pub struct RevListAutoExpandRw {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1478,11 +915,7 @@ pub struct RevListAutoExpandRw {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1490,25 +923,13 @@ pub struct RevListAutoExpandRw {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   /// refAdded
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :refAdded
-  #[sdk(attr(qname = ":refAdded"))]
+  #[sdk(attr(office2016, qname = ":refAdded"))]
   pub ref_added: crate::simple_type::StringValue,
   /// listGuid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :listGuid
-  #[sdk(attr(qname = ":listGuid"))]
+  #[sdk(attr(office2016, qname = ":listGuid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1517,26 +938,14 @@ pub struct RevListAutoExpandRw {
   pub list_guid: crate::simple_type::StringValue,
 }
 /// Defines the RevGroup Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:xrrg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevGroup/xr:xrrg")]
+#[sdk(office2016, qname = "xr:CT_RevGroup/xr:xrrg")]
 pub struct RevGroup {
   /// rev
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
-  #[sdk(attr(qname = ":rev"))]
+  #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1544,11 +953,7 @@ pub struct RevGroup {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sh
-  #[sdk(attr(qname = ":sh"))]
+  #[sdk(attr(office2016, qname = ":sh"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1556,11 +961,7 @@ pub struct RevGroup {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidp
-  #[sdk(attr(qname = ":uidp"))]
+  #[sdk(attr(office2016, qname = ":uidp"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1568,11 +969,7 @@ pub struct RevGroup {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ctx
-  #[sdk(attr(qname = ":ctx"))]
+  #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
   #[sdk(choice(
     qname = "xr:CT_RevExFuture/xr:xrrftr",
@@ -1592,98 +989,54 @@ pub struct RevGroup {
   pub xml_children: Vec<RevGroupChoice>,
 }
 /// Defines the RevCell Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:c.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevCell/xr:c")]
+#[sdk(office2016, qname = "xr:CT_RevCell/xr:c")]
 pub struct RevCell {
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues>,
   /// nop
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :nop
-  #[sdk(attr(qname = ":nop"))]
+  #[sdk(attr(office2016, qname = ":nop"))]
   pub nop: Option<crate::simple_type::BooleanValue>,
   /// tick
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tick
-  #[sdk(attr(qname = ":tick"))]
+  #[sdk(attr(office2016, qname = ":tick"))]
   pub tick: Option<crate::simple_type::BooleanValue>,
   /// rep
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rep
-  #[sdk(attr(qname = ":rep"))]
+  #[sdk(attr(office2016, qname = ":rep"))]
   pub rep: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xr:f"))]
+  #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:f"))]
   pub f_formula: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Xstring/xr:v"))]
+  #[sdk(text_child(office2016, qname = "x:ST_Xstring/xr:v"))]
   pub xstring: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_Rst/xr:is"))]
+  #[sdk(child(office2016, qname = "x:CT_Rst/xr:is"))]
   pub rst_type: Option<std::boxed::Box<RstType>>,
 }
 /// Defines the ChangeCellSubEdit Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:ccse.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_ChangeCellSubEdit/xr:ccse")]
+#[sdk(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse")]
 pub struct ChangeCellSubEdit {
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: crate::simple_type::StringValue,
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<FillType>,
   /// x
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
-  #[sdk(attr(qname = ":x"))]
+  #[sdk(attr(office2016, qname = ":x"))]
   pub x: Option<FillTypeExt>,
   /// w
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :w
-  #[sdk(attr(qname = ":w"))]
+  #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "xr:CT_RevCell/xr:c"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
   pub xr_c: Vec<RevCell>,
 }
 /// Defines the ExtensionList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_ExtensionList/xr:extLst")]
+#[sdk(office2016, qname = "x:CT_ExtensionList/xr:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -1691,31 +1044,15 @@ pub struct ExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the FormulaFormula Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:formula.
 pub type FormulaFormula = crate::simple_type::StringValue;
 /// Defines the FFormula Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:f.
 pub type FFormula = crate::simple_type::StringValue;
 /// Defines the StateBasedHeader Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:hdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_StateBasedHeader/xr:hdr")]
+#[sdk(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr")]
 pub struct StateBasedHeader {
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1723,60 +1060,32 @@ pub struct StateBasedHeader {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// eft
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :eft
-  #[sdk(attr(qname = ":eft"))]
+  #[sdk(attr(office2016, qname = ":eft"))]
   pub eft: FeatureType,
   /// eftx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :eftx
-  #[sdk(attr(qname = ":eftx"))]
+  #[sdk(attr(office2016, qname = ":eftx"))]
   pub eftx: Option<ExtFeatureType>,
   /// seft
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :seft
-  #[sdk(attr(qname = ":seft"))]
+  #[sdk(attr(office2016, qname = ":seft"))]
   pub seft: Option<SubFeatureType>,
   /// seftx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :seftx
-  #[sdk(attr(qname = ":seftx"))]
+  #[sdk(attr(office2016, qname = ":seftx"))]
   pub seftx: Option<ExtSubFeatureType>,
   /// _
-  #[sdk(child(qname = "xr:CT_RefMap/xr:refmap"))]
+  #[sdk(child(office2016, qname = "xr:CT_RefMap/xr:refmap"))]
   pub ref_map: Option<RefMap>,
 }
 /// Defines the RevisionStateLink Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:link.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevisionStateLink/xr:link")]
+#[sdk(office2016, qname = "xr:CT_RevisionStateLink/xr:link")]
 pub struct RevisionStateLink {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2016, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the RevisionState Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:body.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RevisionState/xr:body")]
+#[sdk(office2016, qname = "xr:CT_RevisionState/xr:body")]
 pub struct RevisionState {
   #[sdk(choice(
     qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps",
@@ -1788,12 +1097,8 @@ pub struct RevisionState {
   pub xml_children: Option<RevisionStateChoice>,
 }
 /// Defines the RefMap Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:refmap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RefMap/xr:refmap")]
+#[sdk(office2016, qname = "xr:CT_RefMap/xr:refmap")]
 pub struct RefMap {
   #[sdk(choice(
     qname = "xr:CT_RefCell/xr:ref",
@@ -1805,95 +1110,50 @@ pub struct RefMap {
   pub xml_children: Vec<RefMapChoice>,
 }
 /// Defines the RowColVisualOps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:rowColVisualOps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps")]
+#[sdk(office2016, qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps")]
 pub struct RowColVisualOps {
   /// action
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :action
-  #[sdk(attr(qname = ":action"))]
+  #[sdk(attr(office2016, qname = ":action"))]
   pub action: RowColVisualOp,
   /// isRow
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :isRow
-  #[sdk(attr(qname = ":isRow"))]
+  #[sdk(attr(office2016, qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
   /// size
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :size
-  #[sdk(attr(qname = ":size"))]
+  #[sdk(attr(office2016, qname = ":size"))]
   pub size: Option<crate::simple_type::UInt32Value>,
   /// userSized
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :userSized
-  #[sdk(attr(qname = ":userSized"))]
+  #[sdk(attr(office2016, qname = ":userSized"))]
   pub user_sized: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the HideUnhideSheet Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:hideUnhideSheet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet")]
+#[sdk(office2016, qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet")]
 pub struct HideUnhideSheet {
   /// hide
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :hide
-  #[sdk(attr(qname = ":hide"))]
+  #[sdk(attr(office2016, qname = ":hide"))]
   pub hide: crate::simple_type::BooleanValue,
 }
 /// Defines the ShowGridlinesHeadings Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:showGridlinesHeadings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings")]
+#[sdk(
+  office2016,
+  qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"
+)]
 pub struct ShowGridlinesHeadings {
   /// showGridLines
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :showGridLines
-  #[sdk(attr(qname = ":showGridLines"))]
+  #[sdk(attr(office2016, qname = ":showGridLines"))]
   pub show_grid_lines: crate::simple_type::BooleanValue,
   /// showRowCol
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :showRowCol
-  #[sdk(attr(qname = ":showRowCol"))]
+  #[sdk(attr(office2016, qname = ":showRowCol"))]
   pub show_row_col: crate::simple_type::BooleanValue,
 }
 /// Defines the FreezePanes Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:freezePanes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_FreezePanes/xr:freezePanes")]
+#[sdk(office2016, qname = "xr:CT_FreezePanes/xr:freezePanes")]
 pub struct FreezePanes {
   /// sheetViewUid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sheetViewUid
-  #[sdk(attr(qname = ":sheetViewUid"))]
+  #[sdk(attr(office2016, qname = ":sheetViewUid"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -1902,60 +1162,32 @@ pub struct FreezePanes {
   pub sheet_view_uid: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Outlines Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:outlines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_Outlines/xr:outlines")]
+#[sdk(office2016, qname = "xr:CT_Outlines/xr:outlines")]
 pub struct Outlines {
   /// isRow
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :isRow
-  #[sdk(attr(qname = ":isRow"))]
+  #[sdk(attr(office2016, qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
   /// _
-  #[sdk(child(qname = "xr:CT_Outline/xr:outline"))]
+  #[sdk(child(office2016, qname = "xr:CT_Outline/xr:outline"))]
   pub xr_outline: Vec<Outline>,
 }
 /// Defines the Outline Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:outline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_Outline/xr:outline")]
+#[sdk(office2016, qname = "xr:CT_Outline/xr:outline")]
 pub struct Outline {
   /// isCollapsed
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :isCollapsed
-  #[sdk(attr(qname = ":isCollapsed"))]
+  #[sdk(attr(office2016, qname = ":isCollapsed"))]
   pub is_collapsed: crate::simple_type::BooleanValue,
   /// level
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :level
-  #[sdk(attr(qname = ":level"))]
+  #[sdk(attr(office2016, qname = ":level"))]
   pub level: crate::simple_type::ByteValue,
 }
 /// Defines the Xstring Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:v.
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the RstType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:is.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Rst/xr:is")]
+#[sdk(office2016, qname = "x:CT_Rst/xr:is")]
 pub struct RstType {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
@@ -1972,54 +1204,26 @@ pub struct RstType {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticProperties>,
 }
 /// Defines the RefCell Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:ref.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RefCell/xr:ref")]
+#[sdk(office2016, qname = "xr:CT_RefCell/xr:ref")]
 pub struct RefCell {
   /// n
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2016, qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajt
-  #[sdk(attr(qname = ":ajt"))]
+  #[sdk(attr(office2016, qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajtx
-  #[sdk(attr(qname = ":ajtx"))]
+  #[sdk(attr(office2016, qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :homeRef
-  #[sdk(attr(qname = ":homeRef"))]
+  #[sdk(attr(office2016, qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -2027,11 +1231,7 @@ pub struct RefCell {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub uid: Option<crate::simple_type::StringValue>,
   /// uidLast
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uidLast
-  #[sdk(attr(qname = ":uidLast"))]
+  #[sdk(attr(office2016, qname = ":uidLast"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -2040,47 +1240,23 @@ pub struct RefCell {
   pub uid_last: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SheetXluid Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:sheetUid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_SheetXluid/xr:sheetUid")]
+#[sdk(office2016, qname = "xr:CT_SheetXluid/xr:sheetUid")]
 pub struct SheetXluid {
   /// n
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2016, qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajt
-  #[sdk(attr(qname = ":ajt"))]
+  #[sdk(attr(office2016, qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajtx
-  #[sdk(attr(qname = ":ajtx"))]
+  #[sdk(attr(office2016, qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :homeRef
-  #[sdk(attr(qname = ":homeRef"))]
+  #[sdk(attr(office2016, qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// uid
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :uid
-  #[sdk(attr(qname = ":uid"))]
+  #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -2089,54 +1265,26 @@ pub struct SheetXluid {
   pub uid: crate::simple_type::StringValue,
 }
 /// Defines the RefOartAnchor Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:oartAnchor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RefOartAnchor/xr:oartAnchor")]
+#[sdk(office2016, qname = "xr:CT_RefOartAnchor/xr:oartAnchor")]
 pub struct RefOartAnchor {
   /// n
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2016, qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajt
-  #[sdk(attr(qname = ":ajt"))]
+  #[sdk(attr(office2016, qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajtx
-  #[sdk(attr(qname = ":ajtx"))]
+  #[sdk(attr(office2016, qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :homeRef
-  #[sdk(attr(qname = ":homeRef"))]
+  #[sdk(attr(office2016, qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: Option<crate::simple_type::StringValue>,
   /// fromRowOff
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :fromRowOff
-  #[sdk(attr(qname = ":fromRowOff"))]
+  #[sdk(attr(office2016, qname = ":fromRowOff"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2146,11 +1294,7 @@ pub struct RefOartAnchor {
   ))]
   pub from_row_off: Option<crate::simple_type::Int64Value>,
   /// fromColOff
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :fromColOff
-  #[sdk(attr(qname = ":fromColOff"))]
+  #[sdk(attr(office2016, qname = ":fromColOff"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2160,11 +1304,7 @@ pub struct RefOartAnchor {
   ))]
   pub from_col_off: Option<crate::simple_type::Int64Value>,
   /// toRowOff
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :toRowOff
-  #[sdk(attr(qname = ":toRowOff"))]
+  #[sdk(attr(office2016, qname = ":toRowOff"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2174,11 +1314,7 @@ pub struct RefOartAnchor {
   ))]
   pub to_row_off: Option<crate::simple_type::Int64Value>,
   /// toColOff
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :toColOff
-  #[sdk(attr(qname = ":toColOff"))]
+  #[sdk(attr(office2016, qname = ":toColOff"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2188,11 +1324,7 @@ pub struct RefOartAnchor {
   ))]
   pub to_col_off: Option<crate::simple_type::Int64Value>,
   /// cx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :cx
-  #[sdk(attr(qname = ":cx"))]
+  #[sdk(attr(office2016, qname = ":cx"))]
   #[sdk(number_range(
     source = 0u32,
     min = "0",
@@ -2202,11 +1334,7 @@ pub struct RefOartAnchor {
   ))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :cy
-  #[sdk(attr(qname = ":cy"))]
+  #[sdk(attr(office2016, qname = ":cy"))]
   #[sdk(number_range(
     source = 0u32,
     min = "0",
@@ -2216,11 +1344,7 @@ pub struct RefOartAnchor {
   ))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// x
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
-  #[sdk(attr(qname = ":x"))]
+  #[sdk(attr(office2016, qname = ":x"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2230,11 +1354,7 @@ pub struct RefOartAnchor {
   ))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :y
-  #[sdk(attr(qname = ":y"))]
+  #[sdk(attr(office2016, qname = ":y"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -2244,161 +1364,81 @@ pub struct RefOartAnchor {
   ))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// oat
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :oat
-  #[sdk(attr(qname = ":oat"))]
+  #[sdk(attr(office2016, qname = ":oat"))]
   pub oat: OartAnchorType,
 }
 /// Defines the RefTest Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:test.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xr:CT_RefTest/xr:test")]
+#[sdk(office2016, qname = "xr:CT_RefTest/xr:test")]
 pub struct RefTest {
   /// n
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2016, qname = ":n"))]
   pub n: crate::simple_type::StringValue,
   /// ajt
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajt
-  #[sdk(attr(qname = ":ajt"))]
+  #[sdk(attr(office2016, qname = ":ajt"))]
   pub ajt: AdjustType,
   /// ajtx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :ajtx
-  #[sdk(attr(qname = ":ajtx"))]
+  #[sdk(attr(office2016, qname = ":ajtx"))]
   pub ajtx: Option<AdjustTypeExt>,
   /// homeRef
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :homeRef
-  #[sdk(attr(qname = ":homeRef"))]
+  #[sdk(attr(office2016, qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
 }
 /// Represents an external link to another workbook..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:dataValidation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_DataValidation/xr:dataValidation")]
+#[sdk(office2016, qname = "x:CT_DataValidation/xr:dataValidation")]
 pub struct DataValidation {
     /// type
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :type
     #[sdk(attr(qname = ":type"))]
     pub r#type: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationValues,
     >,
     /// errorStyle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :errorStyle
     #[sdk(attr(qname = ":errorStyle"))]
     pub error_style: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationErrorStyleValues,
     >,
     /// imeMode
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :imeMode
     #[sdk(attr(qname = ":imeMode"))]
     pub ime_mode: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationImeModeValues,
     >,
     /// operator
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :operator
     #[sdk(attr(qname = ":operator"))]
     pub operator: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationOperatorValues,
     >,
     /// allowBlank
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :allowBlank
     #[sdk(attr(qname = ":allowBlank"))]
     pub allow_blank: Option<crate::simple_type::BooleanValue>,
     /// showDropDown
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDropDown
     #[sdk(attr(qname = ":showDropDown"))]
     pub show_drop_down: Option<crate::simple_type::BooleanValue>,
     /// showInputMessage
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showInputMessage
     #[sdk(attr(qname = ":showInputMessage"))]
     pub show_input_message: Option<crate::simple_type::BooleanValue>,
     /// showErrorMessage
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showErrorMessage
     #[sdk(attr(qname = ":showErrorMessage"))]
     pub show_error_message: Option<crate::simple_type::BooleanValue>,
     /// errorTitle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :errorTitle
     #[sdk(attr(qname = ":errorTitle"))]
     pub error_title: Option<crate::simple_type::StringValue>,
     /// error
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :error
     #[sdk(attr(qname = ":error"))]
     pub error: Option<crate::simple_type::StringValue>,
     /// promptTitle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :promptTitle
     #[sdk(attr(qname = ":promptTitle"))]
     pub prompt_title: Option<crate::simple_type::StringValue>,
     /// prompt
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :prompt
     #[sdk(attr(qname = ":prompt"))]
     pub prompt: Option<crate::simple_type::StringValue>,
     /// sqref
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :sqref
     #[sdk(attr(qname = ":sqref"))]
     pub sequence_of_references: crate::simple_type::ListValue<
         crate::simple_type::StringValue,
     >,
     /// _
-    #[sdk(text_child(qname = "x:ST_Xstring/x12ac:list"))]
+    #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
     pub list: Option<crate::simple_type::StringValue>,
     /// _
     #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
@@ -2412,240 +1452,140 @@ pub struct DataValidation {
     >,
 }
 /// Represents a hyperlink within a cell..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:hyperlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Hyperlink/xr:hyperlink")]
+#[sdk(office2016, qname = "x:CT_Hyperlink/xr:hyperlink")]
 pub struct Hyperlink {
   /// Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
   /// Relationship Id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Location
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :location
   #[sdk(attr(qname = ":location"))]
   pub location: Option<crate::simple_type::StringValue>,
   /// Tool Tip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tooltip
   #[sdk(attr(qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// Display String
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :display
   #[sdk(attr(qname = ":display"))]
   pub display: Option<crate::simple_type::StringValue>,
 }
 /// Represents a sparkline group of 1 or more sparklines..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:sparklineGroup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SparklineGroup/xr:sparklineGroup")]
+#[sdk(office2016, qname = "x14:CT_SparklineGroup/xr:sparklineGroup")]
 pub struct SparklineGroup {
     /// manualMax
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :manualMax
-    #[sdk(attr(qname = ":manualMax"))]
+    #[sdk(attr(office2010, qname = ":manualMax"))]
     pub manual_max: Option<crate::simple_type::DoubleValue>,
     /// manualMin
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :manualMin
-    #[sdk(attr(qname = ":manualMin"))]
+    #[sdk(attr(office2010, qname = ":manualMin"))]
     pub manual_min: Option<crate::simple_type::DoubleValue>,
     /// lineWeight
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :lineWeight
-    #[sdk(attr(qname = ":lineWeight"))]
+    #[sdk(attr(office2010, qname = ":lineWeight"))]
     pub line_weight: Option<crate::simple_type::DoubleValue>,
     /// type
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :type
-    #[sdk(attr(qname = ":type"))]
+    #[sdk(attr(office2010, qname = ":type"))]
     pub r#type: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineTypeValues,
     >,
     /// dateAxis
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :dateAxis
-    #[sdk(attr(qname = ":dateAxis"))]
+    #[sdk(attr(office2010, qname = ":dateAxis"))]
     pub date_axis: Option<crate::simple_type::BooleanValue>,
     /// displayEmptyCellsAs
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :displayEmptyCellsAs
-    #[sdk(attr(qname = ":displayEmptyCellsAs"))]
+    #[sdk(attr(office2010, qname = ":displayEmptyCellsAs"))]
     pub display_empty_cells_as: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DisplayBlanksAsValues,
     >,
     /// markers
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :markers
-    #[sdk(attr(qname = ":markers"))]
+    #[sdk(attr(office2010, qname = ":markers"))]
     pub markers: Option<crate::simple_type::BooleanValue>,
     /// high
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :high
-    #[sdk(attr(qname = ":high"))]
+    #[sdk(attr(office2010, qname = ":high"))]
     pub high: Option<crate::simple_type::BooleanValue>,
     /// low
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :low
-    #[sdk(attr(qname = ":low"))]
+    #[sdk(attr(office2010, qname = ":low"))]
     pub low: Option<crate::simple_type::BooleanValue>,
     /// first
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :first
-    #[sdk(attr(qname = ":first"))]
+    #[sdk(attr(office2010, qname = ":first"))]
     pub first: Option<crate::simple_type::BooleanValue>,
     /// last
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :last
-    #[sdk(attr(qname = ":last"))]
+    #[sdk(attr(office2010, qname = ":last"))]
     pub last: Option<crate::simple_type::BooleanValue>,
     /// negative
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :negative
-    #[sdk(attr(qname = ":negative"))]
+    #[sdk(attr(office2010, qname = ":negative"))]
     pub negative: Option<crate::simple_type::BooleanValue>,
     /// displayXAxis
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :displayXAxis
-    #[sdk(attr(qname = ":displayXAxis"))]
+    #[sdk(attr(office2010, qname = ":displayXAxis"))]
     pub display_x_axis: Option<crate::simple_type::BooleanValue>,
     /// displayHidden
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :displayHidden
-    #[sdk(attr(qname = ":displayHidden"))]
+    #[sdk(attr(office2010, qname = ":displayHidden"))]
     pub display_hidden: Option<crate::simple_type::BooleanValue>,
     /// minAxisType
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :minAxisType
-    #[sdk(attr(qname = ":minAxisType"))]
+    #[sdk(attr(office2010, qname = ":minAxisType"))]
     pub min_axis_type: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineAxisMinMaxValues,
     >,
     /// maxAxisType
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :maxAxisType
-    #[sdk(attr(qname = ":maxAxisType"))]
+    #[sdk(attr(office2010, qname = ":maxAxisType"))]
     pub max_axis_type: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineAxisMinMaxValues,
     >,
     /// rightToLeft
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :rightToLeft
-    #[sdk(attr(qname = ":rightToLeft"))]
+    #[sdk(attr(office2010, qname = ":rightToLeft"))]
     pub right_to_left: Option<crate::simple_type::BooleanValue>,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorSeries"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
     pub series_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SeriesColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorNegative"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
     pub negative_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::NegativeColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorAxis"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
     pub axis_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::AxisColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorMarkers"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
     pub markers_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::MarkersColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorFirst"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
     pub first_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FirstMarkerColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorLast"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
     pub last_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LastMarkerColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorHigh"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
     pub high_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::HighMarkerColor,
     >,
     /// _
-    #[sdk(child(qname = "x:CT_Color/x14:colorLow"))]
+    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
     pub low_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LowMarkerColor,
     >,
     /// _
-    #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+    #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
     pub formula: Option<crate::simple_type::StringValue>,
     /// _
-    #[sdk(child(qname = "x14:CT_Sparklines/x14:sparklines"))]
+    #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
     pub sparklines: std::boxed::Box<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Sparklines,
     >,
 }
 /// Represents one comment within a cell..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:comments.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Comments/xr:comments")]
+#[sdk(office2016, qname = "x:CT_Comments/xr:comments")]
 pub struct Comments {
   /// Authors
   #[sdk(child(qname = "x:CT_Authors/x:authors"))]
@@ -2662,18 +1602,10 @@ pub struct Comments {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Represents an autofilter..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:autoFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_AutoFilter/xr:autoFilter")]
+#[sdk(office2016, qname = "x:CT_AutoFilter/xr:autoFilter")]
 pub struct AutoFilter {
   /// Cell or Range Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
   /// _
@@ -2691,487 +1623,214 @@ pub struct AutoFilter {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Represents a PivotTable View..
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xr:pivotTableDefinition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition")]
+#[sdk(
+  office2016,
+  qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
+)]
 pub struct PivotTableDefinition {
     /// name
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// cacheId
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :cacheId
     #[sdk(attr(qname = ":cacheId"))]
     pub cache_id: crate::simple_type::UInt32Value,
     /// dataOnRows
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :dataOnRows
     #[sdk(attr(qname = ":dataOnRows"))]
     pub data_on_rows: Option<crate::simple_type::BooleanValue>,
     /// dataPosition
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :dataPosition
     #[sdk(attr(qname = ":dataPosition"))]
     pub data_position: Option<crate::simple_type::UInt32Value>,
     /// Auto Format Id
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :autoFormatId
     #[sdk(attr(qname = ":autoFormatId"))]
     pub auto_format_id: Option<crate::simple_type::UInt32Value>,
     /// Apply Number Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyNumberFormats
     #[sdk(attr(qname = ":applyNumberFormats"))]
     pub apply_number_formats: Option<crate::simple_type::BooleanValue>,
     /// Apply Border Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyBorderFormats
     #[sdk(attr(qname = ":applyBorderFormats"))]
     pub apply_border_formats: Option<crate::simple_type::BooleanValue>,
     /// Apply Font Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyFontFormats
     #[sdk(attr(qname = ":applyFontFormats"))]
     pub apply_font_formats: Option<crate::simple_type::BooleanValue>,
     /// Apply Pattern Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyPatternFormats
     #[sdk(attr(qname = ":applyPatternFormats"))]
     pub apply_pattern_formats: Option<crate::simple_type::BooleanValue>,
     /// Apply Alignment Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyAlignmentFormats
     #[sdk(attr(qname = ":applyAlignmentFormats"))]
     pub apply_alignment_formats: Option<crate::simple_type::BooleanValue>,
     /// Apply Width / Height Formats
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :applyWidthHeightFormats
     #[sdk(attr(qname = ":applyWidthHeightFormats"))]
     pub apply_width_height_formats: Option<crate::simple_type::BooleanValue>,
     /// dataCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :dataCaption
     #[sdk(attr(qname = ":dataCaption"))]
     pub data_caption: crate::simple_type::StringValue,
     /// grandTotalCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :grandTotalCaption
     #[sdk(attr(qname = ":grandTotalCaption"))]
     pub grand_total_caption: Option<crate::simple_type::StringValue>,
     /// errorCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :errorCaption
     #[sdk(attr(qname = ":errorCaption"))]
     pub error_caption: Option<crate::simple_type::StringValue>,
     /// showError
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showError
     #[sdk(attr(qname = ":showError"))]
     pub show_error: Option<crate::simple_type::BooleanValue>,
     /// missingCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :missingCaption
     #[sdk(attr(qname = ":missingCaption"))]
     pub missing_caption: Option<crate::simple_type::StringValue>,
     /// showMissing
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showMissing
     #[sdk(attr(qname = ":showMissing"))]
     pub show_missing: Option<crate::simple_type::BooleanValue>,
     /// pageStyle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :pageStyle
     #[sdk(attr(qname = ":pageStyle"))]
     pub page_style: Option<crate::simple_type::StringValue>,
     /// pivotTableStyle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :pivotTableStyle
     #[sdk(attr(qname = ":pivotTableStyle"))]
     pub pivot_table_style_name: Option<crate::simple_type::StringValue>,
     /// vacatedStyle
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :vacatedStyle
     #[sdk(attr(qname = ":vacatedStyle"))]
     pub vacated_style: Option<crate::simple_type::StringValue>,
     /// tag
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :tag
     #[sdk(attr(qname = ":tag"))]
     pub tag: Option<crate::simple_type::StringValue>,
     /// updatedVersion
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :updatedVersion
     #[sdk(attr(qname = ":updatedVersion"))]
     pub updated_version: Option<crate::simple_type::ByteValue>,
     /// minRefreshableVersion
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :minRefreshableVersion
     #[sdk(attr(qname = ":minRefreshableVersion"))]
     pub min_refreshable_version: Option<crate::simple_type::ByteValue>,
     /// asteriskTotals
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :asteriskTotals
     #[sdk(attr(qname = ":asteriskTotals"))]
     pub asterisk_totals: Option<crate::simple_type::BooleanValue>,
     /// showItems
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showItems
     #[sdk(attr(qname = ":showItems"))]
     pub show_items: Option<crate::simple_type::BooleanValue>,
     /// editData
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :editData
     #[sdk(attr(qname = ":editData"))]
     pub edit_data: Option<crate::simple_type::BooleanValue>,
     /// disableFieldList
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :disableFieldList
     #[sdk(attr(qname = ":disableFieldList"))]
     pub disable_field_list: Option<crate::simple_type::BooleanValue>,
     /// showCalcMbrs
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showCalcMbrs
     #[sdk(attr(qname = ":showCalcMbrs"))]
     pub show_calculated_members: Option<crate::simple_type::BooleanValue>,
     /// visualTotals
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :visualTotals
     #[sdk(attr(qname = ":visualTotals"))]
     pub visual_totals: Option<crate::simple_type::BooleanValue>,
     /// showMultipleLabel
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showMultipleLabel
     #[sdk(attr(qname = ":showMultipleLabel"))]
     pub show_multiple_label: Option<crate::simple_type::BooleanValue>,
     /// showDataDropDown
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDataDropDown
     #[sdk(attr(qname = ":showDataDropDown"))]
     pub show_data_drop_down: Option<crate::simple_type::BooleanValue>,
     /// showDrill
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDrill
     #[sdk(attr(qname = ":showDrill"))]
     pub show_drill: Option<crate::simple_type::BooleanValue>,
     /// printDrill
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :printDrill
     #[sdk(attr(qname = ":printDrill"))]
     pub print_drill: Option<crate::simple_type::BooleanValue>,
     /// showMemberPropertyTips
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showMemberPropertyTips
     #[sdk(attr(qname = ":showMemberPropertyTips"))]
     pub show_member_property_tips: Option<crate::simple_type::BooleanValue>,
     /// showDataTips
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDataTips
     #[sdk(attr(qname = ":showDataTips"))]
     pub show_data_tips: Option<crate::simple_type::BooleanValue>,
     /// enableWizard
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :enableWizard
     #[sdk(attr(qname = ":enableWizard"))]
     pub enable_wizard: Option<crate::simple_type::BooleanValue>,
     /// enableDrill
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :enableDrill
     #[sdk(attr(qname = ":enableDrill"))]
     pub enable_drill: Option<crate::simple_type::BooleanValue>,
     /// enableFieldProperties
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :enableFieldProperties
     #[sdk(attr(qname = ":enableFieldProperties"))]
     pub enable_field_properties: Option<crate::simple_type::BooleanValue>,
     /// preserveFormatting
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :preserveFormatting
     #[sdk(attr(qname = ":preserveFormatting"))]
     pub preserve_formatting: Option<crate::simple_type::BooleanValue>,
     /// useAutoFormatting
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :useAutoFormatting
     #[sdk(attr(qname = ":useAutoFormatting"))]
     pub use_auto_formatting: Option<crate::simple_type::BooleanValue>,
     /// pageWrap
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :pageWrap
     #[sdk(attr(qname = ":pageWrap"))]
     pub page_wrap: Option<crate::simple_type::UInt32Value>,
     /// pageOverThenDown
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :pageOverThenDown
     #[sdk(attr(qname = ":pageOverThenDown"))]
     pub page_over_then_down: Option<crate::simple_type::BooleanValue>,
     /// subtotalHiddenItems
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :subtotalHiddenItems
     #[sdk(attr(qname = ":subtotalHiddenItems"))]
     pub subtotal_hidden_items: Option<crate::simple_type::BooleanValue>,
     /// rowGrandTotals
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :rowGrandTotals
     #[sdk(attr(qname = ":rowGrandTotals"))]
     pub row_grand_totals: Option<crate::simple_type::BooleanValue>,
     /// colGrandTotals
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :colGrandTotals
     #[sdk(attr(qname = ":colGrandTotals"))]
     pub column_grand_totals: Option<crate::simple_type::BooleanValue>,
     /// fieldPrintTitles
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :fieldPrintTitles
     #[sdk(attr(qname = ":fieldPrintTitles"))]
     pub field_print_titles: Option<crate::simple_type::BooleanValue>,
     /// itemPrintTitles
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :itemPrintTitles
     #[sdk(attr(qname = ":itemPrintTitles"))]
     pub item_print_titles: Option<crate::simple_type::BooleanValue>,
     /// mergeItem
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :mergeItem
     #[sdk(attr(qname = ":mergeItem"))]
     pub merge_item: Option<crate::simple_type::BooleanValue>,
     /// showDropZones
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDropZones
     #[sdk(attr(qname = ":showDropZones"))]
     pub show_drop_zones: Option<crate::simple_type::BooleanValue>,
     /// createdVersion
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :createdVersion
     #[sdk(attr(qname = ":createdVersion"))]
     pub created_version: Option<crate::simple_type::ByteValue>,
     /// indent
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :indent
     #[sdk(attr(qname = ":indent"))]
     pub indent: Option<crate::simple_type::UInt32Value>,
     /// showEmptyRow
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showEmptyRow
     #[sdk(attr(qname = ":showEmptyRow"))]
     pub show_empty_row: Option<crate::simple_type::BooleanValue>,
     /// showEmptyCol
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showEmptyCol
     #[sdk(attr(qname = ":showEmptyCol"))]
     pub show_empty_column: Option<crate::simple_type::BooleanValue>,
     /// showHeaders
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :showHeaders
     #[sdk(attr(qname = ":showHeaders"))]
     pub show_headers: Option<crate::simple_type::BooleanValue>,
     /// compact
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :compact
     #[sdk(attr(qname = ":compact"))]
     pub compact: Option<crate::simple_type::BooleanValue>,
     /// outline
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :outline
     #[sdk(attr(qname = ":outline"))]
     pub outline: Option<crate::simple_type::BooleanValue>,
     /// outlineData
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :outlineData
     #[sdk(attr(qname = ":outlineData"))]
     pub outline_data: Option<crate::simple_type::BooleanValue>,
     /// compactData
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :compactData
     #[sdk(attr(qname = ":compactData"))]
     pub compact_data: Option<crate::simple_type::BooleanValue>,
     /// published
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :published
     #[sdk(attr(qname = ":published"))]
     pub published: Option<crate::simple_type::BooleanValue>,
     /// gridDropZones
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :gridDropZones
     #[sdk(attr(qname = ":gridDropZones"))]
     pub grid_drop_zones: Option<crate::simple_type::BooleanValue>,
     /// immersive
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :immersive
     #[sdk(attr(qname = ":immersive"))]
     pub stop_immersive_ui: Option<crate::simple_type::BooleanValue>,
     /// multipleFieldFilters
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :multipleFieldFilters
     #[sdk(attr(qname = ":multipleFieldFilters"))]
     pub multiple_field_filters: Option<crate::simple_type::BooleanValue>,
     /// chartFormat
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :chartFormat
     #[sdk(attr(qname = ":chartFormat"))]
     pub chart_format: Option<crate::simple_type::UInt32Value>,
     /// rowHeaderCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :rowHeaderCaption
     #[sdk(attr(qname = ":rowHeaderCaption"))]
     pub row_header_caption: Option<crate::simple_type::StringValue>,
     /// colHeaderCaption
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :colHeaderCaption
     #[sdk(attr(qname = ":colHeaderCaption"))]
     pub column_header_caption: Option<crate::simple_type::StringValue>,
     /// fieldListSortAscending
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :fieldListSortAscending
     #[sdk(attr(qname = ":fieldListSortAscending"))]
     pub field_list_sort_ascending: Option<crate::simple_type::BooleanValue>,
     /// mdxSubqueries
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :mdxSubqueries
     #[sdk(attr(qname = ":mdxSubqueries"))]
     pub mdx_subqueries: Option<crate::simple_type::BooleanValue>,
     /// customListSort
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :customListSort
     #[sdk(attr(qname = ":customListSort"))]
     pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
     /// _
@@ -3263,151 +1922,157 @@ pub struct PivotTableDefinition {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExStreamChoice {
   /// Defines the RevExFuture Class.
-  #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
   /// Defines the RevExUnsupported Class.
-  #[sdk(child(qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   XrXrrUspt(std::boxed::Box<RevExUnsupported>),
   /// Defines the RevExTrimmed Class.
-  #[sdk(child(qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   XrXrrTrim(std::boxed::Box<RevExTrimmed>),
   /// Defines the RevExRowColumn Class.
-  #[sdk(child(qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   XrXrrrc(std::boxed::Box<RevExRowColumn>),
   /// Defines the RevExMove Class.
-  #[sdk(child(qname = "xr:CT_RevExMove/xr:xrrm"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExMove/xr:xrrm"))]
   XrXrrm(std::boxed::Box<RevExMove>),
   /// Defines the RevExChangeCell Class.
-  #[sdk(child(qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   XrXrrc(std::boxed::Box<RevExChangeCell>),
   /// Defines the RevExFormatting Class.
-  #[sdk(child(qname = "xr:CT_RevExFormatting/xr:xrrf"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   XrXrrf(std::boxed::Box<RevExFormatting>),
   /// Defines the RevExDefinedName Class.
-  #[sdk(child(qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   XrXrrDefName(std::boxed::Box<RevExDefinedName>),
   /// Defines the RevExDelObj Class.
-  #[sdk(child(qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   XrXrrdo(std::boxed::Box<RevExDelObj>),
   /// Defines the RevExChgObj Class.
-  #[sdk(child(qname = "xr:CT_RevExChgObj/xr:xrrco"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   XrXrrco(std::boxed::Box<RevExChgObj>),
   /// Defines the RevExSheetOp Class.
-  #[sdk(child(qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   XrXrrSheet(std::boxed::Box<RevExSheetOp>),
   /// Defines the RevisionList Class.
-  #[sdk(child(qname = "xr:CT_RevisionList/xr:xrrList"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevisionList/xr:xrrList"))]
   XrXrrList(std::boxed::Box<RevisionList>),
   /// Defines the RevListAutoExpandRw Class.
-  #[sdk(child(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   XrXrrListExpR(std::boxed::Box<RevListAutoExpandRw>),
   /// Defines the RevGroup Class.
-  #[sdk(child(qname = "xr:CT_RevGroup/xr:xrrg"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevGroup/xr:xrrg"))]
   XrXrrg(std::boxed::Box<RevGroup>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StateBasedObjectChoice {
   /// Represents an external link to another workbook..
-  #[sdk(child(qname = "x:CT_DataValidation/xr:dataValidation"))]
+  #[sdk(child(office2016, qname = "x:CT_DataValidation/xr:dataValidation"))]
   XrDataValidation(std::boxed::Box<DataValidation>),
   /// Represents a hyperlink within a cell..
-  #[sdk(child(qname = "x:CT_Hyperlink/xr:hyperlink"))]
+  #[sdk(child(office2016, qname = "x:CT_Hyperlink/xr:hyperlink"))]
   XrHyperlink(std::boxed::Box<Hyperlink>),
   /// Represents a sparkline group of 1 or more sparklines..
-  #[sdk(child(qname = "x14:CT_SparklineGroup/xr:sparklineGroup"))]
+  #[sdk(child(office2016, qname = "x14:CT_SparklineGroup/xr:sparklineGroup"))]
   XrSparklineGroup(std::boxed::Box<SparklineGroup>),
   /// Represents one comment within a cell..
-  #[sdk(child(qname = "x:CT_Comments/xr:comments"))]
+  #[sdk(child(office2016, qname = "x:CT_Comments/xr:comments"))]
   XrComments(std::boxed::Box<Comments>),
   /// Represents an autofilter..
-  #[sdk(child(qname = "x:CT_AutoFilter/xr:autoFilter"))]
+  #[sdk(child(office2016, qname = "x:CT_AutoFilter/xr:autoFilter"))]
   XrAutoFilter(std::boxed::Box<AutoFilter>),
   /// Represents a PivotTable View..
-  #[sdk(child(qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"))]
+  #[sdk(child(
+    office2016,
+    qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
+  ))]
   XrPivotTableDefinition(std::boxed::Box<PivotTableDefinition>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExChgObjChoice {
-  #[sdk(child(qname = "xr:CT_RevisionStateLink/xr:link"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevisionStateLink/xr:link"))]
   XrLink(std::boxed::Box<RevisionStateLink>),
-  #[sdk(child(qname = "xr:CT_RevisionState/xr:body"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevisionState/xr:body"))]
   XrBody(std::boxed::Box<RevisionState>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevGroupChoice {
   /// Defines the RevExFuture Class.
-  #[sdk(child(qname = "xr:CT_RevExFuture/xr:xrrftr"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExFuture/xr:xrrftr"))]
   XrXrrftr(std::boxed::Box<RevExFuture>),
   /// Defines the RevExUnsupported Class.
-  #[sdk(child(qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExUnsupported/xr:xrrUspt"))]
   XrXrrUspt(std::boxed::Box<RevExUnsupported>),
   /// Defines the RevExTrimmed Class.
-  #[sdk(child(qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExTrimmed/xr:xrrTrim"))]
   XrXrrTrim(std::boxed::Box<RevExTrimmed>),
   /// Defines the RevExRowColumn Class.
-  #[sdk(child(qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExRowColumn/xr:xrrrc"))]
   XrXrrrc(std::boxed::Box<RevExRowColumn>),
   /// Defines the RevExMove Class.
-  #[sdk(child(qname = "xr:CT_RevExMove/xr:xrrm"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExMove/xr:xrrm"))]
   XrXrrm(std::boxed::Box<RevExMove>),
   /// Defines the RevExChangeCell Class.
-  #[sdk(child(qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExChangeCell/xr:xrrc"))]
   XrXrrc(std::boxed::Box<RevExChangeCell>),
   /// Defines the RevExFormatting Class.
-  #[sdk(child(qname = "xr:CT_RevExFormatting/xr:xrrf"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExFormatting/xr:xrrf"))]
   XrXrrf(std::boxed::Box<RevExFormatting>),
   /// Defines the RevExDefinedName Class.
-  #[sdk(child(qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExDefinedName/xr:xrrDefName"))]
   XrXrrDefName(std::boxed::Box<RevExDefinedName>),
   /// Defines the RevExDelObj Class.
-  #[sdk(child(qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExDelObj/xr:xrrdo"))]
   XrXrrdo(std::boxed::Box<RevExDelObj>),
   /// Defines the RevExChgObj Class.
-  #[sdk(child(qname = "xr:CT_RevExChgObj/xr:xrrco"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExChgObj/xr:xrrco"))]
   XrXrrco(std::boxed::Box<RevExChgObj>),
   /// Defines the RevExSheetOp Class.
-  #[sdk(child(qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevExSheetOp/xr:xrrSheet"))]
   XrXrrSheet(std::boxed::Box<RevExSheetOp>),
   /// Defines the RevisionList Class.
-  #[sdk(child(qname = "xr:CT_RevisionList/xr:xrrList"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevisionList/xr:xrrList"))]
   XrXrrList(std::boxed::Box<RevisionList>),
   /// Defines the RevListAutoExpandRw Class.
-  #[sdk(child(qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
+  #[sdk(child(office2016, qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"))]
   XrXrrListExpR(std::boxed::Box<RevListAutoExpandRw>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionStateChoice {
   /// Defines the RowColVisualOps Class.
-  #[sdk(child(qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps"))]
+  #[sdk(child(office2016, qname = "xr:CT_RowColVisualOps/xr:rowColVisualOps"))]
   XrRowColVisualOps(std::boxed::Box<RowColVisualOps>),
   /// Defines the HideUnhideSheet Class.
-  #[sdk(child(qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet"))]
+  #[sdk(child(office2016, qname = "xr:CT_HideUnhideSheet/xr:hideUnhideSheet"))]
   XrHideUnhideSheet(std::boxed::Box<HideUnhideSheet>),
   /// Defines the ShowGridlinesHeadings Class.
-  #[sdk(child(qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"))]
+  #[sdk(child(
+    office2016,
+    qname = "xr:CT_ShowGridlinesHeadings/xr:showGridlinesHeadings"
+  ))]
   XrShowGridlinesHeadings(std::boxed::Box<ShowGridlinesHeadings>),
   /// Defines the FreezePanes Class.
-  #[sdk(child(qname = "xr:CT_FreezePanes/xr:freezePanes"))]
+  #[sdk(child(office2016, qname = "xr:CT_FreezePanes/xr:freezePanes"))]
   XrFreezePanes(std::boxed::Box<FreezePanes>),
   /// Defines the Outlines Class.
-  #[sdk(child(qname = "xr:CT_Outlines/xr:outlines"))]
+  #[sdk(child(office2016, qname = "xr:CT_Outlines/xr:outlines"))]
   XrOutlines(std::boxed::Box<Outlines>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RefMapChoice {
   /// Defines the RefCell Class.
-  #[sdk(child(qname = "xr:CT_RefCell/xr:ref"))]
+  #[sdk(child(office2016, qname = "xr:CT_RefCell/xr:ref"))]
   XrRef(std::boxed::Box<RefCell>),
   /// Defines the SheetXluid Class.
-  #[sdk(child(qname = "xr:CT_SheetXluid/xr:sheetUid"))]
+  #[sdk(child(office2016, qname = "xr:CT_SheetXluid/xr:sheetUid"))]
   XrSheetUid(std::boxed::Box<SheetXluid>),
   /// Defines the RefOartAnchor Class.
-  #[sdk(child(qname = "xr:CT_RefOartAnchor/xr:oartAnchor"))]
+  #[sdk(child(office2016, qname = "xr:CT_RefOartAnchor/xr:oartAnchor"))]
   XrOartAnchor(std::boxed::Box<RefOartAnchor>),
   /// Defines the RefFuture Class.
-  #[sdk(empty_child(qname = "xr:CT_RefFuture/xr:future"))]
+  #[sdk(empty_child(office2016, qname = "xr:CT_RefFuture/xr:future"))]
   XrFuture,
   /// Defines the RefTest Class.
-  #[sdk(child(qname = "xr:CT_RefTest/xr:test"))]
+  #[sdk(child(office2016, qname = "xr:CT_RefTest/xr:test"))]
   XrTest(std::boxed::Box<RefTest>),
 }

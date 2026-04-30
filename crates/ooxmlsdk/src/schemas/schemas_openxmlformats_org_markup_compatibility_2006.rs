@@ -5,10 +5,6 @@
 //
 
 /// Defines the AlternateContent Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is mc:AlternateContent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_AlternateContent/mc:AlternateContent")]
 pub struct AlternateContent {
@@ -18,10 +14,6 @@ pub struct AlternateContent {
   pub alternate_content_choice: Vec<AlternateContentChoice>,
 }
 /// Defines the Choice Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is mc:Choice.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_Choice/mc:Choice")]
 pub struct Choice {
@@ -31,10 +23,6 @@ pub struct Choice {
   pub xml_children: Vec<String>,
 }
 /// Defines the Fallback Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is mc:Fallback.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mc:CT_Fallback/mc:Fallback")]
 pub struct Fallback {

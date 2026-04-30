@@ -5,70 +5,50 @@
 //
 
 /// Defines the PivotOptions Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:pivotOptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_PivotOptions/c14:pivotOptions")]
+#[sdk(office2010, qname = "c14:CT_PivotOptions/c14:pivotOptions")]
 pub struct PivotOptions {
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:dropZoneFilter"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneFilter"))]
   pub drop_zone_filter: Option<DropZoneFilter>,
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:dropZoneCategories"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneCategories"))]
   pub drop_zone_categories: Option<DropZoneCategories>,
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:dropZoneData"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneData"))]
   pub drop_zone_data: Option<DropZoneData>,
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:dropZoneSeries"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneSeries"))]
   pub drop_zone_series: Option<DropZoneSeries>,
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:dropZonesVisible"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZonesVisible"))]
   pub drop_zones_visible: Option<DropZonesVisible>,
 }
 /// Defines the SketchOptions Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:sketchOptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_SketchOptions/c14:sketchOptions")]
+#[sdk(office2010, qname = "c14:CT_SketchOptions/c14:sketchOptions")]
 pub struct SketchOptions {
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanFalse/c14:inSketchMode"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:inSketchMode"))]
   pub in_sketch_mode: Option<InSketchMode>,
   /// _
-  #[sdk(child(qname = "c14:CT_BooleanTrue/c14:showSketchBtn"))]
+  #[sdk(child(office2010, qname = "c14:CT_BooleanTrue/c14:showSketchBtn"))]
   pub show_sketch_button: Option<ShowSketchButton>,
 }
 /// Defines the InvertSolidFillFormat Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:invertSolidFillFmt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt")]
+#[sdk(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt")]
 pub struct InvertSolidFillFormat {
   /// _
-  #[sdk(child(qname = "a:CT_ShapeProperties/c14:spPr"))]
+  #[sdk(child(office2010, qname = "a:CT_ShapeProperties/c14:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
 }
 /// Defines the Style Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_Style/c14:style")]
+#[sdk(office2010, qname = "c14:CT_Style/c14:style")]
 pub struct Style {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   #[sdk(number_range(
     source = 1u32,
     min = "101",
@@ -79,19 +59,11 @@ pub struct Style {
   pub val: crate::simple_type::ByteValue,
 }
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/c14:spPr")]
+#[sdk(office2010, qname = "a:CT_ShapeProperties/c14:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -142,131 +114,67 @@ pub struct ShapeProperties {
   >,
 }
 /// Defines the DropZoneFilter Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:dropZoneFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneFilter")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneFilter")]
 pub struct DropZoneFilter {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneCategories Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:dropZoneCategories.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneCategories")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneCategories")]
 pub struct DropZoneCategories {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneData Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:dropZoneData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneData")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneData")]
 pub struct DropZoneData {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZoneSeries Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:dropZoneSeries.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:dropZoneSeries")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneSeries")]
 pub struct DropZoneSeries {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DropZonesVisible Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:dropZonesVisible.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:dropZonesVisible")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:dropZonesVisible")]
 pub struct DropZonesVisible {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the InSketchMode Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:inSketchMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/c14:inSketchMode")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/c14:inSketchMode")]
 pub struct InSketchMode {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the BooleanFalseType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanFalse/")]
+#[sdk(office2010, qname = "c14:CT_BooleanFalse/")]
 pub struct BooleanFalseType {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShowSketchButton Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c14:showSketchBtn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c14:CT_BooleanTrue/c14:showSketchBtn")]
+#[sdk(office2010, qname = "c14:CT_BooleanTrue/c14:showSketchBtn")]
 pub struct ShowSketchButton {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

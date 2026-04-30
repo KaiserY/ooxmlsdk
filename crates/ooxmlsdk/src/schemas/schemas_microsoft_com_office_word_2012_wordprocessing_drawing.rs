@@ -5,32 +5,16 @@
 //
 
 /// Defines the WebVideoProperty Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is wp15:webVideoPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wp15:CT_WebVideoPr/wp15:webVideoPr")]
+#[sdk(office2013, qname = "wp15:CT_WebVideoPr/wp15:webVideoPr")]
 pub struct WebVideoProperty {
   /// embeddedHtml
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :embeddedHtml
-  #[sdk(attr(qname = ":embeddedHtml"))]
+  #[sdk(attr(office2013, qname = ":embeddedHtml"))]
   pub embedded_html: Option<crate::simple_type::StringValue>,
   /// h
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :h
-  #[sdk(attr(qname = ":h"))]
+  #[sdk(attr(office2013, qname = ":h"))]
   pub height: Option<crate::simple_type::UInt32Value>,
   /// w
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :w
-  #[sdk(attr(qname = ":w"))]
+  #[sdk(attr(office2013, qname = ":w"))]
   pub width: Option<crate::simple_type::UInt32Value>,
 }

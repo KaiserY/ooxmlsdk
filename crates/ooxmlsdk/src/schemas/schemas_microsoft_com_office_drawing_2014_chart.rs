@@ -5,19 +5,11 @@
 //
 
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/c16:spPr")]
+#[sdk(office2016, qname = "a:CT_ShapeProperties/c16:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -68,76 +60,40 @@ pub struct ShapeProperties {
   >,
 }
 /// Defines the UnsignedIntegerType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:explosion.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_UnsignedInt/c16:explosion")]
+#[sdk(office2016, qname = "c:CT_UnsignedInt/c16:explosion")]
 pub struct UnsignedIntegerType {
   /// Integer Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the InvertIfNegativeBoolean Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:invertIfNegative.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Boolean/c16:invertIfNegative")]
+#[sdk(office2016, qname = "c:CT_Boolean/c16:invertIfNegative")]
 pub struct InvertIfNegativeBoolean {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Bubble3DBoolean Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:bubble3D.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Boolean/c16:bubble3D")]
+#[sdk(office2016, qname = "c:CT_Boolean/c16:bubble3D")]
 pub struct Bubble3DBoolean {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the BooleanType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Boolean/")]
 pub struct BooleanType {
   /// Boolean Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Marker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:marker.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Marker/c16:marker")]
+#[sdk(office2016, qname = "c:CT_Marker/c16:marker")]
 pub struct Marker {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
@@ -159,12 +115,8 @@ pub struct Marker {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
 }
 /// Defines the DLbl Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:dLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_DLbl/c16:dLbl")]
+#[sdk(office2016, qname = "c:CT_DLbl/c16:dLbl")]
 pub struct DLbl {
   /// _
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
@@ -193,126 +145,100 @@ pub struct DLbl {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DLblExtensionList>,
 }
 /// Defines the CategoryFilterExceptions Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:categoryFilterExceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
+)]
 pub struct CategoryFilterExceptions {
   /// _
-  #[sdk(child(qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"
+  ))]
   pub c16_category_filter_exception: Vec<CategoryFilterException>,
 }
 /// Defines the PivotOptions16 Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:pivotOptions16.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_PivotOptions16/c16:pivotOptions16")]
+#[sdk(office2016, qname = "c16:CT_PivotOptions16/c16:pivotOptions16")]
 pub struct PivotOptions16 {
   /// _
-  #[sdk(child(qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons"
+  ))]
   pub boolean_false: Option<BooleanFalse>,
 }
 /// Defines the ChartDataPointUniqueIDMap Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:datapointuniqueidmap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
+)]
 pub struct ChartDataPointUniqueIdMap {
   /// _
-  #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"))]
+  #[sdk(child(
+    office2016,
+    qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"
+  ))]
   pub c16_ptentry: Vec<ChartDataPointUniqueIdMapEntry>,
 }
 /// Defines the UniqueIdChartUniqueID Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:uniqueId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_ChartUniqueID/c16:uniqueId")]
+#[sdk(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId")]
 pub struct UniqueIdChartUniqueId {
   /// val
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the UniqueID Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:uniqueID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_ChartUniqueID/c16:uniqueID")]
+#[sdk(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID")]
 pub struct UniqueId {
   /// val
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the UniqueIDChart Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_ChartUniqueID/")]
+#[sdk(office2016, qname = "c16:CT_ChartUniqueID/")]
 pub struct UniqueIdChart {
   /// val
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the CategoryFilterException Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:categoryFilterException.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_CategoryFilterException/c16:categoryFilterException")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"
+)]
 pub struct CategoryFilterException {
   /// _
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   pub unique_id_chart_unique_id: std::boxed::Box<UniqueIdChartUniqueId>,
   /// _
-  #[sdk(child(qname = "a:CT_ShapeProperties/c16:spPr"))]
+  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/c16:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// _
-  #[sdk(child(qname = "c:CT_UnsignedInt/c16:explosion"))]
+  #[sdk(child(office2016, qname = "c:CT_UnsignedInt/c16:explosion"))]
   pub unsigned_integer_type: Option<UnsignedIntegerType>,
   /// _
-  #[sdk(child(qname = "c:CT_Boolean/c16:invertIfNegative"))]
+  #[sdk(child(office2016, qname = "c:CT_Boolean/c16:invertIfNegative"))]
   pub invert_if_negative_boolean: Option<InvertIfNegativeBoolean>,
   /// _
-  #[sdk(child(qname = "c:CT_Boolean/c16:bubble3D"))]
+  #[sdk(child(office2016, qname = "c:CT_Boolean/c16:bubble3D"))]
   pub bubble3_d_boolean: Option<Bubble3DBoolean>,
   /// _
-  #[sdk(child(qname = "c:CT_Marker/c16:marker"))]
+  #[sdk(child(office2016, qname = "c:CT_Marker/c16:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
   /// _
-  #[sdk(child(qname = "c:CT_DLbl/c16:dLbl"))]
+  #[sdk(child(office2016, qname = "c:CT_DLbl/c16:dLbl"))]
   pub d_lbl: Option<std::boxed::Box<DLbl>>,
 }
 /// Defines the NumberDataType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:numCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_NumData/c16:numCache")]
+#[sdk(office2016, qname = "c:CT_NumData/c16:numCache")]
 pub struct NumberDataType {
   /// Format Code
   #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
@@ -330,24 +256,19 @@ pub struct NumberDataType {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
 }
 /// Defines the NumFilteredLiteralCache Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_NumFilteredLiteralCache/c16:filteredLitCache")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_NumFilteredLiteralCache/c16:filteredLitCache"
+)]
 pub struct NumFilteredLiteralCache {
   /// _
-  #[sdk(child(qname = "c:CT_NumData/c16:numCache"))]
+  #[sdk(child(office2016, qname = "c:CT_NumData/c16:numCache"))]
   pub number_data_type: std::boxed::Box<NumberDataType>,
 }
 /// Defines the StringDataType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:strCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_StrData/c16:strCache")]
+#[sdk(office2016, qname = "c:CT_StrData/c16:strCache")]
 pub struct StringDataType {
   /// _
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
@@ -362,24 +283,19 @@ pub struct StringDataType {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
 }
 /// Defines the StrFilteredLiteralCache Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_StrFilteredLiteralCache/c16:filteredLitCache")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_StrFilteredLiteralCache/c16:filteredLitCache"
+)]
 pub struct StrFilteredLiteralCache {
   /// _
-  #[sdk(child(qname = "c:CT_StrData/c16:strCache"))]
+  #[sdk(child(office2016, qname = "c:CT_StrData/c16:strCache"))]
   pub string_data_type: std::boxed::Box<StringDataType>,
 }
 /// Defines the MultiLvlStrData Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:multiLvlStrCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache")]
+#[sdk(office2016, qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache")]
 pub struct MultiLvlStrData {
   /// _
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
@@ -394,68 +310,49 @@ pub struct MultiLvlStrData {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
 }
 /// Defines the MultiLvlStrFilteredLiteralCache Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:filteredLitCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_MultiLvlStrFilteredLiteralCache/c16:filteredLitCache")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_MultiLvlStrFilteredLiteralCache/c16:filteredLitCache"
+)]
 pub struct MultiLvlStrFilteredLiteralCache {
   /// _
-  #[sdk(child(qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache"))]
+  #[sdk(child(office2016, qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache"))]
   pub multi_lvl_str_data: std::boxed::Box<MultiLvlStrData>,
 }
 /// Defines the LiteralDataChart Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:literalDataChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_LiteralDataChart/c16:literalDataChart")]
+#[sdk(office2016, qname = "c16:CT_LiteralDataChart/c16:literalDataChart")]
 pub struct LiteralDataChart {
   /// val
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::BooleanValue,
 }
 /// Defines the BooleanFalse Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:showExpandCollapseFieldButtons.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons"
+)]
 pub struct BooleanFalse {
   /// val
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2016, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the XsdunsignedInt Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:ptidx.
 pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 /// Defines the ChartDataPointUniqueIDMapEntry Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is c16:ptentry.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry")]
+#[sdk(
+  office2016,
+  qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"
+)]
 pub struct ChartDataPointUniqueIdMapEntry {
   /// _
-  #[sdk(text_child(qname = "xsd:unsignedInt/c16:ptidx"))]
+  #[sdk(text_child(office2016, qname = "xsd:unsignedInt/c16:ptidx"))]
   pub xsdunsigned_int: crate::simple_type::UInt32Value,
   /// _
-  #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
+  #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

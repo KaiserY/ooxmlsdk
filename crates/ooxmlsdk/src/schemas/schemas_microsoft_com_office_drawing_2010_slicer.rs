@@ -5,31 +5,19 @@
 //
 
 /// Defines the Slicer Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is sle:slicer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "sle:CT_Slicer/sle:slicer")]
+#[sdk(office2010, qname = "sle:CT_Slicer/sle:slicer")]
 pub struct Slicer {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/sle:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/sle:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is sle:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/sle:extLst")]
+#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/sle:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.

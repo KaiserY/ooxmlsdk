@@ -309,127 +309,85 @@ pub enum ObjectTypeValues {
   Dialog,
 }
 /// Defines the ConditionalFormattings Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:conditionalFormattings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"
+)]
 pub struct ConditionalFormattings {
   /// _
-  #[sdk(child(qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"))]
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
+  ))]
   pub x14_conditional_formatting: Vec<ConditionalFormatting>,
 }
 /// Defines the DataValidations Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dataValidations.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataValidations/x14:dataValidations")]
+#[sdk(office2010, qname = "x14:CT_DataValidations/x14:dataValidations")]
 pub struct DataValidations {
   /// disablePrompts
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :disablePrompts
-  #[sdk(attr(qname = ":disablePrompts"))]
+  #[sdk(attr(office2010, qname = ":disablePrompts"))]
   pub disable_prompts: Option<crate::simple_type::BooleanValue>,
   /// xWindow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :xWindow
-  #[sdk(attr(qname = ":xWindow"))]
+  #[sdk(attr(office2010, qname = ":xWindow"))]
   pub x_window: Option<crate::simple_type::UInt32Value>,
   /// yWindow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :yWindow
-  #[sdk(attr(qname = ":yWindow"))]
+  #[sdk(attr(office2010, qname = ":yWindow"))]
   pub y_window: Option<crate::simple_type::UInt32Value>,
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_DataValidation/x14:dataValidation"))]
+  #[sdk(child(office2010, qname = "x14:CT_DataValidation/x14:dataValidation"))]
   pub x14_data_validation: Vec<DataValidation>,
 }
 /// Defines the SparklineGroups Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sparklineGroups.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SparklineGroups/x14:sparklineGroups")]
+#[sdk(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups")]
 pub struct SparklineGroups {
   /// _
-  #[sdk(child(qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
+  #[sdk(child(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
   pub x14_sparkline_group: Vec<SparklineGroup>,
 }
 /// Defines the SlicerList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerRefs/x14:slicerList")]
+#[sdk(office2010, qname = "x14:CT_SlicerRefs/x14:slicerList")]
 pub struct SlicerList {
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerRef/x14:slicer"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerRef/x14:slicer"))]
   pub x14_slicer: Vec<SlicerRef>,
 }
 /// Defines the ProtectedRanges Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:protectedRanges.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ProtectedRanges/x14:protectedRanges")]
+#[sdk(office2010, qname = "x14:CT_ProtectedRanges/x14:protectedRanges")]
 pub struct ProtectedRanges {
   /// _
-  #[sdk(child(qname = "x14:CT_ProtectedRange/x14:protectedRange"))]
+  #[sdk(child(office2010, qname = "x14:CT_ProtectedRange/x14:protectedRange"))]
   pub x14_protected_range: Vec<ProtectedRange>,
 }
 /// Defines the IgnoredErrors Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:ignoredErrors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_IgnoredErrors/x14:ignoredErrors")]
+#[sdk(office2010, qname = "x14:CT_IgnoredErrors/x14:ignoredErrors")]
 pub struct IgnoredErrors {
   /// _
-  #[sdk(child(qname = "x14:CT_IgnoredError/x14:ignoredError"))]
+  #[sdk(child(office2010, qname = "x14:CT_IgnoredError/x14:ignoredError"))]
   pub x14_ignored_error: Vec<IgnoredError>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
 /// Defines the DefinedNames Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:definedNames.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DefinedNames/x14:definedNames")]
+#[sdk(office2010, qname = "x14:CT_DefinedNames/x14:definedNames")]
 pub struct DefinedNames {
   /// _
-  #[sdk(child(qname = "x14:CT_DefinedName/x14:definedName"))]
+  #[sdk(child(office2010, qname = "x14:CT_DefinedName/x14:definedName"))]
   pub x14_defined_name: Vec<DefinedName>,
 }
 /// Defines the PivotCaches Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotCaches.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_PivotCaches/x14:pivotCaches")]
+#[sdk(office2010, qname = "x:CT_PivotCaches/x14:pivotCaches")]
 pub struct PivotCaches {
   /// _
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
@@ -437,400 +395,206 @@ pub struct PivotCaches {
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
 }
 /// Defines the SlicerCaches Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerCaches.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCaches/x14:slicerCaches")]
+#[sdk(office2010, qname = "x14:CT_SlicerCaches/x14:slicerCaches")]
 pub struct SlicerCaches {
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerCache/x14:slicerCache"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache"))]
   pub x14_slicer_cache: Vec<SlicerCache>,
 }
 /// Defines the WorkbookProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:workbookPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_WorkbookPr/x14:workbookPr")]
+#[sdk(office2010, qname = "x14:CT_WorkbookPr/x14:workbookPr")]
 pub struct WorkbookProperties {
   /// defaultImageDpi
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :defaultImageDpi
-  #[sdk(attr(qname = ":defaultImageDpi"))]
+  #[sdk(attr(office2010, qname = ":defaultImageDpi"))]
   pub default_image_dpi: Option<crate::simple_type::UInt32Value>,
   /// discardImageEditData
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :discardImageEditData
-  #[sdk(attr(qname = ":discardImageEditData"))]
+  #[sdk(attr(office2010, qname = ":discardImageEditData"))]
   pub discard_image_edit_data: Option<crate::simple_type::BooleanValue>,
   /// accuracyVersion
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :accuracyVersion
-  #[sdk(attr(qname = ":accuracyVersion"))]
+  #[sdk(attr(office2010, qname = ":accuracyVersion"))]
   pub accuracy_version: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the CalculatedMember Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:calculatedMember.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CalculatedMember/x14:calculatedMember")]
+#[sdk(office2010, qname = "x14:CT_CalculatedMember/x14:calculatedMember")]
 pub struct CalculatedMember {
   /// displayFolder
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :displayFolder
-  #[sdk(attr(qname = ":displayFolder"))]
+  #[sdk(attr(office2010, qname = ":displayFolder"))]
   pub display_folder: Option<crate::simple_type::StringValue>,
   /// flattenHierarchies
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :flattenHierarchies
-  #[sdk(attr(qname = ":flattenHierarchies"))]
+  #[sdk(attr(office2010, qname = ":flattenHierarchies"))]
   pub flatten_hierarchies: Option<crate::simple_type::BooleanValue>,
   /// dynamicSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dynamicSet
-  #[sdk(attr(qname = ":dynamicSet"))]
+  #[sdk(attr(office2010, qname = ":dynamicSet"))]
   pub dynamic_set: Option<crate::simple_type::BooleanValue>,
   /// hierarchizeDistinct
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hierarchizeDistinct
-  #[sdk(attr(qname = ":hierarchizeDistinct"))]
+  #[sdk(attr(office2010, qname = ":hierarchizeDistinct"))]
   pub hierarchize_distinct: Option<crate::simple_type::BooleanValue>,
   /// mdxLong
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :mdxLong
-  #[sdk(attr(qname = ":mdxLong"))]
+  #[sdk(attr(office2010, qname = ":mdxLong"))]
   pub mdx_long: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSet/x14:tupleSet"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSet/x14:tupleSet"))]
   pub tuple_set: Option<std::boxed::Box<TupleSet>>,
 }
 /// Defines the CacheHierarchy Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:cacheHierarchy.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy")]
+#[sdk(office2010, qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy")]
 pub struct CacheHierarchy {
   /// flattenHierarchies
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :flattenHierarchies
-  #[sdk(attr(qname = ":flattenHierarchies"))]
+  #[sdk(attr(office2010, qname = ":flattenHierarchies"))]
   pub flatten_hierarchies: Option<crate::simple_type::BooleanValue>,
   /// measuresSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :measuresSet
-  #[sdk(attr(qname = ":measuresSet"))]
+  #[sdk(attr(office2010, qname = ":measuresSet"))]
   pub measures_set: Option<crate::simple_type::BooleanValue>,
   /// hierarchizeDistinct
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hierarchizeDistinct
-  #[sdk(attr(qname = ":hierarchizeDistinct"))]
+  #[sdk(attr(office2010, qname = ":hierarchizeDistinct"))]
   pub hierarchize_distinct: Option<crate::simple_type::BooleanValue>,
   /// ignore
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ignore
-  #[sdk(attr(qname = ":ignore"))]
+  #[sdk(attr(office2010, qname = ":ignore"))]
   pub ignore: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_SetLevels/x14:setLevels"))]
+  #[sdk(child(office2010, qname = "x14:CT_SetLevels/x14:setLevels"))]
   pub set_levels: Option<SetLevels>,
 }
 /// Defines the DataField Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dataField.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataField/x14:dataField")]
+#[sdk(office2010, qname = "x14:CT_DataField/x14:dataField")]
 pub struct DataField {
   /// pivotShowAs
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :pivotShowAs
-  #[sdk(attr(qname = ":pivotShowAs"))]
+  #[sdk(attr(office2010, qname = ":pivotShowAs"))]
   pub pivot_show_as: Option<PivotShowAsValues>,
   /// sourceField
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sourceField
-  #[sdk(attr(qname = ":sourceField"))]
+  #[sdk(attr(office2010, qname = ":sourceField"))]
   pub source_field: Option<crate::simple_type::UInt32Value>,
   /// uniqueName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueName
-  #[sdk(attr(qname = ":uniqueName"))]
+  #[sdk(attr(office2010, qname = ":uniqueName"))]
   pub unique_name: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PivotField Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotField.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotField/x14:pivotField")]
+#[sdk(office2010, qname = "x14:CT_PivotField/x14:pivotField")]
 pub struct PivotField {
   /// fillDownLabels
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fillDownLabels
-  #[sdk(attr(qname = ":fillDownLabels"))]
+  #[sdk(attr(office2010, qname = ":fillDownLabels"))]
   pub fill_down_labels: Option<crate::simple_type::BooleanValue>,
   /// ignore
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ignore
-  #[sdk(attr(qname = ":ignore"))]
+  #[sdk(attr(office2010, qname = ":ignore"))]
   pub ignore: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the PivotTableDefinition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotTableDefinition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition"
+)]
 pub struct PivotTableDefinition {
   /// fillDownLabelsDefault
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fillDownLabelsDefault
-  #[sdk(attr(qname = ":fillDownLabelsDefault"))]
+  #[sdk(attr(office2010, qname = ":fillDownLabelsDefault"))]
   pub fill_down_labels_default: Option<crate::simple_type::BooleanValue>,
   /// visualTotalsForSets
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :visualTotalsForSets
-  #[sdk(attr(qname = ":visualTotalsForSets"))]
+  #[sdk(attr(office2010, qname = ":visualTotalsForSets"))]
   pub visual_totals_for_sets: Option<crate::simple_type::BooleanValue>,
   /// calculatedMembersInFilters
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :calculatedMembersInFilters
-  #[sdk(attr(qname = ":calculatedMembersInFilters"))]
+  #[sdk(attr(office2010, qname = ":calculatedMembersInFilters"))]
   pub calculated_members_in_filters: Option<crate::simple_type::BooleanValue>,
   /// altText
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :altText
-  #[sdk(attr(qname = ":altText"))]
+  #[sdk(attr(office2010, qname = ":altText"))]
   pub alt_text: Option<crate::simple_type::StringValue>,
   /// altTextSummary
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :altTextSummary
-  #[sdk(attr(qname = ":altTextSummary"))]
+  #[sdk(attr(office2010, qname = ":altTextSummary"))]
   pub alt_text_summary: Option<crate::simple_type::StringValue>,
   /// enableEdit
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :enableEdit
-  #[sdk(attr(qname = ":enableEdit"))]
+  #[sdk(attr(office2010, qname = ":enableEdit"))]
   pub enable_edit: Option<crate::simple_type::BooleanValue>,
   /// autoApply
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :autoApply
-  #[sdk(attr(qname = ":autoApply"))]
+  #[sdk(attr(office2010, qname = ":autoApply"))]
   pub auto_apply: Option<crate::simple_type::BooleanValue>,
   /// allocationMethod
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :allocationMethod
-  #[sdk(attr(qname = ":allocationMethod"))]
+  #[sdk(attr(office2010, qname = ":allocationMethod"))]
   pub allocation_method: Option<AllocationMethodValues>,
   /// weightExpression
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :weightExpression
-  #[sdk(attr(qname = ":weightExpression"))]
+  #[sdk(attr(office2010, qname = ":weightExpression"))]
   pub weight_expression: Option<crate::simple_type::StringValue>,
   /// hideValuesRow
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hideValuesRow
-  #[sdk(attr(qname = ":hideValuesRow"))]
+  #[sdk(attr(office2010, qname = ":hideValuesRow"))]
   pub hide_values_row: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_PivotEdits/x14:pivotEdits"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotEdits/x14:pivotEdits"))]
   pub pivot_edits: Option<PivotEdits>,
   /// _
-  #[sdk(child(qname = "x14:CT_PivotChanges/x14:pivotChanges"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotChanges/x14:pivotChanges"))]
   pub pivot_changes: Option<PivotChanges>,
   /// _
-  #[sdk(child(qname = "x14:CT_ConditionalFormats/x14:conditionalFormats"))]
+  #[sdk(child(office2010, qname = "x14:CT_ConditionalFormats/x14:conditionalFormats"))]
   pub conditional_formats: Option<ConditionalFormats>,
 }
 /// Defines the PivotCacheDefinition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotCacheDefinition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition"
+)]
 pub struct PivotCacheDefinition {
   /// slicerData
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :slicerData
-  #[sdk(attr(qname = ":slicerData"))]
+  #[sdk(attr(office2010, qname = ":slicerData"))]
   pub slicer_data: Option<crate::simple_type::BooleanValue>,
   /// pivotCacheId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :pivotCacheId
-  #[sdk(attr(qname = ":pivotCacheId"))]
+  #[sdk(attr(office2010, qname = ":pivotCacheId"))]
   pub pivot_cache_id: Option<crate::simple_type::UInt32Value>,
   /// supportSubqueryNonVisual
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :supportSubqueryNonVisual
-  #[sdk(attr(qname = ":supportSubqueryNonVisual"))]
+  #[sdk(attr(office2010, qname = ":supportSubqueryNonVisual"))]
   pub support_subquery_non_visual: Option<crate::simple_type::BooleanValue>,
   /// supportSubqueryCalcMem
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :supportSubqueryCalcMem
-  #[sdk(attr(qname = ":supportSubqueryCalcMem"))]
+  #[sdk(attr(office2010, qname = ":supportSubqueryCalcMem"))]
   pub support_subquery_calc_mem: Option<crate::simple_type::BooleanValue>,
   /// supportAddCalcMems
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :supportAddCalcMems
-  #[sdk(attr(qname = ":supportAddCalcMems"))]
+  #[sdk(attr(office2010, qname = ":supportAddCalcMems"))]
   pub support_add_calc_mems: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Connection Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:connection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Connection/x14:connection")]
+#[sdk(office2010, qname = "x14:CT_Connection/x14:connection")]
 pub struct Connection {
   /// culture
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :culture
-  #[sdk(attr(qname = ":culture"))]
+  #[sdk(attr(office2010, qname = ":culture"))]
   pub culture: Option<crate::simple_type::StringValue>,
   /// embeddedDataId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :embeddedDataId
-  #[sdk(attr(qname = ":embeddedDataId"))]
+  #[sdk(attr(office2010, qname = ":embeddedDataId"))]
   pub embedded_data_id: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_CalculatedMembers/x14:calculatedMembers"))]
+  #[sdk(child(office2010, qname = "x:CT_CalculatedMembers/x14:calculatedMembers"))]
   pub calculated_members: Option<CalculatedMembers>,
 }
 /// Defines the Table Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:table.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Table/x14:table")]
+#[sdk(office2010, qname = "x14:CT_Table/x14:table")]
 pub struct Table {
   /// altText
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :altText
-  #[sdk(attr(qname = ":altText"))]
+  #[sdk(attr(office2010, qname = ":altText"))]
   pub alt_text: Option<crate::simple_type::StringValue>,
   /// altTextSummary
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :altTextSummary
-  #[sdk(attr(qname = ":altTextSummary"))]
+  #[sdk(attr(office2010, qname = ":altTextSummary"))]
   pub alt_text_summary: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SlicerStyles Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerStyles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerStyles/x14:slicerStyles")]
+#[sdk(office2010, qname = "x14:CT_SlicerStyles/x14:slicerStyles")]
 pub struct SlicerStyles {
   /// defaultSlicerStyle
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :defaultSlicerStyle
-  #[sdk(attr(qname = ":defaultSlicerStyle"))]
+  #[sdk(attr(office2010, qname = ":defaultSlicerStyle"))]
   pub default_slicer_style: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerStyle/x14:slicerStyle"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerStyle/x14:slicerStyle"))]
   pub x14_slicer_style: Vec<SlicerStyle>,
 }
 /// Defines the DifferentialFormats Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dxfs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Dxfs/x14:dxfs")]
+#[sdk(office2010, qname = "x:CT_Dxfs/x14:dxfs")]
 pub struct DifferentialFormats {
   /// Format Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
@@ -839,664 +603,345 @@ pub struct DifferentialFormats {
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
 }
 /// Defines the OleItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:oleItem.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OleItem/x14:oleItem")]
+#[sdk(office2010, qname = "x14:CT_OleItem/x14:oleItem")]
 pub struct OleItem {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// icon
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :icon
-  #[sdk(attr(qname = ":icon"))]
+  #[sdk(attr(office2010, qname = ":icon"))]
   pub icon: Option<crate::simple_type::BooleanValue>,
   /// advise
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :advise
-  #[sdk(attr(qname = ":advise"))]
+  #[sdk(attr(office2010, qname = ":advise"))]
   pub advise: Option<crate::simple_type::BooleanValue>,
   /// preferPic
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :preferPic
-  #[sdk(attr(qname = ":preferPic"))]
+  #[sdk(attr(office2010, qname = ":preferPic"))]
   pub prefer_picture: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x:CT_DdeValues/x14:values"))]
+  #[sdk(child(office2010, qname = "x:CT_DdeValues/x14:values"))]
   pub dde_values: Option<DdeValues>,
 }
 /// Defines the PivotHierarchy Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotHierarchy.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy")]
+#[sdk(office2010, qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy")]
 pub struct PivotHierarchy {
   /// ignore
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ignore
-  #[sdk(attr(qname = ":ignore"))]
+  #[sdk(attr(office2010, qname = ":ignore"))]
   pub ignore: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the CacheField Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:cacheField.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CacheField/x14:cacheField")]
+#[sdk(office2010, qname = "x14:CT_CacheField/x14:cacheField")]
 pub struct CacheField {
   /// ignore
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ignore
-  #[sdk(attr(qname = ":ignore"))]
+  #[sdk(attr(office2010, qname = ":ignore"))]
   pub ignore: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Id Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:id.
 pub type Id = crate::simple_type::StringValue;
 /// Defines the IconFilter Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:iconFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_IconFilter/x14:iconFilter")]
+#[sdk(office2010, qname = "x14:CT_IconFilter/x14:iconFilter")]
 pub struct IconFilter {
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set: IconSetTypeValues,
   /// iconId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconId
-  #[sdk(attr(qname = ":iconId"))]
+  #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: crate::simple_type::UInt32Value,
 }
 /// Defines the Filter Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:filter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Filter/x14:filter")]
+#[sdk(office2010, qname = "x14:CT_Filter/x14:filter")]
 pub struct Filter {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Defines the CustomFilters Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:customFilters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CustomFilters/x14:customFilters")]
+#[sdk(office2010, qname = "x14:CT_CustomFilters/x14:customFilters")]
 pub struct CustomFilters {
   /// and
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :and
-  #[sdk(attr(qname = ":and"))]
+  #[sdk(attr(office2010, qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_CustomFilter/x14:customFilter"))]
+  #[sdk(child(office2010, qname = "x14:CT_CustomFilter/x14:customFilter"))]
   pub x14_custom_filter: Vec<CustomFilter>,
 }
 /// Defines the SortCondition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sortCondition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SortCondition/x14:sortCondition")]
+#[sdk(office2010, qname = "x14:CT_SortCondition/x14:sortCondition")]
 pub struct SortCondition {
   /// descending
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :descending
-  #[sdk(attr(qname = ":descending"))]
+  #[sdk(attr(office2010, qname = ":descending"))]
   pub descending: Option<crate::simple_type::BooleanValue>,
   /// sortBy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortBy
-  #[sdk(attr(qname = ":sortBy"))]
+  #[sdk(attr(office2010, qname = ":sortBy"))]
   pub sort_by:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortByValues>,
   /// ref
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2010, qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
   /// customList
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :customList
-  #[sdk(attr(qname = ":customList"))]
+  #[sdk(attr(office2010, qname = ":customList"))]
   pub custom_list: Option<crate::simple_type::StringValue>,
   /// dxfId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dxfId
-  #[sdk(attr(qname = ":dxfId"))]
+  #[sdk(attr(office2010, qname = ":dxfId"))]
   pub format_id: Option<crate::simple_type::UInt32Value>,
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set: Option<IconSetTypeValues>,
   /// iconId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconId
-  #[sdk(attr(qname = ":iconId"))]
+  #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the SourceConnection Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sourceConnection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SourceConnection/x14:sourceConnection")]
+#[sdk(office2010, qname = "x14:CT_SourceConnection/x14:sourceConnection")]
 pub struct SourceConnection {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
 }
 /// Defines the DatastoreItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:datastoreItem.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DatastoreItem/x14:datastoreItem")]
+#[sdk(office2010, qname = "x14:CT_DatastoreItem/x14:datastoreItem")]
 pub struct DatastoreItem {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2010, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the FormControlProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:formControlPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_FormControlPr/x14:formControlPr")]
+#[sdk(office2010, qname = "x14:CT_FormControlPr/x14:formControlPr")]
 pub struct FormControlProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// objectType
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :objectType
-  #[sdk(attr(qname = ":objectType"))]
+  #[sdk(attr(office2010, qname = ":objectType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub object_type: Option<ObjectTypeValues>,
   /// checked
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :checked
-  #[sdk(attr(qname = ":checked"))]
+  #[sdk(attr(office2010, qname = ":checked"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub checked: Option<CheckedValues>,
   /// colored
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :colored
-  #[sdk(attr(qname = ":colored"))]
+  #[sdk(attr(office2010, qname = ":colored"))]
   pub colored: Option<crate::simple_type::BooleanValue>,
   /// dropLines
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dropLines
-  #[sdk(attr(qname = ":dropLines"))]
+  #[sdk(attr(office2010, qname = ":dropLines"))]
   pub drop_lines: Option<crate::simple_type::UInt32Value>,
   /// dropStyle
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dropStyle
-  #[sdk(attr(qname = ":dropStyle"))]
+  #[sdk(attr(office2010, qname = ":dropStyle"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub drop_style: Option<DropStyleValues>,
   /// dx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dx
-  #[sdk(attr(qname = ":dx"))]
+  #[sdk(attr(office2010, qname = ":dx"))]
   pub scroll_bar_width: Option<crate::simple_type::UInt32Value>,
   /// firstButton
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :firstButton
-  #[sdk(attr(qname = ":firstButton"))]
+  #[sdk(attr(office2010, qname = ":firstButton"))]
   pub first_button: Option<crate::simple_type::BooleanValue>,
   /// fmlaGroup
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fmlaGroup
-  #[sdk(attr(qname = ":fmlaGroup"))]
+  #[sdk(attr(office2010, qname = ":fmlaGroup"))]
   pub fmla_group: Option<crate::simple_type::StringValue>,
   /// fmlaLink
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fmlaLink
-  #[sdk(attr(qname = ":fmlaLink"))]
+  #[sdk(attr(office2010, qname = ":fmlaLink"))]
   pub fmla_link: Option<crate::simple_type::StringValue>,
   /// fmlaRange
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fmlaRange
-  #[sdk(attr(qname = ":fmlaRange"))]
+  #[sdk(attr(office2010, qname = ":fmlaRange"))]
   pub fmla_range: Option<crate::simple_type::StringValue>,
   /// fmlaTxbx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :fmlaTxbx
-  #[sdk(attr(qname = ":fmlaTxbx"))]
+  #[sdk(attr(office2010, qname = ":fmlaTxbx"))]
   pub fmla_textbox: Option<crate::simple_type::StringValue>,
   /// horiz
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :horiz
-  #[sdk(attr(qname = ":horiz"))]
+  #[sdk(attr(office2010, qname = ":horiz"))]
   pub horizontal: Option<crate::simple_type::BooleanValue>,
   /// inc
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :inc
-  #[sdk(attr(qname = ":inc"))]
+  #[sdk(attr(office2010, qname = ":inc"))]
   pub incremental: Option<crate::simple_type::UInt32Value>,
   /// justLastX
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :justLastX
-  #[sdk(attr(qname = ":justLastX"))]
+  #[sdk(attr(office2010, qname = ":justLastX"))]
   pub just_last_x: Option<crate::simple_type::BooleanValue>,
   /// lockText
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :lockText
-  #[sdk(attr(qname = ":lockText"))]
+  #[sdk(attr(office2010, qname = ":lockText"))]
   pub lock_text: Option<crate::simple_type::BooleanValue>,
   /// max
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :max
-  #[sdk(attr(qname = ":max"))]
+  #[sdk(attr(office2010, qname = ":max"))]
   pub max: Option<crate::simple_type::UInt32Value>,
   /// min
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :min
-  #[sdk(attr(qname = ":min"))]
+  #[sdk(attr(office2010, qname = ":min"))]
   pub min: Option<crate::simple_type::UInt32Value>,
   /// multiSel
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :multiSel
-  #[sdk(attr(qname = ":multiSel"))]
+  #[sdk(attr(office2010, qname = ":multiSel"))]
   pub multiple_selection: Option<crate::simple_type::StringValue>,
   /// noThreeD
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :noThreeD
-  #[sdk(attr(qname = ":noThreeD"))]
+  #[sdk(attr(office2010, qname = ":noThreeD"))]
   pub no_three_d: Option<crate::simple_type::BooleanValue>,
   /// noThreeD2
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :noThreeD2
-  #[sdk(attr(qname = ":noThreeD2"))]
+  #[sdk(attr(office2010, qname = ":noThreeD2"))]
   pub no_three_d2: Option<crate::simple_type::BooleanValue>,
   /// page
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :page
-  #[sdk(attr(qname = ":page"))]
+  #[sdk(attr(office2010, qname = ":page"))]
   pub page: Option<crate::simple_type::UInt32Value>,
   /// sel
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sel
-  #[sdk(attr(qname = ":sel"))]
+  #[sdk(attr(office2010, qname = ":sel"))]
   pub selected: Option<crate::simple_type::UInt32Value>,
   /// seltype
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :seltype
-  #[sdk(attr(qname = ":seltype"))]
+  #[sdk(attr(office2010, qname = ":seltype"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub selection_type: Option<SelectionTypeValues>,
   /// textHAlign
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :textHAlign
-  #[sdk(attr(qname = ":textHAlign"))]
+  #[sdk(attr(office2010, qname = ":textHAlign"))]
   pub text_horizontal_align: Option<TextHorizontalAlignmentValues>,
   /// textVAlign
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :textVAlign
-  #[sdk(attr(qname = ":textVAlign"))]
+  #[sdk(attr(office2010, qname = ":textVAlign"))]
   pub text_vertical_align: Option<TextVerticalAlignmentValues>,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::UInt32Value>,
   /// widthMin
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :widthMin
-  #[sdk(attr(qname = ":widthMin"))]
+  #[sdk(attr(office2010, qname = ":widthMin"))]
   pub minimum_width: Option<crate::simple_type::UInt32Value>,
   /// editVal
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :editVal
-  #[sdk(attr(qname = ":editVal"))]
+  #[sdk(attr(office2010, qname = ":editVal"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub edit_val: Option<EditValidationValues>,
   /// multiLine
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :multiLine
-  #[sdk(attr(qname = ":multiLine"))]
+  #[sdk(attr(office2010, qname = ":multiLine"))]
   pub multiple_lines: Option<crate::simple_type::BooleanValue>,
   /// verticalBar
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :verticalBar
-  #[sdk(attr(qname = ":verticalBar"))]
+  #[sdk(attr(office2010, qname = ":verticalBar"))]
   pub vertical_bar: Option<crate::simple_type::BooleanValue>,
   /// passwordEdit
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :passwordEdit
-  #[sdk(attr(qname = ":passwordEdit"))]
+  #[sdk(attr(office2010, qname = ":passwordEdit"))]
   pub password_edit: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_ListItems/x14:itemLst"))]
+  #[sdk(child(office2010, qname = "x14:CT_ListItems/x14:itemLst"))]
   pub list_items: Option<std::boxed::Box<ListItems>>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the Slicers Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Slicers/x14:slicers")]
+#[sdk(office2010, qname = "x14:CT_Slicers/x14:slicers")]
 pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// _
-  #[sdk(child(qname = "x14:CT_Slicer/x14:slicer"))]
+  #[sdk(child(office2010, qname = "x14:CT_Slicer/x14:slicer"))]
   pub x14_slicer: Vec<Slicer>,
 }
 /// Defines the SlicerCacheDefinition Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerCacheDefinition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCacheDefinition/x14:slicerCacheDefinition")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_SlicerCacheDefinition/x14:slicerCacheDefinition"
+)]
 pub struct SlicerCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// sourceName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sourceName
-  #[sdk(attr(qname = ":sourceName"))]
+  #[sdk(attr(office2010, qname = ":sourceName"))]
   pub source_name: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables"))]
   pub slicer_cache_pivot_tables: Option<SlicerCachePivotTables>,
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerCacheData/x14:data"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerCacheData/x14:data"))]
   pub slicer_cache_data: Option<std::boxed::Box<SlicerCacheData>>,
   /// _
-  #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"))]
+  #[sdk(child(
+    office2010,
+    qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"
+  ))]
   pub slicer_cache_definition_extension_list: Option<SlicerCacheDefinitionExtensionList>,
 }
 /// Defines the ConditionalFormatting Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:conditionalFormatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
+)]
 pub struct ConditionalFormatting {
   /// pivot
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :pivot
-  #[sdk(attr(qname = ":pivot"))]
+  #[sdk(attr(office2010, qname = ":pivot"))]
   pub pivot: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_CfRule/x14:cfRule"))]
+  #[sdk(child(office2010, qname = "x14:CT_CfRule/x14:cfRule"))]
   pub x14_cf_rule: Vec<ConditionalFormattingRule>,
   /// _
-  #[sdk(text_child(qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub xne_sqref: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ConditionalFormattingRule Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:cfRule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CfRule/x14:cfRule")]
+#[sdk(office2010, qname = "x14:CT_CfRule/x14:cfRule")]
 pub struct ConditionalFormattingRule {
     /// type
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :type
-    #[sdk(attr(qname = ":type"))]
+    #[sdk(attr(office2010, qname = ":type"))]
     pub r#type: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormatValues,
     >,
     /// priority
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :priority
-    #[sdk(attr(qname = ":priority"))]
+    #[sdk(attr(office2010, qname = ":priority"))]
     pub priority: Option<crate::simple_type::Int32Value>,
     /// stopIfTrue
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :stopIfTrue
-    #[sdk(attr(qname = ":stopIfTrue"))]
+    #[sdk(attr(office2010, qname = ":stopIfTrue"))]
     pub stop_if_true: Option<crate::simple_type::BooleanValue>,
     /// aboveAverage
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :aboveAverage
-    #[sdk(attr(qname = ":aboveAverage"))]
+    #[sdk(attr(office2010, qname = ":aboveAverage"))]
     pub above_average: Option<crate::simple_type::BooleanValue>,
     /// percent
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :percent
-    #[sdk(attr(qname = ":percent"))]
+    #[sdk(attr(office2010, qname = ":percent"))]
     pub percent: Option<crate::simple_type::BooleanValue>,
     /// bottom
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :bottom
-    #[sdk(attr(qname = ":bottom"))]
+    #[sdk(attr(office2010, qname = ":bottom"))]
     pub bottom: Option<crate::simple_type::BooleanValue>,
     /// operator
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :operator
-    #[sdk(attr(qname = ":operator"))]
+    #[sdk(attr(office2010, qname = ":operator"))]
     pub operator: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormattingOperatorValues,
     >,
     /// text
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :text
-    #[sdk(attr(qname = ":text"))]
+    #[sdk(attr(office2010, qname = ":text"))]
     pub text: Option<crate::simple_type::StringValue>,
     /// timePeriod
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :timePeriod
-    #[sdk(attr(qname = ":timePeriod"))]
+    #[sdk(attr(office2010, qname = ":timePeriod"))]
     pub time_period: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::TimePeriodValues,
     >,
     /// rank
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :rank
-    #[sdk(attr(qname = ":rank"))]
+    #[sdk(attr(office2010, qname = ":rank"))]
     pub rank: Option<crate::simple_type::UInt32Value>,
     /// stdDev
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :stdDev
-    #[sdk(attr(qname = ":stdDev"))]
+    #[sdk(attr(office2010, qname = ":stdDev"))]
     pub standard_deviation: Option<crate::simple_type::Int32Value>,
     /// equalAverage
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :equalAverage
-    #[sdk(attr(qname = ":equalAverage"))]
+    #[sdk(attr(office2010, qname = ":equalAverage"))]
     pub equal_average: Option<crate::simple_type::BooleanValue>,
     /// activePresent
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :activePresent
-    #[sdk(attr(qname = ":activePresent"))]
+    #[sdk(attr(office2010, qname = ":activePresent"))]
     pub active_present: Option<crate::simple_type::BooleanValue>,
     /// id
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
-    #[sdk(attr(qname = ":id"))]
+    #[sdk(attr(office2010, qname = ":id"))]
     #[sdk(
         pattern(
             source = 0u32,
@@ -1506,31 +951,27 @@ pub struct ConditionalFormattingRule {
     #[sdk(string_format(source = 0u32, kind = "token"))]
     pub id: Option<crate::simple_type::StringValue>,
     /// _
-    #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+    #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
     pub xne_f: Vec<crate::simple_type::StringValue>,
     /// _
-    #[sdk(child(qname = "x14:CT_ColorScale/x14:colorScale"))]
+    #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
     pub x14_color_scale: Option<ColorScale>,
     /// _
-    #[sdk(child(qname = "x14:CT_DataBar/x14:dataBar"))]
+    #[sdk(child(office2010, qname = "x14:CT_DataBar/x14:dataBar"))]
     pub x14_data_bar: Option<std::boxed::Box<DataBar>>,
     /// _
-    #[sdk(child(qname = "x14:CT_IconSet/x14:iconSet"))]
+    #[sdk(child(office2010, qname = "x14:CT_IconSet/x14:iconSet"))]
     pub x14_icon_set: Option<IconSet>,
     /// _
-    #[sdk(child(qname = "x:CT_Dxf/x14:dxf"))]
+    #[sdk(child(office2010, qname = "x:CT_Dxf/x14:dxf"))]
     pub x14_dxf: Option<std::boxed::Box<DifferentialType>>,
     /// _
-    #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+    #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
     pub x14_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_ExtensionList/x14:extLst")]
+#[sdk(office2010, qname = "x:CT_ExtensionList/x14:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -1538,1407 +979,739 @@ pub struct ExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the DataValidation Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dataValidation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataValidation/x14:dataValidation")]
+#[sdk(office2010, qname = "x14:CT_DataValidation/x14:dataValidation")]
 pub struct DataValidation {
     /// type
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :type
-    #[sdk(attr(qname = ":type"))]
+    #[sdk(attr(office2010, qname = ":type"))]
     pub r#type: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationValues,
     >,
     /// errorStyle
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :errorStyle
-    #[sdk(attr(qname = ":errorStyle"))]
+    #[sdk(attr(office2010, qname = ":errorStyle"))]
     pub error_style: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationErrorStyleValues,
     >,
     /// imeMode
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :imeMode
-    #[sdk(attr(qname = ":imeMode"))]
+    #[sdk(attr(office2010, qname = ":imeMode"))]
     pub ime_mode: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationImeModeValues,
     >,
     /// operator
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :operator
-    #[sdk(attr(qname = ":operator"))]
+    #[sdk(attr(office2010, qname = ":operator"))]
     pub operator: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationOperatorValues,
     >,
     /// allowBlank
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :allowBlank
-    #[sdk(attr(qname = ":allowBlank"))]
+    #[sdk(attr(office2010, qname = ":allowBlank"))]
     pub allow_blank: Option<crate::simple_type::BooleanValue>,
     /// showDropDown
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :showDropDown
-    #[sdk(attr(qname = ":showDropDown"))]
+    #[sdk(attr(office2010, qname = ":showDropDown"))]
     pub show_drop_down: Option<crate::simple_type::BooleanValue>,
     /// showInputMessage
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :showInputMessage
-    #[sdk(attr(qname = ":showInputMessage"))]
+    #[sdk(attr(office2010, qname = ":showInputMessage"))]
     pub show_input_message: Option<crate::simple_type::BooleanValue>,
     /// showErrorMessage
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :showErrorMessage
-    #[sdk(attr(qname = ":showErrorMessage"))]
+    #[sdk(attr(office2010, qname = ":showErrorMessage"))]
     pub show_error_message: Option<crate::simple_type::BooleanValue>,
     /// errorTitle
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :errorTitle
-    #[sdk(attr(qname = ":errorTitle"))]
+    #[sdk(attr(office2010, qname = ":errorTitle"))]
     pub error_title: Option<crate::simple_type::StringValue>,
     /// error
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :error
-    #[sdk(attr(qname = ":error"))]
+    #[sdk(attr(office2010, qname = ":error"))]
     pub error: Option<crate::simple_type::StringValue>,
     /// promptTitle
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :promptTitle
-    #[sdk(attr(qname = ":promptTitle"))]
+    #[sdk(attr(office2010, qname = ":promptTitle"))]
     pub prompt_title: Option<crate::simple_type::StringValue>,
     /// prompt
-    ///
-    /// Available in Office2010 and above.
-    ///
-    /// Represents the following attribute in the schema: :prompt
-    #[sdk(attr(qname = ":prompt"))]
+    #[sdk(attr(office2010, qname = ":prompt"))]
     pub prompt: Option<crate::simple_type::StringValue>,
     /// _
-    #[sdk(child(qname = "x14:CT_DataValidationFormula/x14:formula1"))]
+    #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1"))]
     pub data_validation_forumla1: Option<DataValidationForumla1>,
     /// _
-    #[sdk(child(qname = "x14:CT_DataValidationFormula/x14:formula2"))]
+    #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
     pub data_validation_forumla2: Option<DataValidationForumla2>,
     /// _
-    #[sdk(text_child(qname = "xne:ST_Sqref/xne:sqref"))]
+    #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
     pub reference_sequence: crate::simple_type::StringValue,
 }
 /// Defines the DataValidationForumla1 Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:formula1.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataValidationFormula/x14:formula1")]
+#[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1")]
 pub struct DataValidationForumla1 {
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::simple_type::StringValue,
 }
 /// Defines the DataValidationForumla2 Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:formula2.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataValidationFormula/x14:formula2")]
+#[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2")]
 pub struct DataValidationForumla2 {
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::simple_type::StringValue,
 }
 /// Defines the DataValidationFormulaType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataValidationFormula/")]
+#[sdk(office2010, qname = "x14:CT_DataValidationFormula/")]
 pub struct DataValidationFormulaType {
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the SparklineGroup Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sparklineGroup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SparklineGroup/x14:sparklineGroup")]
+#[sdk(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup")]
 pub struct SparklineGroup {
   /// manualMax
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :manualMax
-  #[sdk(attr(qname = ":manualMax"))]
+  #[sdk(attr(office2010, qname = ":manualMax"))]
   pub manual_max: Option<crate::simple_type::DoubleValue>,
   /// manualMin
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :manualMin
-  #[sdk(attr(qname = ":manualMin"))]
+  #[sdk(attr(office2010, qname = ":manualMin"))]
   pub manual_min: Option<crate::simple_type::DoubleValue>,
   /// lineWeight
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :lineWeight
-  #[sdk(attr(qname = ":lineWeight"))]
+  #[sdk(attr(office2010, qname = ":lineWeight"))]
   pub line_weight: Option<crate::simple_type::DoubleValue>,
   /// type
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
-  #[sdk(attr(qname = ":type"))]
+  #[sdk(attr(office2010, qname = ":type"))]
   pub r#type: Option<SparklineTypeValues>,
   /// dateAxis
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dateAxis
-  #[sdk(attr(qname = ":dateAxis"))]
+  #[sdk(attr(office2010, qname = ":dateAxis"))]
   pub date_axis: Option<crate::simple_type::BooleanValue>,
   /// displayEmptyCellsAs
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :displayEmptyCellsAs
-  #[sdk(attr(qname = ":displayEmptyCellsAs"))]
+  #[sdk(attr(office2010, qname = ":displayEmptyCellsAs"))]
   pub display_empty_cells_as: Option<DisplayBlanksAsValues>,
   /// markers
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :markers
-  #[sdk(attr(qname = ":markers"))]
+  #[sdk(attr(office2010, qname = ":markers"))]
   pub markers: Option<crate::simple_type::BooleanValue>,
   /// high
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :high
-  #[sdk(attr(qname = ":high"))]
+  #[sdk(attr(office2010, qname = ":high"))]
   pub high: Option<crate::simple_type::BooleanValue>,
   /// low
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :low
-  #[sdk(attr(qname = ":low"))]
+  #[sdk(attr(office2010, qname = ":low"))]
   pub low: Option<crate::simple_type::BooleanValue>,
   /// first
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :first
-  #[sdk(attr(qname = ":first"))]
+  #[sdk(attr(office2010, qname = ":first"))]
   pub first: Option<crate::simple_type::BooleanValue>,
   /// last
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :last
-  #[sdk(attr(qname = ":last"))]
+  #[sdk(attr(office2010, qname = ":last"))]
   pub last: Option<crate::simple_type::BooleanValue>,
   /// negative
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :negative
-  #[sdk(attr(qname = ":negative"))]
+  #[sdk(attr(office2010, qname = ":negative"))]
   pub negative: Option<crate::simple_type::BooleanValue>,
   /// displayXAxis
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :displayXAxis
-  #[sdk(attr(qname = ":displayXAxis"))]
+  #[sdk(attr(office2010, qname = ":displayXAxis"))]
   pub display_x_axis: Option<crate::simple_type::BooleanValue>,
   /// displayHidden
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :displayHidden
-  #[sdk(attr(qname = ":displayHidden"))]
+  #[sdk(attr(office2010, qname = ":displayHidden"))]
   pub display_hidden: Option<crate::simple_type::BooleanValue>,
   /// minAxisType
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :minAxisType
-  #[sdk(attr(qname = ":minAxisType"))]
+  #[sdk(attr(office2010, qname = ":minAxisType"))]
   pub min_axis_type: Option<SparklineAxisMinMaxValues>,
   /// maxAxisType
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :maxAxisType
-  #[sdk(attr(qname = ":maxAxisType"))]
+  #[sdk(attr(office2010, qname = ":maxAxisType"))]
   pub max_axis_type: Option<SparklineAxisMinMaxValues>,
   /// rightToLeft
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :rightToLeft
-  #[sdk(attr(qname = ":rightToLeft"))]
+  #[sdk(attr(office2010, qname = ":rightToLeft"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorSeries"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
   pub series_color: Option<SeriesColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorNegative"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
   pub negative_color: Option<NegativeColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorAxis"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
   pub axis_color: Option<AxisColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorMarkers"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
   pub markers_color: Option<MarkersColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorFirst"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
   pub first_marker_color: Option<FirstMarkerColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorLast"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
   pub last_marker_color: Option<LastMarkerColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorHigh"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
   pub high_marker_color: Option<HighMarkerColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:colorLow"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
   pub low_marker_color: Option<LowMarkerColor>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_Sparklines/x14:sparklines"))]
+  #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
   pub sparklines: std::boxed::Box<Sparklines>,
 }
 /// Defines the SeriesColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorSeries.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorSeries")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorSeries")]
 pub struct SeriesColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the NegativeColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorNegative.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorNegative")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorNegative")]
 pub struct NegativeColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the AxisColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorAxis.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorAxis")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorAxis")]
 pub struct AxisColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the MarkersColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorMarkers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorMarkers")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorMarkers")]
 pub struct MarkersColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the FirstMarkerColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorFirst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorFirst")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorFirst")]
 pub struct FirstMarkerColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the LastMarkerColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorLast.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorLast")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorLast")]
 pub struct LastMarkerColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the HighMarkerColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorHigh.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorHigh")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorHigh")]
 pub struct HighMarkerColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the LowMarkerColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorLow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:colorLow")]
+#[sdk(office2010, qname = "x:CT_Color/x14:colorLow")]
 pub struct LowMarkerColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the Color Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:color.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:color")]
+#[sdk(office2010, qname = "x:CT_Color/x14:color")]
 pub struct Color {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the FillColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:fillColor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:fillColor")]
+#[sdk(office2010, qname = "x:CT_Color/x14:fillColor")]
 pub struct FillColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the BorderColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:borderColor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:borderColor")]
+#[sdk(office2010, qname = "x:CT_Color/x14:borderColor")]
 pub struct BorderColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the NegativeFillColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:negativeFillColor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:negativeFillColor")]
+#[sdk(office2010, qname = "x:CT_Color/x14:negativeFillColor")]
 pub struct NegativeFillColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the NegativeBorderColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:negativeBorderColor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:negativeBorderColor")]
+#[sdk(office2010, qname = "x:CT_Color/x14:negativeBorderColor")]
 pub struct NegativeBorderColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the BarAxisColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:axisColor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/x14:axisColor")]
+#[sdk(office2010, qname = "x:CT_Color/x14:axisColor")]
 pub struct BarAxisColor {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the ColorType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Color/")]
 pub struct ColorType {
   /// Automatic
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :auto
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indexed
   #[sdk(attr(qname = ":indexed"))]
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rgb
   #[sdk(attr(qname = ":rgb"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :theme
   #[sdk(attr(qname = ":theme"))]
   pub theme: Option<crate::simple_type::UInt32Value>,
   /// Tint
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tint
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
 /// Defines the Sparklines Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sparklines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Sparklines/x14:sparklines")]
+#[sdk(office2010, qname = "x14:CT_Sparklines/x14:sparklines")]
 pub struct Sparklines {
   /// _
-  #[sdk(child(qname = "x14:CT_Sparkline/x14:sparkline"))]
+  #[sdk(child(office2010, qname = "x14:CT_Sparkline/x14:sparkline"))]
   pub x14_sparkline: Vec<Sparkline>,
 }
 /// Defines the Sparkline Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:sparkline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Sparkline/x14:sparkline")]
+#[sdk(office2010, qname = "x14:CT_Sparkline/x14:sparkline")]
 pub struct Sparkline {
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
 /// Defines the SlicerRef Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerRef/x14:slicer")]
+#[sdk(office2010, qname = "x14:CT_SlicerRef/x14:slicer")]
 pub struct SlicerRef {
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2010, qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the SlicerCache Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerCache.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCache/x14:slicerCache")]
+#[sdk(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache")]
 pub struct SlicerCache {
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2010, qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the DefinedName Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:definedName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DefinedName/x14:definedName")]
+#[sdk(office2010, qname = "x14:CT_DefinedName/x14:definedName")]
 pub struct DefinedName {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x14:CT_DefinedNameArgumentDescriptions/x14:argumentDescriptions"))]
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_DefinedNameArgumentDescriptions/x14:argumentDescriptions"
+  ))]
   pub argument_descriptions: Option<ArgumentDescriptions>,
 }
 /// Defines the ArgumentDescriptions Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:argumentDescriptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DefinedNameArgumentDescriptions/x14:argumentDescriptions")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_DefinedNameArgumentDescriptions/x14:argumentDescriptions"
+)]
 pub struct ArgumentDescriptions {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription"))]
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription"
+  ))]
   pub x14_argument_description: Vec<ArgumentDescription>,
 }
 /// Defines the ArgumentDescription Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:argumentDescription.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription"
+)]
 pub struct ArgumentDescription {
   /// index
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :index
-  #[sdk(attr(qname = ":index"))]
+  #[sdk(attr(office2010, qname = ":index"))]
   pub index: crate::simple_type::UInt32Value,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TupleSet Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:tupleSet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSet/x14:tupleSet")]
+#[sdk(office2010, qname = "x14:CT_TupleSet/x14:tupleSet")]
 pub struct TupleSet {
   /// rowCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :rowCount
-  #[sdk(attr(qname = ":rowCount"))]
+  #[sdk(attr(office2010, qname = ":rowCount"))]
   pub row_count: Option<crate::simple_type::UInt32Value>,
   /// columnCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :columnCount
-  #[sdk(attr(qname = ":columnCount"))]
+  #[sdk(attr(office2010, qname = ":columnCount"))]
   pub column_count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSetHeaders/x14:headers"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSetHeaders/x14:headers"))]
   pub tuple_set_headers: std::boxed::Box<TupleSetHeaders>,
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSetRows/x14:rows"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSetRows/x14:rows"))]
   pub tuple_set_rows: std::boxed::Box<TupleSetRows>,
 }
 /// Defines the TupleSetHeaders Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:headers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSetHeaders/x14:headers")]
+#[sdk(office2010, qname = "x14:CT_TupleSetHeaders/x14:headers")]
 pub struct TupleSetHeaders {
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSetHeader/x14:header"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSetHeader/x14:header"))]
   pub x14_header: Vec<TupleSetHeader>,
 }
 /// Defines the TupleSetRows Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:rows.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSetRows/x14:rows")]
+#[sdk(office2010, qname = "x14:CT_TupleSetRows/x14:rows")]
 pub struct TupleSetRows {
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSetRow/x14:row"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSetRow/x14:row"))]
   pub x14_row: Vec<TupleSetRow>,
 }
 /// Defines the TupleSetHeader Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSetHeader/x14:header")]
+#[sdk(office2010, qname = "x14:CT_TupleSetHeader/x14:header")]
 pub struct TupleSetHeader {
   /// uniqueName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueName
-  #[sdk(attr(qname = ":uniqueName"))]
+  #[sdk(attr(office2010, qname = ":uniqueName"))]
   pub unique_name: Option<crate::simple_type::StringValue>,
   /// hierarchyName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hierarchyName
-  #[sdk(attr(qname = ":hierarchyName"))]
+  #[sdk(attr(office2010, qname = ":hierarchyName"))]
   pub hierarchy_name: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TupleSetRow Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:row.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSetRow/x14:row")]
+#[sdk(office2010, qname = "x14:CT_TupleSetRow/x14:row")]
 pub struct TupleSetRow {
   /// _
-  #[sdk(child(qname = "x14:CT_TupleSetRowItem/x14:rowItem"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleSetRowItem/x14:rowItem"))]
   pub x14_row_item: Vec<TupleSetRowItem>,
 }
 /// Defines the TupleSetRowItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:rowItem.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleSetRowItem/x14:rowItem")]
+#[sdk(office2010, qname = "x14:CT_TupleSetRowItem/x14:rowItem")]
 pub struct TupleSetRowItem {
   /// u
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :u
-  #[sdk(attr(qname = ":u"))]
+  #[sdk(attr(office2010, qname = ":u"))]
   pub unique_name: Option<crate::simple_type::StringValue>,
   /// d
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :d
-  #[sdk(attr(qname = ":d"))]
+  #[sdk(attr(office2010, qname = ":d"))]
   pub display_name: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SetLevel Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:setLevel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SetLevel/x14:setLevel")]
+#[sdk(office2010, qname = "x14:CT_SetLevel/x14:setLevel")]
 pub struct SetLevel {
   /// hierarchy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hierarchy
-  #[sdk(attr(qname = ":hierarchy"))]
+  #[sdk(attr(office2010, qname = ":hierarchy"))]
   pub hierarchy: crate::simple_type::Int32Value,
 }
 /// Defines the SetLevels Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:setLevels.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SetLevels/x14:setLevels")]
+#[sdk(office2010, qname = "x14:CT_SetLevels/x14:setLevels")]
 pub struct SetLevels {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_SetLevel/x14:setLevel"))]
+  #[sdk(child(office2010, qname = "x14:CT_SetLevel/x14:setLevel"))]
   pub x14_set_level: Vec<SetLevel>,
 }
 /// Defines the ColorScale Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:colorScale.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ColorScale/x14:colorScale")]
+#[sdk(office2010, qname = "x14:CT_ColorScale/x14:colorScale")]
 pub struct ColorScale {
   /// _
-  #[sdk(child(qname = "x14:CT_Cfvo/x14:cfvo"))]
+  #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:color"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:color"))]
   pub x14_color: Vec<Color>,
 }
 /// Defines the DataBar Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dataBar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_DataBar/x14:dataBar")]
+#[sdk(office2010, qname = "x14:CT_DataBar/x14:dataBar")]
 pub struct DataBar {
   /// minLength
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :minLength
-  #[sdk(attr(qname = ":minLength"))]
+  #[sdk(attr(office2010, qname = ":minLength"))]
   pub min_length: Option<crate::simple_type::UInt32Value>,
   /// maxLength
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :maxLength
-  #[sdk(attr(qname = ":maxLength"))]
+  #[sdk(attr(office2010, qname = ":maxLength"))]
   pub max_length: Option<crate::simple_type::UInt32Value>,
   /// showValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :showValue
-  #[sdk(attr(qname = ":showValue"))]
+  #[sdk(attr(office2010, qname = ":showValue"))]
   pub show_value: Option<crate::simple_type::BooleanValue>,
   /// border
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :border
-  #[sdk(attr(qname = ":border"))]
+  #[sdk(attr(office2010, qname = ":border"))]
   pub border: Option<crate::simple_type::BooleanValue>,
   /// gradient
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :gradient
-  #[sdk(attr(qname = ":gradient"))]
+  #[sdk(attr(office2010, qname = ":gradient"))]
   pub gradient: Option<crate::simple_type::BooleanValue>,
   /// direction
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :direction
-  #[sdk(attr(qname = ":direction"))]
+  #[sdk(attr(office2010, qname = ":direction"))]
   pub direction: Option<DataBarDirectionValues>,
   /// negativeBarColorSameAsPositive
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :negativeBarColorSameAsPositive
-  #[sdk(attr(qname = ":negativeBarColorSameAsPositive"))]
+  #[sdk(attr(office2010, qname = ":negativeBarColorSameAsPositive"))]
   pub negative_bar_color_same_as_positive: Option<crate::simple_type::BooleanValue>,
   /// negativeBarBorderColorSameAsPositive
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :negativeBarBorderColorSameAsPositive
-  #[sdk(attr(qname = ":negativeBarBorderColorSameAsPositive"))]
+  #[sdk(attr(office2010, qname = ":negativeBarBorderColorSameAsPositive"))]
   pub negative_bar_border_color_same_as_positive: Option<crate::simple_type::BooleanValue>,
   /// axisPosition
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :axisPosition
-  #[sdk(attr(qname = ":axisPosition"))]
+  #[sdk(attr(office2010, qname = ":axisPosition"))]
   pub axis_position: Option<DataBarAxisPositionValues>,
   /// _
-  #[sdk(child(qname = "x14:CT_Cfvo/x14:cfvo"))]
+  #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:fillColor"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:fillColor"))]
   pub x14_fill_color: Option<FillColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:borderColor"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:borderColor"))]
   pub x14_border_color: Option<BorderColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:negativeFillColor"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeFillColor"))]
   pub x14_negative_fill_color: Option<NegativeFillColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:negativeBorderColor"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeBorderColor"))]
   pub x14_negative_border_color: Option<NegativeBorderColor>,
   /// _
-  #[sdk(child(qname = "x:CT_Color/x14:axisColor"))]
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:axisColor"))]
   pub x14_axis_color: Option<BarAxisColor>,
 }
 /// Defines the IconSet Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:iconSet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_IconSet/x14:iconSet")]
+#[sdk(office2010, qname = "x14:CT_IconSet/x14:iconSet")]
 pub struct IconSet {
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set_types: Option<IconSetTypeValues>,
   /// showValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :showValue
-  #[sdk(attr(qname = ":showValue"))]
+  #[sdk(attr(office2010, qname = ":showValue"))]
   pub show_value: Option<crate::simple_type::BooleanValue>,
   /// percent
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :percent
-  #[sdk(attr(qname = ":percent"))]
+  #[sdk(attr(office2010, qname = ":percent"))]
   pub percent: Option<crate::simple_type::BooleanValue>,
   /// reverse
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :reverse
-  #[sdk(attr(qname = ":reverse"))]
+  #[sdk(attr(office2010, qname = ":reverse"))]
   pub reverse: Option<crate::simple_type::BooleanValue>,
   /// custom
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :custom
-  #[sdk(attr(qname = ":custom"))]
+  #[sdk(attr(office2010, qname = ":custom"))]
   pub custom: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_Cfvo/x14:cfvo"))]
+  #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
   /// _
-  #[sdk(child(qname = "x14:CT_CfIcon/x14:cfIcon"))]
+  #[sdk(child(office2010, qname = "x14:CT_CfIcon/x14:cfIcon"))]
   pub x14_cf_icon: Vec<ConditionalFormattingIcon>,
 }
 /// Defines the DifferentialType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:dxf.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Dxf/x14:dxf")]
+#[sdk(office2010, qname = "x:CT_Dxf/x14:dxf")]
 pub struct DifferentialType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
@@ -2973,113 +1746,65 @@ pub struct DifferentialType {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Defines the ConditionalFormattingValueObject Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:cfvo.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Cfvo/x14:cfvo")]
+#[sdk(office2010, qname = "x14:CT_Cfvo/x14:cfvo")]
 pub struct ConditionalFormattingValueObject {
   /// type
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
-  #[sdk(attr(qname = ":type"))]
+  #[sdk(attr(office2010, qname = ":type"))]
   pub r#type: ConditionalFormattingValueObjectTypeValues,
   /// gte
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :gte
-  #[sdk(attr(qname = ":gte"))]
+  #[sdk(attr(office2010, qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the ConditionalFormattingIcon Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:cfIcon.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CfIcon/x14:cfIcon")]
+#[sdk(office2010, qname = "x14:CT_CfIcon/x14:cfIcon")]
 pub struct ConditionalFormattingIcon {
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set: IconSetTypeValues,
   /// iconId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconId
-  #[sdk(attr(qname = ":iconId"))]
+  #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: crate::simple_type::UInt32Value,
 }
 /// Defines the PivotEdits Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotEdits.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotEdits/x14:pivotEdits")]
+#[sdk(office2010, qname = "x14:CT_PivotEdits/x14:pivotEdits")]
 pub struct PivotEdits {
   /// _
-  #[sdk(child(qname = "x14:CT_PivotEdit/x14:pivotEdit"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotEdit/x14:pivotEdit"))]
   pub x14_pivot_edit: Vec<PivotEdit>,
 }
 /// Defines the PivotChanges Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotChanges.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotChanges/x14:pivotChanges")]
+#[sdk(office2010, qname = "x14:CT_PivotChanges/x14:pivotChanges")]
 pub struct PivotChanges {
   /// _
-  #[sdk(child(qname = "x14:CT_PivotChange/x14:pivotChange"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotChange/x14:pivotChange"))]
   pub x14_pivot_change: Vec<PivotChange>,
 }
 /// Defines the ConditionalFormats Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:conditionalFormats.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ConditionalFormats/x14:conditionalFormats")]
+#[sdk(office2010, qname = "x14:CT_ConditionalFormats/x14:conditionalFormats")]
 pub struct ConditionalFormats {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_ConditionalFormat/x14:conditionalFormat"))]
+  #[sdk(child(office2010, qname = "x14:CT_ConditionalFormat/x14:conditionalFormat"))]
   pub x14_conditional_format: Vec<ConditionalFormat>,
 }
 /// Defines the CalculatedMembers Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:calculatedMembers.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_CalculatedMembers/x14:calculatedMembers")]
+#[sdk(office2010, qname = "x:CT_CalculatedMembers/x14:calculatedMembers")]
 pub struct CalculatedMembers {
   /// Calculated Members Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
@@ -3088,33 +1813,25 @@ pub struct CalculatedMembers {
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculatedMember>,
 }
 /// Defines the PivotEdit Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotEdit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotEdit/x14:pivotEdit")]
+#[sdk(office2010, qname = "x14:CT_PivotEdit/x14:pivotEdit")]
 pub struct PivotEdit {
   /// _
-  #[sdk(child(qname = "x14:CT_PivotUserEdit/x14:userEdit"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotUserEdit/x14:userEdit"))]
   pub pivot_user_edit: std::boxed::Box<PivotUserEdit>,
   /// _
-  #[sdk(child(qname = "x14:CT_TupleItems/x14:tupleItems"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleItems/x14:tupleItems"))]
   pub tuple_items: std::boxed::Box<TupleItems>,
   /// _
-  #[sdk(child(qname = "x:CT_PivotArea/x14:pivotArea"))]
+  #[sdk(child(office2010, qname = "x:CT_PivotArea/x14:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotUserEdit Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:userEdit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotUserEdit/x14:userEdit")]
+#[sdk(office2010, qname = "x14:CT_PivotUserEdit/x14:userEdit")]
 pub struct PivotUserEdit {
   #[sdk(choice(
     qname = "x:ST_Formula/xne:f",
@@ -3123,110 +1840,54 @@ pub struct PivotUserEdit {
   pub xml_children: Option<PivotUserEditChoice>,
 }
 /// Defines the TupleItems Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:tupleItems.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TupleItems/x14:tupleItems")]
+#[sdk(office2010, qname = "x14:CT_TupleItems/x14:tupleItems")]
 pub struct TupleItems {
   /// _
-  #[sdk(text_child(qname = "x:ST_Xstring/x14:tupleItem"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Xstring/x14:tupleItem"))]
   pub x14_tuple_item: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the PivotArea Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotArea.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_PivotArea/x14:pivotArea")]
+#[sdk(office2010, qname = "x:CT_PivotArea/x14:pivotArea")]
 pub struct PivotArea {
   /// Field Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :field
   #[sdk(attr(qname = ":field"))]
   pub field: Option<crate::simple_type::Int32Value>,
   /// Rule Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotAreaValues>,
   /// Data Only
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :dataOnly
   #[sdk(attr(qname = ":dataOnly"))]
   pub data_only: Option<crate::simple_type::BooleanValue>,
   /// Labels Only
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :labelOnly
   #[sdk(attr(qname = ":labelOnly"))]
   pub label_only: Option<crate::simple_type::BooleanValue>,
   /// Include Row Grand Total
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :grandRow
   #[sdk(attr(qname = ":grandRow"))]
   pub grand_row: Option<crate::simple_type::BooleanValue>,
   /// Include Column Grand Total
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :grandCol
   #[sdk(attr(qname = ":grandCol"))]
   pub grand_column: Option<crate::simple_type::BooleanValue>,
   /// Cache Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cacheIndex
   #[sdk(attr(qname = ":cacheIndex"))]
   pub cache_index: Option<crate::simple_type::BooleanValue>,
   /// Outline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :outline
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
   /// Offset Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :offset
   #[sdk(attr(qname = ":offset"))]
   pub offset: Option<crate::simple_type::StringValue>,
   /// Collapsed Levels Are Subtotals
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :collapsedLevelsAreSubtotals
   #[sdk(attr(qname = ":collapsedLevelsAreSubtotals"))]
   pub collapsed_levels_are_subtotals: Option<crate::simple_type::BooleanValue>,
   /// Axis
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
   pub axis: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableAxisValues,
   >,
   /// Field Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fieldPosition
   #[sdk(attr(qname = ":fieldPosition"))]
   pub field_position: Option<crate::simple_type::UInt32Value>,
   /// References
@@ -3239,93 +1900,56 @@ pub struct PivotArea {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Defines the PivotChange Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotChange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotChange/x14:pivotChange")]
+#[sdk(office2010, qname = "x14:CT_PivotChange/x14:pivotChange")]
 pub struct PivotChange {
   /// allocationMethod
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :allocationMethod
-  #[sdk(attr(qname = ":allocationMethod"))]
+  #[sdk(attr(office2010, qname = ":allocationMethod"))]
   pub allocation_method: Option<AllocationMethodValues>,
   /// weightExpression
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :weightExpression
-  #[sdk(attr(qname = ":weightExpression"))]
+  #[sdk(attr(office2010, qname = ":weightExpression"))]
   pub weight_expression: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_PivotEditValue/x14:editValue"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
   pub pivot_edit_value: std::boxed::Box<PivotEditValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_TupleItems/x14:tupleItems"))]
+  #[sdk(child(office2010, qname = "x14:CT_TupleItems/x14:tupleItems"))]
   pub tuple_items: std::boxed::Box<TupleItems>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotEditValue Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:editValue.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_PivotEditValue/x14:editValue")]
+#[sdk(office2010, qname = "x14:CT_PivotEditValue/x14:editValue")]
 pub struct PivotEditValue {
   /// valueType
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :valueType
-  #[sdk(attr(qname = ":valueType"))]
+  #[sdk(attr(office2010, qname = ":valueType"))]
   pub value_type: PivotEditValueTypeValues,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Xstring Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:tupleItem.
 pub type Xstring = crate::simple_type::StringValue;
 /// Defines the SlicerStyleElements Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerStyleElements.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements")]
+#[sdk(
+  office2010,
+  qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements"
+)]
 pub struct SlicerStyleElements {
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement"))]
   pub x14_slicer_style_element: Vec<SlicerStyleElement>,
 }
 /// Defines the DdeValues Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:values.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_DdeValues/x14:values")]
+#[sdk(office2010, qname = "x:CT_DdeValues/x14:values")]
 pub struct DdeValues {
   /// Rows
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rows
   #[sdk(attr(qname = ":rows"))]
   pub rows: Option<crate::simple_type::UInt32Value>,
   /// Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cols
   #[sdk(attr(qname = ":cols"))]
   pub columns: Option<crate::simple_type::UInt32Value>,
   /// _
@@ -3333,42 +1957,22 @@ pub struct DdeValues {
   pub x_value: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Value>,
 }
 /// Defines the ConditionalFormat Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:conditionalFormat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ConditionalFormat/x14:conditionalFormat")]
+#[sdk(office2010, qname = "x14:CT_ConditionalFormat/x14:conditionalFormat")]
 pub struct ConditionalFormat {
   /// scope
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :scope
-  #[sdk(attr(qname = ":scope"))]
+  #[sdk(attr(office2010, qname = ":scope"))]
   pub scope:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ScopeValues>,
   /// type
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
-  #[sdk(attr(qname = ":type"))]
+  #[sdk(attr(office2010, qname = ":type"))]
   pub r#type:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RuleValues>,
   /// priority
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :priority
-  #[sdk(attr(qname = ":priority"))]
+  #[sdk(attr(office2010, qname = ":priority"))]
   pub priority: Option<crate::simple_type::UInt32Value>,
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2010, qname = ":id"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -3376,25 +1980,17 @@ pub struct ConditionalFormat {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x:CT_PivotAreas/x14:pivotAreas"))]
+  #[sdk(child(office2010, qname = "x:CT_PivotAreas/x14:pivotAreas"))]
   pub pivot_areas: Option<PivotAreas>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the PivotAreas Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotAreas.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_PivotAreas/x14:pivotAreas")]
+#[sdk(office2010, qname = "x:CT_PivotAreas/x14:pivotAreas")]
 pub struct PivotAreas {
   /// Pivot Area Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
@@ -3403,672 +1999,355 @@ pub struct PivotAreas {
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotArea>,
 }
 /// Defines the SlicerStyle Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerStyle/x14:slicerStyle")]
+#[sdk(office2010, qname = "x14:CT_SlicerStyle/x14:slicerStyle")]
 pub struct SlicerStyle {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements"))]
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements"
+  ))]
   pub slicer_style_elements: Option<SlicerStyleElements>,
 }
 /// Defines the SlicerStyleElement Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicerStyleElement.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement")]
+#[sdk(office2010, qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement")]
 pub struct SlicerStyleElement {
   /// type
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
-  #[sdk(attr(qname = ":type"))]
+  #[sdk(attr(office2010, qname = ":type"))]
   pub r#type: SlicerStyleTypeValues,
   /// dxfId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dxfId
-  #[sdk(attr(qname = ":dxfId"))]
+  #[sdk(attr(office2010, qname = ":dxfId"))]
   pub format_id: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the IgnoredError Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:ignoredError.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_IgnoredError/x14:ignoredError")]
+#[sdk(office2010, qname = "x14:CT_IgnoredError/x14:ignoredError")]
 pub struct IgnoredError {
   /// evalError
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :evalError
-  #[sdk(attr(qname = ":evalError"))]
+  #[sdk(attr(office2010, qname = ":evalError"))]
   pub eval_error: Option<crate::simple_type::BooleanValue>,
   /// twoDigitTextYear
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :twoDigitTextYear
-  #[sdk(attr(qname = ":twoDigitTextYear"))]
+  #[sdk(attr(office2010, qname = ":twoDigitTextYear"))]
   pub two_digit_text_year: Option<crate::simple_type::BooleanValue>,
   /// numberStoredAsText
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :numberStoredAsText
-  #[sdk(attr(qname = ":numberStoredAsText"))]
+  #[sdk(attr(office2010, qname = ":numberStoredAsText"))]
   pub number_stored_as_text: Option<crate::simple_type::BooleanValue>,
   /// formula
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :formula
-  #[sdk(attr(qname = ":formula"))]
+  #[sdk(attr(office2010, qname = ":formula"))]
   pub formula: Option<crate::simple_type::BooleanValue>,
   /// formulaRange
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :formulaRange
-  #[sdk(attr(qname = ":formulaRange"))]
+  #[sdk(attr(office2010, qname = ":formulaRange"))]
   pub formula_range: Option<crate::simple_type::BooleanValue>,
   /// unlockedFormula
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :unlockedFormula
-  #[sdk(attr(qname = ":unlockedFormula"))]
+  #[sdk(attr(office2010, qname = ":unlockedFormula"))]
   pub unlocked_formula: Option<crate::simple_type::BooleanValue>,
   /// emptyCellReference
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :emptyCellReference
-  #[sdk(attr(qname = ":emptyCellReference"))]
+  #[sdk(attr(office2010, qname = ":emptyCellReference"))]
   pub empty_cell_reference: Option<crate::simple_type::BooleanValue>,
   /// listDataValidation
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :listDataValidation
-  #[sdk(attr(qname = ":listDataValidation"))]
+  #[sdk(attr(office2010, qname = ":listDataValidation"))]
   pub list_data_validation: Option<crate::simple_type::BooleanValue>,
   /// calculatedColumn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :calculatedColumn
-  #[sdk(attr(qname = ":calculatedColumn"))]
+  #[sdk(attr(office2010, qname = ":calculatedColumn"))]
   pub calculated_column: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(text_child(qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
 /// Defines the ProtectedRange Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:protectedRange.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ProtectedRange/x14:protectedRange")]
+#[sdk(office2010, qname = "x14:CT_ProtectedRange/x14:protectedRange")]
 pub struct ProtectedRange {
   /// password
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :password
-  #[sdk(attr(qname = ":password"))]
+  #[sdk(attr(office2010, qname = ":password"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub password: Option<crate::simple_type::HexBinaryValue>,
   /// algorithmName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :algorithmName
-  #[sdk(attr(qname = ":algorithmName"))]
+  #[sdk(attr(office2010, qname = ":algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
   /// hashValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :hashValue
-  #[sdk(attr(qname = ":hashValue"))]
+  #[sdk(attr(office2010, qname = ":hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
   /// saltValue
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :saltValue
-  #[sdk(attr(qname = ":saltValue"))]
+  #[sdk(attr(office2010, qname = ":saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
   /// spinCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :spinCount
-  #[sdk(attr(qname = ":spinCount"))]
+  #[sdk(attr(office2010, qname = ":spinCount"))]
   pub spin_count: Option<crate::simple_type::UInt32Value>,
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// securityDescriptor
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :securityDescriptor
-  #[sdk(attr(qname = ":securityDescriptor"))]
+  #[sdk(attr(office2010, qname = ":securityDescriptor"))]
   pub security_descriptor: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
 /// Defines the CustomFilter Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:customFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_CustomFilter/x14:customFilter")]
+#[sdk(office2010, qname = "x14:CT_CustomFilter/x14:customFilter")]
 pub struct CustomFilter {
   /// operator
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :operator
-  #[sdk(attr(qname = ":operator"))]
+  #[sdk(attr(office2010, qname = ":operator"))]
   pub operator: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterOperatorValues,
   >,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ListItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:item.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ListItem/x14:item")]
+#[sdk(office2010, qname = "x14:CT_ListItem/x14:item")]
 pub struct ListItem {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2010, qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the ListItems Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:itemLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_ListItems/x14:itemLst")]
+#[sdk(office2010, qname = "x14:CT_ListItems/x14:itemLst")]
 pub struct ListItems {
   /// _
-  #[sdk(child(qname = "x14:CT_ListItem/x14:item"))]
+  #[sdk(child(office2010, qname = "x14:CT_ListItem/x14:item"))]
   pub x14_item: Vec<ListItem>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
 /// Defines the Slicer Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:slicer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_Slicer/x14:slicer")]
+#[sdk(office2010, qname = "x14:CT_Slicer/x14:slicer")]
 pub struct Slicer {
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// cache
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :cache
-  #[sdk(attr(qname = ":cache"))]
+  #[sdk(attr(office2010, qname = ":cache"))]
   pub cache: crate::simple_type::StringValue,
   /// caption
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :caption
-  #[sdk(attr(qname = ":caption"))]
+  #[sdk(attr(office2010, qname = ":caption"))]
   pub caption: Option<crate::simple_type::StringValue>,
   /// startItem
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :startItem
-  #[sdk(attr(qname = ":startItem"))]
+  #[sdk(attr(office2010, qname = ":startItem"))]
   pub start_item: Option<crate::simple_type::UInt32Value>,
   /// columnCount
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :columnCount
-  #[sdk(attr(qname = ":columnCount"))]
+  #[sdk(attr(office2010, qname = ":columnCount"))]
   pub column_count: Option<crate::simple_type::UInt32Value>,
   /// showCaption
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :showCaption
-  #[sdk(attr(qname = ":showCaption"))]
+  #[sdk(attr(office2010, qname = ":showCaption"))]
   pub show_caption: Option<crate::simple_type::BooleanValue>,
   /// level
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :level
-  #[sdk(attr(qname = ":level"))]
+  #[sdk(attr(office2010, qname = ":level"))]
   pub level: Option<crate::simple_type::UInt32Value>,
   /// style
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :style
-  #[sdk(attr(qname = ":style"))]
+  #[sdk(attr(office2010, qname = ":style"))]
   pub style: Option<crate::simple_type::StringValue>,
   /// lockedPosition
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :lockedPosition
-  #[sdk(attr(qname = ":lockedPosition"))]
+  #[sdk(attr(office2010, qname = ":lockedPosition"))]
   pub locked_position: Option<crate::simple_type::BooleanValue>,
   /// rowHeight
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :rowHeight
-  #[sdk(attr(qname = ":rowHeight"))]
+  #[sdk(attr(office2010, qname = ":rowHeight"))]
   pub row_height: crate::simple_type::UInt32Value,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the OlapSlicerCache Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:olap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCache/x14:olap")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCache/x14:olap")]
 pub struct OlapSlicerCache {
   /// pivotCacheId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :pivotCacheId
-  #[sdk(attr(qname = ":pivotCacheId"))]
+  #[sdk(attr(office2010, qname = ":pivotCacheId"))]
   pub pivot_cache_id: crate::simple_type::UInt32Value,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheLevelsData/x14:levels"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheLevelsData/x14:levels"))]
   pub olap_slicer_cache_levels_data: std::boxed::Box<OlapSlicerCacheLevelsData>,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheSelections/x14:selections"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheSelections/x14:selections"))]
   pub olap_slicer_cache_selections: std::boxed::Box<OlapSlicerCacheSelections>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the TabularSlicerCache Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:tabular.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TabularSlicerCache/x14:tabular")]
+#[sdk(office2010, qname = "x14:CT_TabularSlicerCache/x14:tabular")]
 pub struct TabularSlicerCache {
   /// pivotCacheId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :pivotCacheId
-  #[sdk(attr(qname = ":pivotCacheId"))]
+  #[sdk(attr(office2010, qname = ":pivotCacheId"))]
   pub pivot_cache_id: crate::simple_type::UInt32Value,
   /// sortOrder
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortOrder
-  #[sdk(attr(qname = ":sortOrder"))]
+  #[sdk(attr(office2010, qname = ":sortOrder"))]
   pub sort_order: Option<TabularSlicerCacheSortOrderValues>,
   /// customListSort
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :customListSort
-  #[sdk(attr(qname = ":customListSort"))]
+  #[sdk(attr(office2010, qname = ":customListSort"))]
   pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
   /// showMissing
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :showMissing
-  #[sdk(attr(qname = ":showMissing"))]
+  #[sdk(attr(office2010, qname = ":showMissing"))]
   pub show_missing: Option<crate::simple_type::BooleanValue>,
   /// crossFilter
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :crossFilter
-  #[sdk(attr(qname = ":crossFilter"))]
+  #[sdk(attr(office2010, qname = ":crossFilter"))]
   pub cross_filter: Option<SlicerCacheCrossFilterValues>,
   /// _
-  #[sdk(child(qname = "x14:CT_TabularSlicerCacheItems/x14:items"))]
+  #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCacheItems/x14:items"))]
   pub tabular_slicer_cache_items: std::boxed::Box<TabularSlicerCacheItems>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/x14:extLst"))]
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SlicerCachePivotTable Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotTable.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable")]
+#[sdk(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable")]
 pub struct SlicerCachePivotTable {
   /// tabId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :tabId
-  #[sdk(attr(qname = ":tabId"))]
+  #[sdk(attr(office2010, qname = ":tabId"))]
   pub tab_id: crate::simple_type::UInt32Value,
   /// name
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
 }
 /// Defines the OlapSlicerCacheItemParent Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:p.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheItemParent/x14:p")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p")]
 pub struct OlapSlicerCacheItemParent {
   /// n
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2010, qname = ":n"))]
   pub name: crate::simple_type::StringValue,
 }
 /// Defines the OlapSlicerCacheItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:i.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheItem/x14:i")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheItem/x14:i")]
 pub struct OlapSlicerCacheItem {
   /// n
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2010, qname = ":n"))]
   pub name: crate::simple_type::StringValue,
   /// c
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :c
-  #[sdk(attr(qname = ":c"))]
+  #[sdk(attr(office2010, qname = ":c"))]
   pub display_name: Option<crate::simple_type::StringValue>,
   /// nd
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :nd
-  #[sdk(attr(qname = ":nd"))]
+  #[sdk(attr(office2010, qname = ":nd"))]
   pub non_display: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
   pub x14_p: Vec<OlapSlicerCacheItemParent>,
 }
 /// Defines the OlapSlicerCacheRange Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:range.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheRange/x14:range")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheRange/x14:range")]
 pub struct OlapSlicerCacheRange {
   /// startItem
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :startItem
-  #[sdk(attr(qname = ":startItem"))]
+  #[sdk(attr(office2010, qname = ":startItem"))]
   pub start_item: crate::simple_type::UInt32Value,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheItem/x14:i"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItem/x14:i"))]
   pub x14_i: Vec<OlapSlicerCacheItem>,
 }
 /// Defines the OlapSlicerCacheRanges Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:ranges.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges")]
 pub struct OlapSlicerCacheRanges {
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheRange/x14:range"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheRange/x14:range"))]
   pub x14_range: Vec<OlapSlicerCacheRange>,
 }
 /// Defines the OlapSlicerCacheLevelData Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:level.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheLevelData/x14:level")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheLevelData/x14:level")]
 pub struct OlapSlicerCacheLevelData {
   /// uniqueName
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueName
-  #[sdk(attr(qname = ":uniqueName"))]
+  #[sdk(attr(office2010, qname = ":uniqueName"))]
   pub unique_name: crate::simple_type::StringValue,
   /// sourceCaption
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sourceCaption
-  #[sdk(attr(qname = ":sourceCaption"))]
+  #[sdk(attr(office2010, qname = ":sourceCaption"))]
   pub source_caption: Option<crate::simple_type::StringValue>,
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
   /// sortOrder
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortOrder
-  #[sdk(attr(qname = ":sortOrder"))]
+  #[sdk(attr(office2010, qname = ":sortOrder"))]
   pub sort_order: Option<OlapSlicerCacheSortOrderValues>,
   /// crossFilter
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :crossFilter
-  #[sdk(attr(qname = ":crossFilter"))]
+  #[sdk(attr(office2010, qname = ":crossFilter"))]
   pub cross_filter: Option<SlicerCacheCrossFilterValues>,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges"))]
   pub olap_slicer_cache_ranges: Option<OlapSlicerCacheRanges>,
 }
 /// Defines the OlapSlicerCacheLevelsData Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:levels.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheLevelsData/x14:levels")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheLevelsData/x14:levels")]
 pub struct OlapSlicerCacheLevelsData {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheLevelData/x14:level"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheLevelData/x14:level"))]
   pub x14_level: Vec<OlapSlicerCacheLevelData>,
 }
 /// Defines the OlapSlicerCacheSelections Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:selections.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheSelections/x14:selections")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheSelections/x14:selections")]
 pub struct OlapSlicerCacheSelections {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheSelection/x14:selection"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheSelection/x14:selection"))]
   pub x14_selection: Vec<OlapSlicerCacheSelection>,
 }
 /// Defines the OlapSlicerCacheSelection Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:selection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_OlapSlicerCacheSelection/x14:selection")]
+#[sdk(office2010, qname = "x14:CT_OlapSlicerCacheSelection/x14:selection")]
 pub struct OlapSlicerCacheSelection {
   /// n
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :n
-  #[sdk(attr(qname = ":n"))]
+  #[sdk(attr(office2010, qname = ":n"))]
   pub name: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
   pub x14_p: Vec<OlapSlicerCacheItemParent>,
 }
 /// Defines the TabularSlicerCacheItems Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:items.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TabularSlicerCacheItems/x14:items")]
+#[sdk(office2010, qname = "x14:CT_TabularSlicerCacheItems/x14:items")]
 pub struct TabularSlicerCacheItems {
   /// count
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :count
-  #[sdk(attr(qname = ":count"))]
+  #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "x14:CT_TabularSlicerCacheItem/x14:i"))]
+  #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCacheItem/x14:i"))]
   pub x14_i: Vec<TabularSlicerCacheItem>,
 }
 /// Defines the TabularSlicerCacheItem Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:i.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_TabularSlicerCacheItem/x14:i")]
+#[sdk(office2010, qname = "x14:CT_TabularSlicerCacheItem/x14:i")]
 pub struct TabularSlicerCacheItem {
   /// x
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
-  #[sdk(attr(qname = ":x"))]
+  #[sdk(attr(office2010, qname = ":x"))]
   pub atom: crate::simple_type::UInt32Value,
   /// s
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :s
-  #[sdk(attr(qname = ":s"))]
+  #[sdk(attr(office2010, qname = ":s"))]
   pub is_selected: Option<crate::simple_type::BooleanValue>,
   /// nd
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :nd
-  #[sdk(attr(qname = ":nd"))]
+  #[sdk(attr(office2010, qname = ":nd"))]
   pub non_display: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the SlicerCachePivotTables Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:pivotTables.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables")]
+#[sdk(office2010, qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables")]
 pub struct SlicerCachePivotTables {
   /// _
-  #[sdk(child(qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
+  #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
   pub x14_pivot_table: Vec<SlicerCachePivotTable>,
 }
 /// Defines the SlicerCacheData Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SlicerCacheData/x14:data")]
+#[sdk(office2010, qname = "x14:CT_SlicerCacheData/x14:data")]
 pub struct SlicerCacheData {
   #[sdk(choice(
     qname = "x14:CT_OlapSlicerCache/x14:olap",
@@ -4077,12 +2356,11 @@ pub struct SlicerCacheData {
   pub xml_children: Option<SlicerCacheDataChoice>,
 }
 /// Defines the SlicerCacheDefinitionExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is x14:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst")]
+#[sdk(
+  office2010,
+  qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"
+)]
 pub struct SlicerCacheDefinitionExtensionList {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// _
@@ -4094,18 +2372,18 @@ pub struct SlicerCacheDefinitionExtensionList {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotUserEditChoice {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   XneF(crate::simple_type::StringValue),
   /// Defines the PivotEditValue Class.
-  #[sdk(child(qname = "x14:CT_PivotEditValue/x14:editValue"))]
+  #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
   X14EditValue(std::boxed::Box<PivotEditValue>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDataChoice {
   /// Defines the OlapSlicerCache Class.
-  #[sdk(child(qname = "x14:CT_OlapSlicerCache/x14:olap"))]
+  #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCache/x14:olap"))]
   X14Olap(std::boxed::Box<OlapSlicerCache>),
   /// Defines the TabularSlicerCache Class.
-  #[sdk(child(qname = "x14:CT_TabularSlicerCache/x14:tabular"))]
+  #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCache/x14:tabular"))]
   X14Tabular(std::boxed::Box<TabularSlicerCache>),
 }

@@ -5,10 +5,6 @@
 //
 
 /// Locked Canvas Container.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is lc:lockedCanvas.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/lc:lockedCanvas")]
 pub struct LockedCanvas {
@@ -55,7 +51,7 @@ pub enum LockedCanvasChoice {
   ),
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   APic(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Picture>),
-  #[sdk(child(qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
+  #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
   A14ContentPart(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::GvmlContentPart,

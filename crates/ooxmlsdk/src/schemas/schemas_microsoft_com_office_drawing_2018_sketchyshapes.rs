@@ -5,19 +5,14 @@
 //
 
 /// Defines the LineSketchStyleProperties Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ask:lineSketchStyleProps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps")]
+#[sdk(
+  office2021,
+  qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"
+)]
 pub struct LineSketchStyleProperties {
   /// sd
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :sd
-  #[sdk(attr(qname = ":sd"))]
+  #[sdk(attr(office2021, qname = ":sd"))]
   pub sd: Option<crate::simple_type::UInt32Value>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
@@ -25,22 +20,18 @@ pub struct LineSketchStyleProperties {
   ))]
   pub line_sketch_style_properties_choice: Option<LineSketchStylePropertiesChoice>,
   /// _
-  #[sdk(child(qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
+  #[sdk(child(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
   pub ask_type: Option<std::boxed::Box<LineSketchTypeProperties>>,
   /// _
-  #[sdk(text_child(qname = "ask:ST_LineSketchSeed/ask:seed"))]
+  #[sdk(text_child(office2021, qname = "ask:ST_LineSketchSeed/ask:seed"))]
   pub ask_seed: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/ask:extLst"))]
+  #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/ask:extLst"))]
   pub ask_ext_lst: Option<OfficeArtExtensionList>,
 }
 /// Defines the LineSketchTypeProperties Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ask:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ask:CT_LineSketchTypeProperties/ask:type")]
+#[sdk(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type")]
 pub struct LineSketchTypeProperties {
   #[sdk(choice(
     qname = "ask:CT_Empty/ask:lineSketchNone",
@@ -51,18 +42,10 @@ pub struct LineSketchTypeProperties {
   pub xml_children: Option<LineSketchTypePropertiesChoice>,
 }
 /// Defines the LineSketchSeed Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ask:seed.
 pub type LineSketchSeed = crate::simple_type::UInt32Value;
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ask:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/ask:extLst")]
+#[sdk(office2021, qname = "a:CT_OfficeArtExtensionList/ask:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -83,15 +66,15 @@ pub enum LineSketchStylePropertiesChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSketchTypePropertiesChoice {
   /// Defines the LineSketchNoneEmpty Class.
-  #[sdk(empty_child(qname = "ask:CT_Empty/ask:lineSketchNone"))]
+  #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchNone"))]
   AskLineSketchNone,
   /// Defines the LineSketchCurvedEmpty Class.
-  #[sdk(empty_child(qname = "ask:CT_Empty/ask:lineSketchCurved"))]
+  #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchCurved"))]
   AskLineSketchCurved,
   /// Defines the LineSketchFreehandEmpty Class.
-  #[sdk(empty_child(qname = "ask:CT_Empty/ask:lineSketchFreehand"))]
+  #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchFreehand"))]
   AskLineSketchFreehand,
   /// Defines the LineSketchScribbleEmpty Class.
-  #[sdk(empty_child(qname = "ask:CT_Empty/ask:lineSketchScribble"))]
+  #[sdk(empty_child(office2021, qname = "ask:CT_Empty/ask:lineSketchScribble"))]
   AskLineSketchScribble,
 }

@@ -1,5 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use proc_macro2::{Group, Ident as TokenIdent, TokenStream, TokenTree};
+use proc_macro2::{Group, Ident as TokenIdent, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -57,6 +57,19 @@ impl VersionCfgContext {
       suppress: self.suppress,
     }
   }
+}
+
+fn sdk_version_marker(version: &str) -> Option<TokenStream> {
+  if version.is_empty() || version == "Office2007" {
+    return None;
+  }
+
+  let marker = TokenIdent::new(&version.to_snake_case(), Span::call_site());
+  Some(quote! { #marker })
+}
+
+fn sdk_version_markers(version: &str) -> Vec<TokenStream> {
+  sdk_version_marker(version).into_iter().collect()
 }
 
 #[derive(Debug)]
@@ -982,30 +995,15 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     } else {
       VersionCfgContext::new(true)
     };
+    let type_sdk_version_markers = sdk_version_markers(schema_type_version);
     let sdk_type_attrs = if let Some(qname) = &type_decl.xml_qname {
       quote! {
-        #[sdk(qname = #qname)]
+        #[sdk(#(#type_sdk_version_markers,)* qname = #qname)]
       }
     } else {
       quote! {}
     };
     let summary_doc = format!(" {}", type_decl.docs);
-    let version_doc = if schema_type_version.is_empty() {
-      " Available in Office2007 and above.".to_string()
-    } else {
-      format!(" Available in {schema_type_version} and above.")
-    };
-    let qualified_doc = if type_decl
-      .xml_qname
-      .as_deref()
-      .is_none_or(|qname| qname.ends_with('/'))
-    {
-      " When the object is serialized out as xml, it's qualified name is .".to_string()
-    } else {
-      let qname = type_decl.xml_qname.as_deref().unwrap_or_default();
-      let qualified_str = &qname[qname.find('/').unwrap() + 1..];
-      format!(" When the object is serialized out as xml, it's qualified name is {qualified_str}.")
-    };
     let sdk_type_derive = sdk_type_derive_tokens();
 
     if type_decl.kind == TypeKind::LeafTextAlias {
@@ -1020,10 +1018,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         token_stream_list.push(quote! {
           #( #type_attrs )*
           #[doc = #summary_doc]
-          #[doc = ""]
-          #[doc = #version_doc]
-          #[doc = ""]
-          #[doc = #qualified_doc]
           pub type #struct_name_ident = #xml_content_type;
         });
 
@@ -1051,10 +1045,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       token_stream_list.push(quote! {
         #( #type_attrs )*
         #[doc = #summary_doc]
-        #[doc = ""]
-        #[doc = #version_doc]
-        #[doc = ""]
-        #[doc = #qualified_doc]
         #sdk_type_derive
         #sdk_type_attrs
         pub struct #struct_name_ident {
@@ -1571,10 +1561,6 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     token_stream_list.push(quote! {
       #( #type_attrs )*
       #[doc = #summary_doc]
-      #[doc = ""]
-      #[doc = #version_doc]
-      #[doc = ""]
-      #[doc = #qualified_doc]
       #sdk_type_derive
       #sdk_type_attrs
       pub struct #struct_name_ident {
@@ -2006,6 +1992,7 @@ fn inline_single_field_sequence_variant_tokens(
   } else {
     quote! {}
   };
+  let field_sdk_version_markers = sdk_version_markers(&field.version);
 
   match &field.wire {
     FieldWireDecl::Child { qname } => {
@@ -2013,20 +2000,20 @@ fn inline_single_field_sequence_variant_tokens(
         Ok(Some(quote! {
           #( #variant_attrs )*
           #empty_leaf_doc_attrs
-          #[sdk(empty_child(qname = #qname))]
+          #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))]
           #variant_ident,
         }))
       } else {
         Ok(Some(quote! {
           #( #variant_attrs )*
-          #[sdk(child(qname = #qname))]
+          #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))]
           #variant_ident(std::boxed::Box<#payload_type>),
         }))
       }
     }
     FieldWireDecl::TextChild { qname } => Ok(Some(quote! {
       #( #variant_attrs )*
-      #[sdk(text_child(qname = #qname))]
+      #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))]
       #variant_ident(#payload_type),
     })),
     _ => Ok(None),
@@ -2054,6 +2041,7 @@ fn gen_choice_variant_tokens(
     .unwrap_or(&variant.rust_name);
   let variant_ident: Ident = parse_str(rendered_variant_name)?;
   let variant_attrs = module_version_cfg_attrs(&variant.version, render_context.variant_cfg);
+  let variant_sdk_version_markers = sdk_version_markers(&variant.version);
   let variant_doc_attrs = choice_variant_doc_attrs(
     variant,
     render_context.module,
@@ -2152,7 +2140,9 @@ fn gen_choice_variant_tokens(
       }
       let qname_attrs = qnames
         .iter()
-        .map(|qname| quote! { #[sdk(text_child(qname = #qname))] })
+        .map(
+          |qname| quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* qname = #qname))] },
+        )
         .collect::<Vec<_>>();
       Ok(vec![quote! {
         #prefix_attrs
@@ -2252,7 +2242,7 @@ fn gen_choice_variant_tokens(
           ) {
             let qname_attrs = qnames
               .iter()
-              .map(|qname| quote! { #[sdk(empty_child(qname = #qname))] })
+              .map(|qname| quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] })
               .collect::<Vec<_>>();
             Ok(vec![quote! {
               #prefix_attrs
@@ -2264,7 +2254,9 @@ fn gen_choice_variant_tokens(
           } else {
             let qname_attrs = qnames
               .iter()
-              .map(|qname| quote! { #[sdk(child(qname = #qname))] })
+              .map(
+                |qname| quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] },
+              )
               .collect::<Vec<_>>();
             Ok(vec![quote! {
               #prefix_attrs
@@ -2977,8 +2969,9 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
     quote! {}
   };
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
+  let attr_sdk_version_markers = sdk_version_markers(&attr.version);
   let sdk_attr_attrs = quote! {
-    #[sdk(attr(qname = #qname))]
+    #[sdk(attr(#(#attr_sdk_version_markers,)* qname = #qname))]
   };
   let validator_attrs: Vec<TokenStream> = attr
     .validators
@@ -3058,24 +3051,11 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
     }})
     .collect();
   let property_comments_doc = format!(" {}", attr.docs);
-  let version_doc = if attr.version.is_empty() {
-    " Available in Office2007 and above.".to_string()
-  } else {
-    format!(" Available in {} and above.", attr.version)
-  };
-  let qualified_doc = format!(
-    " Represents the following attribute in the schema: {}",
-    qname
-  );
 
   Ok(match attr.cardinality {
     Cardinality::One => quote! {
       #( #attr_attrs )*
       #[doc = #property_comments_doc]
-      #[doc = ""]
-      #[doc = #version_doc]
-      #[doc = ""]
-      #[doc = #qualified_doc]
       #sdk_attr_attrs
       #( #validator_attrs )*
       #bit_attrs
@@ -3084,10 +3064,6 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
     Cardinality::Optional => quote! {
       #( #attr_attrs )*
       #[doc = #property_comments_doc]
-      #[doc = ""]
-      #[doc = #version_doc]
-      #[doc = ""]
-      #[doc = #qualified_doc]
       #sdk_attr_attrs
       #( #validator_attrs )*
       #bit_attrs
@@ -3405,12 +3381,17 @@ fn gen_direct_child_fields_from_decl_with_context(
       .or_else(|| meaningful_doc_text(&field.docs))
       .unwrap_or_else(|| " _".to_string());
     let property_comments = property_comments_owned.as_str();
+    let field_sdk_version_markers = sdk_version_markers(&field.version);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
-        quote! { #[sdk(empty_child(qname = #qname))] }
+        quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
-      FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
+      FieldWireDecl::Child { qname } => {
+        quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
+      FieldWireDecl::TextChild { qname } => {
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
 
@@ -3493,12 +3474,17 @@ fn gen_inline_sequence_variant_fields_from_decl(
       .or_else(|| meaningful_doc_text(&field.docs))
       .unwrap_or_else(|| " _".to_string());
     let property_comments = property_comments_owned.as_str();
+    let field_sdk_version_markers = sdk_version_markers(&field.version);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
-        quote! { #[sdk(empty_child(qname = #qname))] }
+        quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname } => quote! { #[sdk(child(qname = #qname))] },
-      FieldWireDecl::TextChild { qname } => quote! { #[sdk(text_child(qname = #qname))] },
+      FieldWireDecl::Child { qname } => {
+        quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
+      FieldWireDecl::TextChild { qname } => {
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
       _ => {
         return Err(
           format!(
@@ -3644,17 +3630,27 @@ fn gen_choice_fields_from_decl(
       .into_iter()
       .map(|qname| quote! { qname = #qname })
       .collect::<Vec<_>>();
+    let field_sdk_version_markers = sdk_version_markers(&field.version);
     let mut sdk_choice_attrs = Vec::new();
     if choice_qname_attrs.is_empty() && !choice_accepts_text && !choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
+      if field_sdk_version_markers.is_empty() {
+        sdk_choice_attrs.push(quote! { #[sdk(choice)] });
+      } else {
+        sdk_choice_attrs.push(quote! { #[sdk(choice(#(#field_sdk_version_markers),*))] });
+      }
     } else if choice_accepts_text && choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text, any))] });
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* text, any))] });
     } else if choice_accepts_text {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text))] });
+      sdk_choice_attrs.push(
+        quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* text))] },
+      );
     } else if choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* any))] });
+      sdk_choice_attrs.push(
+        quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* any))] },
+      );
     } else {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs),*))] });
+      sdk_choice_attrs
+        .push(quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs),*))] });
     }
     if !gated_choice_qname_attrs.is_empty() {
       sdk_choice_attrs.push(quote! {
@@ -3840,7 +3836,9 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (qname = \"oac:CT_Empty/oac:fill\"))]"));
+    assert!(
+      generated.contains("# [sdk (empty_child (office2016 , qname = \"oac:CT_Empty/oac:fill\"))]")
+    );
     assert!(generated.contains("pub fill_empty : Option < () >"));
     assert!(!generated.contains("pub struct FillEmpty"));
     assert!(!generated.contains("pub fill_empty : Option < FillEmpty >"));
@@ -3853,7 +3851,9 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (empty_child (qname = \"w:CT_Empty/w14:noFill\"))]"));
+    assert!(
+      generated.contains("# [sdk (empty_child (office2010 , qname = \"w:CT_Empty/w14:noFill\"))]")
+    );
     assert!(generated.contains("W14NoFill ,"));
     assert!(!generated.contains("pub struct NoFillEmpty"));
     assert!(!generated.contains("W14NoFill (std :: boxed :: Box < NoFillEmpty >)"));
@@ -3867,7 +3867,9 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(!generated.contains("pub struct EmptyType"));
-    assert!(generated.contains("# [sdk (empty_child (qname = \"p:CT_Empty/p228:add\"))]"));
+    assert!(
+      generated.contains("# [sdk (empty_child (microsoft365 , qname = \"p:CT_Empty/p228:add\"))]")
+    );
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {
@@ -6455,7 +6457,7 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("# [sdk (attr (qname = \":creationId\"))]"));
+    assert!(generated.contains("# [sdk (attr (office2016 , qname = \":creationId\"))]"));
     assert!(generated.contains("# [sdk (pattern (source = 0u32 , regex = \"[A-Z]+\"))]"));
     assert!(generated.contains("# [sdk (string_format (source = 1u32 , kind = \"token\"))]"));
     assert!(

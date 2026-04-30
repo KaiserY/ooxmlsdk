@@ -885,10 +885,6 @@ pub enum VerticalAlignmentValues {
   Bottom2010,
 }
 /// Color Transform Definitions.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:colorsDef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransform/dgm:colorsDef")]
 pub struct ColorsDefinition {
@@ -897,17 +893,9 @@ pub struct ColorsDefinition {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Unique ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
   /// Minimum Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// _
@@ -927,32 +915,16 @@ pub struct ColorsDefinition {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// Color Transform Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:colorsDefHdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransformHeader/dgm:colorsDefHdr")]
 pub struct ColorsDefinitionHeader {
   /// Unique ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: crate::simple_type::StringValue,
   /// Minimum Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// Resource ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :resId
   #[sdk(attr(qname = ":resId"))]
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// _
@@ -969,10 +941,6 @@ pub struct ColorsDefinitionHeader {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// Color Transform Header List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:colorsDefHdrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ColorTransformHeaderLst/dgm:colorsDefHdrLst")]
 pub struct ColorsDefinitionHeaderList {
@@ -981,10 +949,6 @@ pub struct ColorsDefinitionHeaderList {
   pub dgm_colors_def_hdr: Vec<ColorsDefinitionHeader>,
 }
 /// Data Model.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:dataModel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModelRoot/dgm:dataModel")]
 pub struct DataModelRoot {
@@ -1008,10 +972,6 @@ pub struct DataModelRoot {
   pub data_model_extension_list: Option<DataModelExtensionList>,
 }
 /// Layout Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:layoutDef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinition/dgm:layoutDef")]
 pub struct LayoutDefinition {
@@ -1020,24 +980,12 @@ pub struct LayoutDefinition {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// uniqueId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
   /// minVer
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// defStyle
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :defStyle
   #[sdk(attr(qname = ":defStyle"))]
   pub default_style: Option<crate::simple_type::StringValue>,
   /// _
@@ -1066,39 +1014,19 @@ pub struct LayoutDefinition {
   pub dgm_ext_lst: Option<DiagramDefinitionExtensionList>,
 }
 /// Layout Definition Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:layoutDefHdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionHeader/dgm:layoutDefHdr")]
 pub struct LayoutDefinitionHeader {
   /// Unique Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: crate::simple_type::StringValue,
   /// Minimum Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// Default Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :defStyle
   #[sdk(attr(qname = ":defStyle"))]
   pub default_style: Option<crate::simple_type::StringValue>,
   /// Resource Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :resId
   #[sdk(attr(qname = ":resId"))]
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// _
@@ -1115,10 +1043,6 @@ pub struct LayoutDefinitionHeader {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// Diagram Layout Header List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:layoutDefHdrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionHeaderLst/dgm:layoutDefHdrLst")]
 pub struct LayoutDefinitionHeaderList {
@@ -1127,47 +1051,23 @@ pub struct LayoutDefinitionHeaderList {
   pub dgm_layout_def_hdr: Vec<LayoutDefinitionHeader>,
 }
 /// Explicit Relationships to Diagram Parts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:relIds.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_RelIds/dgm:relIds")]
 pub struct RelationshipIds {
   /// Explicit Relationship to Diagram Data Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:dm
   #[sdk(attr(qname = "r:dm"))]
   pub data_part: crate::simple_type::StringValue,
   /// Explicit Relationship to Diagram Layout Definition Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:lo
   #[sdk(attr(qname = "r:lo"))]
   pub layout_part: crate::simple_type::StringValue,
   /// Explicit Relationship to Style Definition Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:qs
   #[sdk(attr(qname = "r:qs"))]
   pub style_part: crate::simple_type::StringValue,
   /// Explicit Relationship to Diagram Colors Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:cs
   #[sdk(attr(qname = "r:cs"))]
   pub color_part: crate::simple_type::StringValue,
 }
 /// Style Definition.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleDef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinition/dgm:styleDef")]
 pub struct StyleDefinition {
@@ -1176,17 +1076,9 @@ pub struct StyleDefinition {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Unique Style ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
   /// Minimum Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// _
@@ -1209,32 +1101,16 @@ pub struct StyleDefinition {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// Style Definition Header.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleDefHdr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinitionHeader/dgm:styleDefHdr")]
 pub struct StyleDefinitionHeader {
   /// Unique Style ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: crate::simple_type::StringValue,
   /// Minimum Version
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
   #[sdk(attr(qname = ":minVer"))]
   pub min_version: Option<crate::simple_type::StringValue>,
   /// Resource ID
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :resId
   #[sdk(attr(qname = ":resId"))]
   pub resource_id: Option<crate::simple_type::Int32Value>,
   /// _
@@ -1251,10 +1127,6 @@ pub struct StyleDefinitionHeader {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// List of Style Definition Headers.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleDefHdrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleDefinitionHeaderLst/dgm:styleDefHdrLst")]
 pub struct StyleDefinitionHeaderList {
@@ -1263,51 +1135,27 @@ pub struct StyleDefinitionHeaderList {
   pub dgm_style_def_hdr: Vec<StyleDefinitionHeader>,
 }
 /// Color Transform Category.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:cat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTCategory/dgm:cat")]
 pub struct ColorTransformCategory {
   /// Category Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :pri
   #[sdk(attr(qname = ":pri"))]
   pub priority: crate::simple_type::UInt32Value,
 }
 /// Fill Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:fillClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1324,27 +1172,15 @@ pub struct FillColorList {
   pub fill_color_list_choice: Vec<FillColorListChoice>,
 }
 /// Line Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:linClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1361,27 +1197,15 @@ pub struct LineColorList {
   pub line_color_list_choice: Vec<LineColorListChoice>,
 }
 /// Effect Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:effectClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1398,27 +1222,15 @@ pub struct EffectColorList {
   pub effect_color_list_choice: Vec<EffectColorListChoice>,
 }
 /// Text Line Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:txLinClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1435,27 +1247,15 @@ pub struct TextLineColorList {
   pub text_line_color_list_choice: Vec<TextLineColorListChoice>,
 }
 /// Text Fill Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:txFillClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1472,27 +1272,15 @@ pub struct TextFillColorList {
   pub text_fill_color_list_choice: Vec<TextFillColorListChoice>,
 }
 /// Text Effect Color List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:txEffectClrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1509,27 +1297,15 @@ pub struct TextEffectColorList {
   pub text_effect_color_list_choice: Vec<TextEffectColorListChoice>,
 }
 /// Defines the ColorsType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/")]
 pub struct ColorsType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :meth
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hueDir
   #[sdk(attr(qname = ":hueDir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
@@ -1546,10 +1322,6 @@ pub struct ColorsType {
   pub xml_children: Vec<ColorsTypeChoice>,
 }
 /// Defines the ExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
 pub struct ExtensionList {
@@ -1559,56 +1331,28 @@ pub struct ExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:title.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTName/dgm:title")]
 pub struct ColorDefinitionTitle {
   /// Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Description Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Description.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:desc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTDescription/dgm:desc")]
 pub struct ColorTransformDescription {
   /// Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Description Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Color Transform Category List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:catLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTCategories/dgm:catLst")]
 pub struct ColorTransformCategories {
@@ -1617,18 +1361,10 @@ pub struct ColorTransformCategories {
   pub dgm_cat: Vec<ColorTransformCategory>,
 }
 /// Style Label.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CTStyleLabel/dgm:styleLbl")]
 pub struct ColorTransformStyleLabel {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// Fill Color List
@@ -1654,18 +1390,10 @@ pub struct ColorTransformStyleLabel {
   pub extension_list: Option<ExtensionList>,
 }
 /// Point.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:pt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Pt/dgm:pt")]
 pub struct Point {
   /// Model Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :modelId
   #[sdk(attr(qname = ":modelId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1675,18 +1403,10 @@ pub struct Point {
   ))]
   pub model_id: crate::simple_type::StringValue,
   /// Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#type: Option<PointValues>,
   /// Connection Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cxnId
   #[sdk(attr(qname = ":cxnId"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1709,18 +1429,10 @@ pub struct Point {
   pub pt_extension_list: Option<PtExtensionList>,
 }
 /// Connection.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:cxn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Cxn/dgm:cxn")]
 pub struct Connection {
   /// Model Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :modelId
   #[sdk(attr(qname = ":modelId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1730,18 +1442,10 @@ pub struct Connection {
   ))]
   pub model_id: crate::simple_type::StringValue,
   /// Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#type: Option<ConnectionValues>,
   /// Source Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :srcId
   #[sdk(attr(qname = ":srcId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1751,10 +1455,6 @@ pub struct Connection {
   ))]
   pub source_id: crate::simple_type::StringValue,
   /// Destination Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :destId
   #[sdk(attr(qname = ":destId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1764,24 +1464,12 @@ pub struct Connection {
   ))]
   pub destination_id: crate::simple_type::StringValue,
   /// Source Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :srcOrd
   #[sdk(attr(qname = ":srcOrd"))]
   pub source_position: crate::simple_type::UInt32Value,
   /// Destination Position
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :destOrd
   #[sdk(attr(qname = ":destOrd"))]
   pub destination_position: crate::simple_type::UInt32Value,
   /// Parent Transition Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :parTransId
   #[sdk(attr(qname = ":parTransId"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1791,10 +1479,6 @@ pub struct Connection {
   ))]
   pub parent_transition_id: Option<crate::simple_type::StringValue>,
   /// Sibling Transition Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :sibTransId
   #[sdk(attr(qname = ":sibTransId"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -1804,10 +1488,6 @@ pub struct Connection {
   ))]
   pub sibling_transition_id: Option<crate::simple_type::StringValue>,
   /// Presentation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presId
   #[sdk(attr(qname = ":presId"))]
   pub presentation_id: Option<crate::simple_type::StringValue>,
   /// _
@@ -1815,95 +1495,47 @@ pub struct Connection {
   pub extension_list: Option<ExtensionList>,
 }
 /// Constraint.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:constr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Constraint/dgm:constr")]
 pub struct Constraint {
   /// Constraint Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub r#type: ConstraintValues,
   /// For
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :for
   #[sdk(attr(qname = ":for"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#for: Option<ConstraintRelationshipValues>,
   /// For Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :forName
   #[sdk(attr(qname = ":forName"))]
   pub for_name: Option<crate::simple_type::StringValue>,
   /// Data Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub point_type: Option<ElementValues>,
   /// Reference Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :refType
   #[sdk(attr(qname = ":refType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub reference_type: Option<ConstraintValues>,
   /// Reference For
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :refFor
   #[sdk(attr(qname = ":refFor"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub reference_for: Option<ConstraintRelationshipValues>,
   /// Reference For Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :refForName
   #[sdk(attr(qname = ":refForName"))]
   pub reference_for_name: Option<crate::simple_type::StringValue>,
   /// Reference Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :refPtType
   #[sdk(attr(qname = ":refPtType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub reference_point_type: Option<ElementValues>,
   /// Operator
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :op
   #[sdk(attr(qname = ":op"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub operator: Option<BoolOperatorValues>,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::DoubleValue>,
   /// Factor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fact
   #[sdk(attr(qname = ":fact"))]
   pub fact: Option<crate::simple_type::DoubleValue>,
   /// _
@@ -1911,63 +1543,31 @@ pub struct Constraint {
   pub extension_list: Option<ExtensionList>,
 }
 /// Rule.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:rule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_NumericRule/dgm:rule")]
 pub struct Rule {
   /// Constraint Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub r#type: ConstraintValues,
   /// For
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :for
   #[sdk(attr(qname = ":for"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#for: Option<ConstraintRelationshipValues>,
   /// For Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :forName
   #[sdk(attr(qname = ":forName"))]
   pub for_name: Option<crate::simple_type::StringValue>,
   /// Data Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub point_type: Option<ElementValues>,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::DoubleValue>,
   /// Factor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fact
   #[sdk(attr(qname = ":fact"))]
   pub fact: Option<crate::simple_type::DoubleValue>,
   /// Max Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :max
   #[sdk(attr(qname = ":max"))]
   pub max: Option<crate::simple_type::DoubleValue>,
   /// _
@@ -1975,34 +1575,18 @@ pub struct Rule {
   pub extension_list: Option<ExtensionList>,
 }
 /// Shape Adjust.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:adj.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Adj/dgm:adj")]
 pub struct Adjust {
   /// Adjust Handle Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub index: crate::simple_type::UInt32Value,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Shape Adjust List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:adjLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AdjLst/dgm:adjLst")]
 pub struct AdjustList {
@@ -2011,26 +1595,14 @@ pub struct AdjustList {
   pub dgm_adj: Vec<Adjust>,
 }
 /// Parameter.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:param.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Parameter/dgm:param")]
 pub struct Parameter {
   /// Parameter Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub r#type: ParameterIdValues,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["l", "ctr", "r", "none"]))]
   #[sdk(
@@ -2152,26 +1724,14 @@ pub struct Parameter {
   pub val: Option<crate::simple_type::StringValue>,
 }
 /// Algorithm.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:alg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Algorithm/dgm:alg")]
 pub struct Algorithm {
   /// Algorithm Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub r#type: AlgorithmValues,
   /// Revision Number
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rev
   #[sdk(attr(qname = ":rev"))]
   pub revision: Option<crate::simple_type::UInt32Value>,
   /// _
@@ -2182,26 +1742,14 @@ pub struct Algorithm {
   pub dgm_ext_lst: Option<ExtensionList>,
 }
 /// Shape.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Shape/dgm:shape")]
 pub struct Shape {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::DoubleValue>,
   /// Shape Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(
         string_set(
@@ -2399,38 +1947,18 @@ pub struct Shape {
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["none", "conn"]))]
   pub r#type: Option<crate::simple_type::StringValue>,
   /// Relationship to Image Part
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:blip
   #[sdk(attr(qname = "r:blip"))]
   pub blip: Option<crate::simple_type::StringValue>,
   /// Z-Order Offset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :zOrderOff
   #[sdk(attr(qname = ":zOrderOff"))]
   pub z_order_offset: Option<crate::simple_type::Int32Value>,
   /// Hide Geometry
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hideGeom
   #[sdk(attr(qname = ":hideGeom"))]
   pub hide_geometry: Option<crate::simple_type::BooleanValue>,
   /// Prevent Text Editing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lkTxEntry
   #[sdk(attr(qname = ":lkTxEntry"))]
   pub locked_text: Option<crate::simple_type::BooleanValue>,
   /// Image Placeholder
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :blipPhldr
   #[sdk(attr(qname = ":blipPhldr"))]
   pub blip_placeholder: Option<crate::simple_type::BooleanValue>,
   /// Shape Adjust List
@@ -2441,53 +1969,25 @@ pub struct Shape {
   pub extension_list: Option<ExtensionList>,
 }
 /// Presentation Of.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:presOf.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PresentationOf/dgm:presOf")]
 pub struct PresentationOf {
   /// Axis
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
   pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
   pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
   pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
   pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
   pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
   pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// _
@@ -2495,10 +1995,6 @@ pub struct PresentationOf {
   pub extension_list: Option<ExtensionList>,
 }
 /// Constraint List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:constrLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Constraints/dgm:constrLst")]
 pub struct Constraints {
@@ -2507,10 +2003,6 @@ pub struct Constraints {
   pub dgm_constr: Vec<Constraint>,
 }
 /// Rule List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:ruleLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Rules/dgm:ruleLst")]
 pub struct RuleList {
@@ -2519,10 +2011,6 @@ pub struct RuleList {
   pub dgm_rule: Vec<Rule>,
 }
 /// Variable List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:varLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:varLst")]
 pub struct VariableList {
@@ -2555,10 +2043,6 @@ pub struct VariableList {
   pub resize_handles: Option<ResizeHandles>,
 }
 /// Presentation Layout Variables.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:presLayoutVars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/dgm:presLayoutVars")]
 pub struct PresentationLayoutVariables {
@@ -2591,10 +2075,6 @@ pub struct PresentationLayoutVariables {
   pub resize_handles: Option<ResizeHandles>,
 }
 /// Defines the LayoutVariablePropertySetType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutVariablePropertySet/")]
 pub struct LayoutVariablePropertySetType {
@@ -2612,67 +2092,31 @@ pub struct LayoutVariablePropertySetType {
   pub xml_children: Vec<LayoutVariablePropertySetTypeChoice>,
 }
 /// For Each.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:forEach.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ForEach/dgm:forEach")]
 pub struct ForEach {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
   /// Axis
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
   pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
   pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
   pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
   pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
   pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
   pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   #[sdk(choice(
@@ -2689,40 +2133,20 @@ pub struct ForEach {
   pub xml_children: Vec<ForEachChoice>,
 }
 /// Layout Node.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:layoutNode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_LayoutNode/dgm:layoutNode")]
 pub struct LayoutNode {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Style Label
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :styleLbl
   #[sdk(attr(qname = ":styleLbl"))]
   pub style_label: Option<crate::simple_type::StringValue>,
   /// Child Order
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :chOrder
   #[sdk(attr(qname = ":chOrder"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub child_order: Option<ChildOrderValues>,
   /// Move With
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :moveWith
   #[sdk(attr(qname = ":moveWith"))]
   pub move_with: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
@@ -2740,18 +2164,10 @@ pub struct LayoutNode {
   pub xml_children: Vec<LayoutNodeChoice>,
 }
 /// Choose Element.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:choose.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Choose/dgm:choose")]
 pub struct Choose {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// _
@@ -2762,75 +2178,35 @@ pub struct Choose {
   pub dgm_else: Option<DiagramChooseElse>,
 }
 /// If.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:if.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_When/dgm:if")]
 pub struct DiagramChooseIf {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Axis
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :axis
   #[sdk(attr(qname = ":axis"))]
   pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
   /// Data Point Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ptType
   #[sdk(attr(qname = ":ptType"))]
   pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
   /// Hide Last Transition
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hideLastTrans
   #[sdk(attr(qname = ":hideLastTrans"))]
   pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
   /// Start
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :st
   #[sdk(attr(qname = ":st"))]
   pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cnt
   #[sdk(attr(qname = ":cnt"))]
   pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// Step
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :step
   #[sdk(attr(qname = ":step"))]
   pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Function
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :func
   #[sdk(attr(qname = ":func"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub function: FunctionValues,
   /// Argument
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :arg
   #[sdk(attr(qname = ":arg"))]
   #[sdk(
         string_set(
@@ -2849,18 +2225,10 @@ pub struct DiagramChooseIf {
     )]
   pub argument: Option<crate::simple_type::StringValue>,
   /// Operator
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :op
   #[sdk(attr(qname = ":op"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub operator: FunctionOperatorValues,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "xsd:boolean"))]
@@ -2894,18 +2262,10 @@ pub struct DiagramChooseIf {
   pub xml_children: Vec<DiagramChooseIfChoice>,
 }
 /// Else.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:else.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Otherwise/dgm:else")]
 pub struct DiagramChooseElse {
   /// Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
@@ -2922,10 +2282,6 @@ pub struct DiagramChooseElse {
   pub xml_children: Vec<DiagramChooseElseChoice>,
 }
 /// Data Model.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:dataModel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DataModel/dgm:dataModel")]
 pub struct DataModel {
@@ -2946,80 +2302,40 @@ pub struct DataModel {
   pub data_model_extension_list: Option<DataModelExtensionList>,
 }
 /// Category.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:cat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Category/dgm:cat")]
 pub struct Category {
   /// Category Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :pri
   #[sdk(attr(qname = ":pri"))]
   pub priority: crate::simple_type::UInt32Value,
 }
 /// Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:title.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Name/dgm:title")]
 pub struct Title {
   /// Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Description.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:desc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Description/dgm:desc")]
 pub struct Description {
   /// Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Category List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:catLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Categories/dgm:catLst")]
 pub struct CategoryList {
@@ -3028,10 +2344,6 @@ pub struct CategoryList {
   pub dgm_cat: Vec<Category>,
 }
 /// Shape Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/dgm:style")]
 pub struct Style {
@@ -3054,185 +2366,97 @@ pub struct Style {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
 }
 /// Show Organization Chart User Interface.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:orgChart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_OrgChart/dgm:orgChart")]
 pub struct OrganizationChart {
   /// Show Organization Chart User Interface Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Maximum Children.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:chMax.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ChildMax/dgm:chMax")]
 pub struct MaxNumberOfChildren {
   /// Maximum Children Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 0u32, min = "-1", min_inclusive = true, max_inclusive = false))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
 /// Preferred Number of Children.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:chPref.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ChildPref/dgm:chPref")]
 pub struct PreferredNumberOfChildren {
   /// Preferred Number of CHildren Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 0u32, min = "-1", min_inclusive = true, max_inclusive = false))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
 /// Show Insert Bullet.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:bulletEnabled.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled")]
 pub struct BulletEnabled {
   /// Show Insert Bullet Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
 /// Diagram Direction.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:dir.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Direction/dgm:dir")]
 pub struct Direction {
   /// Diagram Direction Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub val: Option<DirectionValues>,
 }
 /// Organization Chart Branch Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:hierBranch.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch")]
 pub struct HierarchyBranch {
   /// Organization Chart Branch Style Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub val: Option<HierarchyBranchStyleValues>,
 }
 /// One by One Animation String.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:animOne.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AnimOne/dgm:animOne")]
 pub struct AnimateOneByOne {
   /// One By One Animation Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub val: Option<AnimateOneByOneValues>,
 }
 /// Level Animation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:animLvl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_AnimLvl/dgm:animLvl")]
 pub struct AnimationLevel {
   /// Level Animation Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub val: Option<AnimationLevelStringValues>,
 }
 /// Shape Resize Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:resizeHandles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles")]
 pub struct ResizeHandles {
   /// Shape Resize Style Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub val: Option<ResizeHandlesStringValues>,
 }
 /// Category.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:cat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDCategory/dgm:cat")]
 pub struct StyleDisplayCategory {
   /// Category Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 1u32, kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :pri
   #[sdk(attr(qname = ":pri"))]
   pub priority: crate::simple_type::UInt32Value,
 }
 /// 3-D Scene.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:scene3d.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scene3D/dgm:scene3d")]
 pub struct Scene3D {
@@ -3255,18 +2479,10 @@ pub struct Scene3D {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// 3-D Shape Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:sp3d.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Shape3D/dgm:sp3d")]
 pub struct Shape3D {
   /// Shape Depth
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :z
   #[sdk(attr(qname = ":z"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3277,10 +2493,6 @@ pub struct Shape3D {
   ))]
   pub z: Option<crate::simple_type::Int64Value>,
   /// Extrusion Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :extrusionH
   #[sdk(attr(qname = ":extrusionH"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3291,10 +2503,6 @@ pub struct Shape3D {
   ))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// Contour Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contourW
   #[sdk(attr(qname = ":contourW"))]
   #[sdk(number_range(
     source = 0u32,
@@ -3305,10 +2513,6 @@ pub struct Shape3D {
   ))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// Preset Material Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :prstMaterial
   #[sdk(attr(qname = ":prstMaterial"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub preset_material: Option<
@@ -3337,10 +2541,6 @@ pub struct Shape3D {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Text Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:txPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_TextProps/dgm:txPr")]
 pub struct TextProperties {
@@ -3348,56 +2548,28 @@ pub struct TextProperties {
   pub xml_children: Option<TextPropertiesChoice>,
 }
 /// Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:title.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDName/dgm:title")]
 pub struct StyleDefinitionTitle {
   /// Natural Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Description Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Style Label Description.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:desc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDDescription/dgm:desc")]
 pub struct StyleLabelDescription {
   /// Natural Language
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lang
   #[sdk(attr(qname = ":lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// Description Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::StringValue,
 }
 /// Category List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:catLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SDCategories/dgm:catLst")]
 pub struct StyleDisplayCategories {
@@ -3406,18 +2578,10 @@ pub struct StyleDisplayCategories {
   pub dgm_cat: Vec<StyleDisplayCategory>,
 }
 /// Style Label.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleLbl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_StyleLabel/dgm:styleLbl")]
 pub struct StyleLabel {
   /// Style Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// 3-D Scene
@@ -3437,10 +2601,6 @@ pub struct StyleLabel {
   pub extension_list: Option<ExtensionList>,
 }
 /// Point List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:ptLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_PtList/dgm:ptLst")]
 pub struct PointList {
@@ -3449,10 +2609,6 @@ pub struct PointList {
   pub dgm_pt: Vec<Point>,
 }
 /// Connection List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:cxnLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_CxnList/dgm:cxnLst")]
 pub struct ConnectionList {
@@ -3461,10 +2617,6 @@ pub struct ConnectionList {
   pub dgm_cxn: Vec<Connection>,
 }
 /// Background Formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:bg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BackgroundFormatting/dgm:bg")]
 pub struct Background {
@@ -3484,10 +2636,6 @@ pub struct Background {
   pub background_choice2: Option<BackgroundChoice2>,
 }
 /// Whole E2O Formatting.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:whole.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_WholeE2oFormatting/dgm:whole")]
 pub struct Whole {
@@ -3503,10 +2651,6 @@ pub struct Whole {
   pub whole_choice: Option<WholeChoice>,
 }
 /// Defines the DataModelExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DataModelExtensionList/dgm:extLst")]
 pub struct DataModelExtensionList {
@@ -3517,18 +2661,10 @@ pub struct DataModelExtensionList {
     Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DataModelExtension>,
 }
 /// Property Set.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:prSet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_ElemPropSet/dgm:prSet")]
 pub struct PropertySet {
   /// Presentation Element Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presAssocID
   #[sdk(attr(qname = ":presAssocID"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
@@ -3538,192 +2674,84 @@ pub struct PropertySet {
   ))]
   pub presentation_element_id: Option<crate::simple_type::StringValue>,
   /// Presentation Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presName
   #[sdk(attr(qname = ":presName"))]
   pub presentation_name: Option<crate::simple_type::StringValue>,
   /// Presentation Style Label
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presStyleLbl
   #[sdk(attr(qname = ":presStyleLbl"))]
   pub presentation_style_label: Option<crate::simple_type::StringValue>,
   /// Presentation Style Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presStyleIdx
   #[sdk(attr(qname = ":presStyleIdx"))]
   pub presentation_style_index: Option<crate::simple_type::Int32Value>,
   /// Presentation Style Count
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :presStyleCnt
   #[sdk(attr(qname = ":presStyleCnt"))]
   pub presentation_style_count: Option<crate::simple_type::Int32Value>,
   /// Current Diagram Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :loTypeId
   #[sdk(attr(qname = ":loTypeId"))]
   pub layout_type_id: Option<crate::simple_type::StringValue>,
   /// Current Diagram Category
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :loCatId
   #[sdk(attr(qname = ":loCatId"))]
   pub layout_category_id: Option<crate::simple_type::StringValue>,
   /// Current Style Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :qsTypeId
   #[sdk(attr(qname = ":qsTypeId"))]
   pub quick_style_type_id: Option<crate::simple_type::StringValue>,
   /// Current Style Category
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :qsCatId
   #[sdk(attr(qname = ":qsCatId"))]
   pub quick_style_category_id: Option<crate::simple_type::StringValue>,
   /// Color Transform Type Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :csTypeId
   #[sdk(attr(qname = ":csTypeId"))]
   pub color_type: Option<crate::simple_type::StringValue>,
   /// Color Transform Category
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :csCatId
   #[sdk(attr(qname = ":csCatId"))]
   pub color_category_id: Option<crate::simple_type::StringValue>,
   /// Coherent 3D Behavior
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :coherent3DOff
   #[sdk(attr(qname = ":coherent3DOff"))]
   pub coherent3_d: Option<crate::simple_type::BooleanValue>,
   /// Placeholder Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :phldrT
   #[sdk(attr(qname = ":phldrT"))]
   pub placeholder_text: Option<crate::simple_type::StringValue>,
   /// Placeholder
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :phldr
   #[sdk(attr(qname = ":phldr"))]
   pub placeholder: Option<crate::simple_type::BooleanValue>,
   /// Custom Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custAng
   #[sdk(attr(qname = ":custAng"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Custom Vertical Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custFlipVert
   #[sdk(attr(qname = ":custFlipVert"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Custom Horizontal Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custFlipHor
   #[sdk(attr(qname = ":custFlipHor"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
   /// Fixed Width Override
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custSzX
   #[sdk(attr(qname = ":custSzX"))]
   pub fixed_width_override: Option<crate::simple_type::Int32Value>,
   /// Fixed Height Override
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custSzY
   #[sdk(attr(qname = ":custSzY"))]
   pub fixed_height_override: Option<crate::simple_type::Int32Value>,
   /// Width Scale
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custScaleX
   #[sdk(attr(qname = ":custScaleX"))]
   pub width_scale: Option<crate::simple_type::Int32Value>,
   /// Height Scale
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custScaleY
   #[sdk(attr(qname = ":custScaleY"))]
   pub height_scale: Option<crate::simple_type::Int32Value>,
   /// Text Changed
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custT
   #[sdk(attr(qname = ":custT"))]
   pub text_changed: Option<crate::simple_type::BooleanValue>,
   /// Custom Factor Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custLinFactX
   #[sdk(attr(qname = ":custLinFactX"))]
   pub factor_width: Option<crate::simple_type::Int32Value>,
   /// Custom Factor Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custLinFactY
   #[sdk(attr(qname = ":custLinFactY"))]
   pub factor_height: Option<crate::simple_type::Int32Value>,
   /// Neighbor Offset Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custLinFactNeighborX
   #[sdk(attr(qname = ":custLinFactNeighborX"))]
   pub neighbor_offset_width: Option<crate::simple_type::Int32Value>,
   /// Neighbor Offset Height
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custLinFactNeighborY
   #[sdk(attr(qname = ":custLinFactNeighborY"))]
   pub neighbor_offset_height: Option<crate::simple_type::Int32Value>,
   /// Radius Scale
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custRadScaleRad
   #[sdk(attr(qname = ":custRadScaleRad"))]
   pub radius_scale: Option<crate::simple_type::Int32Value>,
   /// Include Angle Scale
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :custRadScaleInc
   #[sdk(attr(qname = ":custRadScaleInc"))]
   pub include_angle_scale: Option<crate::simple_type::Int32Value>,
   /// Presentation Layout Variables
@@ -3734,19 +2762,11 @@ pub struct PropertySet {
   pub style: Option<std::boxed::Box<Style>>,
 }
 /// Shape Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/dgm:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -3797,10 +2817,6 @@ pub struct ShapeProperties {
   >,
 }
 /// Text Body.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:t.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
@@ -3820,10 +2836,6 @@ pub struct TextBody {
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
 /// Defines the PtExtensionList Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PtExtensionList/dgm:extLst")]
 pub struct PtExtensionList {
@@ -3833,10 +2845,6 @@ pub struct PtExtensionList {
   pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PtExtension>,
 }
 /// Defines the DiagramDefinitionExtension Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:ext.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
@@ -3844,10 +2852,6 @@ pub struct DiagramDefinitionExtension {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :uri
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
@@ -3859,18 +2863,10 @@ pub struct DiagramDefinitionExtension {
   pub xml_children: Option<DiagramDefinitionExtensionChoice>,
 }
 /// Defines the SampleData Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:sampData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:sampData")]
 pub struct SampleData {
   /// Use Default
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
   /// Data Model
@@ -3878,18 +2874,10 @@ pub struct SampleData {
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
 /// Defines the StyleData Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:styleData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:styleData")]
 pub struct StyleData {
   /// Use Default
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
   /// Data Model
@@ -3897,18 +2885,10 @@ pub struct StyleData {
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
 /// Defines the ColorData Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:clrData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/dgm:clrData")]
 pub struct ColorData {
   /// Use Default
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
   /// Data Model
@@ -3916,18 +2896,10 @@ pub struct ColorData {
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
 /// Defines the SampleDataType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_SampleData/")]
 pub struct SampleDataType {
   /// Use Default
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :useDef
   #[sdk(attr(qname = ":useDef"))]
   pub use_default: Option<crate::simple_type::BooleanValue>,
   /// Data Model
@@ -3935,10 +2907,6 @@ pub struct SampleDataType {
   pub data_model: Vec<DataModel>,
 }
 /// List of extensions to the CT_DiagramDefintions type..
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst")]
 pub struct DiagramDefinitionExtensionList {
@@ -4472,13 +3440,16 @@ pub enum ShapePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramDefinitionExtensionChoice {
-  #[sdk(child(qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"))]
+  #[sdk(child(
+    office2019,
+    qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"
+  ))]
   Dgm1611AutoBuNodeInfoLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2016_11_diagram::NumberDiagramInfoList,
     >,
   ),
-  #[sdk(child(qname = "a:CT_TextListStyle/dgm1612:lstStyle"))]
+  #[sdk(child(office2019, qname = "a:CT_TextListStyle/dgm1612:lstStyle"))]
   Dgm1612LstStyle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2016_12_diagram::TextListStyleType,

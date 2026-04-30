@@ -109,194 +109,94 @@ pub enum VerticalAnchorValues {
   Text,
 }
 /// Top Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:bordertop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:bordertop")]
 pub struct TopBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   #[sdk(number_sign(source = 0u32, kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shadow
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Left Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:borderleft.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderleft")]
 pub struct LeftBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   #[sdk(number_sign(source = 0u32, kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shadow
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Right Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:borderright.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderright")]
 pub struct RightBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   #[sdk(number_sign(source = 0u32, kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shadow
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Bottom Border.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:borderbottom.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/w10:borderbottom")]
 pub struct BottomBorder {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   #[sdk(number_sign(source = 0u32, kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shadow
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Defines the BorderType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Border/")]
 pub struct BorderType {
   /// Border Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<BorderValues>,
   /// Border Width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :width
   #[sdk(attr(qname = ":width"))]
   #[sdk(number_sign(source = 0u32, kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shadow
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
 /// Text Wrapping.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w10:wrap.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Wrap/w10:wrap")]
 pub struct TextWrap {
   /// Wrapping type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<WrapValues>,
   /// Wrapping side
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :side
   #[sdk(attr(qname = ":side"))]
   pub side: Option<WrapSideValues>,
   /// Horizontal Positioning Base
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :anchorx
   #[sdk(attr(qname = ":anchorx"))]
   pub anchor_x: Option<HorizontalAnchorValues>,
   /// Vertical Positioning Base
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :anchory
   #[sdk(attr(qname = ":anchory"))]
   pub anchor_y: Option<VerticalAnchorValues>,
 }

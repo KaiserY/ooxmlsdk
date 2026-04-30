@@ -43,10 +43,6 @@ pub enum DataSourceValues {
   Miscellaneous,
 }
 /// Sources.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Sources.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_Sources/b:Sources")]
 pub struct Sources {
@@ -54,26 +50,14 @@ pub struct Sources {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// Selected Style
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :SelectedStyle
   #[sdk(attr(qname = ":SelectedStyle"))]
   #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
   pub selected_style: Option<crate::simple_type::StringValue>,
   /// Documentation Style Name
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :StyleName
   #[sdk(attr(qname = ":StyleName"))]
   #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
   pub style_name: Option<crate::simple_type::StringValue>,
   /// Uniform Resource Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :URI
   #[sdk(attr(qname = ":URI"))]
   #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
   pub uri: Option<crate::simple_type::StringValue>,
@@ -82,10 +66,6 @@ pub struct Sources {
   pub b_source: Vec<Source>,
 }
 /// Person.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Person.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_PersonType/b:Person")]
 pub struct Person {
@@ -100,334 +80,114 @@ pub struct Person {
   pub b_middle: Vec<crate::simple_type::StringValue>,
 }
 /// Person's Last, or Family, Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Last.
 pub type Last = crate::simple_type::StringValue;
 /// Person's First, or Given, Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:First.
 pub type First = crate::simple_type::StringValue;
 /// Person's Middle, or Other, Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Middle.
 pub type Middle = crate::simple_type::StringValue;
 /// Corporate Author.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Corporate.
 pub type Corporate = crate::simple_type::StringValue;
 /// Abbreviated Case Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:AbbreviatedCaseNumber.
 pub type AbbreviatedCaseNumber = crate::simple_type::StringValue;
 /// Album Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:AlbumTitle.
 pub type AlbumTitle = crate::simple_type::StringValue;
 /// Book Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:BookTitle.
 pub type BookTitle = crate::simple_type::StringValue;
 /// Broadcaster.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Broadcaster.
 pub type Broadcaster = crate::simple_type::StringValue;
 /// Broadcast Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:BroadcastTitle.
 pub type BroadcastTitle = crate::simple_type::StringValue;
 /// Case Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:CaseNumber.
 pub type CaseNumber = crate::simple_type::StringValue;
 /// Chapter Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ChapterNumber.
 pub type ChapterNumber = crate::simple_type::StringValue;
 /// City.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:City.
 pub type City = crate::simple_type::StringValue;
 /// Comments.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Comments.
 pub type Comments = crate::simple_type::StringValue;
 /// Conference or Proceedings Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ConferenceName.
 pub type ConferenceName = crate::simple_type::StringValue;
 /// Country or Region.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:CountryRegion.
 pub type CountryRegion = crate::simple_type::StringValue;
 /// Court.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Court.
 pub type Court = crate::simple_type::StringValue;
 /// Day.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Day.
 pub type Day = crate::simple_type::StringValue;
 /// Day Accessed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:DayAccessed.
 pub type DayAccessed = crate::simple_type::StringValue;
 /// Department.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Department.
 pub type Department = crate::simple_type::StringValue;
 /// Distributor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Distributor.
 pub type Distributor = crate::simple_type::StringValue;
 /// Editor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Edition.
 pub type Edition = crate::simple_type::StringValue;
 /// GUID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Guid.
 pub type GuidString = crate::simple_type::StringValue;
 /// Institution.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Institution.
 pub type Institution = crate::simple_type::StringValue;
 /// Internet Site Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:InternetSiteTitle.
 pub type InternetSiteTitle = crate::simple_type::StringValue;
 /// Issue.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Issue.
 pub type Issue = crate::simple_type::StringValue;
 /// Journal Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:JournalName.
 pub type JournalName = crate::simple_type::StringValue;
 /// Locale ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:LCID.
 pub type LcId = crate::simple_type::StringValue;
 /// Medium.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Medium.
 pub type Medium = crate::simple_type::StringValue;
 /// Month.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Month.
 pub type Month = crate::simple_type::StringValue;
 /// Month Accessed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:MonthAccessed.
 pub type MonthAccessed = crate::simple_type::StringValue;
 /// Number of Volumes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:NumberVolumes.
 pub type NumberVolumes = crate::simple_type::StringValue;
 /// Pages.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Pages.
 pub type Pages = crate::simple_type::StringValue;
 /// Patent Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:PatentNumber.
 pub type PatentNumber = crate::simple_type::StringValue;
 /// Periodical Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:PeriodicalTitle.
 pub type PeriodicalTitle = crate::simple_type::StringValue;
 /// Production Company.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ProductionCompany.
 pub type ProductionCompany = crate::simple_type::StringValue;
 /// Publication Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:PublicationTitle.
 pub type PublicationTitle = crate::simple_type::StringValue;
 /// Publisher.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Publisher.
 pub type Publisher = crate::simple_type::StringValue;
 /// Recording Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:RecordingNumber.
 pub type RecordingNumber = crate::simple_type::StringValue;
 /// Reference Order.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:RefOrder.
 pub type ReferenceOrder = crate::simple_type::StringValue;
 /// Reporter.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Reporter.
 pub type Reporter = crate::simple_type::StringValue;
 /// Short Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ShortTitle.
 pub type ShortTitle = crate::simple_type::StringValue;
 /// Standard Number.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:StandardNumber.
 pub type StandardNumber = crate::simple_type::StringValue;
 /// State or Province.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:StateProvince.
 pub type StateProvince = crate::simple_type::StringValue;
 /// Station.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Station.
 pub type Station = crate::simple_type::StringValue;
 /// Tag.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Tag.
 pub type Tag = crate::simple_type::StringValue;
 /// Theater.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Theater.
 pub type Theater = crate::simple_type::StringValue;
 /// Thesis Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ThesisType.
 pub type ThesisType = crate::simple_type::StringValue;
 /// Title.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Title.
 pub type Title = crate::simple_type::StringValue;
 /// Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Type.
 pub type PatentType = crate::simple_type::StringValue;
 /// URL.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:URL.
 pub type UrlString = crate::simple_type::StringValue;
 /// Version.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Version.
 pub type Version = crate::simple_type::StringValue;
 /// Volume.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Volume.
 pub type Volume = crate::simple_type::StringValue;
 /// Year.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Year.
 pub type Year = crate::simple_type::StringValue;
 /// Year Accessed.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:YearAccessed.
 pub type YearAccessed = crate::simple_type::StringValue;
 /// Name List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:NameList.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameListType/b:NameList")]
 pub struct NameList {
@@ -436,10 +196,6 @@ pub struct NameList {
   pub b_person: Vec<Person>,
 }
 /// Artist.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Artist.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Artist")]
 pub struct Artist {
@@ -448,10 +204,6 @@ pub struct Artist {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Book Author.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:BookAuthor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:BookAuthor")]
 pub struct BookAuthor {
@@ -460,10 +212,6 @@ pub struct BookAuthor {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Compiler.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Compiler.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Compiler")]
 pub struct Compiler {
@@ -472,10 +220,6 @@ pub struct Compiler {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Composer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Composer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Composer")]
 pub struct Composer {
@@ -484,10 +228,6 @@ pub struct Composer {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Conductor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Conductor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Conductor")]
 pub struct Conductor {
@@ -496,10 +236,6 @@ pub struct Conductor {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Counsel.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Counsel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Counsel")]
 pub struct Counsel {
@@ -508,10 +244,6 @@ pub struct Counsel {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Director.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Director.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Director")]
 pub struct Director {
@@ -520,10 +252,6 @@ pub struct Director {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Editor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Editor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Editor")]
 pub struct Editor {
@@ -532,10 +260,6 @@ pub struct Editor {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Interviewee.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Interviewee.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Interviewee")]
 pub struct Interviewee {
@@ -544,10 +268,6 @@ pub struct Interviewee {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Interviewer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Interviewer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Interviewer")]
 pub struct Interviewer {
@@ -556,10 +276,6 @@ pub struct Interviewer {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Inventor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Inventor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Inventor")]
 pub struct Inventor {
@@ -568,10 +284,6 @@ pub struct Inventor {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Producer Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:ProducerName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:ProducerName")]
 pub struct ProducerName {
@@ -580,10 +292,6 @@ pub struct ProducerName {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Translator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Translator.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Translator")]
 pub struct Translator {
@@ -592,10 +300,6 @@ pub struct Translator {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Writer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Writer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/b:Writer")]
 pub struct Writer {
@@ -604,10 +308,6 @@ pub struct Writer {
   pub name_list: std::boxed::Box<NameList>,
 }
 /// Defines the NameType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameType/")]
 pub struct NameType {
@@ -616,10 +316,6 @@ pub struct NameType {
   pub name_list: Vec<NameList>,
 }
 /// Author.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Author")]
 pub struct Author {
@@ -630,10 +326,6 @@ pub struct Author {
   pub xml_children: Option<AuthorChoice>,
 }
 /// Performer.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Performer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Performer")]
 pub struct Performer {
@@ -644,10 +336,6 @@ pub struct Performer {
   pub xml_children: Option<PerformerChoice>,
 }
 /// Defines the NameOrCorporateType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/")]
 pub struct NameOrCorporateType {
@@ -658,10 +346,6 @@ pub struct NameOrCorporateType {
   pub xml_children: Option<NameOrCorporateTypeChoice>,
 }
 /// Contributors List.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_AuthorType/b:Author")]
 pub struct AuthorList {
@@ -686,16 +370,8 @@ pub struct AuthorList {
   pub xml_children: Vec<AuthorListChoice>,
 }
 /// Source Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:SourceType.
 pub type SourceType = DataSourceValues;
 /// Source.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is b:Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_SourceType/b:Source")]
 pub struct Source {

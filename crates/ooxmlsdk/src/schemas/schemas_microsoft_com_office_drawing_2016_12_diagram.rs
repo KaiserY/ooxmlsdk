@@ -5,19 +5,11 @@
 //
 
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2019 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm1612:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/dgm1612:spPr")]
+#[sdk(office2019, qname = "a:CT_ShapeProperties/dgm1612:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -68,12 +60,8 @@ pub struct ShapeProperties {
   >,
 }
 /// Defines the TextListStyleType Class.
-///
-/// Available in Office2019 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dgm1612:lstStyle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextListStyle/dgm1612:lstStyle")]
+#[sdk(office2019, qname = "a:CT_TextListStyle/dgm1612:lstStyle")]
 pub struct TextListStyleType {
   /// Default Paragraph Style
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]

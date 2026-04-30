@@ -5,21 +5,16 @@
 //
 
 /// Defines the PivotCacheDataSource Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xlpds:pivotCacheDataSource.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlpds:CT_PivotCacheDataSource/xlpds:pivotCacheDataSource")]
+#[sdk(
+  microsoft365,
+  qname = "xlpds:CT_PivotCacheDataSource/xlpds:pivotCacheDataSource"
+)]
 pub struct PivotCacheDataSource {
   /// ref
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(microsoft365, qname = ":ref"))]
   pub r#ref: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
 }

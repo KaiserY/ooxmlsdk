@@ -17,19 +17,14 @@ pub enum ClassificationOutcomeType {
   Watermark,
 }
 /// Defines the ClassificationOutcome Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is aclsh:classification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "aclsh:CT_ClassificationOutcome/aclsh:classification")]
+#[sdk(
+  office2021,
+  qname = "aclsh:CT_ClassificationOutcome/aclsh:classification"
+)]
 pub struct ClassificationOutcome {
   /// classificationOutcomeType
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :classificationOutcomeType
-  #[sdk(attr(qname = ":classificationOutcomeType"))]
+  #[sdk(attr(office2021, qname = ":classificationOutcomeType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub classification_outcome_type: Option<ClassificationOutcomeType>,
 }

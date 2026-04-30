@@ -139,42 +139,22 @@ pub enum BooleanValues {
   One,
 }
 /// Script.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:scr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Script/m:scr")]
 pub struct Script {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: ScriptValues,
 }
 /// style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sty.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Style/m:sty")]
 pub struct Style {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: StyleValues,
 }
 /// Defines the Run Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:r.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_R/m:r")]
 pub struct Run {
@@ -229,10 +209,6 @@ pub struct Run {
   pub run_choice: Vec<RunChoice>,
 }
 /// Accent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:acc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Acc/m:acc")]
 pub struct Accent {
@@ -244,10 +220,6 @@ pub struct Accent {
   pub base: std::boxed::Box<Base>,
 }
 /// Bar.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:bar.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Bar/m:bar")]
 pub struct Bar {
@@ -259,10 +231,6 @@ pub struct Bar {
   pub base: std::boxed::Box<Base>,
 }
 /// Box Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:box.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Box/m:box")]
 pub struct Box {
@@ -274,10 +242,6 @@ pub struct Box {
   pub base: std::boxed::Box<Base>,
 }
 /// Border-Box Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:borderBox.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BorderBox/m:borderBox")]
 pub struct BorderBox {
@@ -289,10 +253,6 @@ pub struct BorderBox {
   pub base: std::boxed::Box<Base>,
 }
 /// Delimiter Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:d.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_D/m:d")]
 pub struct Delimiter {
@@ -304,10 +264,6 @@ pub struct Delimiter {
   pub m_e: Vec<Base>,
 }
 /// Equation-Array Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:eqArr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_EqArr/m:eqArr")]
 pub struct EquationArray {
@@ -319,10 +275,6 @@ pub struct EquationArray {
   pub m_e: Vec<Base>,
 }
 /// Fraction Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:f.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_F/m:f")]
 pub struct Fraction {
@@ -337,10 +289,6 @@ pub struct Fraction {
   pub denominator: std::boxed::Box<Denominator>,
 }
 /// Function Apply Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:func.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Func/m:func")]
 pub struct MathFunction {
@@ -355,10 +303,6 @@ pub struct MathFunction {
   pub base: std::boxed::Box<Base>,
 }
 /// Group-Character Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:groupChr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_GroupChr/m:groupChr")]
 pub struct GroupChar {
@@ -370,10 +314,6 @@ pub struct GroupChar {
   pub base: std::boxed::Box<Base>,
 }
 /// Lower-Limit Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:limLow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLow/m:limLow")]
 pub struct LimitLower {
@@ -388,10 +328,6 @@ pub struct LimitLower {
   pub limit: std::boxed::Box<Limit>,
 }
 /// Upper-Limit Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:limUpp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimUpp/m:limUpp")]
 pub struct LimitUpper {
@@ -406,10 +342,6 @@ pub struct LimitUpper {
   pub limit: std::boxed::Box<Limit>,
 }
 /// Matrix Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:m.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_M/m:m")]
 pub struct Matrix {
@@ -421,10 +353,6 @@ pub struct Matrix {
   pub m_mr: Vec<MatrixRow>,
 }
 /// n-ary Operator Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:nary.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Nary/m:nary")]
 pub struct Nary {
@@ -442,10 +370,6 @@ pub struct Nary {
   pub base: std::boxed::Box<Base>,
 }
 /// Phantom Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:phant.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Phant/m:phant")]
 pub struct Phantom {
@@ -457,10 +381,6 @@ pub struct Phantom {
   pub base: std::boxed::Box<Base>,
 }
 /// Radical Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:rad.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Rad/m:rad")]
 pub struct Radical {
@@ -475,10 +395,6 @@ pub struct Radical {
   pub base: std::boxed::Box<Base>,
 }
 /// Pre-Sub-Superscript Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sPre.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SPre/m:sPre")]
 pub struct PreSubSuper {
@@ -496,10 +412,6 @@ pub struct PreSubSuper {
   pub base: std::boxed::Box<Base>,
 }
 /// Subscript Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSub.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSub/m:sSub")]
 pub struct Subscript {
@@ -514,10 +426,6 @@ pub struct Subscript {
   pub sub_argument: std::boxed::Box<SubArgument>,
 }
 /// Sub-Superscript Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSubSup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubSup/m:sSubSup")]
 pub struct SubSuperscript {
@@ -535,10 +443,6 @@ pub struct SubSuperscript {
   pub super_argument: std::boxed::Box<SuperArgument>,
 }
 /// Superscript Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSup/m:sSup")]
 pub struct Superscript {
@@ -553,10 +457,6 @@ pub struct Superscript {
   pub super_argument: std::boxed::Box<SuperArgument>,
 }
 /// Defines the Paragraph Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:oMathPara.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathPara/m:oMathPara")]
 pub struct Paragraph {
@@ -604,10 +504,6 @@ pub struct Paragraph {
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
 /// Defines the OfficeMath Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:oMath.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMath/m:oMath")]
 pub struct OfficeMath {
@@ -675,10 +571,6 @@ pub struct OfficeMath {
   pub office_math_choice: Vec<OfficeMathChoice>,
 }
 /// Math Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mathPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MathPr/m:mathPr")]
 pub struct MathProperties {
@@ -731,514 +623,258 @@ pub struct MathProperties {
   pub m_nary_lim: Option<NaryLimitLocation>,
 }
 /// Literal.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:lit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:lit")]
 pub struct Literal {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Normal Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:nor.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:nor")]
 pub struct NormalText {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Align.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:aln.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:aln")]
 pub struct Alignment {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Operator Emulator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:opEmu.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:opEmu")]
 pub struct OperatorEmulator {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// No Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:noBreak.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:noBreak")]
 pub struct NoBreak {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Differential.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:diff.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:diff")]
 pub struct Differential {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Top Edge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:hideTop.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideTop")]
 pub struct HideTop {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Bottom Edge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:hideBot.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideBot")]
 pub struct HideBottom {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Left Edge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:hideLeft.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideLeft")]
 pub struct HideLeft {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Right Edge.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:hideRight.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:hideRight")]
 pub struct HideRight {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Border Box Strikethrough Horizontal.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:strikeH.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeH")]
 pub struct StrikeHorizontal {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Border Box Strikethrough Vertical.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:strikeV.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeV")]
 pub struct StrikeVertical {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Border Box Strikethrough Bottom-Left to Top-Right.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:strikeBLTR.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeBLTR")]
 pub struct StrikeBottomLeftToTopRight {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Border Box Strikethrough Top-Left to Bottom-Right.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:strikeTLBR.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:strikeTLBR")]
 pub struct StrikeTopLeftToBottomRight {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Delimiter Grow.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:grow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:grow")]
 pub struct GrowOperators {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Maximum Distribution.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:maxDist.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:maxDist")]
 pub struct MaxDistribution {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Object Distribution.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:objDist.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:objDist")]
 pub struct ObjectDistribution {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Placeholders (Matrix).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:plcHide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:plcHide")]
 pub struct HidePlaceholder {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Subscript (n-ary).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:subHide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:subHide")]
 pub struct HideSubArgument {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Superscript (n-ary).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:supHide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:supHide")]
 pub struct HideSuperArgument {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Phantom Show.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:show.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:show")]
 pub struct ShowPhantom {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Phantom Zero Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:zeroWid.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroWid")]
 pub struct ZeroWidth {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Phantom Zero Ascent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:zeroAsc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroAsc")]
 pub struct ZeroAscent {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Phantom Zero Descent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:zeroDesc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:zeroDesc")]
 pub struct ZeroDescent {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Transparent (Phantom).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:transp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:transp")]
 pub struct Transparent {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Hide Degree.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:degHide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:degHide")]
 pub struct HideDegree {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Align Scripts.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:alnScr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:alnScr")]
 pub struct AlignScripts {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Small Fraction.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:smallFrac.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:smallFrac")]
 pub struct SmallFraction {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Use Display Math Defaults.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:dispDef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:dispDef")]
 pub struct DisplayDefaults {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Wrap Right.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:wrapRight.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/m:wrapRight")]
 pub struct WrapRight {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Defines the OnOffType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OnOff/")]
 pub struct OnOffType {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BooleanValues>,
 }
 /// Break.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:brk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_ManualBreak/m:brk")]
 pub struct Break {
   /// Index of Operator to Align To
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:alnAt
   #[sdk(attr(qname = "m:alnAt"))]
   #[sdk(number_range(
     source = 0u32,
@@ -1249,10 +885,6 @@ pub struct Break {
   ))]
   pub align_at: Option<crate::simple_type::IntegerValue>,
   /// Index of Operator to Align To
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 0u32,
@@ -1264,10 +896,6 @@ pub struct Break {
   pub val: Option<crate::simple_type::IntegerValue>,
 }
 /// Run Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:rPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_RPR/m:rPr")]
 pub struct RunProperties {
@@ -1288,113 +916,61 @@ pub struct RunProperties {
   pub m_aln: Option<Alignment>,
 }
 /// Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:t.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Text/m:t")]
 pub struct Text {
   /// space
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: xml:space
   #[sdk(attr(qname = "xml:space"))]
   pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
 /// Accent Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:chr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:chr")]
 pub struct AccentChar {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Beginning Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:begChr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:begChr")]
 pub struct BeginChar {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Separator Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sepChr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:sepChr")]
 pub struct SeparatorChar {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Ending Character.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:endChr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/m:endChr")]
 pub struct EndChar {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Defines the CharType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Char/")]
 pub struct CharType {
   /// value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Control Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:ctrlPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_CtrlPr/m:ctrlPr")]
 pub struct ControlProperties {
@@ -1410,10 +986,6 @@ pub struct ControlProperties {
   pub control_properties_choice: Option<ControlPropertiesChoice>,
 }
 /// Accent Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:accPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_AccPr/m:accPr")]
 pub struct AccentProperties {
@@ -1425,10 +997,6 @@ pub struct AccentProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Base.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:e.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:e")]
 pub struct Base {
@@ -1502,10 +1070,6 @@ pub struct Base {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Numerator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:num.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:num")]
 pub struct Numerator {
@@ -1579,10 +1143,6 @@ pub struct Numerator {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Denominator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:den.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:den")]
 pub struct Denominator {
@@ -1656,10 +1216,6 @@ pub struct Denominator {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Function Name.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:fName.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:fName")]
 pub struct FunctionName {
@@ -1733,10 +1289,6 @@ pub struct FunctionName {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Limit (Lower).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:lim.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:lim")]
 pub struct Limit {
@@ -1810,10 +1362,6 @@ pub struct Limit {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Lower limit (n-ary) .
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sub.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sub")]
 pub struct SubArgument {
@@ -1887,10 +1435,6 @@ pub struct SubArgument {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Upper limit (n-ary).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sup.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sup")]
 pub struct SuperArgument {
@@ -1964,10 +1508,6 @@ pub struct SuperArgument {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Degree.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:deg.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:deg")]
 pub struct Degree {
@@ -2041,10 +1581,6 @@ pub struct Degree {
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Defines the OfficeMathArgumentType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/")]
 pub struct OfficeMathArgumentType {
@@ -2111,58 +1647,30 @@ pub struct OfficeMathArgumentType {
   pub xml_children: Vec<OfficeMathArgumentTypeChoice>,
 }
 /// Position (Bar).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:pos.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/m:pos")]
 pub struct Position {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: VerticalJustificationValues,
 }
 /// Vertical Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:vertJc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/m:vertJc")]
 pub struct VerticalJustification {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: VerticalJustificationValues,
 }
 /// Defines the TopBottomType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TopBot/")]
 pub struct TopBottomType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: VerticalJustificationValues,
 }
 /// Bar Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:barPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BarPr/m:barPr")]
 pub struct BarProperties {
@@ -2174,10 +1682,6 @@ pub struct BarProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Box Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:boxPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BoxPr/m:boxPr")]
 pub struct BoxProperties {
@@ -2201,10 +1705,6 @@ pub struct BoxProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Border Box Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:borderBoxPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BorderBoxPr/m:borderBoxPr")]
 pub struct BorderBoxProperties {
@@ -2237,26 +1737,14 @@ pub struct BorderBoxProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Shape (Delimiters).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:shp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Shp/m:shp")]
 pub struct Shape {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: ShapeDelimiterValues,
 }
 /// Delimiter Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:dPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_DPr/m:dPr")]
 pub struct DelimiterProperties {
@@ -2280,34 +1768,18 @@ pub struct DelimiterProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Equation Array Base Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:baseJc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_YAlign/m:baseJc")]
 pub struct BaseJustification {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: VerticalAlignmentValues,
 }
 /// Row Spacing Rule.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:rSpRule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/m:rSpRule")]
 pub struct RowSpacingRule {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2319,18 +1791,10 @@ pub struct RowSpacingRule {
   pub val: crate::simple_type::IntegerValue,
 }
 /// Matrix Column Gap Rule.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:cGpRule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/m:cGpRule")]
 pub struct ColumnGapRule {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2342,18 +1806,10 @@ pub struct ColumnGapRule {
   pub val: crate::simple_type::IntegerValue,
 }
 /// Defines the SpacingRuleType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SpacingRule/")]
 pub struct SpacingRuleType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2365,58 +1821,30 @@ pub struct SpacingRuleType {
   pub val: crate::simple_type::IntegerValue,
 }
 /// Row Spacing (Equation Array).
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:rSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/m:rSp")]
 pub struct RowSpacing {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: crate::simple_type::UInt16Value,
 }
 /// Matrix Column Gap.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:cGp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/m:cGp")]
 pub struct ColumnGap {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: crate::simple_type::UInt16Value,
 }
 /// Defines the UnsignedShortType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_UnSignedShort/")]
 pub struct UnsignedShortType {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: crate::simple_type::UInt16Value,
 }
 /// Equation Array Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:eqArrPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_EqArrPr/m:eqArrPr")]
 pub struct EquationArrayProperties {
@@ -2440,26 +1868,14 @@ pub struct EquationArrayProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Fraction type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FType/m:type")]
 pub struct FractionType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: FractionTypeValues,
 }
 /// Fraction Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:fPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FPr/m:fPr")]
 pub struct FractionProperties {
@@ -2471,10 +1887,6 @@ pub struct FractionProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Function Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:funcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FuncPr/m:funcPr")]
 pub struct FunctionProperties {
@@ -2483,10 +1895,6 @@ pub struct FunctionProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Group-Character Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:groupChrPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_GroupChrPr/m:groupChrPr")]
 pub struct GroupCharProperties {
@@ -2504,10 +1912,6 @@ pub struct GroupCharProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Lower Limit Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:limLowPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLowPr/m:limLowPr")]
 pub struct LimitLowerProperties {
@@ -2516,10 +1920,6 @@ pub struct LimitLowerProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Upper Limit Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:limUppPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimUppPr/m:limUppPr")]
 pub struct LimitUpperProperties {
@@ -2528,18 +1928,10 @@ pub struct LimitUpperProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Matrix Column Count.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:count.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Integer64/m:count")]
 pub struct MatrixColumnCount {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2551,26 +1943,14 @@ pub struct MatrixColumnCount {
   pub val: crate::simple_type::IntegerValue,
 }
 /// Matrix Column Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mcJc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_XAlign/m:mcJc")]
 pub struct MatrixColumnJustification {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: HorizontalAlignmentValues,
 }
 /// Matrix Column Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mcPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MCPr/m:mcPr")]
 pub struct MatrixColumnProperties {
@@ -2582,10 +1962,6 @@ pub struct MatrixColumnProperties {
   pub matrix_column_justification: Option<MatrixColumnJustification>,
 }
 /// Matrix Column.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MC/m:mc")]
 pub struct MatrixColumn {
@@ -2594,18 +1970,10 @@ pub struct MatrixColumn {
   pub matrix_column_properties: Option<std::boxed::Box<MatrixColumnProperties>>,
 }
 /// Matrix Column Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:cSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:cSp")]
 pub struct ColumnSpacing {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2616,18 +1984,10 @@ pub struct ColumnSpacing {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Left Margin.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:lMargin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:lMargin")]
 pub struct LeftMargin {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2638,18 +1998,10 @@ pub struct LeftMargin {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Right Margin.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:rMargin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:rMargin")]
 pub struct RightMargin {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2660,18 +2012,10 @@ pub struct RightMargin {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Pre-Equation Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:preSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:preSp")]
 pub struct PreSpacing {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2682,18 +2026,10 @@ pub struct PreSpacing {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Post-Equation Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:postSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:postSp")]
 pub struct PostSpacing {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2704,18 +2040,10 @@ pub struct PostSpacing {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Inter-Equation Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:interSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:interSp")]
 pub struct InterSpacing {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2726,18 +2054,10 @@ pub struct InterSpacing {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Intra-Equation Spacing.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:intraSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:intraSp")]
 pub struct IntraSpacing {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2748,18 +2068,10 @@ pub struct IntraSpacing {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Wrap Indent.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:wrapIndent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/m:wrapIndent")]
 pub struct WrapIndent {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2770,18 +2082,10 @@ pub struct WrapIndent {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Defines the TwipsMeasureType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_TwipsMeasure/")]
 pub struct TwipsMeasureType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2792,10 +2096,6 @@ pub struct TwipsMeasureType {
   pub val: crate::simple_type::UInt32Value,
 }
 /// Matrix Columns.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mcs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MCS/m:mcs")]
 pub struct MatrixColumns {
@@ -2804,10 +2104,6 @@ pub struct MatrixColumns {
   pub m_mc: Vec<MatrixColumn>,
 }
 /// Matrix Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MPr/m:mPr")]
 pub struct MatrixProperties {
@@ -2840,10 +2136,6 @@ pub struct MatrixProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Matrix Row.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MR/m:mr")]
 pub struct MatrixRow {
@@ -2852,74 +2144,38 @@ pub struct MatrixRow {
   pub m_e: Vec<Base>,
 }
 /// n-ary Limit Location.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:limLoc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:limLoc")]
 pub struct LimitLocation {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: LimitLocationValues,
 }
 /// Integral Limit Locations.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:intLim.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:intLim")]
 pub struct IntegralLimitLocation {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: LimitLocationValues,
 }
 /// n-ary Limit Location.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:naryLim.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/m:naryLim")]
 pub struct NaryLimitLocation {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: LimitLocationValues,
 }
 /// Defines the LimitLocationType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLoc/")]
 pub struct LimitLocationType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: LimitLocationValues,
 }
 /// n-ary Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:naryPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_NaryPr/m:naryPr")]
 pub struct NaryProperties {
@@ -2943,10 +2199,6 @@ pub struct NaryProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Phantom Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:phantPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_PhantPr/m:phantPr")]
 pub struct PhantomProperties {
@@ -2970,10 +2222,6 @@ pub struct PhantomProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Radical Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:radPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_RadPr/m:radPr")]
 pub struct RadicalProperties {
@@ -2985,10 +2233,6 @@ pub struct RadicalProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Pre-Sub-Superscript Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sPrePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SPrePr/m:sPrePr")]
 pub struct PreSubSuperProperties {
@@ -2997,10 +2241,6 @@ pub struct PreSubSuperProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Subscript Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSubPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubPr/m:sSubPr")]
 pub struct SubscriptProperties {
@@ -3009,10 +2249,6 @@ pub struct SubscriptProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Sub-Superscript Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSubSupPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubSupPr/m:sSubSupPr")]
 pub struct SubSuperscriptProperties {
@@ -3024,10 +2260,6 @@ pub struct SubSuperscriptProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Superscript Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:sSupPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSupPr/m:sSupPr")]
 pub struct SuperscriptProperties {
@@ -3036,18 +2268,10 @@ pub struct SuperscriptProperties {
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
 /// Argument Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:argSz.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_Integer2/m:argSz")]
 pub struct ArgumentSize {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(
     source = 1u32,
@@ -3059,10 +2283,6 @@ pub struct ArgumentSize {
   pub val: crate::simple_type::IntegerValue,
 }
 /// Argument Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:argPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArgPr/m:argPr")]
 pub struct ArgumentProperties {
@@ -3071,107 +2291,55 @@ pub struct ArgumentProperties {
   pub argument_size: Option<ArgumentSize>,
 }
 /// Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:jc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/m:jc")]
 pub struct Justification {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: JustificationValues,
 }
 /// Default Justification.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:defJc.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/m:defJc")]
 pub struct DefaultJustification {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: JustificationValues,
 }
 /// Defines the OfficeMathJustificationType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathJc/")]
 pub struct OfficeMathJustificationType {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: JustificationValues,
 }
 /// Math Font.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:mathFont.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FontFace/m:mathFont")]
 pub struct MathFont {
   /// val
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   #[sdk(string_length(source = 1u32, max = 31u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Break on Binary Operators.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:brkBin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BreakBin/m:brkBin")]
 pub struct BreakBinary {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: Option<BreakBinaryOperatorValues>,
 }
 /// Break on Binary Subtraction.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:brkBinSub.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_BreakBinSub/m:brkBinSub")]
 pub struct BreakBinarySubtraction {
   /// Value
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: m:val
   #[sdk(attr(qname = "m:val"))]
   pub val: BreakBinarySubtractionValues,
 }
 /// Office Math Paragraph Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is m:oMathParaPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathParaPr/m:oMathParaPr")]
 pub struct ParagraphProperties {
@@ -3477,28 +2645,32 @@ pub enum ParagraphChoice {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -3533,7 +2705,7 @@ pub enum ParagraphChoice {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -3543,14 +2715,14 @@ pub enum ParagraphChoice {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -3707,28 +2879,32 @@ pub enum OfficeMathChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -3763,7 +2939,7 @@ pub enum OfficeMathChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -3773,14 +2949,14 @@ pub enum OfficeMathChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -4150,28 +3326,32 @@ pub enum BaseChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -4206,7 +3386,7 @@ pub enum BaseChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -4216,14 +3396,14 @@ pub enum BaseChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -4531,28 +3711,32 @@ pub enum NumeratorChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -4587,7 +3771,7 @@ pub enum NumeratorChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -4597,14 +3781,14 @@ pub enum NumeratorChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -4912,28 +4096,32 @@ pub enum DenominatorChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -4968,7 +4156,7 @@ pub enum DenominatorChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -4978,14 +4166,14 @@ pub enum DenominatorChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -5293,28 +4481,32 @@ pub enum FunctionNameChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -5349,7 +4541,7 @@ pub enum FunctionNameChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -5359,14 +4551,14 @@ pub enum FunctionNameChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -5674,28 +4866,32 @@ pub enum LimitChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -5730,7 +4926,7 @@ pub enum LimitChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -5740,14 +4936,14 @@ pub enum LimitChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -6055,28 +5251,32 @@ pub enum SubArgumentChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -6111,7 +5311,7 @@ pub enum SubArgumentChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -6121,14 +5321,14 @@ pub enum SubArgumentChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -6436,28 +5636,32 @@ pub enum SuperArgumentChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -6492,7 +5696,7 @@ pub enum SuperArgumentChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -6502,14 +5706,14 @@ pub enum SuperArgumentChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -6817,28 +6021,32 @@ pub enum DegreeChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -6873,7 +6081,7 @@ pub enum DegreeChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -6883,14 +6091,14 @@ pub enum DegreeChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
             >,
         >,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<
             std::boxed::Box<
                 crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,
@@ -7245,25 +6453,29 @@ pub enum OfficeMathArgumentTypeChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeEnd,
@@ -7293,19 +6505,19 @@ pub enum OfficeMathArgumentTypeChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictDeletion,

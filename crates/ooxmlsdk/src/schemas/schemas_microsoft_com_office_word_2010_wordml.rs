@@ -473,40 +473,20 @@ pub enum NumberSpacingValues {
   Tabular,
 }
 /// Defines the RunConflictInsertion Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:conflictIns.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w14:conflictIns")]
+#[sdk(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns")]
 pub struct RunConflictInsertion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -584,40 +564,20 @@ pub struct RunConflictInsertion {
   pub run_conflict_insertion_choice: Vec<RunConflictInsertionChoice>,
 }
 /// Defines the RunConflictDeletion Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:conflictDel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_RunTrackChange/w14:conflictDel")]
+#[sdk(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel")]
 pub struct RunConflictDeletion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -695,41 +655,21 @@ pub struct RunConflictDeletion {
   pub run_conflict_deletion_choice: Vec<RunConflictDeletionChoice>,
 }
 /// Defines the RunTrackChangeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RunTrackChange/")]
 pub struct RunTrackChangeType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -807,40 +747,20 @@ pub struct RunTrackChangeType {
   pub xml_children: Vec<RunTrackChangeTypeChoice>,
 }
 /// Defines the ConflictInsertion Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:conflictIns.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w14:conflictIns")]
+#[sdk(office2010, qname = "w:CT_TrackChange/w14:conflictIns")]
 pub struct ConflictInsertion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -859,40 +779,20 @@ pub struct ConflictInsertion {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the ConflictDeletion Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:conflictDel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w14:conflictDel")]
+#[sdk(office2010, qname = "w:CT_TrackChange/w14:conflictDel")]
 pub struct ConflictDeletion {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -911,40 +811,23 @@ pub struct ConflictDeletion {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlConflictInsertionRangeStart Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictInsRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")]
+#[sdk(
+  office2010,
+  qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+)]
 pub struct CustomXmlConflictInsertionRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -963,40 +846,23 @@ pub struct CustomXmlConflictInsertionRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlConflictDeletionRangeStart Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictDelRangeStart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")]
+#[sdk(
+  office2010,
+  qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+)]
 pub struct CustomXmlConflictDeletionRangeStart {
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -1015,41 +881,21 @@ pub struct CustomXmlConflictDeletionRangeStart {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the TrackChangeType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_TrackChange/")]
 pub struct TrackChangeType {
   pub xml_other_attrs: Vec<(String, String)>,
   /// author
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:author
   #[sdk(attr(qname = "w:author"))]
   #[sdk(string_length(source = 1u32, max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
   /// dateUtc
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: w16du:dateUtc
-  #[sdk(attr(qname = "w16du:dateUtc"))]
+  #[sdk(attr(microsoft365, qname = "w16du:dateUtc"))]
   pub date_utc: Option<crate::simple_type::DateTimeValue>,
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -1068,19 +914,11 @@ pub struct TrackChangeType {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the Tint Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:tint.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:tint")]
+#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint")]
 pub struct Tint {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -1092,19 +930,11 @@ pub struct Tint {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the Shade Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:shade.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:shade")]
+#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade")]
 pub struct Shade {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -1116,19 +946,11 @@ pub struct Shade {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the Alpha Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:alpha.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PositiveFixedPercentage/w14:alpha")]
+#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha")]
 pub struct Alpha {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -1140,19 +962,11 @@ pub struct Alpha {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PositiveFixedPercentageType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PositiveFixedPercentage/")]
+#[sdk(office2010, qname = "w14:CT_PositiveFixedPercentage/")]
 pub struct PositiveFixedPercentageType {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -1164,19 +978,11 @@ pub struct PositiveFixedPercentageType {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the HueModulation Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:hueMod.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PositivePercentage/w14:hueMod")]
+#[sdk(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod")]
 pub struct HueModulation {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -1187,134 +993,71 @@ pub struct HueModulation {
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the Saturation Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:sat.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:sat")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:sat")]
 pub struct Saturation {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the SaturationOffset Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:satOff.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:satOff")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:satOff")]
 pub struct SaturationOffset {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the SaturationModulation Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:satMod.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:satMod")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:satMod")]
 pub struct SaturationModulation {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the Luminance Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:lum.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:lum")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:lum")]
 pub struct Luminance {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the LuminanceOffset Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:lumOff.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:lumOff")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:lumOff")]
 pub struct LuminanceOffset {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the LuminanceModulation Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:lumMod.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/w14:lumMod")]
+#[sdk(office2010, qname = "w14:CT_Percentage/w14:lumMod")]
 pub struct LuminanceModulation {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the PercentageType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Percentage/")]
+#[sdk(office2010, qname = "w14:CT_Percentage/")]
 pub struct PercentageType {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the RgbColorModelHex Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:srgbClr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SRgbColor/w14:srgbClr")]
+#[sdk(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr")]
 pub struct RgbColorModelHex {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
   #[sdk(choice(
+    microsoft365,
     qname = "w14:CT_PositiveFixedPercentage/w14:tint",
     qname = "w14:CT_PositiveFixedPercentage/w14:shade",
     qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
@@ -1329,21 +1072,14 @@ pub struct RgbColorModelHex {
   pub rgb_color_model_hex_choice: Vec<RgbColorModelHexChoice>,
 }
 /// Defines the SchemeColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:schemeClr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SchemeColor/w14:schemeClr")]
+#[sdk(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr")]
 pub struct SchemeColor {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: SchemeColorValues,
   #[sdk(choice(
+    microsoft365,
     qname = "w14:CT_PositiveFixedPercentage/w14:tint",
     qname = "w14:CT_PositiveFixedPercentage/w14:shade",
     qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
@@ -1358,19 +1094,11 @@ pub struct SchemeColor {
   pub scheme_color_choice: Vec<SchemeColorChoice>,
 }
 /// Defines the LinearShadeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:lin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_LinearShadeProperties/w14:lin")]
+#[sdk(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin")]
 pub struct LinearShadeProperties {
   /// ang
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:ang
-  #[sdk(attr(qname = "w14:ang"))]
+  #[sdk(attr(office2010, qname = "w14:ang"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1381,39 +1109,23 @@ pub struct LinearShadeProperties {
   ))]
   pub angle: Option<crate::simple_type::Int32Value>,
   /// scaled
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:scaled
-  #[sdk(attr(qname = "w14:scaled"))]
+  #[sdk(attr(office2010, qname = "w14:scaled"))]
   pub scaled: Option<OnOffValues>,
 }
 /// Defines the PathShadeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:path.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PathShadeProperties/w14:path")]
+#[sdk(office2010, qname = "w14:CT_PathShadeProperties/w14:path")]
 pub struct PathShadeProperties {
   /// path
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:path
-  #[sdk(attr(qname = "w14:path"))]
+  #[sdk(attr(office2010, qname = "w14:path"))]
   pub path: Option<PathShadeTypeValues>,
   /// _
-  #[sdk(child(qname = "w14:CT_RelativeRect/w14:fillToRect"))]
+  #[sdk(child(office2010, qname = "w14:CT_RelativeRect/w14:fillToRect"))]
   pub fill_to_rectangle: Option<FillToRectangle>,
 }
 /// Defines the SolidColorFillProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:solidFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
+#[sdk(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill")]
 pub struct SolidColorFillProperties {
   #[sdk(choice(
     qname = "w14:CT_SRgbColor/w14:srgbClr",
@@ -1422,52 +1134,33 @@ pub struct SolidColorFillProperties {
   pub xml_children: Option<SolidColorFillPropertiesChoice>,
 }
 /// Defines the GradientFillProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:gradFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_GradientFillProperties/w14:gradFill")]
+#[sdk(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill")]
 pub struct GradientFillProperties {
   /// _
-  #[sdk(child(qname = "w14:CT_GradientStopList/w14:gsLst"))]
+  #[sdk(child(office2010, qname = "w14:CT_GradientStopList/w14:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
   #[sdk(choice(
+    microsoft365,
     qname = "w14:CT_LinearShadeProperties/w14:lin",
     qname = "w14:CT_PathShadeProperties/w14:path"
   ))]
   pub gradient_fill_properties_choice: Option<GradientFillPropertiesChoice>,
 }
 /// Defines the PresetLineDashProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:prstDash.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_PresetLineDashProperties/w14:prstDash")]
+#[sdk(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash")]
 pub struct PresetLineDashProperties {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<PresetLineDashValues>,
 }
 /// Defines the LineJoinMiterProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:miter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_LineJoinMiterProperties/w14:miter")]
+#[sdk(office2010, qname = "w14:CT_LineJoinMiterProperties/w14:miter")]
 pub struct LineJoinMiterProperties {
   /// lim
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:lim
-  #[sdk(attr(qname = "w14:lim"))]
+  #[sdk(attr(office2010, qname = "w14:lim"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1478,19 +1171,11 @@ pub struct LineJoinMiterProperties {
   pub limit: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the Glow Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:glow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Glow/w14:glow")]
+#[sdk(office2010, qname = "w14:CT_Glow/w14:glow")]
 pub struct Glow {
   /// rad
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:rad
-  #[sdk(attr(qname = "w14:rad"))]
+  #[sdk(attr(office2010, qname = "w14:rad"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1507,19 +1192,11 @@ pub struct Glow {
   pub xml_children: Option<GlowChoice>,
 }
 /// Defines the Shadow Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:shadow.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Shadow/w14:shadow")]
+#[sdk(office2010, qname = "w14:CT_Shadow/w14:shadow")]
 pub struct Shadow {
   /// blurRad
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:blurRad
-  #[sdk(attr(qname = "w14:blurRad"))]
+  #[sdk(attr(office2010, qname = "w14:blurRad"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1530,11 +1207,7 @@ pub struct Shadow {
   ))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// dist
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:dist
-  #[sdk(attr(qname = "w14:dist"))]
+  #[sdk(attr(office2010, qname = "w14:dist"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1545,11 +1218,7 @@ pub struct Shadow {
   ))]
   pub distance_from_text: Option<crate::simple_type::Int64Value>,
   /// dir
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:dir
-  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(attr(office2010, qname = "w14:dir"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1560,25 +1229,13 @@ pub struct Shadow {
   ))]
   pub direction_angle: Option<crate::simple_type::Int32Value>,
   /// sx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:sx
-  #[sdk(attr(qname = "w14:sx"))]
+  #[sdk(attr(office2010, qname = "w14:sx"))]
   pub horizontal_scaling_factor: Option<crate::simple_type::Int32Value>,
   /// sy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:sy
-  #[sdk(attr(qname = "w14:sy"))]
+  #[sdk(attr(office2010, qname = "w14:sy"))]
   pub vertical_scaling_factor: Option<crate::simple_type::Int32Value>,
   /// kx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:kx
-  #[sdk(attr(qname = "w14:kx"))]
+  #[sdk(attr(office2010, qname = "w14:kx"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1589,11 +1246,7 @@ pub struct Shadow {
   ))]
   pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
   /// ky
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:ky
-  #[sdk(attr(qname = "w14:ky"))]
+  #[sdk(attr(office2010, qname = "w14:ky"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1604,11 +1257,7 @@ pub struct Shadow {
   ))]
   pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
   /// algn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:algn
-  #[sdk(attr(qname = "w14:algn"))]
+  #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<RectangleAlignmentValues>,
   #[sdk(choice(
     qname = "w14:CT_SRgbColor/w14:srgbClr",
@@ -1617,19 +1266,11 @@ pub struct Shadow {
   pub xml_children: Option<ShadowChoice>,
 }
 /// Defines the Reflection Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:reflection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Reflection/w14:reflection")]
+#[sdk(office2010, qname = "w14:CT_Reflection/w14:reflection")]
 pub struct Reflection {
   /// blurRad
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:blurRad
-  #[sdk(attr(qname = "w14:blurRad"))]
+  #[sdk(attr(office2010, qname = "w14:blurRad"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1640,11 +1281,7 @@ pub struct Reflection {
   ))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// stA
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:stA
-  #[sdk(attr(qname = "w14:stA"))]
+  #[sdk(attr(office2010, qname = "w14:stA"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1655,11 +1292,7 @@ pub struct Reflection {
   ))]
   pub starting_opacity: Option<crate::simple_type::Int32Value>,
   /// stPos
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:stPos
-  #[sdk(attr(qname = "w14:stPos"))]
+  #[sdk(attr(office2010, qname = "w14:stPos"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1670,11 +1303,7 @@ pub struct Reflection {
   ))]
   pub start_position: Option<crate::simple_type::Int32Value>,
   /// endA
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:endA
-  #[sdk(attr(qname = "w14:endA"))]
+  #[sdk(attr(office2010, qname = "w14:endA"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1685,11 +1314,7 @@ pub struct Reflection {
   ))]
   pub ending_opacity: Option<crate::simple_type::Int32Value>,
   /// endPos
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:endPos
-  #[sdk(attr(qname = "w14:endPos"))]
+  #[sdk(attr(office2010, qname = "w14:endPos"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1700,11 +1325,7 @@ pub struct Reflection {
   ))]
   pub end_position: Option<crate::simple_type::Int32Value>,
   /// dist
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:dist
-  #[sdk(attr(qname = "w14:dist"))]
+  #[sdk(attr(office2010, qname = "w14:dist"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1715,11 +1336,7 @@ pub struct Reflection {
   ))]
   pub distance_from_text: Option<crate::simple_type::Int64Value>,
   /// dir
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:dir
-  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(attr(office2010, qname = "w14:dir"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1730,11 +1347,7 @@ pub struct Reflection {
   ))]
   pub direction_angle: Option<crate::simple_type::Int32Value>,
   /// fadeDir
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:fadeDir
-  #[sdk(attr(qname = "w14:fadeDir"))]
+  #[sdk(attr(office2010, qname = "w14:fadeDir"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1745,25 +1358,13 @@ pub struct Reflection {
   ))]
   pub fade_direction: Option<crate::simple_type::Int32Value>,
   /// sx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:sx
-  #[sdk(attr(qname = "w14:sx"))]
+  #[sdk(attr(office2010, qname = "w14:sx"))]
   pub horizontal_scaling_factor: Option<crate::simple_type::Int32Value>,
   /// sy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:sy
-  #[sdk(attr(qname = "w14:sy"))]
+  #[sdk(attr(office2010, qname = "w14:sy"))]
   pub vertical_scaling_factor: Option<crate::simple_type::Int32Value>,
   /// kx
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:kx
-  #[sdk(attr(qname = "w14:kx"))]
+  #[sdk(attr(office2010, qname = "w14:kx"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1774,11 +1375,7 @@ pub struct Reflection {
   ))]
   pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
   /// ky
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:ky
-  #[sdk(attr(qname = "w14:ky"))]
+  #[sdk(attr(office2010, qname = "w14:ky"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1789,27 +1386,15 @@ pub struct Reflection {
   ))]
   pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
   /// algn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:algn
-  #[sdk(attr(qname = "w14:algn"))]
+  #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<RectangleAlignmentValues>,
 }
 /// Defines the TextOutlineEffect Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:textOutline.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_TextOutlineEffect/w14:textOutline")]
+#[sdk(office2010, qname = "w14:CT_TextOutlineEffect/w14:textOutline")]
 pub struct TextOutlineEffect {
   /// w
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:w
-  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(attr(office2010, qname = "w14:w"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1820,36 +1405,26 @@ pub struct TextOutlineEffect {
   ))]
   pub line_width: Option<crate::simple_type::Int32Value>,
   /// cap
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:cap
-  #[sdk(attr(qname = "w14:cap"))]
+  #[sdk(attr(office2010, qname = "w14:cap"))]
   pub cap_type: Option<LineCapValues>,
   /// cmpd
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:cmpd
-  #[sdk(attr(qname = "w14:cmpd"))]
+  #[sdk(attr(office2010, qname = "w14:cmpd"))]
   pub compound: Option<CompoundLineValues>,
   /// algn
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:algn
-  #[sdk(attr(qname = "w14:algn"))]
+  #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
+    microsoft365,
     qname = "w:CT_Empty/w14:noFill",
     qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
     qname = "w14:CT_GradientFillProperties/w14:gradFill"
   ))]
   pub text_outline_effect_choice1: Option<TextOutlineEffectChoice>,
   /// _
-  #[sdk(child(qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
+  #[sdk(child(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
   pub w14_prst_dash: Option<PresetLineDashProperties>,
   #[sdk(choice(
+    microsoft365,
     qname = "w:CT_Empty/w14:round",
     qname = "w:CT_Empty/w14:bevel",
     qname = "w14:CT_LineJoinMiterProperties/w14:miter"
@@ -1857,12 +1432,8 @@ pub struct TextOutlineEffect {
   pub text_outline_effect_choice3: Option<TextOutlineEffectChoice2>,
 }
 /// Defines the FillTextEffect Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:textFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_FillTextEffect/w14:textFill")]
+#[sdk(office2010, qname = "w14:CT_FillTextEffect/w14:textFill")]
 pub struct FillTextEffect {
   #[sdk(choice(
     qname = "w:CT_Empty/w14:noFill",
@@ -1872,34 +1443,22 @@ pub struct FillTextEffect {
   pub xml_children: Option<FillTextEffectChoice>,
 }
 /// Defines the Scene3D Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:scene3d.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Scene3D/w14:scene3d")]
+#[sdk(office2010, qname = "w14:CT_Scene3D/w14:scene3d")]
 pub struct Scene3D {
   /// _
-  #[sdk(child(qname = "w14:CT_Camera/w14:camera"))]
+  #[sdk(child(office2010, qname = "w14:CT_Camera/w14:camera"))]
   pub camera: std::boxed::Box<Camera>,
   /// _
-  #[sdk(child(qname = "w14:CT_LightRig/w14:lightRig"))]
+  #[sdk(child(office2010, qname = "w14:CT_LightRig/w14:lightRig"))]
   pub light_rig: std::boxed::Box<LightRig>,
 }
 /// Defines the Properties3D Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:props3d.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Props3D/w14:props3d")]
+#[sdk(office2010, qname = "w14:CT_Props3D/w14:props3d")]
 pub struct Properties3D {
   /// extrusionH
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:extrusionH
-  #[sdk(attr(qname = "w14:extrusionH"))]
+  #[sdk(attr(office2010, qname = "w14:extrusionH"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1910,11 +1469,7 @@ pub struct Properties3D {
   ))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// contourW
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:contourW
-  #[sdk(attr(qname = "w14:contourW"))]
+  #[sdk(attr(office2010, qname = "w14:contourW"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -1925,231 +1480,134 @@ pub struct Properties3D {
   ))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// prstMaterial
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:prstMaterial
-  #[sdk(attr(qname = "w14:prstMaterial"))]
+  #[sdk(attr(office2010, qname = "w14:prstMaterial"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub preset_material_type: Option<PresetMaterialTypeValues>,
   /// _
-  #[sdk(child(qname = "w14:CT_Bevel/w14:bevelT"))]
+  #[sdk(child(office2010, qname = "w14:CT_Bevel/w14:bevelT"))]
   pub bevel_top: Option<BevelTop>,
   /// _
-  #[sdk(child(qname = "w14:CT_Bevel/w14:bevelB"))]
+  #[sdk(child(office2010, qname = "w14:CT_Bevel/w14:bevelB"))]
   pub bevel_bottom: Option<BevelBottom>,
   /// _
-  #[sdk(child(qname = "w14:CT_Color/w14:extrusionClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_Color/w14:extrusionClr"))]
   pub extrusion_color: Option<std::boxed::Box<ExtrusionColor>>,
   /// _
-  #[sdk(child(qname = "w14:CT_Color/w14:contourClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_Color/w14:contourClr"))]
   pub contour_color: Option<std::boxed::Box<ContourColor>>,
 }
 /// Defines the Ligatures Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:ligatures.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Ligatures/w14:ligatures")]
+#[sdk(office2010, qname = "w14:CT_Ligatures/w14:ligatures")]
 pub struct Ligatures {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: LigaturesValues,
 }
 /// Defines the NumberingFormat Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:numForm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_NumForm/w14:numForm")]
+#[sdk(office2010, qname = "w14:CT_NumForm/w14:numForm")]
 pub struct NumberingFormat {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: NumberFormValues,
 }
 /// Defines the NumberSpacing Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:numSpacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_NumSpacing/w14:numSpacing")]
+#[sdk(office2010, qname = "w14:CT_NumSpacing/w14:numSpacing")]
 pub struct NumberSpacing {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: NumberSpacingValues,
 }
 /// Defines the StylisticSets Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:stylisticSets.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_StylisticSets/w14:stylisticSets")]
+#[sdk(office2010, qname = "w14:CT_StylisticSets/w14:stylisticSets")]
 pub struct StylisticSets {
   /// _
-  #[sdk(child(qname = "w14:CT_StyleSet/w14:styleSet"))]
+  #[sdk(child(office2010, qname = "w14:CT_StyleSet/w14:styleSet"))]
   pub w14_style_set: Vec<StyleSet>,
 }
 /// Defines the ContextualAlternatives Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:cntxtAlts.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_OnOff/w14:cntxtAlts")]
+#[sdk(office2010, qname = "w14:CT_OnOff/w14:cntxtAlts")]
 pub struct ContextualAlternatives {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the ConflictMode Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:conflictMode.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_OnOff/w14:conflictMode")]
+#[sdk(office2010, qname = "w14:CT_OnOff/w14:conflictMode")]
 pub struct ConflictMode {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the DiscardImageEditingData Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:discardImageEditingData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_OnOff/w14:discardImageEditingData")]
+#[sdk(office2010, qname = "w14:CT_OnOff/w14:discardImageEditingData")]
 pub struct DiscardImageEditingData {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the Checked Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:checked.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_OnOff/w14:checked")]
+#[sdk(office2010, qname = "w14:CT_OnOff/w14:checked")]
 pub struct Checked {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the OnOffType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_OnOff/")]
+#[sdk(office2010, qname = "w14:CT_OnOff/")]
 pub struct OnOffType {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the ContentPart Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:contentPart.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_WordContentPart/w14:contentPart")]
+#[sdk(office2010, qname = "w14:CT_WordContentPart/w14:contentPart")]
 pub struct ContentPart {
   /// bwMode
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:bwMode
-  #[sdk(attr(qname = "w14:bwMode"))]
+  #[sdk(attr(office2010, qname = "w14:bwMode"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2010, qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"))]
+  #[sdk(child(
+    office2010,
+    qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"
+  ))]
   pub word_non_visual_content_part_shape_properties:
     Option<std::boxed::Box<WordNonVisualContentPartShapeProperties>>,
   /// _
-  #[sdk(child(qname = "a:CT_Transform2D/w14:xfrm"))]
+  #[sdk(child(office2010, qname = "a:CT_Transform2D/w14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/w14:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/w14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the DocumentId Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:docId.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_LongHexNumber/w14:docId")]
+#[sdk(office2010, qname = "w14:CT_LongHexNumber/w14:docId")]
 pub struct DocumentId {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 2u32, union = 0u64, min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictInsRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd")]
+#[sdk(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd")]
 pub struct CustomXmlConflictInsertionRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2168,18 +1626,10 @@ pub struct CustomXmlConflictInsertionRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:customXmlConflictDelRangeEnd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd")]
+#[sdk(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd")]
 pub struct CustomXmlConflictDeletionRangeEnd {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2198,18 +1648,10 @@ pub struct CustomXmlConflictDeletionRangeEnd {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the MarkupType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Markup/")]
 pub struct MarkupType {
   /// Annotation Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: w:id
   #[sdk(attr(qname = "w:id"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2228,53 +1670,33 @@ pub struct MarkupType {
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the DefaultImageDpi Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:defaultImageDpi.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi")]
+#[sdk(office2010, qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi")]
 pub struct DefaultImageDpi {
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the SdtContentCheckBox Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:checkbox.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SdtCheckbox/w14:checkbox")]
+#[sdk(office2010, qname = "w14:CT_SdtCheckbox/w14:checkbox")]
 pub struct SdtContentCheckBox {
   /// _
-  #[sdk(child(qname = "w14:CT_OnOff/w14:checked"))]
+  #[sdk(child(office2010, qname = "w14:CT_OnOff/w14:checked"))]
   pub checked: Option<Checked>,
   /// _
-  #[sdk(child(qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState"))]
+  #[sdk(child(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState"))]
   pub checked_state: Option<CheckedState>,
   /// _
-  #[sdk(child(qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState"))]
+  #[sdk(child(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState"))]
   pub unchecked_state: Option<UncheckedState>,
 }
 /// Defines the GradientStop Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:gs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_GradientStop/w14:gs")]
+#[sdk(office2010, qname = "w14:CT_GradientStop/w14:gs")]
 pub struct GradientStop {
   /// pos
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:pos
-  #[sdk(attr(qname = "w14:pos"))]
+  #[sdk(attr(office2010, qname = "w14:pos"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -2291,68 +1713,36 @@ pub struct GradientStop {
   pub xml_children: Option<GradientStopChoice>,
 }
 /// Defines the FillToRectangle Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:fillToRect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_RelativeRect/w14:fillToRect")]
+#[sdk(office2010, qname = "w14:CT_RelativeRect/w14:fillToRect")]
 pub struct FillToRectangle {
   /// l
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:l
-  #[sdk(attr(qname = "w14:l"))]
+  #[sdk(attr(office2010, qname = "w14:l"))]
   pub left: Option<crate::simple_type::Int32Value>,
   /// t
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:t
-  #[sdk(attr(qname = "w14:t"))]
+  #[sdk(attr(office2010, qname = "w14:t"))]
   pub top: Option<crate::simple_type::Int32Value>,
   /// r
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:r
-  #[sdk(attr(qname = "w14:r"))]
+  #[sdk(attr(office2010, qname = "w14:r"))]
   pub right: Option<crate::simple_type::Int32Value>,
   /// b
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:b
-  #[sdk(attr(qname = "w14:b"))]
+  #[sdk(attr(office2010, qname = "w14:b"))]
   pub bottom: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the GradientStopList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:gsLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_GradientStopList/w14:gsLst")]
+#[sdk(office2010, qname = "w14:CT_GradientStopList/w14:gsLst")]
 pub struct GradientStopList {
   /// _
-  #[sdk(child(qname = "w14:CT_GradientStop/w14:gs"))]
+  #[sdk(child(office2010, qname = "w14:CT_GradientStop/w14:gs"))]
   pub w14_gs: Vec<GradientStop>,
 }
 /// Defines the SphereCoordinates Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:rot.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SphereCoords/w14:rot")]
+#[sdk(office2010, qname = "w14:CT_SphereCoords/w14:rot")]
 pub struct SphereCoordinates {
   /// lat
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:lat
-  #[sdk(attr(qname = "w14:lat"))]
+  #[sdk(attr(office2010, qname = "w14:lat"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -2363,11 +1753,7 @@ pub struct SphereCoordinates {
   ))]
   pub lattitude: crate::simple_type::Int32Value,
   /// lon
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:lon
-  #[sdk(attr(qname = "w14:lon"))]
+  #[sdk(attr(office2010, qname = "w14:lon"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -2378,11 +1764,7 @@ pub struct SphereCoordinates {
   ))]
   pub longitude: crate::simple_type::Int32Value,
   /// rev
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:rev
-  #[sdk(attr(qname = "w14:rev"))]
+  #[sdk(attr(office2010, qname = "w14:rev"))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
@@ -2394,64 +1776,36 @@ pub struct SphereCoordinates {
   pub revolution: crate::simple_type::Int32Value,
 }
 /// Defines the Camera Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:camera.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Camera/w14:camera")]
+#[sdk(office2010, qname = "w14:CT_Camera/w14:camera")]
 pub struct Camera {
   /// prst
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:prst
-  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(attr(office2010, qname = "w14:prst"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub preset_camera_type: PresetCameraTypeValues,
 }
 /// Defines the LightRig Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:lightRig.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_LightRig/w14:lightRig")]
+#[sdk(office2010, qname = "w14:CT_LightRig/w14:lightRig")]
 pub struct LightRig {
   /// rig
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:rig
-  #[sdk(attr(qname = "w14:rig"))]
+  #[sdk(attr(office2010, qname = "w14:rig"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub light_rig_type: LightRigTypeValues,
   /// dir
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:dir
-  #[sdk(attr(qname = "w14:dir"))]
+  #[sdk(attr(office2010, qname = "w14:dir"))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub light_direction_type: LightRigDirectionValues,
   /// _
-  #[sdk(child(qname = "w14:CT_SphereCoords/w14:rot"))]
+  #[sdk(child(office2010, qname = "w14:CT_SphereCoords/w14:rot"))]
   pub sphere_coordinates: Option<SphereCoordinates>,
 }
 /// Defines the BevelTop Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:bevelT.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Bevel/w14:bevelT")]
+#[sdk(office2010, qname = "w14:CT_Bevel/w14:bevelT")]
 pub struct BevelTop {
   /// w
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:w
-  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(attr(office2010, qname = "w14:w"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2462,11 +1816,7 @@ pub struct BevelTop {
   ))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// h
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:h
-  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(attr(office2010, qname = "w14:h"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2477,28 +1827,16 @@ pub struct BevelTop {
   ))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// prst
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:prst
-  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(attr(office2010, qname = "w14:prst"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub preset_profile_type: Option<BevelPresetTypeValues>,
 }
 /// Defines the BevelBottom Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:bevelB.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Bevel/w14:bevelB")]
+#[sdk(office2010, qname = "w14:CT_Bevel/w14:bevelB")]
 pub struct BevelBottom {
   /// w
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:w
-  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(attr(office2010, qname = "w14:w"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2509,11 +1847,7 @@ pub struct BevelBottom {
   ))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// h
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:h
-  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(attr(office2010, qname = "w14:h"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2524,28 +1858,16 @@ pub struct BevelBottom {
   ))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// prst
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:prst
-  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(attr(office2010, qname = "w14:prst"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub preset_profile_type: Option<BevelPresetTypeValues>,
 }
 /// Defines the BevelType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Bevel/")]
+#[sdk(office2010, qname = "w14:CT_Bevel/")]
 pub struct BevelType {
   /// w
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:w
-  #[sdk(attr(qname = "w14:w"))]
+  #[sdk(attr(office2010, qname = "w14:w"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2556,11 +1878,7 @@ pub struct BevelType {
   ))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// h
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:h
-  #[sdk(attr(qname = "w14:h"))]
+  #[sdk(attr(office2010, qname = "w14:h"))]
   #[sdk(number_range(
     source = 1u32,
     union = 0u64,
@@ -2571,21 +1889,13 @@ pub struct BevelType {
   ))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// prst
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:prst
-  #[sdk(attr(qname = "w14:prst"))]
+  #[sdk(attr(office2010, qname = "w14:prst"))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub preset_profile_type: Option<BevelPresetTypeValues>,
 }
 /// Defines the ExtrusionColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:extrusionClr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Color/w14:extrusionClr")]
+#[sdk(office2010, qname = "w14:CT_Color/w14:extrusionClr")]
 pub struct ExtrusionColor {
   #[sdk(choice(
     qname = "w14:CT_SRgbColor/w14:srgbClr",
@@ -2594,12 +1904,8 @@ pub struct ExtrusionColor {
   pub xml_children: Option<ExtrusionColorChoice>,
 }
 /// Defines the ContourColor Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:contourClr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Color/w14:contourClr")]
+#[sdk(office2010, qname = "w14:CT_Color/w14:contourClr")]
 pub struct ContourColor {
   #[sdk(choice(
     qname = "w14:CT_SRgbColor/w14:srgbClr",
@@ -2608,12 +1914,8 @@ pub struct ContourColor {
   pub xml_children: Option<ContourColorChoice>,
 }
 /// Defines the ColorType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_Color/")]
+#[sdk(office2010, qname = "w14:CT_Color/")]
 pub struct ColorType {
   #[sdk(choice(
     qname = "w14:CT_SRgbColor/w14:srgbClr",
@@ -2622,142 +1924,70 @@ pub struct ColorType {
   pub xml_children: Option<ColorTypeChoice>,
 }
 /// Defines the StyleSet Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:styleSet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_StyleSet/w14:styleSet")]
+#[sdk(office2010, qname = "w14:CT_StyleSet/w14:styleSet")]
 pub struct StyleSet {
   /// id
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:id
-  #[sdk(attr(qname = "w14:id"))]
+  #[sdk(attr(office2010, qname = "w14:id"))]
   pub id: crate::simple_type::UInt32Value,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: Option<OnOffValues>,
 }
 /// Defines the CheckedState Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:checkedState.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState")]
+#[sdk(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:checkedState")]
 pub struct CheckedState {
   /// font
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:font
-  #[sdk(attr(qname = "w14:font"))]
+  #[sdk(attr(office2010, qname = "w14:font"))]
   pub font: Option<crate::simple_type::StringValue>,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
   pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the UncheckedState Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:uncheckedState.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState")]
+#[sdk(office2010, qname = "w14:CT_SdtCheckboxSymbol/w14:uncheckedState")]
 pub struct UncheckedState {
   /// font
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:font
-  #[sdk(attr(qname = "w14:font"))]
+  #[sdk(attr(office2010, qname = "w14:font"))]
   pub font: Option<crate::simple_type::StringValue>,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
   pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the CheckBoxSymbolType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_SdtCheckboxSymbol/")]
+#[sdk(office2010, qname = "w14:CT_SdtCheckboxSymbol/")]
 pub struct CheckBoxSymbolType {
   /// font
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:font
-  #[sdk(attr(qname = "w14:font"))]
+  #[sdk(attr(office2010, qname = "w14:font"))]
   pub font: Option<crate::simple_type::StringValue>,
   /// val
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: w14:val
-  #[sdk(attr(qname = "w14:val"))]
+  #[sdk(attr(office2010, qname = "w14:val"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 2u32, max = 2u32))]
   pub val: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the NonVisualDrawingProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingProps/w14:cNvPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/w14:cNvPr")]
 pub struct NonVisualDrawingProperties {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -2781,76 +2011,57 @@ pub struct NonVisualDrawingProperties {
     >,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:cNvContentPartPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr")]
+#[sdk(
+  office2010,
+  qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"
+)]
 pub struct NonVisualInkContentPartProperties {
   /// isComment
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :isComment
-  #[sdk(attr(qname = ":isComment"))]
+  #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
+  #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
   pub content_part_locks: Option<
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ContentPartLocks,
     >,
   >,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
   pub office_art_extension_list:
     Option<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::OfficeArtExtensionList>,
 }
 /// Defines the WordNonVisualContentPartShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:nvContentPartPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr")]
+#[sdk(
+  office2010,
+  qname = "w14:CT_WordContentPartNonVisual/w14:nvContentPartPr"
+)]
 pub struct WordNonVisualContentPartShapeProperties {
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/w14:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/w14:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   /// _
-  #[sdk(child(qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"))]
+  #[sdk(child(
+    office2010,
+    qname = "a14:CT_NonVisualInkContentPartProperties/w14:cNvContentPartPr"
+  ))]
   pub non_visual_ink_content_part_properties:
     Option<std::boxed::Box<NonVisualInkContentPartProperties>>,
 }
 /// Defines the Transform2D Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:xfrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Transform2D/w14:xfrm")]
+#[sdk(office2010, qname = "a:CT_Transform2D/w14:xfrm")]
 pub struct Transform2D {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Horizontal Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipH
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
   /// Vertical Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
@@ -2861,12 +2072,8 @@ pub struct Transform2D {
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is w14:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/w14:extLst")]
+#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/w14:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -3009,20 +2216,24 @@ pub enum RunConflictInsertionChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
     /// Inserted Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
@@ -3053,7 +2264,7 @@ pub enum RunConflictInsertionChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -3063,10 +2274,10 @@ pub enum RunConflictInsertionChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<std::boxed::Box<RunConflictInsertion>>,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
     },
     /// Defines the Paragraph Class.
@@ -3238,14 +2449,14 @@ pub enum RunConflictInsertionChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
     >,
   ),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
@@ -3388,20 +2599,24 @@ pub enum RunConflictDeletionChoice2 {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
     /// Inserted Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
@@ -3432,7 +2647,7 @@ pub enum RunConflictDeletionChoice2 {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
@@ -3442,10 +2657,10 @@ pub enum RunConflictDeletionChoice2 {
     #[sdk(sequence)]
     Sequence {
         /// Defines the RunConflictInsertion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
         run_conflict_insertion: Option<std::boxed::Box<RunConflictInsertion>>,
         /// Defines the RunConflictDeletion Class.
-        #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+        #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
         run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
     },
     /// Defines the Paragraph Class.
@@ -3617,14 +2832,14 @@ pub enum RunConflictDeletionChoice {
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Run>),
   /// Defines the BidirectionalOverride Class.
-  #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
     >,
   ),
   /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
@@ -3774,20 +2989,24 @@ pub enum RunTrackChangeTypeChoice {
         >,
     ),
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart")
+    )]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<CustomXmlConflictInsertionRangeStart>,
     ),
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(std::boxed::Box<CustomXmlConflictInsertionRangeEnd>),
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
-    #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
+    #[sdk(
+        child(office2010, qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart")
+    )]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<CustomXmlConflictDeletionRangeStart>,
     ),
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-    #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+    #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
     /// Inserted Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
@@ -3818,17 +3037,17 @@ pub enum RunTrackChangeTypeChoice {
         >,
     ),
     /// Defines the ContentPart Class.
-    #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
+    #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
     /// Defines the RunConflictInsertion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(std::boxed::Box<RunConflictInsertion>),
     /// Defines the RunConflictDeletion Class.
-    #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(std::boxed::Box<RunConflictDeletion>),
     /// Defines the Paragraph Class.
     #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
@@ -3992,14 +3211,14 @@ pub enum RunTrackChangeTypeChoice {
         >,
     ),
     /// Defines the BidirectionalOverride Class.
-    #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
+    #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalOverride,
         >,
     ),
     /// Defines the BidirectionalEmbedding Class.
-    #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
+    #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
     WDir(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BidirectionalEmbedding,
@@ -4008,150 +3227,150 @@ pub enum RunTrackChangeTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RgbColorModelHexChoice {
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
   W14Tint(std::boxed::Box<Tint>),
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
   W14Shade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
   W14Alpha(std::boxed::Box<Alpha>),
-  #[sdk(child(qname = "w14:CT_PositivePercentage/w14:hueMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod"))]
   W14HueMod(std::boxed::Box<HueModulation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:sat"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:sat"))]
   W14Sat(std::boxed::Box<Saturation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:satOff"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satOff"))]
   W14SatOff(std::boxed::Box<SaturationOffset>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:satMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satMod"))]
   W14SatMod(std::boxed::Box<SaturationModulation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lum"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lum"))]
   W14Lum(std::boxed::Box<Luminance>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lumOff"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumOff"))]
   W14LumOff(std::boxed::Box<LuminanceOffset>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lumMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumMod"))]
   W14LumMod(std::boxed::Box<LuminanceModulation>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SchemeColorChoice {
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:tint"))]
   W14Tint(std::boxed::Box<Tint>),
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:shade"))]
   W14Shade(std::boxed::Box<Shade>),
-  #[sdk(child(qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositiveFixedPercentage/w14:alpha"))]
   W14Alpha(std::boxed::Box<Alpha>),
-  #[sdk(child(qname = "w14:CT_PositivePercentage/w14:hueMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_PositivePercentage/w14:hueMod"))]
   W14HueMod(std::boxed::Box<HueModulation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:sat"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:sat"))]
   W14Sat(std::boxed::Box<Saturation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:satOff"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satOff"))]
   W14SatOff(std::boxed::Box<SaturationOffset>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:satMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:satMod"))]
   W14SatMod(std::boxed::Box<SaturationModulation>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lum"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lum"))]
   W14Lum(std::boxed::Box<Luminance>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lumOff"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumOff"))]
   W14LumOff(std::boxed::Box<LuminanceOffset>),
-  #[sdk(child(qname = "w14:CT_Percentage/w14:lumMod"))]
+  #[sdk(child(office2010, qname = "w14:CT_Percentage/w14:lumMod"))]
   W14LumMod(std::boxed::Box<LuminanceModulation>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SolidColorFillPropertiesChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientFillPropertiesChoice {
-  #[sdk(child(qname = "w14:CT_LinearShadeProperties/w14:lin"))]
+  #[sdk(child(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin"))]
   W14Lin(std::boxed::Box<LinearShadeProperties>),
-  #[sdk(child(qname = "w14:CT_PathShadeProperties/w14:path"))]
+  #[sdk(child(office2010, qname = "w14:CT_PathShadeProperties/w14:path"))]
   W14Path(std::boxed::Box<PathShadeProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GlowChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShadowChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextOutlineEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w14:noFill"))]
+  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
   W14NoFill,
-  #[sdk(child(qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
   W14SolidFill(std::boxed::Box<SolidColorFillProperties>),
-  #[sdk(child(qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
   W14GradFill(std::boxed::Box<GradientFillProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextOutlineEffectChoice2 {
   /// Defines the RoundEmpty Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w14:round"))]
+  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:round"))]
   W14Round,
   /// Defines the BevelEmpty Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w14:bevel"))]
+  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:bevel"))]
   W14Bevel,
-  #[sdk(child(qname = "w14:CT_LineJoinMiterProperties/w14:miter"))]
+  #[sdk(child(office2010, qname = "w14:CT_LineJoinMiterProperties/w14:miter"))]
   W14Miter(std::boxed::Box<LineJoinMiterProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillTextEffectChoice {
   /// Defines the NoFillEmpty Class.
-  #[sdk(empty_child(qname = "w:CT_Empty/w14:noFill"))]
+  #[sdk(empty_child(office2010, qname = "w:CT_Empty/w14:noFill"))]
   W14NoFill,
   /// Defines the SolidColorFillProperties Class.
-  #[sdk(child(qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_SolidColorFillProperties/w14:solidFill"))]
   W14SolidFill(std::boxed::Box<SolidColorFillProperties>),
   /// Defines the GradientFillProperties Class.
-  #[sdk(child(qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
+  #[sdk(child(office2010, qname = "w14:CT_GradientFillProperties/w14:gradFill"))]
   W14GradFill(std::boxed::Box<GradientFillProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientStopChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ExtrusionColorChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContourColorChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   /// Defines the RgbColorModelHex Class.
-  #[sdk(child(qname = "w14:CT_SRgbColor/w14:srgbClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SRgbColor/w14:srgbClr"))]
   W14SrgbClr(std::boxed::Box<RgbColorModelHex>),
   /// Defines the SchemeColor Class.
-  #[sdk(child(qname = "w14:CT_SchemeColor/w14:schemeClr"))]
+  #[sdk(child(office2010, qname = "w14:CT_SchemeColor/w14:schemeClr"))]
   W14SchemeClr(std::boxed::Box<SchemeColor>),
 }

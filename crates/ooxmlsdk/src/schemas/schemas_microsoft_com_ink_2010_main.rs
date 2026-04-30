@@ -91,18 +91,10 @@ pub enum KnownSemanticTypeValues {
   Connector,
 }
 /// Defines the ContextNode Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is msink:context.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxNode/msink:context")]
 pub struct ContextNode {
   /// id
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   #[sdk(pattern(
     source = 0u32,
@@ -111,10 +103,6 @@ pub struct ContextNode {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(
         string_set(
@@ -152,68 +140,36 @@ pub struct ContextNode {
   ))]
   pub r#type: crate::simple_type::StringValue,
   /// rotatedBoundingBox
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rotatedBoundingBox
   #[sdk(attr(qname = ":rotatedBoundingBox"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
   pub rotated_bounding_box: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// alignmentLevel
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :alignmentLevel
   #[sdk(attr(qname = ":alignmentLevel"))]
   pub alignment_level: Option<crate::simple_type::Int32Value>,
   /// contentType
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :contentType
   #[sdk(attr(qname = ":contentType"))]
   pub content_type: Option<crate::simple_type::Int32Value>,
   /// ascender
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ascender
   #[sdk(attr(qname = ":ascender"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "msink:ST_Point"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   pub ascender: Option<crate::simple_type::StringValue>,
   /// descender
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :descender
   #[sdk(attr(qname = ":descender"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "msink:ST_Point"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   pub descender: Option<crate::simple_type::StringValue>,
   /// baseline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :baseline
   #[sdk(attr(qname = ":baseline"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "msink:ST_Point"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   pub baseline: Option<crate::simple_type::StringValue>,
   /// midline
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :midline
   #[sdk(attr(qname = ":midline"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "msink:ST_Point"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   pub midline: Option<crate::simple_type::StringValue>,
   /// customRecognizerId
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :customRecognizerId
   #[sdk(attr(qname = ":customRecognizerId"))]
   #[sdk(pattern(
     source = 0u32,
@@ -222,68 +178,32 @@ pub struct ContextNode {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub custom_recognizer_id: Option<crate::simple_type::StringValue>,
   /// mathML
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :mathML
   #[sdk(attr(qname = ":mathML"))]
   pub math_ml: Option<crate::simple_type::StringValue>,
   /// mathStruct
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :mathStruct
   #[sdk(attr(qname = ":mathStruct"))]
   pub math_struct: Option<crate::simple_type::StringValue>,
   /// mathSymbol
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :mathSymbol
   #[sdk(attr(qname = ":mathSymbol"))]
   pub math_symbol: Option<crate::simple_type::StringValue>,
   /// beginModifierType
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :beginModifierType
   #[sdk(attr(qname = ":beginModifierType"))]
   pub begin_modifier_type: Option<crate::simple_type::StringValue>,
   /// endModifierType
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :endModifierType
   #[sdk(attr(qname = ":endModifierType"))]
   pub end_modifier_type: Option<crate::simple_type::StringValue>,
   /// rotationAngle
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rotationAngle
   #[sdk(attr(qname = ":rotationAngle"))]
   pub rotation_angle: Option<crate::simple_type::Int32Value>,
   /// hotPoints
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hotPoints
   #[sdk(attr(qname = ":hotPoints"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
   pub hot_points: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// centroid
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :centroid
   #[sdk(attr(qname = ":centroid"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
   pub centroid: Option<crate::simple_type::StringValue>,
   /// semanticType
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :semanticType
   #[sdk(attr(qname = ":semanticType"))]
   #[sdk(
         string_set(
@@ -305,17 +225,9 @@ pub struct ContextNode {
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:unsignedInt"))]
   pub semantic_type: Option<crate::simple_type::StringValue>,
   /// shapeName
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shapeName
   #[sdk(attr(qname = ":shapeName"))]
   pub shape_name: Option<crate::simple_type::StringValue>,
   /// shapeGeometry
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :shapeGeometry
   #[sdk(attr(qname = ":shapeGeometry"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
   pub shape_geometry: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
@@ -330,18 +242,10 @@ pub struct ContextNode {
   pub msink_destination_link: Vec<DestinationLink>,
 }
 /// Defines the ContextNodeProperty Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is msink:property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_Property/msink:property")]
 pub struct ContextNodeProperty {
   /// type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
   #[sdk(attr(qname = ":type"))]
   #[sdk(pattern(
     source = 0u32,
@@ -353,25 +257,13 @@ pub struct ContextNodeProperty {
   pub xml_content: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the SourceLink Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is msink:sourceLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/msink:sourceLink")]
 pub struct SourceLink {
   /// direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :direction
   #[sdk(attr(qname = ":direction"))]
   pub direction: Option<LinkDirectionValues>,
   /// ref
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   #[sdk(pattern(
     source = 0u32,
@@ -382,25 +274,13 @@ pub struct SourceLink {
   pub reference: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DestinationLink Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is msink:destinationLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/msink:destinationLink")]
 pub struct DestinationLink {
   /// direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :direction
   #[sdk(attr(qname = ":direction"))]
   pub direction: Option<LinkDirectionValues>,
   /// ref
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   #[sdk(pattern(
     source = 0u32,
@@ -411,25 +291,13 @@ pub struct DestinationLink {
   pub reference: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ContextLinkType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "msink:CT_CtxLink/")]
 pub struct ContextLinkType {
   /// direction
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :direction
   #[sdk(attr(qname = ":direction"))]
   pub direction: Option<LinkDirectionValues>,
   /// ref
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   #[sdk(pattern(
     source = 0u32,

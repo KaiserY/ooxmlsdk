@@ -5,31 +5,19 @@
 //
 
 /// Defines the ScriptLink Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is asl:scriptLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "asl:CT_ScriptLink/asl:scriptLink")]
+#[sdk(microsoft365, qname = "asl:CT_ScriptLink/asl:scriptLink")]
 pub struct ScriptLink {
   /// val
-  ///
-  /// Available in Microsoft365 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(microsoft365, qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/asl:extLst"))]
+  #[sdk(child(microsoft365, qname = "a:CT_OfficeArtExtensionList/asl:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Microsoft365 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is asl:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/asl:extLst")]
+#[sdk(microsoft365, qname = "a:CT_OfficeArtExtensionList/asl:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.

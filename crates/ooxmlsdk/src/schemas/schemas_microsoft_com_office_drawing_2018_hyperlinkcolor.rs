@@ -13,19 +13,11 @@ pub enum HyperlinkColorEnum {
   Tx,
 }
 /// Defines the HyperlinkColor Class.
-///
-/// Available in Office2019 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is ahyp:hlinkClr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr")]
+#[sdk(office2019, qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr")]
 pub struct HyperlinkColor {
   /// val
-  ///
-  /// Available in Office2019 and above.
-  ///
-  /// Represents the following attribute in the schema: :val
-  #[sdk(attr(qname = ":val"))]
+  #[sdk(attr(office2019, qname = ":val"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub val: HyperlinkColorEnum,
 }

@@ -5,10 +5,6 @@
 //
 
 /// Picture.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:pic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
@@ -24,58 +20,34 @@ pub struct Picture {
   #[sdk(child(qname = "a:CT_ShapeProperties/pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_ShapeStyle/pic14:style"))]
+  #[sdk(child(office2010, qname = "a:CT_ShapeStyle/pic14:style"))]
   pub shape_style: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_picture::ShapeStyle>,
   >,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/pic14:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/pic14:extLst"))]
   pub office_art_extension_list: Option<
     crate::schemas::schemas_microsoft_com_office_drawing_2010_picture::OfficeArtExtensionList,
   >,
 }
 /// Non-Visual Drawing Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualDrawingProps/pic:cNvPr")]
 pub struct NonVisualDrawingProperties {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -99,18 +71,10 @@ pub struct NonVisualDrawingProperties {
     >,
 }
 /// Non-Visual Picture Drawing Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:cNvPicPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPictureProperties/pic:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
     /// preferRelativeResize
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :preferRelativeResize
     #[sdk(attr(qname = ":preferRelativeResize"))]
     pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
     /// _
@@ -127,10 +91,6 @@ pub struct NonVisualPictureDrawingProperties {
     >,
 }
 /// Non-Visual Picture Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:nvPicPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_PictureNonVisual/pic:nvPicPr")]
 pub struct NonVisualPictureProperties {
@@ -142,25 +102,13 @@ pub struct NonVisualPictureProperties {
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
 }
 /// Picture Fill.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:blipFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_BlipFillProperties/pic:blipFill")]
 pub struct BlipFill {
   /// DPI Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :dpi
   #[sdk(attr(qname = ":dpi"))]
   pub dpi: Option<crate::simple_type::UInt32Value>,
   /// Rotate With Shape
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rotWithShape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
   /// _
@@ -178,19 +126,11 @@ pub struct BlipFill {
   pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Shape Properties.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is pic:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeProperties/pic:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:

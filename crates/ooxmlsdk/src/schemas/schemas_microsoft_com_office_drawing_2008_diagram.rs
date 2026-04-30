@@ -5,87 +5,47 @@
 //
 
 /// Defines the Drawing Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_Drawing/dsp:drawing")]
+#[sdk(office2010, qname = "dsp:CT_Drawing/dsp:drawing")]
 pub struct Drawing {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// _
-  #[sdk(child(qname = "dsp:CT_GroupShape/dsp:spTree"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,
 }
 /// Defines the DataModelExtensionBlock Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:dataModelExt.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt")]
+#[sdk(office2010, qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt")]
 pub struct DataModelExtensionBlock {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// relId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :relId
-  #[sdk(attr(qname = ":relId"))]
+  #[sdk(attr(office2010, qname = ":relId"))]
   pub rel_id: Option<crate::simple_type::StringValue>,
   /// minVer
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :minVer
-  #[sdk(attr(qname = ":minVer"))]
+  #[sdk(attr(office2010, qname = ":minVer"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub min_ver: Option<crate::simple_type::StringValue>,
 }
 /// Defines the NonVisualDrawingProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr")]
 pub struct NonVisualDrawingProperties {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -109,19 +69,11 @@ pub struct NonVisualDrawingProperties {
     >,
 }
 /// Defines the NonVisualDrawingShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:cNvSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr")]
+#[sdk(office2010, qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr")]
 pub struct NonVisualDrawingShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Text Box
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :txBox
   #[sdk(attr(qname = ":txBox"))]
   pub text_box: Option<crate::simple_type::BooleanValue>,
   /// Shape Locks
@@ -135,35 +87,23 @@ pub struct NonVisualDrawingShapeProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the ShapeNonVisualProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:nvSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr")]
+#[sdk(office2010, qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr")]
 pub struct ShapeNonVisualProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingShapeProps/dsp:cNvSpPr"))]
   pub non_visual_drawing_shape_properties: std::boxed::Box<NonVisualDrawingShapeProperties>,
 }
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/dsp:spPr")]
+#[sdk(office2010, qname = "a:CT_ShapeProperties/dsp:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -214,12 +154,8 @@ pub struct ShapeProperties {
   >,
 }
 /// Defines the ShapeStyle Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeStyle/dsp:style")]
+#[sdk(office2010, qname = "a:CT_ShapeStyle/dsp:style")]
 pub struct ShapeStyle {
   /// _
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
@@ -240,12 +176,8 @@ pub struct ShapeStyle {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
 }
 /// Defines the TextBody Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:txBody.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBody/dsp:txBody")]
+#[sdk(office2010, qname = "a:CT_TextBody/dsp:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
@@ -262,33 +194,17 @@ pub struct TextBody {
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
 /// Defines the Transform2D Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:txXfrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Transform2D/dsp:txXfrm")]
+#[sdk(office2010, qname = "a:CT_Transform2D/dsp:txXfrm")]
 pub struct Transform2D {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Horizontal Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipH
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
   /// Vertical Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
@@ -299,12 +215,8 @@ pub struct Transform2D {
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/dsp:extLst")]
+#[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -312,12 +224,11 @@ pub struct OfficeArtExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:cNvGrpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr")]
+#[sdk(
+  office2010,
+  qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr"
+)]
 pub struct NonVisualGroupDrawingShapeProperties {
     /// _
     #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
@@ -333,34 +244,25 @@ pub struct NonVisualGroupDrawingShapeProperties {
     >,
 }
 /// Defines the GroupShapeNonVisualProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:nvGrpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr")]
+#[sdk(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr")]
 pub struct GroupShapeNonVisualProperties {
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
+  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/dsp:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr"))]
+  #[sdk(child(
+    office2010,
+    qname = "a:CT_NonVisualGroupDrawingShapeProps/dsp:cNvGrpSpPr"
+  ))]
   pub non_visual_group_drawing_shape_properties:
     std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
 }
 /// Defines the GroupShapeProperties Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:grpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr")]
+#[sdk(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -395,20 +297,12 @@ pub struct GroupShapeProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the Shape Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:sp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_Shape/dsp:sp")]
+#[sdk(office2010, qname = "dsp:CT_Shape/dsp:sp")]
 pub struct Shape {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// modelId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :modelId
-  #[sdk(attr(qname = ":modelId"))]
+  #[sdk(attr(office2010, qname = ":modelId"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:int"))]
   #[sdk(pattern(
     source = 2u32,
@@ -417,73 +311,70 @@ pub struct Shape {
   ))]
   pub model_id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:CT_ShapeNonVisual/dsp:nvSpPr"))]
   pub shape_non_visual_properties: std::boxed::Box<ShapeNonVisualProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_ShapeProperties/dsp:spPr"))]
+  #[sdk(child(office2010, qname = "a:CT_ShapeProperties/dsp:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_ShapeStyle/dsp:style"))]
+  #[sdk(child(office2010, qname = "a:CT_ShapeStyle/dsp:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
   /// _
-  #[sdk(child(qname = "a:CT_TextBody/dsp:txBody"))]
+  #[sdk(child(office2010, qname = "a:CT_TextBody/dsp:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
   /// _
-  #[sdk(child(qname = "a:CT_Transform2D/dsp:txXfrm"))]
+  #[sdk(child(office2010, qname = "a:CT_Transform2D/dsp:txXfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShape Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:grpSp.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_GroupShape/dsp:grpSp")]
+#[sdk(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp")]
 pub struct GroupShape {
   /// _
-  #[sdk(child(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  #[sdk(choice(
+    microsoft365,
+    qname = "dsp:CT_Shape/dsp:sp",
+    qname = "dsp:CT_GroupShape/dsp:grpSp"
+  ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub dsp_ext_lst: Option<OfficeArtExtensionList>,
 }
 /// Defines the ShapeTree Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is dsp:spTree.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_GroupShape/dsp:spTree")]
+#[sdk(office2010, qname = "dsp:CT_GroupShape/dsp:spTree")]
 pub struct ShapeTree {
   /// _
-  #[sdk(child(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
   pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// _
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  #[sdk(choice(
+    microsoft365,
+    qname = "dsp:CT_Shape/dsp:sp",
+    qname = "dsp:CT_GroupShape/dsp:grpSp"
+  ))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub dsp_ext_lst: Option<OfficeArtExtensionList>,
 }
 /// Defines the GroupShapeType Class.
-///
-/// Available in Office2010 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dsp:CT_GroupShape/")]
+#[sdk(office2010, qname = "dsp:CT_GroupShape/")]
 pub struct GroupShapeType {
   #[sdk(choice(
+    microsoft365,
     qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr",
     qname = "a:CT_GroupShapeProperties/dsp:grpSpPr",
     qname = "dsp:CT_Shape/dsp:sp",
@@ -575,28 +466,28 @@ pub enum GroupShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  #[sdk(child(qname = "dsp:CT_Shape/dsp:sp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
-  #[sdk(child(qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
-  #[sdk(child(qname = "dsp:CT_Shape/dsp:sp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
-  #[sdk(child(qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeTypeChoice {
-  #[sdk(child(qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
   DspNvGrpSpPr(std::boxed::Box<GroupShapeNonVisualProperties>),
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
+  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   DspGrpSpPr(std::boxed::Box<GroupShapeProperties>),
-  #[sdk(child(qname = "dsp:CT_Shape/dsp:sp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
-  #[sdk(child(qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   DspExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }

@@ -74,18 +74,10 @@ pub enum BooleanEntryWithBlankValues {
   Empty,
 }
 /// Attached Object Data.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ClientData.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xvml:CT_ClientData/xvml:ClientData")]
 pub struct ClientData {
   /// Object type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :ObjectType
   #[sdk(attr(qname = ":ObjectType"))]
   pub object_type: ObjectValues,
   #[sdk(choice(
@@ -160,406 +152,138 @@ pub struct ClientData {
   pub xml_children: Vec<ClientDataChoice>,
 }
 /// Move with Cells.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:MoveWithCells.
 pub type MoveWithCells = BooleanEntryWithBlankValues;
 /// Resize with Cells.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:SizeWithCells.
 pub type ResizeWithCells = BooleanEntryWithBlankValues;
 /// Lock Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Locked.
 pub type Locked = BooleanEntryWithBlankValues;
 /// Default Size Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:DefaultSize.
 pub type DefaultSize = BooleanEntryWithBlankValues;
 /// Print Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:PrintObject.
 pub type PrintObject = BooleanEntryWithBlankValues;
 /// Macro Disable Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Disabled.
 pub type Disabled = BooleanEntryWithBlankValues;
 /// AutoFill.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:AutoFill.
 pub type AutoFill = BooleanEntryWithBlankValues;
 /// AutoLine.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:AutoLine.
 pub type AutoLine = BooleanEntryWithBlankValues;
 /// Automatically Size.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:AutoPict.
 pub type AutoSizePicture = BooleanEntryWithBlankValues;
 /// Text Lock.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:LockText.
 pub type LockText = BooleanEntryWithBlankValues;
 /// East Asia Alignment Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:JustLastX.
 pub type JustifyLastLine = BooleanEntryWithBlankValues;
 /// Password Edit.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:SecretEdit.
 pub type SecretEdit = BooleanEntryWithBlankValues;
 /// Default Button.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Default.
 pub type DefaultButton = BooleanEntryWithBlankValues;
 /// Help Button.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Help.
 pub type HelpButton = BooleanEntryWithBlankValues;
 /// Cancel Button.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Cancel.
 pub type CancelButton = BooleanEntryWithBlankValues;
 /// Dismiss Button.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Dismiss.
 pub type DismissButton = BooleanEntryWithBlankValues;
 /// Comment Visibility Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Visible.
 pub type Visible = BooleanEntryWithBlankValues;
 /// Comment's Row is Hidden.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:RowHidden.
 pub type RowHidden = BooleanEntryWithBlankValues;
 /// Comment's Column is Hidden.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ColHidden.
 pub type ColumnHidden = BooleanEntryWithBlankValues;
 /// Multi-line.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:MultiLine.
 pub type MultiLine = BooleanEntryWithBlankValues;
 /// Vertical Scroll.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:VScroll.
 pub type VerticalScrollBar = BooleanEntryWithBlankValues;
 /// Valid ID.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ValidIds.
 pub type ValidIds = BooleanEntryWithBlankValues;
 /// Disable 3D.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:NoThreeD2.
 pub type Disable3DForListBoxAndDropDown = BooleanEntryWithBlankValues;
 /// Dropdown Color Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Colored.
 pub type Colored = BooleanEntryWithBlankValues;
 /// Disable 3D.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:NoThreeD.
 pub type Disable3D = BooleanEntryWithBlankValues;
 /// First Radio Button.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FirstButton.
 pub type FirstButton = BooleanEntryWithBlankValues;
 /// Scroll Bar Orientation.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Horiz.
 pub type HorizontalScrollBar = BooleanEntryWithBlankValues;
 /// ActiveX Control.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:MapOCX.
 pub type MapOcxControl = BooleanEntryWithBlankValues;
 /// Camera Tool.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Camera.
 pub type CameraObject = BooleanEntryWithBlankValues;
 /// Recalculation Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:RecalcAlways.
 pub type RecalculateAlways = BooleanEntryWithBlankValues;
 /// Font AutoScale.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:AutoScale.
 pub type AutoScaleFont = BooleanEntryWithBlankValues;
 /// Dynamic Data Exchange.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:DDE.
 pub type DdeObject = BooleanEntryWithBlankValues;
 /// UI Object Toggle.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:UIObj.
 pub type UiObject = BooleanEntryWithBlankValues;
 /// Anchor.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Anchor.
 pub type Anchor = crate::simple_type::StringValue;
 /// Horizontal Text Alignment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:TextHAlign.
 pub type HorizontalTextAlignment = crate::simple_type::StringValue;
 /// Vertical Text Alignment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:TextVAlign.
 pub type VerticalTextAlignment = crate::simple_type::StringValue;
 /// List Items Source Range.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaRange.
 pub type FormulaRange = crate::simple_type::StringValue;
 /// Selection Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:SelType.
 pub type SelectionType = crate::simple_type::StringValue;
 /// Multiple Selections.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:MultiSel.
 pub type MultiSelections = crate::simple_type::StringValue;
 /// Callback Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:LCT.
 pub type ListBoxCallbackType = crate::simple_type::StringValue;
 /// Non-linked List Item.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ListItem.
 pub type ListItem = crate::simple_type::StringValue;
 /// Dropdown Style.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:DropStyle.
 pub type DropStyle = crate::simple_type::StringValue;
 /// Linked Formula.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaLink.
 pub type FormulaLink = crate::simple_type::StringValue;
 /// Camera Source Range.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaPict.
 pub type FormulaPicture = crate::simple_type::StringValue;
 /// Linked Formula - Group Box.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaGroup.
 pub type FormulaGroup = crate::simple_type::StringValue;
 /// HTML Script Text.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ScriptText.
 pub type ScriptText = crate::simple_type::StringValue;
 /// HTML Script Attributes.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ScriptExtended.
 pub type ScriptExtended = crate::simple_type::StringValue;
 /// Text Formula.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaTxbx.
 pub type FormulaTextBox = crate::simple_type::StringValue;
 /// Reference to Custom Function.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:FmlaMacro.
 pub type FormulaMacro = crate::simple_type::StringValue;
 /// Primary Keyboard Accelerator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Accel.
 pub type AcceleratorPrimary = crate::simple_type::ByteValue;
 /// Secondary Keyboard Accelerator.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Accel2.
 pub type AcceleratorSecondary = crate::simple_type::ByteValue;
 /// Comment Row Target.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Row.
 pub type CommentRowTarget = crate::simple_type::IntegerValue;
 /// Comment Column Target.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Column.
 pub type CommentColumnTarget = crate::simple_type::IntegerValue;
 /// Validation Type.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:VTEdit.
 pub type InputValidationType = crate::simple_type::IntegerValue;
 /// Minimum Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:WidthMin.
 pub type MinDropDownWidth = crate::simple_type::IntegerValue;
 /// Selected Entry.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Sel.
 pub type SelectionEntry = crate::simple_type::IntegerValue;
 /// Dropdown Maximum Lines.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:DropLines.
 pub type DropLines = crate::simple_type::IntegerValue;
 /// Checked.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Checked.
 pub type Checked = crate::simple_type::IntegerValue;
 /// Scroll bar position.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Val.
 pub type ScrollBarPosition = crate::simple_type::IntegerValue;
 /// Scroll Bar Minimum.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Min.
 pub type ScrollBarMin = crate::simple_type::IntegerValue;
 /// Scroll Bar Maximum.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Max.
 pub type ScrollBarMax = crate::simple_type::IntegerValue;
 /// Scroll Bar Increment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Inc.
 pub type ScrollBarIncrement = crate::simple_type::IntegerValue;
 /// Scroll Bar Page Increment.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Page.
 pub type ScrollBarPageIncrement = crate::simple_type::IntegerValue;
 /// Scroll Bar Width.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:Dx.
 pub type ScrollBarWidth = crate::simple_type::IntegerValue;
 /// Clipboard Format.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:CF.
 pub type ClipboardFormat = ClipboardFormatValues;
 /// HTML Script Language.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ScriptLanguage.
 pub type ScriptLanguage = crate::simple_type::IntegerValue;
 /// HTML Script Location.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xvml:ScriptLocation.
 pub type ScriptLocation = crate::simple_type::IntegerValue;
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ClientDataChoice {

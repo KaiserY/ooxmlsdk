@@ -5,97 +5,64 @@
 //
 
 /// Defines the WebExtension Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:webextension.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtension/we:webextension")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtension/we:webextension")]
 pub struct WebExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// id
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// frozen
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :frozen
-  #[sdk(attr(qname = ":frozen"))]
+  #[sdk(attr(office2013, qname = ":frozen"))]
   pub frozen: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionReference/we:reference"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub web_extension_store_reference: std::boxed::Box<WebExtensionStoreReference>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences"))]
+  #[sdk(child(
+    office2013,
+    qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences"
+  ))]
   pub web_extension_reference_list: Option<WebExtensionReferenceList>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionPropertyBag/we:properties"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionPropertyBag/we:properties"))]
   pub web_extension_property_bag: std::boxed::Box<WebExtensionPropertyBag>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionBindingList/we:bindings"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBindingList/we:bindings"))]
   pub web_extension_binding_list: std::boxed::Box<WebExtensionBindingList>,
   /// _
-  #[sdk(child(qname = "a:CT_Blip/we:snapshot"))]
+  #[sdk(child(office2013, qname = "a:CT_Blip/we:snapshot"))]
   pub snapshot: Option<std::boxed::Box<Snapshot>>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
+  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionReference Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:webextensionref.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_WebExtensionPartRef/we:webextensionref")]
+#[sdk(office2013, qname = "we:CT_WebExtensionPartRef/we:webextensionref")]
 pub struct WebExtensionReference {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: r:id
-  #[sdk(attr(qname = "r:id"))]
+  #[sdk(attr(office2013, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
 /// Defines the WebExtensionProperty Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionProperty/we:property")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property")]
 pub struct WebExtensionProperty {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2013, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// value
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :value
-  #[sdk(attr(qname = ":value"))]
+  #[sdk(attr(office2013, qname = ":value"))]
   pub value: crate::simple_type::StringValue,
 }
 /// Defines the OfficeArtExtensionList Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_OfficeArtExtensionList/we:extLst")]
+#[sdk(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst")]
 pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -103,147 +70,86 @@ pub struct OfficeArtExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the WebExtensionBinding Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:binding.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionBinding/we:binding")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding")]
 pub struct WebExtensionBinding {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// type
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :type
-  #[sdk(attr(qname = ":type"))]
+  #[sdk(attr(office2013, qname = ":type"))]
   pub r#type: crate::simple_type::StringValue,
   /// appref
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :appref
-  #[sdk(attr(qname = ":appref"))]
+  #[sdk(attr(office2013, qname = ":appref"))]
   pub app_reference: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
+  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionStoreReference Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:reference.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionReference/we:reference")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference")]
 pub struct WebExtensionStoreReference {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2013, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
   /// version
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :version
-  #[sdk(attr(qname = ":version"))]
+  #[sdk(attr(office2013, qname = ":version"))]
   pub version: crate::simple_type::StringValue,
   /// store
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :store
-  #[sdk(attr(qname = ":store"))]
+  #[sdk(attr(office2013, qname = ":store"))]
   pub store: Option<crate::simple_type::StringValue>,
   /// storeType
-  ///
-  /// Available in Office2013 and above.
-  ///
-  /// Represents the following attribute in the schema: :storeType
-  #[sdk(attr(qname = ":storeType"))]
+  #[sdk(attr(office2013, qname = ":storeType"))]
   pub store_type: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
+  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
 /// Defines the WebExtensionReferenceList Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:alternateReferences.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences")]
+#[sdk(
+  office2013,
+  qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences"
+)]
 pub struct WebExtensionReferenceList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionReference/we:reference"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub we_reference: Vec<WebExtensionStoreReference>,
 }
 /// Defines the WebExtensionPropertyBag Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
 pub struct WebExtensionPropertyBag {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionProperty/we:property"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property"))]
   pub we_property: Vec<WebExtensionProperty>,
 }
 /// Defines the WebExtensionBindingList Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:bindings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
+#[sdk(office2013, qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
 pub struct WebExtensionBindingList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// _
-  #[sdk(child(qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
+  #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
   pub we_binding: Vec<WebExtensionBinding>,
 }
 /// Defines the Snapshot Class.
-///
-/// Available in Office2013 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is we:snapshot.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Blip/we:snapshot")]
+#[sdk(office2013, qname = "a:CT_Blip/we:snapshot")]
 pub struct Snapshot {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Embedded Picture Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:embed
   #[sdk(attr(qname = "r:embed"))]
   pub embed: Option<crate::simple_type::StringValue>,
   /// Linked Picture Reference
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: r:link
   #[sdk(attr(qname = "r:link"))]
   pub link: Option<crate::simple_type::StringValue>,
   /// Compression state for blips.
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cstate
   #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub compression_state:

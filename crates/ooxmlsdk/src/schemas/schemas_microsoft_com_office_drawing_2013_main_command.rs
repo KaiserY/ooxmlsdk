@@ -25,26 +25,14 @@ pub enum DetachConnection {
   Both,
 }
 /// Defines the ShapeMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:spMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ShapeMoniker/oac:spMk")]
+#[sdk(office2016, qname = "oac:CT_ShapeMoniker/oac:spMk")]
 pub struct ShapeMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -53,26 +41,14 @@ pub struct ShapeMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GroupShapeMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:grpSpMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk")]
+#[sdk(office2016, qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk")]
 pub struct GroupShapeMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -81,26 +57,14 @@ pub struct GroupShapeMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GraphicFrameMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:graphicFrameMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk")]
+#[sdk(office2016, qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk")]
 pub struct GraphicFrameMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -109,26 +73,14 @@ pub struct GraphicFrameMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ConnectorMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cxnSpMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk")]
+#[sdk(office2016, qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk")]
 pub struct ConnectorMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -137,26 +89,14 @@ pub struct ConnectorMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PictureMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:picMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_PictureMoniker/oac:picMk")]
+#[sdk(office2016, qname = "oac:CT_PictureMoniker/oac:picMk")]
 pub struct PictureMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -165,26 +105,14 @@ pub struct PictureMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the InkMoniker Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:inkMk.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_InkMoniker/oac:inkMk")]
+#[sdk(office2016, qname = "oac:CT_InkMoniker/oac:inkMk")]
 pub struct InkMoniker {
   /// id
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// creationId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :creationId
-  #[sdk(attr(qname = ":creationId"))]
+  #[sdk(attr(office2016, qname = ":creationId"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -193,44 +121,24 @@ pub struct InkMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DrawingMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:dgMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingMonikerList/oac:dgMkLst")]
+#[sdk(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst")]
 pub struct DrawingMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the Transform2D Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:xfrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Transform2D/oac:xfrm")]
+#[sdk(office2016, qname = "a:CT_Transform2D/oac:xfrm")]
 pub struct Transform2D {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Horizontal Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipH
   #[sdk(attr(qname = ":flipH"))]
   pub horizontal_flip: Option<crate::simple_type::BooleanValue>,
   /// Vertical Flip
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipV
   #[sdk(attr(qname = ":flipV"))]
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
@@ -241,142 +149,82 @@ pub struct Transform2D {
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
 /// Defines the GroupShapeMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:grpSpMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst")]
+#[sdk(office2016, qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst")]
 pub struct GroupShapeMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the DeMkLstDrawingElementMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:deMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst")]
+#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst")]
 pub struct DeMkLstDrawingElementMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the DeMasterMkLstDrawingElementMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:deMasterMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst"
+)]
 pub struct DeMasterMkLstDrawingElementMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the DeSrcMkLstDrawingElementMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:deSrcMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deSrcMkLst")]
+#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deSrcMkLst")]
 pub struct DeSrcMkLstDrawingElementMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the DeTgtMkLstDrawingElementMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:deTgtMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingElementMonikerList/oac:deTgtMkLst")]
+#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deTgtMkLst")]
 pub struct DeTgtMkLstDrawingElementMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ImgDataImgData Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:imgData.
 pub type ImgDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the OrigImgDataImgData Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:origImgData.
 pub type OrigImgDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the SndDataImgData Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:sndData.
 pub type SndDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the OpenXmlImgDataElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 pub type OpenXmlImgDataElement = crate::simple_type::Base64BinaryValue;
 /// Defines the ResourceUrl Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:imgUrl.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResourceUrl/oac:imgUrl")]
+#[sdk(office2016, qname = "oac:CT_ResourceUrl/oac:imgUrl")]
 pub struct ResourceUrl {
   /// src
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :src
-  #[sdk(attr(qname = ":src"))]
+  #[sdk(attr(office2016, qname = ":src"))]
   #[sdk(string_format(source = 0u32, kind = "uri"))]
   pub src: Option<crate::simple_type::StringValue>,
   /// linkage
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :linkage
-  #[sdk(attr(qname = ":linkage"))]
+  #[sdk(attr(office2016, qname = ":linkage"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub linkage: Option<ResourceLinkage>,
 }
 /// Defines the GroupCommand Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:grpCmd.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GroupCommand/oac:grpCmd")]
+#[sdk(office2016, qname = "oac:CT_GroupCommand/oac:grpCmd")]
 pub struct GroupCommand {
   /// verId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :verId
-  #[sdk(attr(qname = ":verId"))]
+  #[sdk(attr(office2016, qname = ":verId"))]
   pub ver_id: Option<crate::simple_type::UInt32Value>,
   /// preventRegroup
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :preventRegroup
-  #[sdk(attr(qname = ":preventRegroup"))]
+  #[sdk(attr(office2016, qname = ":preventRegroup"))]
   pub prevent_regroup: Option<crate::simple_type::BooleanValue>,
   /// grpId
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :grpId
-  #[sdk(attr(qname = ":grpId"))]
+  #[sdk(attr(office2016, qname = ":grpId"))]
   pub grp_id: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
+  #[sdk(child(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
   pub drawing_moniker_list: std::boxed::Box<DrawingMonikerList>,
   #[sdk(choice(
+    microsoft365,
     qname = "oac:CT_ShapeMoniker/oac:spMk",
     qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk",
     qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk",
@@ -386,295 +234,188 @@ pub struct GroupCommand {
   ))]
   pub group_command_choice: Vec<GroupCommandChoice>,
   /// _
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/oac:grpSpPr"))]
+  #[sdk(child(office2016, qname = "a:CT_GroupShapeProperties/oac:grpSpPr"))]
   pub oac_grp_sp_pr: Option<std::boxed::Box<GroupShapeProperties>>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualDrawingProps/oac:cNvPr"))]
+  #[sdk(child(office2016, qname = "a:CT_NonVisualDrawingProps/oac:cNvPr"))]
   pub oac_c_nv_pr: Option<std::boxed::Box<NonVisualDrawingProps>>,
   /// _
-  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr"))]
+  #[sdk(child(
+    office2016,
+    qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr"
+  ))]
   pub oac_c_nv_grp_sp_pr: Option<std::boxed::Box<NonVisualGroupDrawingShapeProps>>,
 }
 /// Defines the ImgLink Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:imgLink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ImgLink/oac:imgLink")]
+#[sdk(office2016, qname = "oac:CT_ImgLink/oac:imgLink")]
 pub struct ImgLink {
   /// tgt
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tgt
-  #[sdk(attr(qname = ":tgt"))]
+  #[sdk(attr(office2016, qname = ":tgt"))]
   #[sdk(string_format(source = 1u32, kind = "uri"))]
   pub tgt: crate::simple_type::StringValue,
 }
 /// Defines the DocumentContextMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:dcMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst")]
+#[sdk(office2016, qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst")]
 pub struct DocumentContextMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the GraphicParentMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:graphicParentMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst"
+)]
 pub struct GraphicParentMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ShapeMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:spMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ShapeMonikerList/oac:spMkLst")]
+#[sdk(office2016, qname = "oac:CT_ShapeMonikerList/oac:spMkLst")]
 pub struct ShapeMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the GraphicFrameMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:graphicFrameMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst"
+)]
 pub struct GraphicFrameMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ConnectorMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cxnSpMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst")]
+#[sdk(office2016, qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst")]
 pub struct ConnectorMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the PictureMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:picMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_PictureMonikerList/oac:picMkLst")]
+#[sdk(office2016, qname = "oac:CT_PictureMonikerList/oac:picMkLst")]
 pub struct PictureMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the InkMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:inkMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_InkMonikerList/oac:inkMkLst")]
+#[sdk(office2016, qname = "oac:CT_InkMonikerList/oac:inkMkLst")]
 pub struct InkMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TextBodyMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:txBodyMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst")]
+#[sdk(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst")]
 pub struct TextBodyMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TextCharRangeMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:txMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst")]
+#[sdk(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst")]
 pub struct TextCharRangeMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the HyperlinkMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlinkMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst")]
+#[sdk(office2016, qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst")]
 pub struct HyperlinkMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the Model3DMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:model3DMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst")]
+#[sdk(office2016, qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst")]
 pub struct Model3DMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ViewSelectionStgList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:viewSelLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst")]
+#[sdk(office2016, qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst")]
 pub struct ViewSelectionStgList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the EditorSelectionStgList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:editorSelLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst")]
+#[sdk(office2016, qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst")]
 pub struct EditorSelectionStgList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the DrawingSelectionStgList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:drSelLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst")]
+#[sdk(office2016, qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst")]
 pub struct DrawingSelectionStgList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TableMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:tblMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TableMonikerList/oac:tblMkLst")]
+#[sdk(office2016, qname = "oac:CT_TableMonikerList/oac:tblMkLst")]
 pub struct TableMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TableCellMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:tcMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TableCellMonikerList/oac:tcMkLst")]
+#[sdk(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst")]
 pub struct TableCellMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TableRowMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:trMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TableRowMonikerList/oac:trMkLst")]
+#[sdk(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst")]
 pub struct TableRowMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the TableColumnMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:gridColMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")]
+#[sdk(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")]
 pub struct TableColumnMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ModifyNonVisualDrawingProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualDrawingProps/oac:cNvPr")]
+#[sdk(office2016, qname = "oac:CT_ModifyNonVisualDrawingProps/oac:cNvPr")]
 pub struct ModifyNonVisualDrawingProps {
   /// name
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2016, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// descr
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :descr
-  #[sdk(attr(qname = ":descr"))]
+  #[sdk(attr(office2016, qname = ":descr"))]
   pub descr: Option<crate::simple_type::StringValue>,
   /// hidden
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :hidden
-  #[sdk(attr(qname = ":hidden"))]
+  #[sdk(attr(office2016, qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
   /// title
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :title
-  #[sdk(attr(qname = ":title"))]
+  #[sdk(attr(office2016, qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   /// decor
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :decor
-  #[sdk(attr(qname = ":decor"))]
+  #[sdk(attr(office2016, qname = ":decor"))]
   pub decor: Option<crate::simple_type::BooleanValue>,
   /// scriptLink
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :scriptLink
-  #[sdk(attr(qname = ":scriptLink"))]
+  #[sdk(attr(office2016, qname = ":scriptLink"))]
   pub script_link: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ModifyTransformProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:xfrm.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyTransformProps/oac:xfrm")]
+#[sdk(office2016, qname = "oac:CT_ModifyTransformProps/oac:xfrm")]
 pub struct ModifyTransformProps {
   /// x
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
-  #[sdk(attr(qname = ":x"))]
+  #[sdk(attr(office2016, qname = ":x"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -684,11 +425,7 @@ pub struct ModifyTransformProps {
   ))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :y
-  #[sdk(attr(qname = ":y"))]
+  #[sdk(attr(office2016, qname = ":y"))]
   #[sdk(number_range(
     source = 0u32,
     min = "-27273042329600",
@@ -698,11 +435,7 @@ pub struct ModifyTransformProps {
   ))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// cx
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :cx
-  #[sdk(attr(qname = ":cx"))]
+  #[sdk(attr(office2016, qname = ":cx"))]
   #[sdk(number_range(
     source = 0u32,
     min = "0",
@@ -712,11 +445,7 @@ pub struct ModifyTransformProps {
   ))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :cy
-  #[sdk(attr(qname = ":cy"))]
+  #[sdk(attr(office2016, qname = ":cy"))]
   #[sdk(number_range(
     source = 0u32,
     min = "0",
@@ -726,40 +455,20 @@ pub struct ModifyTransformProps {
   ))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// rot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
-  #[sdk(attr(qname = ":rot"))]
+  #[sdk(attr(office2016, qname = ":rot"))]
   pub rot: Option<crate::simple_type::Int32Value>,
   /// flipH
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipH
-  #[sdk(attr(qname = ":flipH"))]
+  #[sdk(attr(office2016, qname = ":flipH"))]
   pub flip_h: Option<crate::simple_type::BooleanValue>,
   /// flipV
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :flipV
-  #[sdk(attr(qname = ":flipV"))]
+  #[sdk(attr(office2016, qname = ":flipV"))]
   pub flip_v: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the Point2DType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:off.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point2D/oac:off")]
+#[sdk(office2016, qname = "a:CT_Point2D/oac:off")]
 pub struct Point2DType {
   /// X-Axis Coordinate
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :x
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(
     source = 1u32,
@@ -770,10 +479,6 @@ pub struct Point2DType {
   ))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :y
   #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(
     source = 1u32,
@@ -785,19 +490,11 @@ pub struct Point2DType {
   pub y: crate::simple_type::Int64Value,
 }
 /// Defines the TextParagraphPropertiesType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:pPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextParagraphProperties/oac:pPr")]
+#[sdk(office2016, qname = "a:CT_TextParagraphProperties/oac:pPr")]
 pub struct TextParagraphPropertiesType {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :marL
   #[sdk(attr(qname = ":marL"))]
   #[sdk(number_range(
     source = 0u32,
@@ -808,10 +505,6 @@ pub struct TextParagraphPropertiesType {
   ))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :marR
   #[sdk(attr(qname = ":marR"))]
   #[sdk(number_range(
     source = 0u32,
@@ -822,10 +515,6 @@ pub struct TextParagraphPropertiesType {
   ))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lvl
   #[sdk(attr(qname = ":lvl"))]
   #[sdk(number_range(
     source = 0u32,
@@ -836,10 +525,6 @@ pub struct TextParagraphPropertiesType {
   ))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :indent
   #[sdk(attr(qname = ":indent"))]
   #[sdk(number_range(
     source = 0u32,
@@ -850,56 +535,28 @@ pub struct TextParagraphPropertiesType {
   ))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :algn
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAlignmentTypeValues>,
   /// Default Tab Size
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :defTabSz
   #[sdk(attr(qname = ":defTabSz"))]
   pub default_tab_size: Option<crate::simple_type::Int32Value>,
   /// Right To Left
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rtl
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
   /// East Asian Line Break
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :eaLnBrk
   #[sdk(attr(qname = ":eaLnBrk"))]
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fontAlgn
   #[sdk(attr(qname = ":fontAlgn"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub font_alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextFontAlignmentValues>,
   /// Latin Line Break
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :latinLnBrk
   #[sdk(attr(qname = ":latinLnBrk"))]
   pub latin_line_break: Option<crate::simple_type::BooleanValue>,
   /// Hanging Punctuation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hangingPunct
   #[sdk(attr(qname = ":hangingPunct"))]
   pub height: Option<crate::simple_type::BooleanValue>,
   /// Line Spacing
@@ -957,99 +614,51 @@ pub struct TextParagraphPropertiesType {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the TextBodyProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:bodyPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBodyProperties/oac:bodyPr")]
+#[sdk(office2016, qname = "a:CT_TextBodyProperties/oac:bodyPr")]
 pub struct TextBodyProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Rotation
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rot
   #[sdk(attr(qname = ":rot"))]
   pub rotation: Option<crate::simple_type::Int32Value>,
   /// Paragraph Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :spcFirstLastPara
   #[sdk(attr(qname = ":spcFirstLastPara"))]
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,
   /// Text Vertical Overflow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :vertOverflow
   #[sdk(attr(qname = ":vertOverflow"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub vertical_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalOverflowValues,
   >,
   /// Text Horizontal Overflow
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :horzOverflow
   #[sdk(attr(qname = ":horzOverflow"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub horizontal_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextHorizontalOverflowValues,
   >,
   /// Vertical Text
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :vert
   #[sdk(attr(qname = ":vert"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub vertical:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalValues>,
   /// Text Wrapping Type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :wrap
   #[sdk(attr(qname = ":wrap"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub wrap:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextWrappingValues>,
   /// Left Inset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :lIns
   #[sdk(attr(qname = ":lIns"))]
   pub left_inset: Option<crate::simple_type::Int32Value>,
   /// Top Inset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :tIns
   #[sdk(attr(qname = ":tIns"))]
   pub top_inset: Option<crate::simple_type::Int32Value>,
   /// Right Inset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rIns
   #[sdk(attr(qname = ":rIns"))]
   pub right_inset: Option<crate::simple_type::Int32Value>,
   /// Bottom Inset
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bIns
   #[sdk(attr(qname = ":bIns"))]
   pub bottom_inset: Option<crate::simple_type::Int32Value>,
   /// Number of Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :numCol
   #[sdk(attr(qname = ":numCol"))]
   #[sdk(number_range(
     source = 0u32,
@@ -1060,62 +669,30 @@ pub struct TextBodyProperties {
   ))]
   pub column_count: Option<crate::simple_type::Int32Value>,
   /// Space Between Columns
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :spcCol
   #[sdk(attr(qname = ":spcCol"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub column_spacing: Option<crate::simple_type::Int32Value>,
   /// Columns Right-To-Left
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rtlCol
   #[sdk(attr(qname = ":rtlCol"))]
   pub right_to_left_columns: Option<crate::simple_type::BooleanValue>,
   /// From WordArt
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :fromWordArt
   #[sdk(attr(qname = ":fromWordArt"))]
   pub from_word_art: Option<crate::simple_type::BooleanValue>,
   /// Anchor
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :anchor
   #[sdk(attr(qname = ":anchor"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub anchor:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues>,
   /// Anchor Center
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :anchorCtr
   #[sdk(attr(qname = ":anchorCtr"))]
   pub anchor_center: Option<crate::simple_type::BooleanValue>,
   /// Force Anti-Alias
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :forceAA
   #[sdk(attr(qname = ":forceAA"))]
   pub force_anti_alias: Option<crate::simple_type::BooleanValue>,
   /// Text Upright
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :upright
   #[sdk(attr(qname = ":upright"))]
   pub up_right: Option<crate::simple_type::BooleanValue>,
   /// Compatible Line Spacing
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :compatLnSpc
   #[sdk(attr(qname = ":compatLnSpc"))]
   pub compatible_line_spacing: Option<crate::simple_type::BooleanValue>,
   /// Preset Text Shape
@@ -1142,123 +719,62 @@ pub struct TextBodyProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the ModifyNonVisualDrawingShapeProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualDrawingShapeProps/oac:cNvSpPr")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_ModifyNonVisualDrawingShapeProps/oac:cNvSpPr"
+)]
 pub struct ModifyNonVisualDrawingShapeProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noRot
-  #[sdk(attr(qname = ":noRot"))]
+  #[sdk(attr(office2016, qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noEditPoints
-  #[sdk(attr(qname = ":noEditPoints"))]
+  #[sdk(attr(office2016, qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noAdjustHandles
-  #[sdk(attr(qname = ":noAdjustHandles"))]
+  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeArrowheads
-  #[sdk(attr(qname = ":noChangeArrowheads"))]
+  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeShapeType
-  #[sdk(attr(qname = ":noChangeShapeType"))]
+  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// noTextEdit
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noTextEdit
-  #[sdk(attr(qname = ":noTextEdit"))]
+  #[sdk(attr(office2016, qname = ":noTextEdit"))]
   pub no_text_edit: Option<crate::simple_type::BooleanValue>,
   /// txBox
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :txBox
-  #[sdk(attr(qname = ":txBox"))]
+  #[sdk(attr(office2016, qname = ":txBox"))]
   pub tx_box: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShapePropsMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:spMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ShapePropsMonikerList/oac:spMkLst")]
+#[sdk(office2016, qname = "oac:CT_ShapePropsMonikerList/oac:spMkLst")]
 pub struct ShapePropsMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the ShapeProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ShapeProperties/oac:spPr")]
+#[sdk(office2016, qname = "a:CT_ShapeProperties/oac:spPr")]
 pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -1309,54 +825,42 @@ pub struct ShapeProperties {
   >,
 }
 /// Defines the ResetShapeProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:spPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetShapeProperties/oac:spPr")]
+#[sdk(office2016, qname = "oac:CT_ResetShapeProperties/oac:spPr")]
 pub struct ResetShapeProperties {
   /// Defines the XfrmEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:xfrm"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:xfrm"))]
   pub xfrm_empty: Option<()>,
   /// Defines the GeomEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:geom"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:geom"))]
   pub geom_empty: Option<()>,
   /// Defines the FillEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fill"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:fill"))]
   pub fill_empty: Option<()>,
   /// Defines the LnEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:ln"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:ln"))]
   pub ln_empty: Option<()>,
   /// Defines the EffectEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:effect"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:effect"))]
   pub effect_empty: Option<()>,
   /// Defines the Scene3dEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:scene3d"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:scene3d"))]
   pub scene3d_empty: Option<()>,
   /// Defines the Sp3dEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:sp3d"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:sp3d"))]
   pub sp3d_empty: Option<()>,
   /// Defines the ExtLstEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:extLst"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:extLst"))]
   pub ext_lst_empty: Option<()>,
   /// Defines the BwModeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:bwMode"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:bwMode"))]
   pub bw_mode_empty: Option<()>,
 }
 /// Defines the LnRefStyleMatrixReference Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:lnRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_StyleMatrixReference/oac:lnRef")]
+#[sdk(office2016, qname = "a:CT_StyleMatrixReference/oac:lnRef")]
 pub struct LnRefStyleMatrixReference {
   /// Style Matrix Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   #[sdk(choice(
@@ -1370,18 +874,10 @@ pub struct LnRefStyleMatrixReference {
   pub xml_children: Option<LnRefStyleMatrixReferenceChoice>,
 }
 /// Defines the FillRefStyleMatrixReference Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:fillRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_StyleMatrixReference/oac:fillRef")]
+#[sdk(office2016, qname = "a:CT_StyleMatrixReference/oac:fillRef")]
 pub struct FillRefStyleMatrixReference {
   /// Style Matrix Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   #[sdk(choice(
@@ -1395,18 +891,10 @@ pub struct FillRefStyleMatrixReference {
   pub xml_children: Option<FillRefStyleMatrixReferenceChoice>,
 }
 /// Defines the EffectRefStyleMatrixReference Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:effectRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_StyleMatrixReference/oac:effectRef")]
+#[sdk(office2016, qname = "a:CT_StyleMatrixReference/oac:effectRef")]
 pub struct EffectRefStyleMatrixReference {
   /// Style Matrix Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   #[sdk(choice(
@@ -1420,20 +908,12 @@ pub struct EffectRefStyleMatrixReference {
   pub xml_children: Option<EffectRefStyleMatrixReferenceChoice>,
 }
 /// Defines the StyleMatrixReferenceType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/")]
 pub struct StyleMatrixReferenceType {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
   /// Style Matrix Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   #[sdk(choice(
@@ -1447,18 +927,10 @@ pub struct StyleMatrixReferenceType {
   pub xml_children: Option<StyleMatrixReferenceTypeChoice>,
 }
 /// Defines the FontReference Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:fontRef.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_FontReference/oac:fontRef")]
+#[sdk(office2016, qname = "a:CT_FontReference/oac:fontRef")]
 pub struct FontReference {
   /// Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub index:
@@ -1474,58 +946,34 @@ pub struct FontReference {
   pub xml_children: Option<FontReferenceChoice>,
 }
 /// Defines the ModifyShapeStyleProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyShapeStyleProps/oac:style")]
+#[sdk(office2016, qname = "oac:CT_ModifyShapeStyleProps/oac:style")]
 pub struct ModifyShapeStyleProps {
   /// _
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/oac:lnRef"))]
+  #[sdk(child(office2016, qname = "a:CT_StyleMatrixReference/oac:lnRef"))]
   pub ln_ref_style_matrix_reference: Option<std::boxed::Box<LnRefStyleMatrixReference>>,
   /// _
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/oac:fillRef"))]
+  #[sdk(child(office2016, qname = "a:CT_StyleMatrixReference/oac:fillRef"))]
   pub fill_ref_style_matrix_reference: Option<std::boxed::Box<FillRefStyleMatrixReference>>,
   /// _
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/oac:effectRef"))]
+  #[sdk(child(office2016, qname = "a:CT_StyleMatrixReference/oac:effectRef"))]
   pub effect_ref_style_matrix_reference: Option<std::boxed::Box<EffectRefStyleMatrixReference>>,
   /// _
-  #[sdk(child(qname = "a:CT_FontReference/oac:fontRef"))]
+  #[sdk(child(office2016, qname = "a:CT_FontReference/oac:fontRef"))]
   pub font_reference: Option<std::boxed::Box<FontReference>>,
 }
 /// Defines the ResetXsdboolean Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:reset.
 pub type ResetXsdboolean = crate::simple_type::BooleanValue;
 /// Defines the UseBoundsXsdboolean Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:useBounds.
 pub type UseBoundsXsdboolean = crate::simple_type::BooleanValue;
 /// Defines the BlipFillProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:blipFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_BlipFillProperties/oac:blipFill")]
+#[sdk(office2016, qname = "a:CT_BlipFillProperties/oac:blipFill")]
 pub struct BlipFillProperties {
   /// DPI Setting
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :dpi
   #[sdk(attr(qname = ":dpi"))]
   pub dpi: Option<crate::simple_type::UInt32Value>,
   /// Rotate With Shape
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :rotWithShape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
   /// _
@@ -1543,208 +991,107 @@ pub struct BlipFillProperties {
   pub blip_fill_properties_choice: Option<BlipFillPropertiesChoice>,
 }
 /// Defines the FillRectRelativeRectProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:fillRect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_RelativeRectProps/oac:fillRect")]
+#[sdk(office2016, qname = "oac:CT_RelativeRectProps/oac:fillRect")]
 pub struct FillRectRelativeRectProps {
   /// l
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :l
-  #[sdk(attr(qname = ":l"))]
+  #[sdk(attr(office2016, qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<crate::simple_type::Int32Value>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: Option<crate::simple_type::Int32Value>,
   /// b
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :b
-  #[sdk(attr(qname = ":b"))]
+  #[sdk(attr(office2016, qname = ":b"))]
   pub b: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the SrcRectRelativeRectProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:srcRect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_RelativeRectProps/oac:srcRect")]
+#[sdk(office2016, qname = "oac:CT_RelativeRectProps/oac:srcRect")]
 pub struct SrcRectRelativeRectProps {
   /// l
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :l
-  #[sdk(attr(qname = ":l"))]
+  #[sdk(attr(office2016, qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<crate::simple_type::Int32Value>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: Option<crate::simple_type::Int32Value>,
   /// b
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :b
-  #[sdk(attr(qname = ":b"))]
+  #[sdk(attr(office2016, qname = ":b"))]
   pub b: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the OpenXmlRelativeRectPropsElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_RelativeRectProps/")]
+#[sdk(office2016, qname = "oac:CT_RelativeRectProps/")]
 pub struct OpenXmlRelativeRectPropsElement {
   /// l
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :l
-  #[sdk(attr(qname = ":l"))]
+  #[sdk(attr(office2016, qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
   /// t
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
-  #[sdk(attr(qname = ":t"))]
+  #[sdk(attr(office2016, qname = ":t"))]
   pub t: Option<crate::simple_type::Int32Value>,
   /// r
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
-  #[sdk(attr(qname = ":r"))]
+  #[sdk(attr(office2016, qname = ":r"))]
   pub r: Option<crate::simple_type::Int32Value>,
   /// b
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :b
-  #[sdk(attr(qname = ":b"))]
+  #[sdk(attr(office2016, qname = ":b"))]
   pub b: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ResetBlipFillProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:blipFill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetBlipFillProperties/oac:blipFill")]
+#[sdk(office2016, qname = "oac:CT_ResetBlipFillProperties/oac:blipFill")]
 pub struct ResetBlipFillProperties {
   /// Defines the SrcRectEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:srcRect"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:srcRect"))]
   pub src_rect_empty: Option<()>,
   /// Defines the FillModeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fillMode"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:fillMode"))]
   pub fill_mode_empty: Option<()>,
   /// Defines the DpiEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:dpi"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:dpi"))]
   pub dpi_empty: Option<()>,
   /// Defines the RotWithShapeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:rotWithShape"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:rotWithShape"))]
   pub rot_with_shape_empty: Option<()>,
 }
 /// Defines the ModifyNonVisualGroupDrawingShapeProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvGrpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_ModifyNonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr"
+)]
 pub struct ModifyNonVisualGroupDrawingShapeProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noUngrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noUngrp
-  #[sdk(attr(qname = ":noUngrp"))]
+  #[sdk(attr(office2016, qname = ":noUngrp"))]
   pub no_ungrp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noRot
-  #[sdk(attr(qname = ":noRot"))]
+  #[sdk(attr(office2016, qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the GroupShapeProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:grpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GroupShapeProperties/oac:grpSpPr")]
+#[sdk(office2016, qname = "a:CT_GroupShapeProperties/oac:grpSpPr")]
 pub struct GroupShapeProperties {
   /// Black and White Mode
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :bwMode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
@@ -1779,74 +1126,46 @@ pub struct GroupShapeProperties {
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
 /// Defines the ResetGroupShapeProperties Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:grpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetGroupShapeProperties/oac:grpSpPr")]
+#[sdk(office2016, qname = "oac:CT_ResetGroupShapeProperties/oac:grpSpPr")]
 pub struct ResetGroupShapeProperties {
   /// Defines the XfrmEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:xfrm"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:xfrm"))]
   pub xfrm_empty: Option<()>,
   /// Defines the FillEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:fill"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:fill"))]
   pub fill_empty: Option<()>,
   /// Defines the EffectEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:effect"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:effect"))]
   pub effect_empty: Option<()>,
   /// Defines the Scene3dEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:scene3d"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:scene3d"))]
   pub scene3d_empty: Option<()>,
   /// Defines the ExtLstEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:extLst"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:extLst"))]
   pub ext_lst_empty: Option<()>,
   /// Defines the BwModeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:bwMode"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:bwMode"))]
   pub bw_mode_empty: Option<()>,
 }
 /// Defines the NonVisualDrawingProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualDrawingProps/oac:cNvPr")]
+#[sdk(office2016, qname = "a:CT_NonVisualDrawingProps/oac:cNvPr")]
 pub struct NonVisualDrawingProps {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
     /// Application defined unique identifier.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :id
     #[sdk(attr(qname = ":id"))]
     pub id: crate::simple_type::UInt32Value,
     /// Name compatible with Object Model (non-unique).
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :name
     #[sdk(attr(qname = ":name"))]
     pub name: crate::simple_type::StringValue,
     /// Description of the drawing element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :descr
     #[sdk(attr(qname = ":descr"))]
     pub description: Option<crate::simple_type::StringValue>,
     /// Flag determining to show or hide this element.
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :hidden
     #[sdk(attr(qname = ":hidden"))]
     pub hidden: Option<crate::simple_type::BooleanValue>,
     /// Title
-    ///
-    /// Available in Office2007 and above.
-    ///
-    /// Represents the following attribute in the schema: :title
     #[sdk(attr(qname = ":title"))]
     pub title: Option<crate::simple_type::StringValue>,
     /// Hyperlink associated with clicking or selecting the element.
@@ -1870,12 +1189,11 @@ pub struct NonVisualDrawingProps {
     >,
 }
 /// Defines the NonVisualGroupDrawingShapeProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvGrpSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr")]
+#[sdk(
+  office2016,
+  qname = "a:CT_NonVisualGroupDrawingShapeProps/oac:cNvGrpSpPr"
+)]
 pub struct NonVisualGroupDrawingShapeProps {
     /// _
     #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
@@ -1891,405 +1209,222 @@ pub struct NonVisualGroupDrawingShapeProps {
     >,
 }
 /// Defines the ModifyNonVisualGraphicFrameProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvGraphicFramePr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualGraphicFrameProps/oac:cNvGraphicFramePr")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_ModifyNonVisualGraphicFrameProps/oac:cNvGraphicFramePr"
+)]
 pub struct ModifyNonVisualGraphicFrameProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noDrilldown
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noDrilldown
-  #[sdk(attr(qname = ":noDrilldown"))]
+  #[sdk(attr(office2016, qname = ":noDrilldown"))]
   pub no_drilldown: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the StCxnConnection Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:stCxn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Connection/oac:stCxn")]
+#[sdk(office2016, qname = "a:CT_Connection/oac:stCxn")]
 pub struct StCxnConnection {
   /// Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
 }
 /// Defines the EndCxnConnection Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:endCxn.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Connection/oac:endCxn")]
+#[sdk(office2016, qname = "a:CT_Connection/oac:endCxn")]
 pub struct EndCxnConnection {
   /// Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
 }
 /// Defines the ConnectionType Class.
-///
-/// Available in Office2007 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/")]
 pub struct ConnectionType {
   /// Identifier
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   /// Index
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
 }
 /// Defines the ModifyNonVisualConnectorProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvCxnSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualConnectorProps/oac:cNvCxnSpPr")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_ModifyNonVisualConnectorProps/oac:cNvCxnSpPr"
+)]
 pub struct ModifyNonVisualConnectorProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noRot
-  #[sdk(attr(qname = ":noRot"))]
+  #[sdk(attr(office2016, qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noEditPoints
-  #[sdk(attr(qname = ":noEditPoints"))]
+  #[sdk(attr(office2016, qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noAdjustHandles
-  #[sdk(attr(qname = ":noAdjustHandles"))]
+  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeArrowheads
-  #[sdk(attr(qname = ":noChangeArrowheads"))]
+  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeShapeType
-  #[sdk(attr(qname = ":noChangeShapeType"))]
+  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "a:CT_Connection/oac:stCxn"))]
+  #[sdk(child(office2016, qname = "a:CT_Connection/oac:stCxn"))]
   pub st_cxn_connection: Option<StCxnConnection>,
   /// _
-  #[sdk(child(qname = "a:CT_Connection/oac:endCxn"))]
+  #[sdk(child(office2016, qname = "a:CT_Connection/oac:endCxn"))]
   pub end_cxn_connection: Option<EndCxnConnection>,
 }
 /// Defines the ResetNonVisualConnectorProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvCxnSpPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetNonVisualConnectorProps/oac:cNvCxnSpPr")]
+#[sdk(
+  office2016,
+  qname = "oac:CT_ResetNonVisualConnectorProps/oac:cNvCxnSpPr"
+)]
 pub struct ResetNonVisualConnectorProps {
   /// Defines the StCxnEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:stCxn"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:stCxn"))]
   pub st_cxn_empty: Option<()>,
   /// Defines the EndCxnEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:endCxn"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:endCxn"))]
   pub end_cxn_empty: Option<()>,
   /// Defines the NoGrpEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noGrp"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noGrp"))]
   pub no_grp_empty: Option<()>,
   /// Defines the NoSelectEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noSelect"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noSelect"))]
   pub no_select_empty: Option<()>,
   /// Defines the NoRotEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noRot"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noRot"))]
   pub no_rot_empty: Option<()>,
   /// Defines the NoChangeAspectEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeAspect"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noChangeAspect"))]
   pub no_change_aspect_empty: Option<()>,
   /// Defines the NoMoveEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noMove"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noMove"))]
   pub no_move_empty: Option<()>,
   /// Defines the NoResizeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noResize"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noResize"))]
   pub no_resize_empty: Option<()>,
   /// Defines the NoEditPointsEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noEditPoints"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noEditPoints"))]
   pub no_edit_points_empty: Option<()>,
   /// Defines the NoAdjustHandlesEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noAdjustHandles"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noAdjustHandles"))]
   pub no_adjust_handles_empty: Option<()>,
   /// Defines the NoChangeArrowheadsEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeArrowheads"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noChangeArrowheads"))]
   pub no_change_arrowheads_empty: Option<()>,
   /// Defines the NoChangeShapeTypeEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:noChangeShapeType"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:noChangeShapeType"))]
   pub no_change_shape_type_empty: Option<()>,
 }
 /// Defines the CompressPictureProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:compressPicPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_CompressPictureProps/oac:compressPicPr")]
+#[sdk(office2016, qname = "oac:CT_CompressPictureProps/oac:compressPicPr")]
 pub struct CompressPictureProps {
   /// removeCrop
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :removeCrop
-  #[sdk(attr(qname = ":removeCrop"))]
+  #[sdk(attr(office2016, qname = ":removeCrop"))]
   pub remove_crop: Option<crate::simple_type::BooleanValue>,
   /// useLocalDpi
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :useLocalDpi
-  #[sdk(attr(qname = ":useLocalDpi"))]
+  #[sdk(attr(office2016, qname = ":useLocalDpi"))]
   pub use_local_dpi: Option<crate::simple_type::BooleanValue>,
   /// cstate
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :cstate
-  #[sdk(attr(qname = ":cstate"))]
+  #[sdk(attr(office2016, qname = ":cstate"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub cstate:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
 }
 /// Defines the ModifyNonVisualPictureProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvPicPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualPictureProps/oac:cNvPicPr")]
+#[sdk(office2016, qname = "oac:CT_ModifyNonVisualPictureProps/oac:cNvPicPr")]
 pub struct ModifyNonVisualPictureProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noRot
-  #[sdk(attr(qname = ":noRot"))]
+  #[sdk(attr(office2016, qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noEditPoints
-  #[sdk(attr(qname = ":noEditPoints"))]
+  #[sdk(attr(office2016, qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noAdjustHandles
-  #[sdk(attr(qname = ":noAdjustHandles"))]
+  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeArrowheads
-  #[sdk(attr(qname = ":noChangeArrowheads"))]
+  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeShapeType
-  #[sdk(attr(qname = ":noChangeShapeType"))]
+  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// noCrop
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noCrop
-  #[sdk(attr(qname = ":noCrop"))]
+  #[sdk(attr(office2016, qname = ":noCrop"))]
   pub no_crop: Option<crate::simple_type::BooleanValue>,
   /// preferRelativeResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :preferRelativeResize
-  #[sdk(attr(qname = ":preferRelativeResize"))]
+  #[sdk(attr(office2016, qname = ":preferRelativeResize"))]
   pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ResetNonVisualPictureProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvPicPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetNonVisualPictureProps/oac:cNvPicPr")]
+#[sdk(office2016, qname = "oac:CT_ResetNonVisualPictureProps/oac:cNvPicPr")]
 pub struct ResetNonVisualPictureProps {
   /// Defines the LfPrEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:lfPr"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:lfPr"))]
   pub lf_pr_empty: Option<()>,
 }
 /// Defines the BoundRect Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:bounds.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_BoundRect/oac:bounds")]
+#[sdk(office2016, qname = "a:CT_BoundRect/oac:bounds")]
 pub struct BoundRect {
   /// l
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :l
   #[sdk(attr(qname = ":l"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2300,10 +1435,6 @@ pub struct BoundRect {
   ))]
   pub l: crate::simple_type::Int64Value,
   /// t
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :t
   #[sdk(attr(qname = ":t"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2314,10 +1445,6 @@ pub struct BoundRect {
   ))]
   pub t: crate::simple_type::Int64Value,
   /// r
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :r
   #[sdk(attr(qname = ":r"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2328,10 +1455,6 @@ pub struct BoundRect {
   ))]
   pub r: crate::simple_type::Int64Value,
   /// b
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :b
   #[sdk(attr(qname = ":b"))]
   #[sdk(number_range(
     source = 1u32,
@@ -2343,30 +1466,18 @@ pub struct BoundRect {
   pub b: crate::simple_type::Int64Value,
 }
 /// Defines the SVGBlipMonikerList Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:svgBlipMkLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_SVGBlipMonikerList/oac:svgBlipMkLst")]
+#[sdk(office2016, qname = "oac:CT_SVGBlipMonikerList/oac:svgBlipMkLst")]
 pub struct SvgBlipMonikerList {
   #[sdk(any)]
   pub xml_children: Vec<String>,
 }
 /// Defines the LinePropertiesType Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:lineProps.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_LineProperties/oac:lineProps")]
+#[sdk(office2016, qname = "a:CT_LineProperties/oac:lineProps")]
 pub struct LinePropertiesType {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :w
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(
     source = 0u32,
@@ -2377,28 +1488,16 @@ pub struct LinePropertiesType {
   ))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cap
   #[sdk(attr(qname = ":cap"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub cap_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineCapValues>,
   /// compound line type
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :cmpd
   #[sdk(attr(qname = ":cmpd"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub compound_line_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CompoundLineValues>,
   /// pen alignment
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :algn
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub alignment:
@@ -2434,340 +1533,176 @@ pub struct LinePropertiesType {
   >,
 }
 /// Defines the ModifyNonVisualInkProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:cNvInkPr.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyNonVisualInkProps/oac:cNvInkPr")]
+#[sdk(office2016, qname = "oac:CT_ModifyNonVisualInkProps/oac:cNvInkPr")]
 pub struct ModifyNonVisualInkProps {
   /// noGrp
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noGrp
-  #[sdk(attr(qname = ":noGrp"))]
+  #[sdk(attr(office2016, qname = ":noGrp"))]
   pub no_grp: Option<crate::simple_type::BooleanValue>,
   /// noSelect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noSelect
-  #[sdk(attr(qname = ":noSelect"))]
+  #[sdk(attr(office2016, qname = ":noSelect"))]
   pub no_select: Option<crate::simple_type::BooleanValue>,
   /// noRot
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noRot
-  #[sdk(attr(qname = ":noRot"))]
+  #[sdk(attr(office2016, qname = ":noRot"))]
   pub no_rot: Option<crate::simple_type::BooleanValue>,
   /// noChangeAspect
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeAspect
-  #[sdk(attr(qname = ":noChangeAspect"))]
+  #[sdk(attr(office2016, qname = ":noChangeAspect"))]
   pub no_change_aspect: Option<crate::simple_type::BooleanValue>,
   /// noMove
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noMove
-  #[sdk(attr(qname = ":noMove"))]
+  #[sdk(attr(office2016, qname = ":noMove"))]
   pub no_move: Option<crate::simple_type::BooleanValue>,
   /// noResize
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noResize
-  #[sdk(attr(qname = ":noResize"))]
+  #[sdk(attr(office2016, qname = ":noResize"))]
   pub no_resize: Option<crate::simple_type::BooleanValue>,
   /// noEditPoints
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noEditPoints
-  #[sdk(attr(qname = ":noEditPoints"))]
+  #[sdk(attr(office2016, qname = ":noEditPoints"))]
   pub no_edit_points: Option<crate::simple_type::BooleanValue>,
   /// noAdjustHandles
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noAdjustHandles
-  #[sdk(attr(qname = ":noAdjustHandles"))]
+  #[sdk(attr(office2016, qname = ":noAdjustHandles"))]
   pub no_adjust_handles: Option<crate::simple_type::BooleanValue>,
   /// noChangeArrowheads
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeArrowheads
-  #[sdk(attr(qname = ":noChangeArrowheads"))]
+  #[sdk(attr(office2016, qname = ":noChangeArrowheads"))]
   pub no_change_arrowheads: Option<crate::simple_type::BooleanValue>,
   /// noChangeShapeType
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :noChangeShapeType
-  #[sdk(attr(qname = ":noChangeShapeType"))]
+  #[sdk(attr(office2016, qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
   /// isComment
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :isComment
-  #[sdk(attr(qname = ":isComment"))]
+  #[sdk(attr(office2016, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the HlinkClickHyperlinkProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlinkClick.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_HyperlinkProps/oac:hlinkClick")]
+#[sdk(office2016, qname = "oac:CT_HyperlinkProps/oac:hlinkClick")]
 pub struct HlinkClickHyperlinkProps {
   /// source
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :source
-  #[sdk(attr(qname = ":source"))]
+  #[sdk(attr(office2016, qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// action
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :action
-  #[sdk(attr(qname = ":action"))]
+  #[sdk(attr(office2016, qname = ":action"))]
   pub action: Option<crate::simple_type::StringValue>,
   /// tgtFrame
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tgtFrame
-  #[sdk(attr(qname = ":tgtFrame"))]
+  #[sdk(attr(office2016, qname = ":tgtFrame"))]
   pub tgt_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tooltip
-  #[sdk(attr(qname = ":tooltip"))]
+  #[sdk(attr(office2016, qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// highlightClick
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :highlightClick
-  #[sdk(attr(qname = ":highlightClick"))]
+  #[sdk(attr(office2016, qname = ":highlightClick"))]
   pub highlight_click: Option<crate::simple_type::BooleanValue>,
   /// endSnd
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :endSnd
-  #[sdk(attr(qname = ":endSnd"))]
+  #[sdk(attr(office2016, qname = ":endSnd"))]
   pub end_snd: Option<crate::simple_type::BooleanValue>,
   /// sndName
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sndName
-  #[sdk(attr(qname = ":sndName"))]
+  #[sdk(attr(office2016, qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "oac:CT_ImgData/oac:sndData"))]
+  #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
   pub snd_data_img_data: Option<crate::simple_type::Base64BinaryValue>,
 }
 /// Defines the HlinkHoverHyperlinkProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlinkHover.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_HyperlinkProps/oac:hlinkHover")]
+#[sdk(office2016, qname = "oac:CT_HyperlinkProps/oac:hlinkHover")]
 pub struct HlinkHoverHyperlinkProps {
   /// source
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :source
-  #[sdk(attr(qname = ":source"))]
+  #[sdk(attr(office2016, qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// action
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :action
-  #[sdk(attr(qname = ":action"))]
+  #[sdk(attr(office2016, qname = ":action"))]
   pub action: Option<crate::simple_type::StringValue>,
   /// tgtFrame
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tgtFrame
-  #[sdk(attr(qname = ":tgtFrame"))]
+  #[sdk(attr(office2016, qname = ":tgtFrame"))]
   pub tgt_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tooltip
-  #[sdk(attr(qname = ":tooltip"))]
+  #[sdk(attr(office2016, qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// highlightClick
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :highlightClick
-  #[sdk(attr(qname = ":highlightClick"))]
+  #[sdk(attr(office2016, qname = ":highlightClick"))]
   pub highlight_click: Option<crate::simple_type::BooleanValue>,
   /// endSnd
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :endSnd
-  #[sdk(attr(qname = ":endSnd"))]
+  #[sdk(attr(office2016, qname = ":endSnd"))]
   pub end_snd: Option<crate::simple_type::BooleanValue>,
   /// sndName
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sndName
-  #[sdk(attr(qname = ":sndName"))]
+  #[sdk(attr(office2016, qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "oac:CT_ImgData/oac:sndData"))]
+  #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
   pub snd_data_img_data: Option<crate::simple_type::Base64BinaryValue>,
 }
 /// Defines the OpenXmlHyperlinkPropsElement Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is .
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_HyperlinkProps/")]
+#[sdk(office2016, qname = "oac:CT_HyperlinkProps/")]
 pub struct OpenXmlHyperlinkPropsElement {
   /// source
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :source
-  #[sdk(attr(qname = ":source"))]
+  #[sdk(attr(office2016, qname = ":source"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// action
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :action
-  #[sdk(attr(qname = ":action"))]
+  #[sdk(attr(office2016, qname = ":action"))]
   pub action: Option<crate::simple_type::StringValue>,
   /// tgtFrame
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tgtFrame
-  #[sdk(attr(qname = ":tgtFrame"))]
+  #[sdk(attr(office2016, qname = ":tgtFrame"))]
   pub tgt_frame: Option<crate::simple_type::StringValue>,
   /// tooltip
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :tooltip
-  #[sdk(attr(qname = ":tooltip"))]
+  #[sdk(attr(office2016, qname = ":tooltip"))]
   pub tooltip: Option<crate::simple_type::StringValue>,
   /// highlightClick
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :highlightClick
-  #[sdk(attr(qname = ":highlightClick"))]
+  #[sdk(attr(office2016, qname = ":highlightClick"))]
   pub highlight_click: Option<crate::simple_type::BooleanValue>,
   /// endSnd
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :endSnd
-  #[sdk(attr(qname = ":endSnd"))]
+  #[sdk(attr(office2016, qname = ":endSnd"))]
   pub end_snd: Option<crate::simple_type::BooleanValue>,
   /// sndName
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :sndName
-  #[sdk(attr(qname = ":sndName"))]
+  #[sdk(attr(office2016, qname = ":sndName"))]
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(text_child(qname = "oac:CT_ImgData/oac:sndData"))]
+  #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
   pub snd_data_img_data: Vec<crate::simple_type::Base64BinaryValue>,
 }
 /// Defines the ModifyHyperlinkProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ModifyHyperlinkProps/oac:hlink")]
+#[sdk(office2016, qname = "oac:CT_ModifyHyperlinkProps/oac:hlink")]
 pub struct ModifyHyperlinkProps {
   /// _
-  #[sdk(child(qname = "oac:CT_HyperlinkProps/oac:hlinkClick"))]
+  #[sdk(child(office2016, qname = "oac:CT_HyperlinkProps/oac:hlinkClick"))]
   pub hlink_click_hyperlink_props: Option<HlinkClickHyperlinkProps>,
   /// _
-  #[sdk(child(qname = "oac:CT_HyperlinkProps/oac:hlinkHover"))]
+  #[sdk(child(office2016, qname = "oac:CT_HyperlinkProps/oac:hlinkHover"))]
   pub hlink_hover_hyperlink_props: Option<HlinkHoverHyperlinkProps>,
 }
 /// Defines the ResetHyperlinkProps Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:hlink.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_ResetHyperlinkProps/oac:hlink")]
+#[sdk(office2016, qname = "oac:CT_ResetHyperlinkProps/oac:hlink")]
 pub struct ResetHyperlinkProps {
   /// Defines the HlinkClickEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:hlinkClick"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:hlinkClick"))]
   pub hlink_click_empty: Option<()>,
   /// Defines the HlinkHoverEmpty Class.
-  #[sdk(empty_child(qname = "oac:CT_Empty/oac:hlinkHover"))]
+  #[sdk(empty_child(office2016, qname = "oac:CT_Empty/oac:hlinkHover"))]
   pub hlink_hover_empty: Option<()>,
 }
 /// Defines the TextCharRangeContext Class.
-///
-/// Available in Office2016 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is oac:context.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "oac:CT_TextCharRangeContext/oac:context")]
+#[sdk(office2016, qname = "oac:CT_TextCharRangeContext/oac:context")]
 pub struct TextCharRangeContext {
   /// len
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :len
-  #[sdk(attr(qname = ":len"))]
+  #[sdk(attr(office2016, qname = ":len"))]
   pub len: Option<crate::simple_type::UInt32Value>,
   /// hash
-  ///
-  /// Available in Office2016 and above.
-  ///
-  /// Represents the following attribute in the schema: :hash
-  #[sdk(attr(qname = ":hash"))]
+  #[sdk(attr(office2016, qname = ":hash"))]
   pub hash: crate::simple_type::UInt32Value,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupCommandChoice {
-  #[sdk(child(qname = "oac:CT_ShapeMoniker/oac:spMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_ShapeMoniker/oac:spMk"))]
   OacSpMk(std::boxed::Box<ShapeMoniker>),
-  #[sdk(child(qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk"))]
   OacGrpSpMk(std::boxed::Box<GroupShapeMoniker>),
-  #[sdk(child(qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk"))]
   OacGraphicFrameMk(std::boxed::Box<GraphicFrameMoniker>),
-  #[sdk(child(qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk"))]
   OacCxnSpMk(std::boxed::Box<ConnectorMoniker>),
-  #[sdk(child(qname = "oac:CT_PictureMoniker/oac:picMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_PictureMoniker/oac:picMk"))]
   OacPicMk(std::boxed::Box<PictureMoniker>),
-  #[sdk(child(qname = "oac:CT_InkMoniker/oac:inkMk"))]
+  #[sdk(child(office2016, qname = "oac:CT_InkMoniker/oac:inkMk"))]
   OacInkMk(std::boxed::Box<InkMoniker>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

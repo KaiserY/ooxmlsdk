@@ -5,44 +5,28 @@
 //
 
 /// Defines the NamedSheetViews Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:namedSheetViews.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_NamedSheetViews/xnsv:namedSheetViews")]
+#[sdk(office2021, qname = "xnsv:CT_NamedSheetViews/xnsv:namedSheetViews")]
 pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   /// _
-  #[sdk(child(qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView"))]
+  #[sdk(child(office2021, qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView"))]
   pub xnsv_named_sheet_view: Vec<NamedSheetView>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xnsv:extLst"))]
+  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
 /// Defines the NamedSheetView Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:namedSheetView.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView")]
+#[sdk(office2021, qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView")]
 pub struct NamedSheetView {
   /// name
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :name
-  #[sdk(attr(qname = ":name"))]
+  #[sdk(attr(office2021, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
   /// id
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2021, qname = ":id"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -50,19 +34,15 @@ pub struct NamedSheetView {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// _
-  #[sdk(child(qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter"))]
+  #[sdk(child(office2021, qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter"))]
   pub xnsv_nsv_filter: Vec<NsvFilter>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xnsv:extLst"))]
+  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:extLst.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_ExtensionList/xnsv:extLst")]
+#[sdk(office2021, qname = "x:CT_ExtensionList/xnsv:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
@@ -70,19 +50,11 @@ pub struct ExtensionList {
   pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the NsvFilter Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:nsvFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter")]
+#[sdk(office2021, qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter")]
 pub struct NsvFilter {
   /// filterId
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :filterId
-  #[sdk(attr(qname = ":filterId"))]
+  #[sdk(attr(office2021, qname = ":filterId"))]
   #[sdk(pattern(
     source = 1u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -90,50 +62,30 @@ pub struct NsvFilter {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub filter_id: crate::simple_type::StringValue,
   /// ref
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2021, qname = ":ref"))]
   pub r#ref: Option<crate::simple_type::StringValue>,
   /// tableId
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :tableId
-  #[sdk(attr(qname = ":tableId"))]
+  #[sdk(attr(office2021, qname = ":tableId"))]
   pub table_id: Option<crate::simple_type::UInt32Value>,
   /// _
-  #[sdk(child(qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter"))]
+  #[sdk(child(office2021, qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter"))]
   pub xnsv_column_filter: Vec<ColumnFilter>,
   /// _
-  #[sdk(child(qname = "xnsv:CT_SortRules/xnsv:sortRules"))]
+  #[sdk(child(office2021, qname = "xnsv:CT_SortRules/xnsv:sortRules"))]
   pub xnsv_sort_rules: Option<std::boxed::Box<SortRules>>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xnsv:extLst"))]
+  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ColumnFilter Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:columnFilter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter")]
+#[sdk(office2021, qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter")]
 pub struct ColumnFilter {
   /// colId
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :colId
-  #[sdk(attr(qname = ":colId"))]
+  #[sdk(attr(office2021, qname = ":colId"))]
   pub col_id: crate::simple_type::UInt32Value,
   /// id
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2021, qname = ":id"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -141,52 +93,36 @@ pub struct ColumnFilter {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_Dxf/xnsv:dxf"))]
+  #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   /// _
-  #[sdk(child(qname = "x:CT_FilterColumn/xnsv:filter"))]
+  #[sdk(child(office2021, qname = "x:CT_FilterColumn/xnsv:filter"))]
   pub xnsv_filter: Vec<FilterColumn>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xnsv:extLst"))]
+  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
 /// Defines the SortRules Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:sortRules.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_SortRules/xnsv:sortRules")]
+#[sdk(office2021, qname = "xnsv:CT_SortRules/xnsv:sortRules")]
 pub struct SortRules {
   /// sortMethod
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortMethod
-  #[sdk(attr(qname = ":sortMethod"))]
+  #[sdk(attr(office2021, qname = ":sortMethod"))]
   pub sort_method:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortMethodValues>,
   /// caseSensitive
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :caseSensitive
-  #[sdk(attr(qname = ":caseSensitive"))]
+  #[sdk(attr(office2021, qname = ":caseSensitive"))]
   pub case_sensitive: Option<crate::simple_type::BooleanValue>,
   /// _
-  #[sdk(child(qname = "xnsv:CT_SortRule/xnsv:sortRule"))]
+  #[sdk(child(office2021, qname = "xnsv:CT_SortRule/xnsv:sortRule"))]
   pub xnsv_sort_rule: Vec<SortRule>,
   /// _
-  #[sdk(child(qname = "x:CT_ExtensionList/xnsv:extLst"))]
+  #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
 /// Defines the DifferentialFormatType Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:dxf.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Dxf/xnsv:dxf")]
+#[sdk(office2021, qname = "x:CT_Dxf/xnsv:dxf")]
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
@@ -221,32 +157,16 @@ pub struct DifferentialFormatType {
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
 }
 /// Defines the FilterColumn Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:filter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_FilterColumn/xnsv:filter")]
+#[sdk(office2021, qname = "x:CT_FilterColumn/xnsv:filter")]
 pub struct FilterColumn {
   /// Filter Column Data
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :colId
   #[sdk(attr(qname = ":colId"))]
   pub column_id: crate::simple_type::UInt32Value,
   /// Hidden AutoFilter Button
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :hiddenButton
   #[sdk(attr(qname = ":hiddenButton"))]
   pub hidden_button: Option<crate::simple_type::BooleanValue>,
   /// Show Filter Button
-  ///
-  /// Available in Office2007 and above.
-  ///
-  /// Represents the following attribute in the schema: :showButton
   #[sdk(attr(qname = ":showButton"))]
   pub show_button: Option<crate::simple_type::BooleanValue>,
   #[sdk(choice(
@@ -263,26 +183,14 @@ pub struct FilterColumn {
   pub xml_children: Option<FilterColumnChoice>,
 }
 /// Defines the SortRule Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:sortRule.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xnsv:CT_SortRule/xnsv:sortRule")]
+#[sdk(office2021, qname = "xnsv:CT_SortRule/xnsv:sortRule")]
 pub struct SortRule {
   /// colId
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :colId
-  #[sdk(attr(qname = ":colId"))]
+  #[sdk(attr(office2021, qname = ":colId"))]
   pub col_id: crate::simple_type::UInt32Value,
   /// id
-  ///
-  /// Available in Office2021 and above.
-  ///
-  /// Represents the following attribute in the schema: :id
-  #[sdk(attr(qname = ":id"))]
+  #[sdk(attr(office2021, qname = ":id"))]
   #[sdk(pattern(
     source = 0u32,
     regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
@@ -290,141 +198,77 @@ pub struct SortRule {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// _
-  #[sdk(child(qname = "x:CT_Dxf/xnsv:dxf"))]
+  #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   #[sdk(choice(
+    microsoft365,
     qname = "x14:CT_SortCondition/xnsv:sortCondition",
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
   ))]
   pub sort_rule_choice: Option<SortRuleChoice>,
 }
 /// Defines the SortCondition Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:sortCondition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x14:CT_SortCondition/xnsv:sortCondition")]
+#[sdk(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition")]
 pub struct SortCondition {
   /// descending
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :descending
-  #[sdk(attr(qname = ":descending"))]
+  #[sdk(attr(office2010, qname = ":descending"))]
   pub descending: Option<crate::simple_type::BooleanValue>,
   /// sortBy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortBy
-  #[sdk(attr(qname = ":sortBy"))]
+  #[sdk(attr(office2010, qname = ":sortBy"))]
   pub sort_by:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortByValues>,
   /// ref
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2010, qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
   /// customList
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :customList
-  #[sdk(attr(qname = ":customList"))]
+  #[sdk(attr(office2010, qname = ":customList"))]
   pub custom_list: Option<crate::simple_type::StringValue>,
   /// dxfId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dxfId
-  #[sdk(attr(qname = ":dxfId"))]
+  #[sdk(attr(office2010, qname = ":dxfId"))]
   pub format_id: Option<crate::simple_type::UInt32Value>,
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set: Option<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconSetTypeValues,
   >,
   /// iconId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconId
-  #[sdk(attr(qname = ":iconId"))]
+  #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the RichSortCondition Class.
-///
-/// Available in Office2021 and above.
-///
-/// When the object is serialized out as xml, it's qualified name is xnsv:richSortCondition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition")]
+#[sdk(
+  office2021,
+  qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
+)]
 pub struct RichSortCondition {
   /// richSortKey
-  ///
-  /// Available in Office2019 and above.
-  ///
-  /// Represents the following attribute in the schema: :richSortKey
-  #[sdk(attr(qname = ":richSortKey"))]
+  #[sdk(attr(office2019, qname = ":richSortKey"))]
   pub rich_sort_key: Option<crate::simple_type::StringValue>,
   /// descending
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :descending
-  #[sdk(attr(qname = ":descending"))]
+  #[sdk(attr(office2010, qname = ":descending"))]
   pub descending: Option<crate::simple_type::BooleanValue>,
   /// sortBy
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :sortBy
-  #[sdk(attr(qname = ":sortBy"))]
+  #[sdk(attr(office2010, qname = ":sortBy"))]
   pub sort_by:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortByValues>,
   /// ref
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :ref
-  #[sdk(attr(qname = ":ref"))]
+  #[sdk(attr(office2010, qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
   /// customList
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :customList
-  #[sdk(attr(qname = ":customList"))]
+  #[sdk(attr(office2010, qname = ":customList"))]
   pub custom_list: Option<crate::simple_type::StringValue>,
   /// dxfId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :dxfId
-  #[sdk(attr(qname = ":dxfId"))]
+  #[sdk(attr(office2010, qname = ":dxfId"))]
   pub format_id: Option<crate::simple_type::UInt32Value>,
   /// iconSet
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconSet
-  #[sdk(attr(qname = ":iconSet"))]
+  #[sdk(attr(office2010, qname = ":iconSet"))]
   pub icon_set: Option<
     crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconSetTypeValues,
   >,
   /// iconId
-  ///
-  /// Available in Office2010 and above.
-  ///
-  /// Represents the following attribute in the schema: :iconId
-  #[sdk(attr(qname = ":iconId"))]
+  #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -440,7 +284,7 @@ pub enum FilterColumnChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Top10>,
   ),
   /// Defines the CustomFilters Class.
-  #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
+  #[sdk(child(office2010, qname = "x14:CT_CustomFilters/x14:customFilters"))]
   X14CustomFilters(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CustomFilters,
@@ -468,7 +312,7 @@ pub enum FilterColumnChoice {
     >,
   ),
   /// Defines the IconFilter Class.
-  #[sdk(child(qname = "x14:CT_IconFilter/x14:iconFilter"))]
+  #[sdk(child(office2010, qname = "x14:CT_IconFilter/x14:iconFilter"))]
   X14IconFilter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconFilter,
@@ -489,8 +333,11 @@ pub enum FilterColumnChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortRuleChoice {
-  #[sdk(child(qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
+  #[sdk(child(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
   XnsvSortCondition(std::boxed::Box<SortCondition>),
-  #[sdk(child(qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"))]
+  #[sdk(child(
+    office2021,
+    qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
+  ))]
   XnsvRichSortCondition(std::boxed::Box<RichSortCondition>),
 }

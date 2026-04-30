@@ -43,12 +43,9 @@ pub struct TwoCellAnchor {
     qname = "xdr:CT_GroupShape/xdr:grpSp",
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic"
+    qname = "xdr:CT_Picture/xdr:pic",
+    qname = "xdr14:CT_ContentPart/xdr:contentPart"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
-  )]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -75,12 +72,9 @@ pub struct OneCellAnchor {
     qname = "xdr:CT_GroupShape/xdr:grpSp",
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic"
+    qname = "xdr:CT_Picture/xdr:pic",
+    qname = "xdr14:CT_ContentPart/xdr:contentPart"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
-  )]
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -107,12 +101,9 @@ pub struct AbsoluteAnchor {
     qname = "xdr:CT_GroupShape/xdr:grpSp",
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
-    qname = "xdr:CT_Picture/xdr:pic"
+    qname = "xdr:CT_Picture/xdr:pic",
+    qname = "xdr14:CT_ContentPart/xdr:contentPart"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "xdr14:CT_ContentPart/xdr:contentPart"))
-  )]
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// _
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
@@ -189,13 +180,10 @@ pub struct GroupShape {
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
     qname = "xdr:CT_Picture/xdr:pic",
+    qname = "xdr14:CT_ContentPart/xdr14:contentPart",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "xdr14:CT_ContentPart/xdr14:contentPart"))
-  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
@@ -298,7 +286,6 @@ pub struct Picture {
   #[sdk(child(qname = "a:CT_ShapeStyle/xdr:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ContentPart Class.
 ///
 /// Available in Office2010 and above.
@@ -1051,7 +1038,6 @@ pub enum TwoCellAnchorChoice {
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
 }
@@ -1067,7 +1053,6 @@ pub enum OneCellAnchorChoice {
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
 }
@@ -1083,7 +1068,6 @@ pub enum AbsoluteAnchorChoice {
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
 }
@@ -1099,7 +1083,6 @@ pub enum GroupShapeChoice {
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "xdr14:CT_ContentPart/xdr14:contentPart"))]
   Xdr14ContentPart(
     std::boxed::Box<

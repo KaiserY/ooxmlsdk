@@ -1297,7 +1297,6 @@ pub enum CalendarValues {
   Gregorian,
   #[sdk(rename = "hijri")]
   Hijri,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "umalqura")]
   Umalqura,
   #[sdk(rename = "hebrew")]
@@ -1316,16 +1315,12 @@ pub enum CalendarValues {
   GregorianTransliteratedEnglish,
   #[sdk(rename = "gregorianXlitFrench")]
   GregorianTransliteratedFrench,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "gregorianUs")]
   GregorianUs,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "gregorianMeFrench")]
   GregorianMeFrench,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "gregorianArabic")]
   GregorianArabic,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "none")]
   None,
 }
@@ -1452,13 +1447,10 @@ pub enum NumberFormatValues {
   ThaiNumbers,
   #[sdk(rename = "thaiCounting")]
   ThaiCounting,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "bahtText")]
   BahtText,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "dollarText")]
   DollarText,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "custom")]
   Custom,
 }
@@ -1467,32 +1459,26 @@ pub enum TextDirectionValues {
   #[sdk(rename = "lrTb")]
   #[default]
   LefToRightTopToBottom,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "tb")]
   LeftToRightTopToBottom2010,
   #[sdk(rename = "tbRl")]
   TopToBottomRightToLeft,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "rl")]
   TopToBottomRightToLeft2010,
   #[sdk(rename = "btLr")]
   BottomToTopLeftToRight,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lr")]
   BottomToTopLeftToRight2010,
   #[sdk(rename = "lrTbV")]
   LefttoRightTopToBottomRotated,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "tbV")]
   LeftToRightTopToBottomRotated2010,
   #[sdk(rename = "tbRlV")]
   TopToBottomRightToLeftRotated,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "rlV")]
   TopToBottomRightToLeftRotated2010,
   #[sdk(rename = "tbLrV")]
   TopToBottomLeftToRightRotated,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lrV")]
   TopToBottomLeftToRightRotated2010,
 }
@@ -1501,7 +1487,6 @@ pub enum CryptAlgorithmValues {
   #[sdk(rename = "typeAny")]
   #[default]
   TypeAny,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "custom")]
   Custom,
 }
@@ -1510,7 +1495,6 @@ pub enum CryptAlgorithmClassValues {
   #[sdk(rename = "hash")]
   #[default]
   Hash,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "custom")]
   Custom,
 }
@@ -1521,7 +1505,6 @@ pub enum CryptProviderValues {
   RsaAdvancedEncryptionStandard,
   #[sdk(rename = "rsaFull")]
   RsaFull,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "custom")]
   Custom,
 }
@@ -1530,14 +1513,12 @@ pub enum JustificationValues {
   #[sdk(rename = "left")]
   #[default]
   Left,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "start")]
   Start,
   #[sdk(rename = "center")]
   Center,
   #[sdk(rename = "right")]
   Right,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "end")]
   End,
   #[sdk(rename = "both")]
@@ -2048,13 +2029,10 @@ pub enum CompatSettingNameValues {
   DoNotFlipMirrorIndents,
   #[sdk(rename = "differentiateMultirowTableHeaders")]
   DifferentiateMultirowTableHeaders,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "useWord2013TrackBottomHyphenation")]
   UseWord2013TrackBottomHyphenation,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "allowHyphenationAtTrackBottom")]
   AllowHyphenationAtTrackBottom,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "allowTextAfterFloatingTableBreak")]
   AllowTextAfterFloatingTableBreak,
 }
@@ -2081,7 +2059,6 @@ pub struct CellInsertion {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2134,7 +2111,6 @@ pub struct CellDeletion {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2187,7 +2163,6 @@ pub struct CustomXmlInsRangeStart {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2240,7 +2215,6 @@ pub struct CustomXmlDelRangeStart {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2293,7 +2267,6 @@ pub struct CustomXmlMoveFromRangeStart {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2346,7 +2319,6 @@ pub struct CustomXmlMoveToRangeStart {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2399,7 +2371,6 @@ pub struct Inserted {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2452,7 +2423,6 @@ pub struct Deleted {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2505,7 +2475,6 @@ pub struct MoveFrom {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2558,7 +2527,6 @@ pub struct MoveTo {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2612,7 +2580,6 @@ pub struct TrackChangeType {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -2680,7 +2647,6 @@ pub struct CellMerge {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -3486,7 +3452,6 @@ pub struct CustomXmlPlaceholder {
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the TableCaption Class.
 ///
 /// Available in Office2010 and above.
@@ -3503,7 +3468,6 @@ pub struct TableCaption {
   #[sdk(attr(qname = "w:val"))]
   pub val: crate::simple_type::StringValue,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the TableDescription Class.
 ///
 /// Available in Office2010 and above.
@@ -7246,7 +7210,6 @@ pub struct Indentation {
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
   pub left: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// start
   ///
   /// Available in Office2010 and above.
@@ -7268,7 +7231,6 @@ pub struct Indentation {
   /// Represents the following attribute in the schema: w:leftChars
   #[sdk(attr(qname = "w:leftChars"))]
   pub left_chars: Option<crate::simple_type::Int32Value>,
-  #[cfg(feature = "microsoft365")]
   /// startChars
   ///
   /// Available in Office2010 and above.
@@ -7290,7 +7252,6 @@ pub struct Indentation {
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
   pub right: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// end
   ///
   /// Available in Office2010 and above.
@@ -7312,7 +7273,6 @@ pub struct Indentation {
   /// Represents the following attribute in the schema: w:rightChars
   #[sdk(attr(qname = "w:rightChars"))]
   pub right_chars: Option<crate::simple_type::Int32Value>,
-  #[cfg(feature = "microsoft365")]
   /// endChars
   ///
   /// Available in Office2010 and above.
@@ -7675,7 +7635,6 @@ pub struct ParagraphPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -7942,7 +7901,6 @@ pub struct EmbeddedObject {
   /// Represents the following attribute in the schema: w:dyaOrig
   #[sdk(attr(qname = "w:dyaOrig"))]
   pub dya_original: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// anchorId
   ///
   /// Available in Office2010 and above.
@@ -7985,7 +7943,6 @@ pub struct EmbeddedObject {
 #[sdk(qname = "w:CT_Picture/w:pict")]
 pub struct Picture {
   pub xml_other_attrs: Vec<(String, String)>,
-  #[cfg(feature = "microsoft365")]
   /// anchorId
   ///
   /// Available in Office2010 and above.
@@ -9548,7 +9505,6 @@ pub struct BarBorder {
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the StartBorder Class.
 ///
 /// Available in Office2010 and above.
@@ -9640,7 +9596,6 @@ pub struct StartBorder {
   #[sdk(attr(qname = "w:frame"))]
   pub frame: Option<crate::simple_type::OnOffValue>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the EndBorder Class.
 ///
 /// Available in Office2010 and above.
@@ -10415,7 +10370,6 @@ pub struct RunPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -10572,21 +10526,17 @@ pub struct RunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Shadow Class.
   #[sdk(child(qname = "w14:CT_Shadow/w14:shadow"))]
   pub shadow14:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Shadow>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect: Option<
@@ -10594,43 +10544,35 @@ pub struct RunProperties {
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect,
     >,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
@@ -10664,7 +10606,6 @@ pub struct InsertedMathControl {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -10720,7 +10661,6 @@ pub struct DeletedMathControl {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -10778,7 +10718,6 @@ pub struct MoveFromMathControl {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -10839,7 +10778,6 @@ pub struct MoveToMathControl {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -10899,7 +10837,6 @@ pub struct MathControlMoveType {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11188,10 +11125,17 @@ pub struct HyperlinkRuby {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -11217,18 +11161,6 @@ pub struct HyperlinkRuby {
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<HyperlinkRubyChoice>,
 }
 /// Phonetic Guide Text Run.
@@ -11340,18 +11272,13 @@ pub struct SdtRunRuby {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub sdt_run_ruby_choice: Vec<SdtRunRubyChoice>,
 }
 /// Defines the ProofError Class.
@@ -11470,7 +11397,6 @@ pub struct InsertedRun {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11585,7 +11511,6 @@ pub struct DeletedRun {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11700,7 +11625,6 @@ pub struct MoveFromRun {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11815,7 +11739,6 @@ pub struct MoveToRun {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11930,7 +11853,6 @@ pub struct RunTrackChangeType {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -11980,10 +11902,17 @@ pub struct RunTrackChangeType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -12006,25 +11935,12 @@ pub struct RunTrackChangeType {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
-    qname = "w:CT_R/w:r"
+    qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel",
-      qname = "w:CT_BdoContentRun/w:bdo",
-      qname = "w:CT_DirContentRun/w:dir"
-    ))
-  )]
   pub xml_children: Vec<RunTrackChangeTypeChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ContentPart Class.
 ///
 /// Available in Office2010 and above.
@@ -12076,18 +11992,13 @@ pub struct SdtRun {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub sdt_run_choice: Vec<SdtRunChoice>,
 }
 /// Defines the CustomXmlBlock Class.
@@ -12177,18 +12088,13 @@ pub struct SdtBlock {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub sdt_block_choice: Vec<SdtBlockChoice>,
 }
 /// Defines the Paragraph Class.
@@ -12240,7 +12146,6 @@ pub struct Paragraph {
   #[sdk(attr(qname = "w:rsidRDefault"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_run_addition_default: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// paraId
   ///
   /// Available in Office2010 and above.
@@ -12249,7 +12154,6 @@ pub struct Paragraph {
   #[sdk(attr(qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// textId
   ///
   /// Available in Office2010 and above.
@@ -12258,7 +12162,6 @@ pub struct Paragraph {
   #[sdk(attr(qname = "w14:textId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub text_id: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// noSpellErr
   ///
   /// Available in Office2010 and above.
@@ -12361,17 +12264,12 @@ pub struct Table {
     qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
-    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"
+    qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub table_choice1: Vec<TableChoice>,
   /// _
   #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
@@ -12402,23 +12300,18 @@ pub struct Table {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
-    qname = "w:CT_RunTrackChange/w:moveTo"
+    qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub table_choice2: Vec<TableChoice2>,
 }
 /// Table Row.
@@ -12462,7 +12355,6 @@ pub struct TableRow {
   #[sdk(attr(qname = "w:rsidTr"))]
   #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
   pub rsid_table_row_properties: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// paraId
   ///
   /// Available in Office2010 and above.
@@ -12471,7 +12363,6 @@ pub struct TableRow {
   #[sdk(attr(qname = "w14:paraId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub paragraph_id: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// textId
   ///
   /// Available in Office2010 and above.
@@ -12611,18 +12502,13 @@ pub struct SdtRow {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub sdt_row_choice: Vec<SdtRowChoice>,
 }
 /// Table Cell.
@@ -12764,18 +12650,13 @@ pub struct SdtCell {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"
-    ))
-  )]
   pub sdt_cell_choice: Vec<SdtCellChoice>,
 }
 /// Defines the CustomXmlRun Class.
@@ -13034,10 +12915,17 @@ pub struct Hyperlink {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -13061,27 +12949,14 @@ pub struct Hyperlink {
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r",
     qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
     qname = "w:CT_Rel/w:subDoc",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel",
-      qname = "w:CT_BdoContentRun/w:bdo",
-      qname = "w:CT_DirContentRun/w:dir"
-    ))
-  )]
   pub xml_children: Vec<HyperlinkChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the BidirectionalOverride Class.
 ///
 /// Available in Office2010 and above.
@@ -13161,7 +13036,6 @@ pub struct BidirectionalOverride {
   ))]
   pub xml_children: Vec<BidirectionalOverrideChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the BidirectionalEmbedding Class.
 ///
 /// Available in Office2010 and above.
@@ -13419,7 +13293,6 @@ pub struct ConditionalFormatStyle {
   #[sdk(pattern(source = 3u32, regex = "[01]*"))]
   #[sdk(string_length(source = 3u32, min = 12u32, max = 12u32))]
   pub val: crate::simple_type::StringValue,
-  #[cfg(feature = "microsoft365")]
   /// firstRow
   ///
   /// Available in Office2010 and above.
@@ -13427,7 +13300,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:firstRow
   #[sdk(attr(qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastRow
   ///
   /// Available in Office2010 and above.
@@ -13435,7 +13307,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:lastRow
   #[sdk(attr(qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// firstColumn
   ///
   /// Available in Office2010 and above.
@@ -13443,7 +13314,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:firstColumn
   #[sdk(attr(qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastColumn
   ///
   /// Available in Office2010 and above.
@@ -13451,7 +13321,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:lastColumn
   #[sdk(attr(qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// oddVBand
   ///
   /// Available in Office2010 and above.
@@ -13459,7 +13328,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:oddVBand
   #[sdk(attr(qname = "w:oddVBand"))]
   pub odd_vertical_band: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// evenVBand
   ///
   /// Available in Office2010 and above.
@@ -13467,7 +13335,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:evenVBand
   #[sdk(attr(qname = "w:evenVBand"))]
   pub even_vertical_band: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// oddHBand
   ///
   /// Available in Office2010 and above.
@@ -13475,7 +13342,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:oddHBand
   #[sdk(attr(qname = "w:oddHBand"))]
   pub odd_horizontal_band: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// evenHBand
   ///
   /// Available in Office2010 and above.
@@ -13483,7 +13349,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:evenHBand
   #[sdk(attr(qname = "w:evenHBand"))]
   pub even_horizontal_band: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// firstRowFirstColumn
   ///
   /// Available in Office2010 and above.
@@ -13491,7 +13356,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:firstRowFirstColumn
   #[sdk(attr(qname = "w:firstRowFirstColumn"))]
   pub first_row_first_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// firstRowLastColumn
   ///
   /// Available in Office2010 and above.
@@ -13499,7 +13363,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:firstRowLastColumn
   #[sdk(attr(qname = "w:firstRowLastColumn"))]
   pub first_row_last_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastRowFirstColumn
   ///
   /// Available in Office2010 and above.
@@ -13507,7 +13370,6 @@ pub struct ConditionalFormatStyle {
   /// Represents the following attribute in the schema: w:lastRowFirstColumn
   #[sdk(attr(qname = "w:lastRowFirstColumn"))]
   pub last_row_first_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastRowLastColumn
   ///
   /// Available in Office2010 and above.
@@ -13684,7 +13546,6 @@ pub struct TopMargin {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the StartMargin Class.
 ///
 /// Available in Office2010 and above.
@@ -13741,7 +13602,6 @@ pub struct BottomMargin {
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the EndMargin Class.
 ///
 /// Available in Office2010 and above.
@@ -13902,7 +13762,6 @@ pub struct TableCellBorders {
   /// Table Cell Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
@@ -13912,7 +13771,6 @@ pub struct TableCellBorders {
   /// Table Cell Right Border
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
@@ -14265,7 +14123,6 @@ pub struct TableCellMargin {
   /// Table Cell Left Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
   pub left_margin: Option<LeftMargin>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
@@ -14275,7 +14132,6 @@ pub struct TableCellMargin {
   /// Table Cell Right Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
   pub right_margin: Option<RightMargin>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
@@ -14592,7 +14448,6 @@ pub struct TableBorders {
   /// Table Left Border
   #[sdk(child(qname = "w:CT_Border/w:left"))]
   pub left_border: Option<LeftBorder>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:start"))]
   pub start_border: Option<StartBorder>,
@@ -14602,7 +14457,6 @@ pub struct TableBorders {
   /// Table Right Border
   #[sdk(child(qname = "w:CT_Border/w:right"))]
   pub right_border: Option<RightBorder>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_Border/w:end"))]
   pub end_border: Option<EndBorder>,
@@ -14645,7 +14499,6 @@ pub struct TableCellMarginDefault {
   /// Table Cell Left Margin Default
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
@@ -14655,7 +14508,6 @@ pub struct TableCellMarginDefault {
   /// Table Cell Right Margin Default
   #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
@@ -14728,7 +14580,6 @@ pub struct TableLook {
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// firstRow
   ///
   /// Available in Office2010 and above.
@@ -14736,7 +14587,6 @@ pub struct TableLook {
   /// Represents the following attribute in the schema: w:firstRow
   #[sdk(attr(qname = "w:firstRow"))]
   pub first_row: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastRow
   ///
   /// Available in Office2010 and above.
@@ -14744,7 +14594,6 @@ pub struct TableLook {
   /// Represents the following attribute in the schema: w:lastRow
   #[sdk(attr(qname = "w:lastRow"))]
   pub last_row: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// firstColumn
   ///
   /// Available in Office2010 and above.
@@ -14752,7 +14601,6 @@ pub struct TableLook {
   /// Represents the following attribute in the schema: w:firstColumn
   #[sdk(attr(qname = "w:firstColumn"))]
   pub first_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// lastColumn
   ///
   /// Available in Office2010 and above.
@@ -14760,7 +14608,6 @@ pub struct TableLook {
   /// Represents the following attribute in the schema: w:lastColumn
   #[sdk(attr(qname = "w:lastColumn"))]
   pub last_column: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// noHBand
   ///
   /// Available in Office2010 and above.
@@ -14768,7 +14615,6 @@ pub struct TableLook {
   /// Represents the following attribute in the schema: w:noHBand
   #[sdk(attr(qname = "w:noHBand"))]
   pub no_horizontal_band: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// noVBand
   ///
   /// Available in Office2010 and above.
@@ -15295,25 +15141,20 @@ pub struct TextBoxContent {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<TextBoxContentChoice>,
 }
 /// Comments Collection.
@@ -15398,25 +15239,20 @@ pub struct Header {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<HeaderChoice>,
 }
 /// Footer.
@@ -15455,25 +15291,20 @@ pub struct Footer {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<FooterChoice>,
 }
 /// Defines the HeaderFooterType Class.
@@ -15510,25 +15341,20 @@ pub struct HeaderFooterType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<HeaderFooterTypeChoice>,
 }
 /// Document Settings.
@@ -15839,31 +15665,25 @@ pub struct Settings {
   /// _
   #[sdk(child(qname = "w:CT_String/w:listSeparator"))]
   pub w_list_separator: Option<ListSeparator>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w14:CT_LongHexNumber/w14:docId"))]
   pub w14_doc_id: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DocumentId>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w14:CT_OnOff/w14:discardImageEditingData"))]
   pub w14_discard_image_editing_data:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DiscardImageEditingData>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w14:CT_DefaultImageDpi/w14:defaultImageDpi"))]
   pub w14_default_image_dpi:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::DefaultImageDpi>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w14:CT_OnOff/w14:conflictMode"))]
   pub w14_conflict_mode:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ConflictMode>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_OnOff/w15:chartTrackingRefBased"))]
   pub w15_chart_tracking_ref_based:
     Option<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::ChartTrackingRefBased>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w15:CT_Guid/w15:docId"))]
   pub w15_doc_id:
@@ -16193,11 +16013,9 @@ pub struct PreviousTableProperties {
   /// Defines the TableLook Class.
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "w:CT_String/w:tblDescription"))]
   pub table_description: Option<TableDescription>,
@@ -16301,7 +16119,6 @@ pub struct PreviousSectionProperties {
   /// Defines the PrinterSettingsReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FootnoteColumns Class.
   #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
@@ -16541,53 +16358,42 @@ pub struct PreviousRunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Vec<SpecVanish>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
@@ -16615,15 +16421,10 @@ pub struct PreviousParagraphMarkRunProperties {
   /// Move Destination Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
-  #[cfg(feature = "microsoft365")]
-  #[sdk(choice)]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:conflictIns",
-      qname = "w:CT_TrackChange/w14:conflictDel"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "w:CT_TrackChange/w14:conflictIns",
+    qname = "w:CT_TrackChange/w14:conflictDel"
+  ))]
   pub previous_paragraph_mark_run_properties_choice:
     Option<PreviousParagraphMarkRunPropertiesChoice>,
   /// Defines the RunStyle Class.
@@ -16740,53 +16541,42 @@ pub struct PreviousParagraphMarkRunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Vec<SpecVanish>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
   pub glow: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Vec<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
@@ -16917,7 +16707,6 @@ pub struct NumberingChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -17006,15 +16795,10 @@ pub struct ParagraphMarkRunProperties {
   /// Move Destination Paragraph
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
-  #[cfg(feature = "microsoft365")]
-  #[sdk(choice)]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:conflictIns",
-      qname = "w:CT_TrackChange/w14:conflictDel"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "w:CT_TrackChange/w14:conflictIns",
+    qname = "w:CT_TrackChange/w14:conflictDel"
+  ))]
   pub paragraph_mark_run_properties_choice: Option<ParagraphMarkRunPropertiesChoice>,
   /// Defines the RunStyle Class.
   #[sdk(child(qname = "w:CT_String253/w:rStyle"))]
@@ -17130,16 +16914,13 @@ pub struct ParagraphMarkRunProperties {
   /// Defines the SpecVanish Class.
   #[sdk(child(qname = "w:CT_OnOff/w:specVanish"))]
   pub spec_vanish: Option<SpecVanish>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Glow Class.
   #[sdk(child(qname = "w14:CT_Glow/w14:glow"))]
   pub glow:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Glow>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Reflection Class.
   #[sdk(child(qname = "w14:CT_Reflection/w14:reflection"))]
   pub reflection: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Reflection>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TextOutlineEffect Class.
   #[sdk(child(qname = "w14:CT_TextOutlineEffect/w14:textOutline"))]
   pub text_outline_effect: Option<
@@ -17147,43 +16928,35 @@ pub struct ParagraphMarkRunProperties {
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::TextOutlineEffect,
     >,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FillTextEffect Class.
   #[sdk(child(qname = "w14:CT_FillTextEffect/w14:textFill"))]
   pub fill_text_effect: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::FillTextEffect>,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Scene3D Class.
   #[sdk(child(qname = "w14:CT_Scene3D/w14:scene3d"))]
   pub scene3_d:
     Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Scene3D>>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Properties3D Class.
   #[sdk(child(qname = "w14:CT_Props3D/w14:props3d"))]
   pub properties3_d: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Properties3D>,
   >,
-  #[cfg(feature = "microsoft365")]
   /// Defines the Ligatures Class.
   #[sdk(child(qname = "w14:CT_Ligatures/w14:ligatures"))]
   pub ligatures: Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::Ligatures>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberingFormat Class.
   #[sdk(child(qname = "w14:CT_NumForm/w14:numForm"))]
   pub numbering_format:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberingFormat>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the NumberSpacing Class.
   #[sdk(child(qname = "w14:CT_NumSpacing/w14:numSpacing"))]
   pub number_spacing:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::NumberSpacing>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the StylisticSets Class.
   #[sdk(child(qname = "w14:CT_StylisticSets/w14:stylisticSets"))]
   pub stylistic_sets:
     Option<crate::schemas::schemas_microsoft_com_office_word_2010_wordml::StylisticSets>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the ContextualAlternatives Class.
   #[sdk(child(qname = "w14:CT_OnOff/w14:cntxtAlts"))]
   pub contextual_alternatives:
@@ -17300,7 +17073,6 @@ pub struct SectionProperties {
   /// Defines the PrinterSettingsReference Class.
   #[sdk(child(qname = "w:CT_Rel/w:printerSettings"))]
   pub printer_settings_reference: Option<PrinterSettingsReference>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the FootnoteColumns Class.
   #[sdk(child(qname = "w:CT_DecimalNumber/w15:footnoteColumns"))]
   pub footnote_columns:
@@ -17712,7 +17484,6 @@ pub struct SectionPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -17769,7 +17540,6 @@ pub struct ParagraphMarkRunPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -17924,10 +17694,17 @@ pub struct RubyContent {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -17953,18 +17730,6 @@ pub struct RubyContent {
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<RubyContentChoice>,
 }
 /// Phonetic Guide Base Text.
@@ -18001,10 +17766,17 @@ pub struct RubyBase {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -18030,18 +17802,6 @@ pub struct RubyBase {
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<RubyBaseChoice>,
 }
 /// Defines the RubyContentType Class.
@@ -18077,10 +17837,17 @@ pub struct RubyContentType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -18104,18 +17871,6 @@ pub struct RubyContentType {
     qname = "m:CT_SSup/m:sSup",
     qname = "m:CT_R/m:r"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<RubyContentTypeChoice>,
 }
 /// Custom XML Data Date Storage Format.
@@ -18189,9 +17944,14 @@ pub struct SdtProperties {
     qname = "w:CT_Placeholder/w:placeholder",
     qname = "w:CT_OnOff/w:showingPlcHdr",
     qname = "w:CT_DataBinding/w:dataBinding",
+    qname = "w:CT_DataBinding/w15:dataBinding",
     qname = "w:CT_OnOff/w:temporary",
     qname = "w:CT_DecimalNumber/w:id",
     qname = "w:CT_String/w:tag",
+    qname = "w:CT_Color/w15:color",
+    qname = "w15:CT_SdtAppearance/w15:appearance",
+    qname = "w:CT_OnOff/w15:webExtensionLinked",
+    qname = "w:CT_OnOff/w15:webExtensionCreated",
     qname = "w:CT_Empty/w:equation",
     qname = "w:CT_SdtComboBox/w:comboBox",
     qname = "w:CT_SdtDate/w:date",
@@ -18204,23 +17964,13 @@ pub struct SdtProperties {
     qname = "w:CT_Empty/w:citation",
     qname = "w:CT_Empty/w:group",
     qname = "w:CT_Empty/w:bibliography",
+    qname = "w:CT_Empty/w14:entityPicker",
+    qname = "w14:CT_SdtCheckbox/w14:checkbox",
+    qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection",
+    qname = "w:CT_Empty/w15:repeatingSectionItem",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_DataBinding/w15:dataBinding",
-      qname = "w:CT_Color/w15:color",
-      qname = "w15:CT_SdtAppearance/w15:appearance",
-      qname = "w:CT_OnOff/w15:webExtensionLinked",
-      qname = "w:CT_OnOff/w15:webExtensionCreated",
-      qname = "w:CT_Empty/w14:entityPicker",
-      qname = "w14:CT_SdtCheckbox/w14:checkbox",
-      qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection",
-      qname = "w:CT_Empty/w15:repeatingSectionItem"
-    ))
-  )]
   pub xml_children: Vec<SdtPropertiesChoice>,
 }
 /// Structured Document Tag End Character Properties.
@@ -18268,25 +18018,20 @@ pub struct SdtContentBlock {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<SdtContentBlockChoice>,
 }
 /// Inline-Level Structured Document Tag Content.
@@ -18323,10 +18068,17 @@ pub struct SdtContentRun {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -18349,24 +18101,12 @@ pub struct SdtContentRun {
     qname = "m:CT_SSubSup/m:sSubSup",
     qname = "m:CT_SSup/m:sSup",
     qname = "w:CT_R/w:r",
+    qname = "w:CT_BdoContentRun/w:bdo",
+    qname = "w:CT_DirContentRun/w:dir",
     qname = "w:CT_Rel/w:subDoc",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel",
-      qname = "w:CT_BdoContentRun/w:bdo",
-      qname = "w:CT_DirContentRun/w:dir"
-    ))
-  )]
   pub xml_children: Vec<SdtContentRunChoice>,
 }
 /// Defines the SdtContentRunRuby Class.
@@ -18403,10 +18143,17 @@ pub struct SdtContentRunRuby {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_Acc/m:acc",
@@ -18432,18 +18179,6 @@ pub struct SdtContentRunRuby {
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<SdtContentRunRubyChoice>,
 }
 /// Cell-Level Structured Document Tag Content.
@@ -18478,25 +18213,20 @@ pub struct SdtContentCell {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<SdtContentCellChoice>,
 }
 /// Row-Level Structured Document Tag Content.
@@ -18531,25 +18261,20 @@ pub struct SdtContentRow {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<SdtContentRowChoice>,
 }
 /// Custom XML Element Properties.
@@ -18680,7 +18405,6 @@ pub struct TableCellPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -18796,7 +18520,6 @@ pub struct TablePropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -18853,7 +18576,6 @@ pub struct TablePropertyExceptionsChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -18935,11 +18657,9 @@ pub struct TableProperties {
   /// Defines the TableLook Class.
   #[sdk(child(qname = "w:CT_TblLook/w:tblLook"))]
   pub table_look: Option<TableLook>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TableCaption Class.
   #[sdk(child(qname = "w:CT_String/w:tblCaption"))]
   pub table_caption: Option<TableCaption>,
-  #[cfg(feature = "microsoft365")]
   /// Defines the TableDescription Class.
   #[sdk(child(qname = "w:CT_String/w:tblDescription"))]
   pub table_description: Option<TableDescription>,
@@ -18994,7 +18714,6 @@ pub struct NumberingFormat {
   /// Represents the following attribute in the schema: w:val
   #[sdk(attr(qname = "w:val"))]
   pub val: NumberFormatValues,
-  #[cfg(feature = "microsoft365")]
   /// format
   ///
   /// Available in Office2010 and above.
@@ -21434,7 +21153,6 @@ pub struct Comment {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -21678,25 +21396,20 @@ pub struct FootnoteEndnoteType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<FootnoteEndnoteTypeChoice>,
 }
 /// Entry Insertion Behavior.
@@ -22167,26 +21880,21 @@ pub struct BodyType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "w:CT_SectPr/w:sectPr",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<BodyTypeChoice>,
 }
 /// Glossary Document Entry.
@@ -22382,15 +22090,10 @@ pub struct TableRowProperties {
   /// Revision Information for Table Row Properties.
   #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
   pub table_row_properties_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
-  #[cfg(feature = "microsoft365")]
-  #[sdk(choice)]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:conflictIns",
-      qname = "w:CT_TrackChange/w14:conflictDel"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "w:CT_TrackChange/w14:conflictIns",
+    qname = "w:CT_TrackChange/w14:conflictDel"
+  ))]
   pub table_row_properties_choice2: Option<TableRowPropertiesChoice2>,
 }
 /// Revision Information for Table Row Properties.
@@ -22417,7 +22120,6 @@ pub struct TableRowPropertiesChange {
   /// Represents the following attribute in the schema: w:date
   #[sdk(attr(qname = "w:date"))]
   pub date: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateUtc
   ///
   /// Available in Microsoft365 and above.
@@ -23013,7 +22715,6 @@ pub struct WriteProtection {
   /// Represents the following attribute in the schema: w:salt
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// algorithmName
   ///
   /// Available in Office2010 and above.
@@ -23021,7 +22722,6 @@ pub struct WriteProtection {
   /// Represents the following attribute in the schema: w:algorithmName
   #[sdk(attr(qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// hashValue
   ///
   /// Available in Office2010 and above.
@@ -23029,7 +22729,6 @@ pub struct WriteProtection {
   /// Represents the following attribute in the schema: w:hashValue
   #[sdk(attr(qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// saltValue
   ///
   /// Available in Office2010 and above.
@@ -23037,7 +22736,6 @@ pub struct WriteProtection {
   /// Represents the following attribute in the schema: w:saltValue
   #[sdk(attr(qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// spinCount
   ///
   /// Available in Office2010 and above.
@@ -23183,7 +22881,6 @@ pub struct StylePaneFormatFilter {
   #[sdk(attr(qname = "w:val"))]
   #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
   pub w_val: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// allStyles
   ///
   /// Available in Office2010 and above.
@@ -23191,7 +22888,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:allStyles
   #[sdk(attr(qname = "w:allStyles"))]
   pub all_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// customStyles
   ///
   /// Available in Office2010 and above.
@@ -23199,7 +22895,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:customStyles
   #[sdk(attr(qname = "w:customStyles"))]
   pub custom_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// latentStyles
   ///
   /// Available in Office2010 and above.
@@ -23207,7 +22902,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:latentStyles
   #[sdk(attr(qname = "w:latentStyles"))]
   pub latent_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// stylesInUse
   ///
   /// Available in Office2010 and above.
@@ -23215,7 +22909,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:stylesInUse
   #[sdk(attr(qname = "w:stylesInUse"))]
   pub styles_in_use: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// headingStyles
   ///
   /// Available in Office2010 and above.
@@ -23223,7 +22916,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:headingStyles
   #[sdk(attr(qname = "w:headingStyles"))]
   pub heading_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// numberingStyles
   ///
   /// Available in Office2010 and above.
@@ -23231,7 +22923,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:numberingStyles
   #[sdk(attr(qname = "w:numberingStyles"))]
   pub numbering_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// tableStyles
   ///
   /// Available in Office2010 and above.
@@ -23239,7 +22930,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:tableStyles
   #[sdk(attr(qname = "w:tableStyles"))]
   pub table_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// directFormattingOnRuns
   ///
   /// Available in Office2010 and above.
@@ -23247,7 +22937,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:directFormattingOnRuns
   #[sdk(attr(qname = "w:directFormattingOnRuns"))]
   pub direct_formatting_on_runs: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// directFormattingOnParagraphs
   ///
   /// Available in Office2010 and above.
@@ -23255,7 +22944,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:directFormattingOnParagraphs
   #[sdk(attr(qname = "w:directFormattingOnParagraphs"))]
   pub direct_formatting_on_paragraphs: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// directFormattingOnNumbering
   ///
   /// Available in Office2010 and above.
@@ -23263,7 +22951,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:directFormattingOnNumbering
   #[sdk(attr(qname = "w:directFormattingOnNumbering"))]
   pub direct_formatting_on_numbering: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// directFormattingOnTables
   ///
   /// Available in Office2010 and above.
@@ -23271,7 +22958,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:directFormattingOnTables
   #[sdk(attr(qname = "w:directFormattingOnTables"))]
   pub direct_formatting_on_tables: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// clearFormatting
   ///
   /// Available in Office2010 and above.
@@ -23279,7 +22965,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:clearFormatting
   #[sdk(attr(qname = "w:clearFormatting"))]
   pub clear_formatting: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// top3HeadingStyles
   ///
   /// Available in Office2010 and above.
@@ -23287,7 +22972,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:top3HeadingStyles
   #[sdk(attr(qname = "w:top3HeadingStyles"))]
   pub top3_heading_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// visibleStyles
   ///
   /// Available in Office2010 and above.
@@ -23295,7 +22979,6 @@ pub struct StylePaneFormatFilter {
   /// Represents the following attribute in the schema: w:visibleStyles
   #[sdk(attr(qname = "w:visibleStyles"))]
   pub visible_styles: Option<crate::simple_type::OnOffValue>,
-  #[cfg(feature = "microsoft365")]
   /// alternateStyleNames
   ///
   /// Available in Office2010 and above.
@@ -23584,7 +23267,6 @@ pub struct DocumentProtection {
   /// Represents the following attribute in the schema: w:salt
   #[sdk(attr(qname = "w:salt"))]
   pub salt: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// algorithmName
   ///
   /// Available in Office2010 and above.
@@ -23592,7 +23274,6 @@ pub struct DocumentProtection {
   /// Represents the following attribute in the schema: w:algorithmName
   #[sdk(attr(qname = "w:algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// hashValue
   ///
   /// Available in Office2010 and above.
@@ -23600,7 +23281,6 @@ pub struct DocumentProtection {
   /// Represents the following attribute in the schema: w:hashValue
   #[sdk(attr(qname = "w:hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// saltValue
   ///
   /// Available in Office2010 and above.
@@ -23608,7 +23288,6 @@ pub struct DocumentProtection {
   /// Represents the following attribute in the schema: w:saltValue
   #[sdk(attr(qname = "w:saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// spinCount
   ///
   /// Available in Office2010 and above.
@@ -24934,7 +24613,6 @@ pub enum CustomXmlRubyChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -24942,7 +24620,6 @@ pub enum CustomXmlRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -24950,7 +24627,6 @@ pub enum CustomXmlRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -24958,7 +24634,6 @@ pub enum CustomXmlRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -24978,11 +24653,9 @@ pub enum CustomXmlRubyChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -25242,7 +24915,6 @@ pub enum SimpleFieldRubyChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -25250,7 +24922,6 @@ pub enum SimpleFieldRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -25258,7 +24929,6 @@ pub enum SimpleFieldRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -25266,7 +24936,6 @@ pub enum SimpleFieldRubyChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -25286,11 +24955,9 @@ pub enum SimpleFieldRubyChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -25541,28 +25208,24 @@ pub enum HyperlinkRubyChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -25577,10 +25240,8 @@ pub enum HyperlinkRubyChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -25878,7 +25539,6 @@ pub enum SdtRunRubyChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -25886,7 +25546,6 @@ pub enum SdtRunRubyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -25894,7 +25553,6 @@ pub enum SdtRunRubyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -25902,7 +25560,6 @@ pub enum SdtRunRubyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -25976,7 +25633,6 @@ pub enum InsertedRunChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -25984,7 +25640,6 @@ pub enum InsertedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -25992,7 +25647,6 @@ pub enum InsertedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -26000,7 +25654,6 @@ pub enum InsertedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -26020,11 +25673,9 @@ pub enum InsertedRunChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -26209,11 +25860,9 @@ pub enum InsertedRunChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -26283,7 +25932,6 @@ pub enum DeletedRunChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -26291,7 +25939,6 @@ pub enum DeletedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -26299,7 +25946,6 @@ pub enum DeletedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -26307,7 +25953,6 @@ pub enum DeletedRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -26327,11 +25972,9 @@ pub enum DeletedRunChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -26516,11 +26159,9 @@ pub enum DeletedRunChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -26590,7 +26231,6 @@ pub enum MoveFromRunChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -26598,7 +26238,6 @@ pub enum MoveFromRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -26606,7 +26245,6 @@ pub enum MoveFromRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -26614,7 +26252,6 @@ pub enum MoveFromRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -26634,11 +26271,9 @@ pub enum MoveFromRunChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -26823,11 +26458,9 @@ pub enum MoveFromRunChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -26897,7 +26530,6 @@ pub enum MoveToRunChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -26905,7 +26537,6 @@ pub enum MoveToRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -26913,7 +26544,6 @@ pub enum MoveToRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -26921,7 +26551,6 @@ pub enum MoveToRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -26941,11 +26570,9 @@ pub enum MoveToRunChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -27130,11 +26757,9 @@ pub enum MoveToRunChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -27207,7 +26832,6 @@ pub enum RunTrackChangeTypeChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -27215,7 +26839,6 @@ pub enum RunTrackChangeTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -27223,7 +26846,6 @@ pub enum RunTrackChangeTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -27231,7 +26853,6 @@ pub enum RunTrackChangeTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -27251,11 +26872,9 @@ pub enum RunTrackChangeTypeChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictInsertion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
@@ -27263,7 +26882,6 @@ pub enum RunTrackChangeTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictDeletion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
@@ -27428,11 +27046,9 @@ pub enum RunTrackChangeTypeChoice {
     /// Phonetic Guide Text Run.
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the BidirectionalOverride Class.
     #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the BidirectionalEmbedding Class.
     #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -27487,7 +27103,6 @@ pub enum SdtRunChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -27495,7 +27110,6 @@ pub enum SdtRunChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -27503,7 +27117,6 @@ pub enum SdtRunChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -27511,7 +27124,6 @@ pub enum SdtRunChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -27597,7 +27209,6 @@ pub enum CustomXmlBlockChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -27605,7 +27216,6 @@ pub enum CustomXmlBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -27613,7 +27223,6 @@ pub enum CustomXmlBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -27621,7 +27230,6 @@ pub enum CustomXmlBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -27641,11 +27249,9 @@ pub enum CustomXmlBlockChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -27721,7 +27327,6 @@ pub enum SdtBlockChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -27729,7 +27334,6 @@ pub enum SdtBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -27737,7 +27341,6 @@ pub enum SdtBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -27745,7 +27348,6 @@ pub enum SdtBlockChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -27819,7 +27421,6 @@ pub enum ParagraphChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -27827,7 +27428,6 @@ pub enum ParagraphChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -27835,7 +27435,6 @@ pub enum ParagraphChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -27843,7 +27442,6 @@ pub enum ParagraphChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -27863,11 +27461,9 @@ pub enum ParagraphChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -28061,11 +27657,9 @@ pub enum ParagraphChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -28129,7 +27723,6 @@ pub enum TableChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28137,7 +27730,6 @@ pub enum TableChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28145,7 +27737,6 @@ pub enum TableChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28153,7 +27744,6 @@ pub enum TableChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28230,7 +27820,6 @@ pub enum TableChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28238,7 +27827,6 @@ pub enum TableChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28246,7 +27834,6 @@ pub enum TableChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28254,7 +27841,6 @@ pub enum TableChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28274,11 +27860,9 @@ pub enum TableChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -28366,7 +27950,6 @@ pub enum TableRowChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28374,7 +27957,6 @@ pub enum TableRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28382,7 +27964,6 @@ pub enum TableRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28390,7 +27971,6 @@ pub enum TableRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28410,11 +27990,9 @@ pub enum TableRowChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -28508,7 +28086,6 @@ pub enum CustomXmlRowChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28516,7 +28093,6 @@ pub enum CustomXmlRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28524,7 +28100,6 @@ pub enum CustomXmlRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28532,7 +28107,6 @@ pub enum CustomXmlRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28552,11 +28126,9 @@ pub enum CustomXmlRowChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -28632,7 +28204,6 @@ pub enum SdtRowChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28640,7 +28211,6 @@ pub enum SdtRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28648,7 +28218,6 @@ pub enum SdtRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28656,7 +28225,6 @@ pub enum SdtRowChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28745,7 +28313,6 @@ pub enum TableCellChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28753,7 +28320,6 @@ pub enum TableCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28761,7 +28327,6 @@ pub enum TableCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28769,7 +28334,6 @@ pub enum TableCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28789,11 +28353,9 @@ pub enum TableCellChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -28887,7 +28449,6 @@ pub enum CustomXmlCellChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -28895,7 +28456,6 @@ pub enum CustomXmlCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -28903,7 +28463,6 @@ pub enum CustomXmlCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -28911,7 +28470,6 @@ pub enum CustomXmlCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -28931,11 +28489,9 @@ pub enum CustomXmlCellChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -29011,7 +28567,6 @@ pub enum SdtCellChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -29019,7 +28574,6 @@ pub enum SdtCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -29027,7 +28581,6 @@ pub enum SdtCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -29035,7 +28588,6 @@ pub enum SdtCellChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -29109,7 +28661,6 @@ pub enum CustomXmlRunChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -29117,7 +28668,6 @@ pub enum CustomXmlRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -29125,7 +28675,6 @@ pub enum CustomXmlRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -29133,7 +28682,6 @@ pub enum CustomXmlRunChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -29153,11 +28701,9 @@ pub enum CustomXmlRunChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -29351,11 +28897,9 @@ pub enum CustomXmlRunChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -29428,7 +28972,6 @@ pub enum SimpleFieldChoice2 {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -29436,7 +28979,6 @@ pub enum SimpleFieldChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -29444,7 +28986,6 @@ pub enum SimpleFieldChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -29452,7 +28993,6 @@ pub enum SimpleFieldChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -29472,11 +29012,9 @@ pub enum SimpleFieldChoice2 {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -29670,11 +29208,9 @@ pub enum SimpleFieldChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<Run>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalOverride Class.
   #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
   WBdo(std::boxed::Box<BidirectionalOverride>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
@@ -29736,28 +29272,24 @@ pub enum HyperlinkChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -29772,10 +29304,8 @@ pub enum HyperlinkChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -29928,10 +29458,8 @@ pub enum HyperlinkChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
@@ -29943,7 +29471,6 @@ pub enum HyperlinkChoice {
     #[sdk(text)]
     XmlText(crate::simple_type::StringValue),
 }
-#[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BidirectionalOverrideChoice {
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
@@ -30185,7 +29712,6 @@ pub enum BidirectionalOverrideChoice {
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
     WSubDoc(std::boxed::Box<SubDocumentReference>),
 }
-#[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BidirectionalEmbeddingChoice {
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
@@ -30477,28 +30003,24 @@ pub enum TextBoxContentChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -30513,10 +30035,8 @@ pub enum TextBoxContentChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -30592,28 +30112,24 @@ pub enum HeaderChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -30628,10 +30144,8 @@ pub enum HeaderChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -30707,28 +30221,24 @@ pub enum FooterChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -30743,10 +30253,8 @@ pub enum FooterChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -30846,7 +30354,6 @@ pub enum HeaderFooterTypeChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -30854,7 +30361,6 @@ pub enum HeaderFooterTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -30862,7 +30368,6 @@ pub enum HeaderFooterTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -30870,7 +30375,6 @@ pub enum HeaderFooterTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -30890,11 +30394,9 @@ pub enum HeaderFooterTypeChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictInsertion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
@@ -30902,7 +30404,6 @@ pub enum HeaderFooterTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictDeletion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
@@ -30959,7 +30460,6 @@ pub enum PreviousTableRowPropertiesChoice {
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
 }
-#[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousParagraphMarkRunPropertiesChoice {
   #[sdk(child(qname = "w:CT_TrackChange/w14:conflictIns"))]
@@ -30975,7 +30475,6 @@ pub enum PreviousParagraphMarkRunPropertiesChoice {
     >,
   ),
 }
-#[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphMarkRunPropertiesChoice {
   #[sdk(child(qname = "w:CT_TrackChange/w14:conflictIns"))]
@@ -31084,28 +30583,24 @@ pub enum RubyContentChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -31120,10 +30615,8 @@ pub enum RubyContentChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -31331,28 +30824,24 @@ pub enum RubyBaseChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -31367,10 +30856,8 @@ pub enum RubyBaseChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -31602,7 +31089,6 @@ pub enum RubyContentTypeChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -31610,7 +31096,6 @@ pub enum RubyContentTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -31618,7 +31103,6 @@ pub enum RubyContentTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -31626,7 +31110,6 @@ pub enum RubyContentTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -31646,11 +31129,9 @@ pub enum RubyContentTypeChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictInsertion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
@@ -31658,7 +31139,6 @@ pub enum RubyContentTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictDeletion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
@@ -31835,7 +31315,6 @@ pub enum SdtPropertiesChoice {
   WShowingPlcHdr(std::boxed::Box<ShowingPlaceholder>),
   #[sdk(child(qname = "w:CT_DataBinding/w:dataBinding"))]
   WDataBinding(std::boxed::Box<DataBinding>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w:CT_DataBinding/w15:dataBinding"))]
   W15DataBinding(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::DataBinding>,
@@ -31846,22 +31325,18 @@ pub enum SdtPropertiesChoice {
   WId(std::boxed::Box<SdtId>),
   #[sdk(child(qname = "w:CT_String/w:tag"))]
   WTag(std::boxed::Box<Tag>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w:CT_Color/w15:color"))]
   W15Color(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::Color>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w15:CT_SdtAppearance/w15:appearance"))]
   W15Appearance(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word_2012_wordml::Appearance>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w:CT_OnOff/w15:webExtensionLinked"))]
   W15WebExtensionLinked(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2012_wordml::WebExtensionLinked,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w:CT_OnOff/w15:webExtensionCreated"))]
   W15WebExtensionCreated(
     std::boxed::Box<
@@ -31898,25 +31373,21 @@ pub enum SdtPropertiesChoice {
   /// Defines the SdtContentBibliography Class.
   #[sdk(empty_child(qname = "w:CT_Empty/w:bibliography"))]
   WBibliography,
-  #[cfg(feature = "microsoft365")]
   /// Defines the EntityPickerEmpty Class.
   #[sdk(empty_child(qname = "w:CT_Empty/w14:entityPicker"))]
   W14EntityPicker,
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w14:CT_SdtCheckbox/w14:checkbox"))]
   W14Checkbox(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2010_wordml::SdtContentCheckBox,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection"))]
   W15RepeatingSection(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_word_2012_wordml::SdtRepeatedSection,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   /// Defines the SdtRepeatedSectionItem Class.
   #[sdk(empty_child(qname = "w:CT_Empty/w15:repeatingSectionItem"))]
   W15RepeatingSectionItem,
@@ -31975,28 +31446,24 @@ pub enum SdtContentBlockChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -32011,10 +31478,8 @@ pub enum SdtContentBlockChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -32094,28 +31559,24 @@ pub enum SdtContentRunChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -32130,10 +31591,8 @@ pub enum SdtContentRunChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -32280,10 +31739,8 @@ pub enum SdtContentRunChoice {
     ),
     #[sdk(child(qname = "w:CT_R/w:r"))]
     WR(std::boxed::Box<Run>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_BdoContentRun/w:bdo"))]
     WBdo(std::boxed::Box<BidirectionalOverride>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_DirContentRun/w:dir"))]
     WDir(std::boxed::Box<BidirectionalEmbedding>),
     #[sdk(child(qname = "w:CT_Rel/w:subDoc"))]
@@ -32345,28 +31802,24 @@ pub enum SdtContentRunRubyChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -32381,10 +31834,8 @@ pub enum SdtContentRunRubyChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -32588,28 +32039,24 @@ pub enum SdtContentCellChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -32624,10 +32071,8 @@ pub enum SdtContentCellChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -32699,28 +32144,24 @@ pub enum SdtContentRowChoice {
     WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -32735,10 +32176,8 @@ pub enum SdtContentRowChoice {
     WMoveFrom(std::boxed::Box<MoveFromRun>),
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -32921,7 +32360,6 @@ pub enum FootnoteChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -32929,7 +32367,6 @@ pub enum FootnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -32937,7 +32374,6 @@ pub enum FootnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -32945,7 +32381,6 @@ pub enum FootnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -32965,11 +32400,9 @@ pub enum FootnoteChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -33069,7 +32502,6 @@ pub enum EndnoteChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -33077,7 +32509,6 @@ pub enum EndnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -33085,7 +32516,6 @@ pub enum EndnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -33093,7 +32523,6 @@ pub enum EndnoteChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -33113,11 +32542,9 @@ pub enum EndnoteChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -33217,7 +32644,6 @@ pub enum FootnoteEndnoteTypeChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -33225,7 +32651,6 @@ pub enum FootnoteEndnoteTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -33233,7 +32658,6 @@ pub enum FootnoteEndnoteTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -33241,7 +32665,6 @@ pub enum FootnoteEndnoteTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -33261,11 +32684,9 @@ pub enum FootnoteEndnoteTypeChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictInsertion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
@@ -33273,7 +32694,6 @@ pub enum FootnoteEndnoteTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictDeletion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
@@ -33362,7 +32782,6 @@ pub enum DocPartBodyChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -33370,7 +32789,6 @@ pub enum DocPartBodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -33378,7 +32796,6 @@ pub enum DocPartBodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -33386,7 +32803,6 @@ pub enum DocPartBodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -33406,11 +32822,9 @@ pub enum DocPartBodyChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -33510,7 +32924,6 @@ pub enum BodyChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -33518,7 +32931,6 @@ pub enum BodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -33526,7 +32938,6 @@ pub enum BodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -33534,7 +32945,6 @@ pub enum BodyChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -33554,11 +32964,9 @@ pub enum BodyChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -33658,7 +33066,6 @@ pub enum BodyTypeChoice {
     /// Defines the CustomXmlMoveToRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
     WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -33666,7 +33073,6 @@ pub enum BodyTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -33674,7 +33080,6 @@ pub enum BodyTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -33682,7 +33087,6 @@ pub enum BodyTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -33702,11 +33106,9 @@ pub enum BodyTypeChoice {
     /// Move Destination Run Content.
     #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
     WMoveTo(std::boxed::Box<MoveToRun>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(std::boxed::Box<ContentPart>),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictInsertion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
@@ -33714,7 +33116,6 @@ pub enum BodyTypeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the RunConflictDeletion Class.
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
@@ -33777,7 +33178,6 @@ pub enum TableRowPropertiesChoice {
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
 }
-#[cfg(feature = "microsoft365")]
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowPropertiesChoice2 {
   /// Defines the ConflictInsertion Class.

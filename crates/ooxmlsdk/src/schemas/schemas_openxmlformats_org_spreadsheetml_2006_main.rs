@@ -1527,7 +1527,6 @@ pub enum CellValues {
   String,
   #[sdk(rename = "inlineStr")]
   InlineString,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "d")]
   Date,
 }
@@ -1548,7 +1547,6 @@ pub enum PivotAreaValues {
   Button,
   #[sdk(rename = "topRight")]
   TopRight,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "topEnd")]
   TopEnd,
 }
@@ -2941,7 +2939,6 @@ pub struct Chartsheet {
   /// Legacy Drawing Reference in  Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
@@ -3003,14 +3000,12 @@ pub struct DialogSheet {
   /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
   /// _
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_Controls/x:controls"))]
   pub controls: Option<Controls>,
@@ -3363,7 +3358,6 @@ pub struct Workbook {
   /// _
   #[sdk(child(qname = "x:CT_WorkbookPr/x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
   pub absolute_path:
@@ -3445,19 +3439,14 @@ pub struct FilterColumn {
   #[sdk(choice(
     qname = "x:CT_Filters/x:filters",
     qname = "x:CT_Top10/x:top10",
+    qname = "x14:CT_CustomFilters/x14:customFilters",
     qname = "x:CT_CustomFilters/x:customFilters",
     qname = "x:CT_DynamicFilter/x:dynamicFilter",
     qname = "x:CT_ColorFilter/x:colorFilter",
+    qname = "x14:CT_IconFilter/x14:iconFilter",
     qname = "x:CT_IconFilter/x:iconFilter",
     qname = "x:CT_ExtensionList/x:extLst"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_CustomFilters/x14:customFilters",
-      qname = "x14:CT_IconFilter/x14:iconFilter"
-    ))
-  )]
   pub xml_children: Option<FilterColumnChoice>,
 }
 /// Sort State for Auto Filter.
@@ -3498,11 +3487,10 @@ pub struct SortState {
   /// Represents the following attribute in the schema: :ref
   #[sdk(attr(qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
-  #[sdk(choice(qname = "x:CT_SortCondition/x:sortCondition"))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_SortCondition/x14:sortCondition"))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_SortCondition/x14:sortCondition",
+    qname = "x:CT_SortCondition/x:sortCondition"
+  ))]
   pub sort_state_choice: Option<SortStateChoice>,
   /// _
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
@@ -3657,7 +3645,6 @@ pub struct Comment {
   ))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub guid: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// shapeId
   ///
   /// Available in Office2010 and above.
@@ -3668,7 +3655,6 @@ pub struct Comment {
   /// Comment Text
   #[sdk(child(qname = "x:CT_Rst/x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_CommentPr/x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
@@ -10035,7 +10021,6 @@ pub struct Row {
   /// Represents the following attribute in the schema: :ph
   #[sdk(attr(qname = ":ph"))]
   pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// dyDescent
   ///
   /// Available in Office2010 and above.
@@ -11560,7 +11545,6 @@ pub struct Control {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_ControlPr/x:controlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
@@ -11761,7 +11745,6 @@ pub struct DataValidation {
   /// Represents the following attribute in the schema: :sqref
   #[sdk(attr(qname = ":sqref"))]
   pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(text_child(qname = "x:ST_Xstring/x12ac:list"))]
   pub list: Option<crate::simple_type::StringValue>,
@@ -12172,7 +12155,6 @@ pub struct OleObject {
   /// Represents the following attribute in the schema: r:id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_ObjectPr/x:objectPr"))]
   pub embedded_object_properties: Option<std::boxed::Box<EmbeddedObjectProperties>>,
@@ -13218,11 +13200,9 @@ pub struct Border {
   /// Represents the following attribute in the schema: :outline
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_BorderPr/x:start"))]
   pub start_border: Option<std::boxed::Box<StartBorder>>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_BorderPr/x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
@@ -13801,11 +13781,12 @@ pub struct Value {
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
   pub xml_other_attrs: Vec<(String, String)>,
-  #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", text, any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_OleItem/x14:oleItem"))
-  )]
+  #[sdk(choice(
+    qname = "x:CT_OleItem/x:oleItem",
+    qname = "x14:CT_OleItem/x14:oleItem",
+    text,
+    any
+  ))]
   pub xml_children: Vec<OleItemsChoice>,
 }
 /// External Workbook.
@@ -13825,7 +13806,6 @@ pub struct ExternalBook {
     /// Represents the following attribute in the schema: r:id
     #[sdk(attr(qname = "r:id"))]
     pub id: crate::simple_type::StringValue,
-    #[cfg(feature = "microsoft365")]
     /// Alternate URLs and identifiers of the external book
     #[sdk(child(qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"))]
     pub external_book_alternate_urls: Option<
@@ -14782,7 +14762,6 @@ pub struct FunctionGroup {
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ObjectAnchor Class.
 ///
 /// Available in Office2010 and above.
@@ -14819,7 +14798,6 @@ pub struct ObjectAnchor {
   #[sdk(child(qname = "xdr:CT_Marker/x:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the FromMarker Class.
 ///
 /// Available in Office2010 and above.
@@ -14841,7 +14819,6 @@ pub struct FromMarker {
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::simple_type::Int64Value,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ToMarker Class.
 ///
 /// Available in Office2010 and above.
@@ -14898,8 +14875,7 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "x:ST_Guid/x14:id")))]
+  #[sdk(choice(qname = "x:ST_Guid/x14:id", any))]
   pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
 }
 /// Defines the PivotHierarchyExtension Class.
@@ -14921,11 +14897,7 @@ pub struct PivotHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy"))
-  )]
+  #[sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy", any))]
   pub xml_children: Option<PivotHierarchyExtensionChoice>,
 }
 /// Defines the PivotFieldExtension Class.
@@ -14947,11 +14919,7 @@ pub struct PivotFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_PivotField/x14:pivotField"))
-  )]
+  #[sdk(choice(qname = "x14:CT_PivotField/x14:pivotField", any))]
   pub xml_children: Option<PivotFieldExtensionChoice>,
 }
 /// Defines the CacheSourceExtension Class.
@@ -14973,11 +14941,7 @@ pub struct CacheSourceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection"))
-  )]
+  #[sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection", any))]
   pub xml_children: Option<CacheSourceExtensionChoice>,
 }
 /// OLE Link Item.
@@ -15017,7 +14981,6 @@ pub struct OleItem {
   #[sdk(attr(qname = ":preferPic"))]
   pub prefer_picture: Option<crate::simple_type::BooleanValue>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the StartBorder Class.
 ///
 /// Available in Office2010 and above.
@@ -15037,7 +15000,6 @@ pub struct StartBorder {
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the EndBorder Class.
 ///
 /// Available in Office2010 and above.
@@ -15209,7 +15171,6 @@ pub struct BorderPropertiesType {
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Vec<Color>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ControlProperties Class.
 ///
 /// Available in Office2010 and above.
@@ -15327,7 +15288,6 @@ pub struct ControlProperties {
   #[sdk(child(qname = "x:CT_ObjectAnchor/x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the EmbeddedObjectProperties Class.
 ///
 /// Available in Office2010 and above.
@@ -16074,7 +16034,6 @@ pub struct SheetFormatProperties {
   /// Represents the following attribute in the schema: :outlineLevelCol
   #[sdk(attr(qname = ":outlineLevelCol"))]
   pub outline_level_column: Option<crate::simple_type::ByteValue>,
-  #[cfg(feature = "microsoft365")]
   /// dyDescent
   ///
   /// Available in Office2010 and above.
@@ -16344,7 +16303,6 @@ pub struct DataConsolidate {
   /// Represents the following attribute in the schema: :leftLabels
   #[sdk(attr(qname = ":leftLabels"))]
   pub left_labels: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// startLabels
   ///
   /// Available in Office2010 and above.
@@ -16590,7 +16548,6 @@ pub struct CacheSourceExtensionList {
   #[sdk(child(qname = "x:CT_CacheSourceExtension/x:ext"))]
   pub x_ext: Vec<CacheSourceExtension>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the CommentProperties Class.
 ///
 /// Available in Office2010 and above.
@@ -16865,13 +16822,10 @@ pub struct Filters {
   #[sdk(attr(qname = ":calendarType"))]
   pub calendar_type: Option<CalendarValues>,
   #[sdk(choice(
+    qname = "x14:CT_Filter/x14:filter",
     qname = "x:CT_Filter/x:filter",
     qname = "x:CT_DateGroupItem/x:dateGroupItem"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x14:CT_Filter/x14:filter"))
-  )]
   pub xml_children: Option<FiltersChoice>,
 }
 /// Top 10.
@@ -16960,7 +16914,6 @@ pub struct DynamicFilter {
   /// Represents the following attribute in the schema: :maxVal
   #[sdk(attr(qname = ":maxVal"))]
   pub max_val: Option<crate::simple_type::DoubleValue>,
-  #[cfg(feature = "microsoft365")]
   /// valIso
   ///
   /// Available in Office2010 and above.
@@ -16968,7 +16921,6 @@ pub struct DynamicFilter {
   /// Represents the following attribute in the schema: :valIso
   #[sdk(attr(qname = ":valIso"))]
   pub val_iso: Option<crate::simple_type::DateTimeValue>,
-  #[cfg(feature = "microsoft365")]
   /// maxValIso
   ///
   /// Available in Office2010 and above.
@@ -17042,15 +16994,12 @@ pub struct SlicerCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables",
-      qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache",
-      qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables",
+    qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache",
+    qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData",
+    any
+  ))]
   pub xml_children: Option<SlicerCacheDefinitionExtensionChoice>,
 }
 /// Defines the PivotFilterExtension Class.
@@ -17072,14 +17021,11 @@ pub struct PivotFilterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x15:CT_PivotFilter/x15:pivotFilter",
-      qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x15:CT_PivotFilter/x15:pivotFilter",
+    qname = "x15:CT_MovingPeriodState/x15:movingPeriodState",
+    any
+  ))]
   pub xml_children: Option<PivotFilterExtensionChoice>,
 }
 /// Defines the QueryTableExtension Class.
@@ -17101,11 +17047,7 @@ pub struct QueryTableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable"))
-  )]
+  #[sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable", any))]
   pub xml_children: Option<QueryTableExtensionChoice>,
 }
 /// Defines the DatabaseProperties Class.
@@ -17495,14 +17437,11 @@ pub struct ConnectionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_Connection/x14:connection",
-      qname = "x15:CT_Connection/x15:connection"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_Connection/x14:connection",
+    qname = "x15:CT_Connection/x15:connection",
+    any
+  ))]
   pub xml_children: Option<ConnectionExtensionChoice>,
 }
 /// Defines the TextFields Class.
@@ -17703,14 +17642,11 @@ pub struct CacheFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_CacheField/x14:cacheField",
-      qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_CacheField/x14:cacheField",
+    qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames",
+    any
+  ))]
   pub xml_children: Option<CacheFieldExtensionChoice>,
 }
 /// Defines the FieldsUsage Class.
@@ -17783,14 +17719,11 @@ pub struct CacheHierarchyExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy",
-      qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy",
+    qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy",
+    any
+  ))]
   pub xml_children: Option<CacheHierarchyExtensionChoice>,
 }
 /// Defines the CalculatedMemberExtensionList Class.
@@ -17825,14 +17758,11 @@ pub struct CalculatedMemberExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_CalculatedMember/x14:calculatedMember",
-      qname = "x15:CT_CalculatedMember/x15:calculatedMember"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_CalculatedMember/x14:calculatedMember",
+    qname = "x15:CT_CalculatedMember/x15:calculatedMember",
+    any
+  ))]
   pub xml_children: Option<CalculatedMemberExtensionChoice>,
 }
 /// Defines the DataFieldExtensionList Class.
@@ -17867,14 +17797,11 @@ pub struct DataFieldExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_DataField/x14:dataField",
-      qname = "x15:CT_DataField/x15:dataField"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_DataField/x14:dataField",
+    qname = "x15:CT_DataField/x15:dataField",
+    any
+  ))]
   pub xml_children: Option<DataFieldExtensionChoice>,
 }
 /// Defines the PivotFilterExtensionList Class.
@@ -18185,20 +18112,17 @@ pub struct WorksheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings",
-      qname = "x14:CT_DataValidations/x14:dataValidations",
-      qname = "x14:CT_SparklineGroups/x14:sparklineGroups",
-      qname = "x14:CT_SlicerRefs/x14:slicerList",
-      qname = "x14:CT_ProtectedRanges/x14:protectedRanges",
-      qname = "x14:CT_IgnoredErrors/x14:ignoredErrors",
-      qname = "x15:CT_WebExtensions/x15:webExtensions",
-      qname = "x15:CT_TimelineRefs/x15:timelineRefs"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings",
+    qname = "x14:CT_DataValidations/x14:dataValidations",
+    qname = "x14:CT_SparklineGroups/x14:sparklineGroups",
+    qname = "x14:CT_SlicerRefs/x14:slicerList",
+    qname = "x14:CT_ProtectedRanges/x14:protectedRanges",
+    qname = "x14:CT_IgnoredErrors/x14:ignoredErrors",
+    qname = "x15:CT_WebExtensions/x15:webExtensions",
+    qname = "x15:CT_TimelineRefs/x15:timelineRefs",
+    any
+  ))]
   pub xml_children: Option<WorksheetExtensionChoice>,
 }
 /// Defines the NumberingFormats Class.
@@ -18237,7 +18161,6 @@ pub struct Fonts {
   /// Represents the following attribute in the schema: :count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  #[cfg(feature = "microsoft365")]
   /// knownFonts
   ///
   /// Available in Office2010 and above.
@@ -18443,16 +18366,13 @@ pub struct StylesheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x:CT_Dxfs/x14:dxfs",
-      qname = "x14:CT_SlicerStyles/x14:slicerStyles",
-      qname = "x:CT_Dxfs/x15:dxfs",
-      qname = "x15:CT_TimelineStyles/x15:timelineStyles"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x:CT_Dxfs/x14:dxfs",
+    qname = "x14:CT_SlicerStyles/x14:slicerStyles",
+    qname = "x:CT_Dxfs/x15:dxfs",
+    qname = "x15:CT_TimelineStyles/x15:timelineStyles",
+    any
+  ))]
   pub xml_children: Option<StylesheetExtensionChoice>,
 }
 /// Defines the Location Class.
@@ -18855,16 +18775,13 @@ pub struct PivotTableDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition",
-      qname = "x15:CT_PivotTableData/x15:pivotTableData",
-      qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings",
-      qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition",
+    qname = "x15:CT_PivotTableData/x15:pivotTableData",
+    qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings",
+    qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo",
+    any
+  ))]
   pub xml_children: Option<PivotTableDefinitionExtensionChoice>,
 }
 /// Defines the CacheSource Class.
@@ -19107,21 +19024,18 @@ pub struct PivotCacheDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition",
-      qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled",
-      qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition",
-      qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion",
-      qname = "xsd:boolean/xxpim:implicitMeasureSupport",
-      qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
-      qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
-      qname = "xsd:boolean/xlpar:autoRefresh",
-      qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition",
+    qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled",
+    qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition",
+    qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion",
+    qname = "xsd:boolean/xxpim:implicitMeasureSupport",
+    qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo",
+    qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo",
+    qname = "xsd:boolean/xlpar:autoRefresh",
+    qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray",
+    any
+  ))]
   pub xml_children: Option<PivotCacheDefinitionExtensionChoice>,
 }
 /// Sheet names of supporting book.
@@ -19255,14 +19169,11 @@ pub struct TableExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_Table/x14:table",
-      qname = "xlmsforms:CT_MsForm/xlmsforms:msForm"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_Table/x14:table",
+    qname = "xlmsforms:CT_MsForm/xlmsforms:msForm",
+    any
+  ))]
   pub xml_children: Option<TableExtensionChoice>,
 }
 /// Defines the FileVersion Class.
@@ -19389,7 +19300,6 @@ pub struct WorkbookProperties {
   /// Represents the following attribute in the schema: :date1904
   #[sdk(attr(qname = ":date1904"))]
   pub date1904: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// dateCompatibility
   ///
   /// Available in Office2010 and above.
@@ -19986,26 +19896,23 @@ pub struct WorkbookExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "x14:CT_DefinedNames/x14:definedNames",
-      qname = "x:CT_PivotCaches/x14:pivotCaches",
-      qname = "x14:CT_SlicerCaches/x14:slicerCaches",
-      qname = "x14:CT_SlicerCaches/x15:slicerCaches",
-      qname = "x14:CT_WorkbookPr/x14:workbookPr",
-      qname = "x:CT_PivotCaches/x15:pivotCaches",
-      qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences",
-      qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches",
-      qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs",
-      qname = "x15:CT_WorkbookPr/x15:workbookPr",
-      qname = "x15:CT_DataModel/x15:dataModel",
-      qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
-      qname = "xlwcv:CT_Version/xlwcv:version",
-      qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "x14:CT_DefinedNames/x14:definedNames",
+    qname = "x:CT_PivotCaches/x14:pivotCaches",
+    qname = "x14:CT_SlicerCaches/x14:slicerCaches",
+    qname = "x14:CT_SlicerCaches/x15:slicerCaches",
+    qname = "x14:CT_WorkbookPr/x14:workbookPr",
+    qname = "x:CT_PivotCaches/x15:pivotCaches",
+    qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences",
+    qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches",
+    qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs",
+    qname = "x15:CT_WorkbookPr/x15:workbookPr",
+    qname = "x15:CT_DataModel/x15:dataModel",
+    qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService",
+    qname = "xlwcv:CT_Version/xlwcv:version",
+    qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput",
+    any
+  ))]
   pub xml_children: Option<WorkbookExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -20070,7 +19977,6 @@ pub enum FilterColumnChoice {
   /// Top 10.
   #[sdk(child(qname = "x:CT_Top10/x:top10"))]
   XTop10(std::boxed::Box<Top10>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the CustomFilters Class.
   #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
   X14CustomFilters(
@@ -20087,7 +19993,6 @@ pub enum FilterColumnChoice {
   /// Color Filter Criteria.
   #[sdk(child(qname = "x:CT_ColorFilter/x:colorFilter"))]
   XColorFilter(std::boxed::Box<ColorFilter>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the IconFilter Class.
   #[sdk(child(qname = "x14:CT_IconFilter/x14:iconFilter"))]
   X14IconFilter(
@@ -20104,7 +20009,6 @@ pub enum FilterColumnChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortStateChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_SortCondition/x14:sortCondition"))]
   X14SortCondition(
     std::boxed::Box<
@@ -20302,7 +20206,6 @@ pub enum OleItemsChoice {
   /// OLE Link Item.
   #[sdk(child(qname = "x:CT_OleItem/x:oleItem"))]
   XOleItem(std::boxed::Box<OleItem>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the OleItem Class.
   #[sdk(child(qname = "x14:CT_OleItem/x14:oleItem"))]
   X14OleItem(
@@ -20334,7 +20237,6 @@ pub enum MarkerTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionalFormattingRuleExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(text_child(qname = "x:ST_Guid/x14:id"))]
   X14Id(crate::simple_type::StringValue),
   #[sdk(any)]
@@ -20342,7 +20244,6 @@ pub enum ConditionalFormattingRuleExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotHierarchyExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy"))]
   X14PivotHierarchy(
     std::boxed::Box<
@@ -20354,7 +20255,6 @@ pub enum PivotHierarchyExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFieldExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_PivotField/x14:pivotField"))]
   X14PivotField(
     std::boxed::Box<
@@ -20366,7 +20266,6 @@ pub enum PivotFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_SourceConnection/x14:sourceConnection"))]
   X14SourceConnection(
     std::boxed::Box<
@@ -20378,7 +20277,6 @@ pub enum CacheSourceExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FiltersChoice {
-  #[cfg(feature = "microsoft365")]
   /// Defines the Filter Class.
   #[sdk(child(qname = "x14:CT_Filter/x14:filter"))]
   X14Filter(
@@ -20393,21 +20291,18 @@ pub enum FiltersChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDefinitionExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"))]
+  #[sdk(child(qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"))]
     X15SlicerCachePivotTables(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCachePivotTables,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache"))]
     X15TableSlicerCache(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TableSlicerCache,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(
         child(qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData")
     )]
@@ -20421,14 +20316,12 @@ pub enum SlicerCacheDefinitionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFilterExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_PivotFilter/x15:pivotFilter"))]
   X15PivotFilter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotFilter,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"))]
   X15MovingPeriodState(
     std::boxed::Box<
@@ -20440,7 +20333,6 @@ pub enum PivotFilterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QueryTableExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_QueryTable/x15:queryTable"))]
   X15QueryTable(
     std::boxed::Box<
@@ -20452,14 +20344,12 @@ pub enum QueryTableExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectionExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_Connection/x14:connection"))]
   X14Connection(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Connection,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_Connection/x15:connection"))]
   X15Connection(
     std::boxed::Box<
@@ -20499,14 +20389,12 @@ pub enum FieldGroupChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheFieldExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_CacheField/x14:cacheField"))]
   X14CacheField(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheField,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames"))]
   X15CachedUniqueNames(
     std::boxed::Box<
@@ -20518,14 +20406,12 @@ pub enum CacheFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheHierarchyExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy"))]
   X14CacheHierarchy(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheHierarchy,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"))]
   X15CacheHierarchy(
     std::boxed::Box<
@@ -20537,14 +20423,12 @@ pub enum CacheHierarchyExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CalculatedMemberExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_CalculatedMember/x14:calculatedMember"))]
   X14CalculatedMember(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CalculatedMember,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_CalculatedMember/x15:calculatedMember"))]
   X15CalculatedMember(
     std::boxed::Box<
@@ -20556,14 +20440,12 @@ pub enum CalculatedMemberExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataFieldExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_DataField/x14:dataField"))]
   X14DataField(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataField,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_DataField/x15:dataField"))]
   X15DataField(
     std::boxed::Box<
@@ -20575,56 +20457,48 @@ pub enum DataFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"))]
+  #[sdk(child(qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"))]
     X14ConditionalFormattings(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ConditionalFormattings,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_DataValidations/x14:dataValidations"))]
     X14DataValidations(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataValidations,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_SparklineGroups/x14:sparklineGroups"))]
     X14SparklineGroups(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineGroups,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_SlicerRefs/x14:slicerList"))]
     X14SlicerList(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerList,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_ProtectedRanges/x14:protectedRanges"))]
     X14ProtectedRanges(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ProtectedRanges,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_IgnoredErrors/x14:ignoredErrors"))]
     X14IgnoredErrors(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IgnoredErrors,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_WebExtensions/x15:webExtensions"))]
     X15WebExtensions(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WebExtensions,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_TimelineRefs/x15:timelineRefs"))]
     X15TimelineRefs(
         std::boxed::Box<
@@ -20636,28 +20510,24 @@ pub enum WorksheetExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x:CT_Dxfs/x14:dxfs"))]
   X14Dxfs(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DifferentialFormats,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_SlicerStyles/x14:slicerStyles"))]
   X14SlicerStyles(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerStyles,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x:CT_Dxfs/x15:dxfs"))]
   X15Dxfs(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DifferentialFormats,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x15:CT_TimelineStyles/x15:timelineStyles"))]
   X15TimelineStyles(
     std::boxed::Box<
@@ -20669,28 +20539,24 @@ pub enum StylesheetExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotTableDefinitionExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition"))]
+  #[sdk(child(qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition"))]
     X14PivotTableDefinition(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotTableDefinition,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_PivotTableData/x15:pivotTableData"))]
     X15PivotTableData(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableData,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings"))]
     X15PivotTableUiSettings(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableUiSettings,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"))]
     XxpviPivotVersionInfo(
         std::boxed::Box<
@@ -20714,21 +20580,18 @@ pub enum CacheSourceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotCacheDefinitionExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition"))]
+  #[sdk(child(qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition"))]
     X14PivotCacheDefinition(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCacheDefinition,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled"))]
     X15PivotCacheDecoupled(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheDecoupled,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(
         child(
             qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition"
@@ -20739,34 +20602,28 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelinePivotCacheDefinition,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion"))]
     X15PivotCacheIdVersion(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheIdVersion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(text_child(qname = "xsd:boolean/xxpim:implicitMeasureSupport"))]
     XxpimImplicitMeasureSupport(crate::simple_type::BooleanValue),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo"))]
     XprdRichInfo(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_rich_data::PivotCacheRichInfo,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo"))]
     XxpviCacheVersionInfo(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_version_info::CacheVersionInfo,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(text_child(qname = "xsd:boolean/xlpar:autoRefresh"))]
     XlparAutoRefresh(crate::simple_type::BooleanValue),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray"))]
     XlpdaPivotCacheDynamicArray(
         std::boxed::Box<
@@ -20778,12 +20635,10 @@ pub enum PivotCacheDefinitionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "x14:CT_Table/x14:table"))]
   X14Table(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Table>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "xlmsforms:CT_MsForm/xlmsforms:msForm"))]
   XlmsformsMsForm(
     std::boxed::Box<
@@ -20795,98 +20650,84 @@ pub enum TableExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorkbookExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "x14:CT_DefinedNames/x14:definedNames"))]
+  #[sdk(child(qname = "x14:CT_DefinedNames/x14:definedNames"))]
     X14DefinedNames(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DefinedNames,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x:CT_PivotCaches/x14:pivotCaches"))]
     X14PivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCaches,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_SlicerCaches/x14:slicerCaches"))]
     X14SlicerCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCaches,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_SlicerCaches/x15:slicerCaches"))]
     X15SlicerCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCaches,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x14:CT_WorkbookPr/x14:workbookPr"))]
     X14WorkbookPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::WorkbookProperties,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x:CT_PivotCaches/x15:pivotCaches"))]
     X15PivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCaches,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences"))]
     X15PivotTableReferences(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableReferences,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches"))]
     X15TimelineCachePivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCachePivotCaches,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs"))]
     X15TimelineCacheRefs(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheReferences,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_WorkbookPr/x15:workbookPr"))]
     X15WorkbookPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WorkbookProperties,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "x15:CT_DataModel/x15:dataModel"))]
     X15DataModel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DataModel,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService"))]
     XlecsExternalCodeService(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2023_external_code_service::ExternalCodeService,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "xlwcv:CT_Version/xlwcv:version"))]
     XlwcvVersion(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2024_workbook_compatibility_version::Version,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(
         child(
             qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput"

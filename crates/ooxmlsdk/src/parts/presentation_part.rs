@@ -204,7 +204,6 @@ impl PresentationPart {
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn comment_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -218,7 +217,6 @@ impl PresentationPart {
       "http://schemas.microsoft.com/office/2018/10/relationships/comments",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn authors_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,

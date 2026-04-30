@@ -23,13 +23,11 @@ pub struct Picture {
   /// Shape Properties
   #[sdk(child(qname = "a:CT_ShapeProperties/pic:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "a:CT_ShapeStyle/pic14:style"))]
   pub shape_style: Option<
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_picture::ShapeStyle>,
   >,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/pic14:extLst"))]
   pub office_art_extension_list: Option<

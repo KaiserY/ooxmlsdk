@@ -16,9 +16,7 @@ use crate::sdk_code::helpers::{
   AttrTypeKind, StructuredChoice, StructuredChoiceVariant, StructuredParticleKind,
   classify_attr_type,
 };
-use crate::sdk_code::versioning::{
-  common_choice_version, is_microsoft365_version, version_cfg_attrs,
-};
+use crate::sdk_code::versioning::{common_choice_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeChild, SchemaTypeChildKind,
 };
@@ -54,8 +52,9 @@ impl VersionCfgContext {
   }
 
   fn child(self, version: &str) -> Self {
+    let _ = version;
     Self {
-      suppress: self.suppress || is_microsoft365_version(version),
+      suppress: self.suppress,
     }
   }
 }
@@ -1657,15 +1656,7 @@ fn gen_schema_enum_from_decl(
   let enum_attrs = version_cfg.attrs(schema_enum_version);
   let nested_version_cfg = version_cfg.child(schema_enum_version);
   let sdk_enum_attrs = quote! {};
-  let baseline_facets: Vec<_> = schema_enum
-    .variants
-    .iter()
-    .filter(|facet| !is_microsoft365_version(&facet.version))
-    .collect();
-  let default_facet = baseline_facets
-    .first()
-    .copied()
-    .unwrap_or_else(|| schema_enum.variants.first().expect("schema enum facet"));
+  let default_facet = schema_enum.variants.first().expect("schema enum facet");
 
   let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
   for facet in &schema_enum.variants {
@@ -3345,16 +3336,13 @@ fn choice_type_specific_start_qname_groups(
   };
 
   let mut unconditional_qnames = Vec::new();
-  let mut feature_gated_qnames = Vec::new();
+  let feature_gated_qnames = Vec::new();
   for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
-    let target_qnames = if module_version_cfg_attrs(&variant.version, version_cfg).is_empty() {
-      &mut unconditional_qnames
-    } else {
-      &mut feature_gated_qnames
-    };
+    let _ = version_cfg;
+    let target_qnames = &mut unconditional_qnames;
 
     match &variant.wire {
       VariantWireDecl::Child {
@@ -3670,7 +3658,7 @@ fn gen_choice_fields_from_decl(
     }
     if !gated_choice_qname_attrs.is_empty() {
       sdk_choice_attrs.push(quote! {
-        #[cfg_attr(feature = "microsoft365", sdk(choice(#(#gated_choice_qname_attrs),*)))]
+        #[sdk(choice(#(#gated_choice_qname_attrs),*))]
       });
     };
 
@@ -4900,7 +4888,7 @@ mod tests {
   }
 
   #[test]
-  fn omits_feature_gated_choice_qnames_from_parent_field_metadata() {
+  fn includes_versioned_choice_qnames_in_parent_field_metadata() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -4978,7 +4966,8 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("# [sdk (choice (qname ="));
-    assert!(generated.contains("# [cfg_attr (feature = \"microsoft365\" , sdk (choice (qname ="));
+    assert!(generated.contains("t14:CT_OfficeOnly/t14:officeOnly"));
+    assert!(!generated.contains("cfg_attr"));
   }
 
   #[test]

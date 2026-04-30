@@ -28,15 +28,12 @@ pub struct LockedCanvas {
     qname = "a:CT_GvmlShape/a:sp",
     qname = "a:CT_GvmlConnector/a:cxnSp",
     qname = "a:CT_GvmlPicture/a:pic",
+    qname = "a14:CT_GvmlContentPart/a14:contentPart",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
     qname = "a:CT_GvmlGroupShape/a:grpSp",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a14:CT_GvmlContentPart/a14:contentPart"))
-  )]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// _
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
@@ -58,7 +55,6 @@ pub enum LockedCanvasChoice {
   ),
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   APic(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
   A14ContentPart(
     std::boxed::Box<

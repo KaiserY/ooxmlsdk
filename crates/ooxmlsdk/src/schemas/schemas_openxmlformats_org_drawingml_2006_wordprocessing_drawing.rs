@@ -263,7 +263,6 @@ pub struct Inline {
   /// Represents the following attribute in the schema: :distR
   #[sdk(attr(qname = ":distR"))]
   pub distance_from_right: Option<crate::simple_type::UInt32Value>,
-  #[cfg(feature = "microsoft365")]
   /// anchorId
   ///
   /// Available in Office2010 and above.
@@ -272,7 +271,6 @@ pub struct Inline {
   #[sdk(attr(qname = "wp14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// editId
   ///
   /// Available in Office2010 and above.
@@ -386,7 +384,6 @@ pub struct Anchor {
   /// Represents the following attribute in the schema: :allowOverlap
   #[sdk(attr(qname = ":allowOverlap"))]
   pub allow_overlap: crate::simple_type::BooleanValue,
-  #[cfg(feature = "microsoft365")]
   /// editId
   ///
   /// Available in Office2010 and above.
@@ -395,7 +392,6 @@ pub struct Anchor {
   #[sdk(attr(qname = "wp14:editId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
   pub edit_id: Option<crate::simple_type::HexBinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// anchorId
   ///
   /// Available in Office2010 and above.
@@ -437,13 +433,11 @@ pub struct Anchor {
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub a_graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
   pub wp14_size_rel_h: Option<
     crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_drawing::RelativeWidth,
   >,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
   pub wp14_size_rel_v: Option<
@@ -705,12 +699,9 @@ pub struct HorizontalPosition {
   pub relative_from: HorizontalRelativePositionValues,
   #[sdk(choice(
     qname = "wp:ST_AlignH/wp:align",
-    qname = "wp:ST_PositionOffset/wp:posOffset"
+    qname = "wp:ST_PositionOffset/wp:posOffset",
+    qname = "a:ST_Percentage/wp14:pctPosHOffset"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a:ST_Percentage/wp14:pctPosHOffset"))
-  )]
   pub xml_children: Option<HorizontalPositionChoice>,
 }
 /// Vertical Positioning.
@@ -733,12 +724,9 @@ pub struct VerticalPosition {
   pub relative_from: VerticalRelativePositionValues,
   #[sdk(choice(
     qname = "wp:ST_AlignV/wp:align",
-    qname = "wp:ST_PositionOffset/wp:posOffset"
+    qname = "wp:ST_PositionOffset/wp:posOffset",
+    qname = "a:ST_Percentage/wp14:pctPosVOffset"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a:ST_Percentage/wp14:pctPosVOffset"))
-  )]
   pub xml_children: Option<VerticalPositionChoice>,
 }
 /// Inline Drawing Object Extents.
@@ -902,7 +890,6 @@ pub enum HorizontalPositionChoice {
   /// Defines the PositionOffset Class.
   #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
   WpPosOffset(crate::simple_type::Int32Value),
-  #[cfg(feature = "microsoft365")]
   /// Defines the PercentagePositionHeightOffset Class.
   #[sdk(text_child(qname = "a:ST_Percentage/wp14:pctPosHOffset"))]
   Wp14PctPosHOffset(crate::simple_type::Int32Value),
@@ -915,7 +902,6 @@ pub enum VerticalPositionChoice {
   /// Defines the PositionOffset Class.
   #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
   WpPosOffset(crate::simple_type::Int32Value),
-  #[cfg(feature = "microsoft365")]
   /// Defines the PercentagePositionVerticalOffset Class.
   #[sdk(text_child(qname = "a:ST_Percentage/wp14:pctPosVOffset"))]
   Wp14PctPosVOffset(crate::simple_type::Int32Value),

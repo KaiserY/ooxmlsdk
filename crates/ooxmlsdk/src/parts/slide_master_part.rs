@@ -49,7 +49,6 @@ impl SlideMasterPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -89,7 +88,6 @@ impl SlideMasterPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn diagram_persist_layout_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -198,7 +196,6 @@ impl SlideMasterPart {
             "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
         )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn model3_d_reference_relationship_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

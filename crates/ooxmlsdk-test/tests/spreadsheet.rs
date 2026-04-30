@@ -1,16 +1,12 @@
-#[cfg(feature = "microsoft365")]
 use std::io::{Cursor, Read};
 
 use ooxmlsdk::common::XmlHeaderType;
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::{
   ArrayFeatureProperty, ArrayFeaturePropertyChoice, BoolFeatureProperty, IntFeatureProperty,
 };
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart::{
   ChartSpace, ChartSpaceExtensionChoice,
 };
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::WorkbookExtensionChoice;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
@@ -24,7 +20,6 @@ fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a s
     .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
 }
 
-#[cfg(feature = "microsoft365")]
 fn doc_sample_part(file_name: &str, part_name: &str) -> String {
   let bytes = std::fs::read(fixtures::doc_sample_path(file_name)).unwrap();
   let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
@@ -121,7 +116,6 @@ fn workbook_round_trip_from_complex01_part_test() {
   assert_eq!(reparsed.sheets.x_sheet.len(), 2);
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs
@@ -144,7 +138,6 @@ fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_t
   assert!(serialized.contains(r#"discardImageEditData="1""#));
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn chart_extension_loads_pivot_options_from_m4_conformance_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs
@@ -249,7 +242,6 @@ fn shared_string_table_round_trip_from_openxml_part_test() {
   assert_eq!(shared_string_items(&reparsed).len(), 1);
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 #[cfg(any())]
 fn shared_string_table_process_content_preserves_extension_attributes_from_mc_support_test() {
@@ -372,7 +364,6 @@ fn color_scale_round_trip_from_bug_regression_test() {
   assert_eq!(color_scale_colors(&reparsed).len(), 2);
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form() {
   let value = ArrayFeatureProperty {
@@ -391,7 +382,6 @@ fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form()
   assert!(parsed.is_nan());
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn bool_feature_property_uses_boolean_value_lexical_form() {
   let value = BoolFeatureProperty {
@@ -410,7 +400,6 @@ fn bool_feature_property_uses_boolean_value_lexical_form() {
   assert_eq!(reparsed.xml_content, Some(true));
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn int_feature_property_uses_integer_value_numeric_form() {
   let value = IntFeatureProperty {

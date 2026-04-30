@@ -298,7 +298,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn custom_data_properties_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -313,7 +312,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn slicer_cache_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -327,7 +325,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn time_line_cache_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -341,7 +338,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn workbook_person_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -355,7 +351,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/10/relationships/person",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -369,7 +364,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn ct_rd_rich_value_structure_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -384,7 +378,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_array_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -398,7 +391,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rich_styles_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -412,7 +404,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_supporting_property_bag_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -427,7 +418,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
     )
   }
-  #[cfg(feature = "microsoft365")]
     pub fn rd_supporting_property_bag_structure_parts<'a, P: crate::sdk::SdkPackage>(
         &'a self,
         package: &'a P,
@@ -443,7 +433,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_types_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -457,7 +446,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn rd_rich_value_web_image_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -471,7 +459,6 @@ impl WorkbookPart {
       "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn feature_property_bags_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,

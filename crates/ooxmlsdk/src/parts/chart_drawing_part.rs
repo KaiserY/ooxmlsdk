@@ -36,7 +36,6 @@ impl ChartDrawingPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,

@@ -1837,154 +1837,104 @@ pub enum PresetColorValues {
   Yellow,
   #[sdk(rename = "yellowGreen")]
   YellowGreen,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkBlue")]
   DarkBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkCyan")]
   DarkCyan2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkGoldenrod")]
   DarkGoldenrod2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkGray")]
   DarkGray2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkGrey")]
   DarkGrey2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkGreen")]
   DarkGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkKhaki")]
   DarkKhaki2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkMagenta")]
   DarkMagenta2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkOliveGreen")]
   DarkOliveGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkOrange")]
   DarkOrange2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkOrchid")]
   DarkOrchid2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkRed")]
   DarkRed2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkSalmon")]
   DarkSalmon2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkSeaGreen")]
   DarkSeaGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkSlateBlue")]
   DarkSlateBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkSlateGray")]
   DarkSlateGray2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkSlateGrey")]
   DarkSlateGrey2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkTurquoise")]
   DarkTurquoise2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "darkViolet")]
   DarkViolet2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightBlue")]
   LightBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightCoral")]
   LightCoral2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightCyan")]
   LightCyan2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightGoldenrodYellow")]
   LightGoldenrodYellow2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightGray")]
   LightGray2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightGrey")]
   LightGrey2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightGreen")]
   LightGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightPink")]
   LightPink2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSalmon")]
   LightSalmon2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSeaGreen")]
   LightSeaGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSkyBlue")]
   LightSkyBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSlateGray")]
   LightSlateGray2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSlateGrey")]
   LightSlateGrey2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightSteelBlue")]
   LightSteelBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "lightYellow")]
   LightYellow2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumAquamarine")]
   MediumAquamarine2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumBlue")]
   MediumBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumOrchid")]
   MediumOrchid2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumPurple")]
   MediumPurple2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumSeaGreen")]
   MediumSeaGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumSlateBlue")]
   MediumSlateBlue2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumSpringGreen")]
   MediumSpringGreen2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumTurquoise")]
   MediumTurquoise2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "mediumVioletRed")]
   MediumVioletRed2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "dkGrey")]
   DarkGrey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "dimGrey")]
   DimGrey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "dkSlateGrey")]
   DarkSlateGrey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "grey")]
   Grey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "ltGrey")]
   LightGrey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "ltSlateGrey")]
   LightSlateGrey,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "slateGrey")]
   SlateGrey,
 }
@@ -2713,7 +2663,6 @@ pub struct RgbColorModelHex {
   #[sdk(attr(qname = ":val"))]
   #[sdk(string_length(source = 1u32, min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
-  #[cfg(feature = "microsoft365")]
   /// legacySpreadsheetColorIndex
   ///
   /// Available in Office2010 and above.
@@ -6323,7 +6272,6 @@ pub struct Theme {
   /// Represents the following attribute in the schema: :name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// id
   ///
   /// Available in Office2013 and above.
@@ -13959,10 +13907,10 @@ pub struct Paragraph {
     qname = "a:CT_RegularTextRun/a:r",
     qname = "a:CT_TextLineBreak/a:br",
     qname = "a:CT_TextField/a:fld",
+    qname = "a14:CT_TextMath/a14:m",
     text,
     any
   ))]
-  #[cfg_attr(feature = "microsoft365", sdk(choice(qname = "a14:CT_TextMath/a14:m")))]
   pub paragraph_choice: Vec<ParagraphChoice>,
   /// _
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:endParaRPr"))]
@@ -14131,18 +14079,15 @@ pub struct ShapePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "a:CT_FillProperties/a14:hiddenFill",
-      qname = "a:CT_LineProperties/a14:hiddenLine",
-      qname = "a:CT_EffectProperties/a14:hiddenEffects",
-      qname = "a:CT_Scene3D/a14:hiddenScene3d",
-      qname = "a:CT_Shape3D/a14:hiddenSp3d",
-      qname = "a14:CT_ShadowObscured/a14:shadowObscured"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "a:CT_FillProperties/a14:hiddenFill",
+    qname = "a:CT_LineProperties/a14:hiddenLine",
+    qname = "a:CT_EffectProperties/a14:hiddenEffects",
+    qname = "a:CT_Scene3D/a14:hiddenScene3d",
+    qname = "a:CT_Shape3D/a14:hiddenSp3d",
+    qname = "a14:CT_ShadowObscured/a14:shadowObscured",
+    any
+  ))]
   pub xml_children: Option<ShapePropertiesExtensionChoice>,
 }
 /// Defines the GvmlGroupShapeExtension Class.
@@ -14164,11 +14109,7 @@ pub struct GvmlGroupShapeExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas"))
-  )]
+  #[sdk(choice(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas", any))]
   pub xml_children: Option<GvmlGroupShapeExtensionChoice>,
 }
 /// Defines the ShapePropertiesExtensionList Class.
@@ -14351,15 +14292,12 @@ pub struct GroupShape {
     qname = "a:CT_GvmlShape/a:sp",
     qname = "a:CT_GvmlConnector/a:cxnSp",
     qname = "a:CT_GvmlPicture/a:pic",
+    qname = "a14:CT_GvmlContentPart/a14:contentPart",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
     qname = "a:CT_GvmlGroupShape/a:grpSp",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a14:CT_GvmlContentPart/a14:contentPart"))
-  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
@@ -14397,11 +14335,7 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"))
-  )]
+  #[sdk(choice(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps", any))]
   pub xml_children: Option<NonVisualGroupDrawingShapePropsExtensionChoice>,
 }
 /// Defines the OfficeStyleSheetExtension Class.
@@ -14423,11 +14357,7 @@ pub struct OfficeStyleSheetExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "thm15:CT_ThemeFamily/thm15:themeFamily"))
-  )]
+  #[sdk(choice(qname = "thm15:CT_ThemeFamily/thm15:themeFamily", any))]
   pub xml_children: Option<OfficeStyleSheetExtensionChoice>,
 }
 /// Defines the ConnectorLockingExtension Class.
@@ -14931,14 +14861,11 @@ pub struct DataModelExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt",
-      qname = "dgm14:CT_Boolean/dgm14:recolorImg"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt",
+    qname = "dgm14:CT_Boolean/dgm14:recolorImg",
+    any
+  ))]
   pub xml_children: Option<DataModelExtensionChoice>,
 }
 /// Defines the PtExtension Class.
@@ -14960,11 +14887,7 @@ pub struct PtExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr"))
-  )]
+  #[sdk(choice(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr", any))]
   pub xml_children: Option<PtExtensionChoice>,
 }
 /// Defines the HyperlinkExtension Class.
@@ -14986,11 +14909,7 @@ pub struct HyperlinkExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr"))
-  )]
+  #[sdk(choice(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr", any))]
   pub xml_children: Option<HyperlinkExtensionChoice>,
 }
 /// Future extensions..
@@ -15025,11 +14944,10 @@ pub struct LinePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"))
-  )]
+  #[sdk(choice(
+    qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps",
+    any
+  ))]
   pub xml_children: Option<LinePropertiesExtensionChoice>,
 }
 /// default head line end style is none.
@@ -15163,19 +15081,16 @@ pub struct NonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "a14:CT_CompatExt/a14:compatExt",
-      qname = "a15:CT_BackgroundPr/a15:backgroundPr",
-      qname = "a16:CT_CreationId/a16:creationId",
-      qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef",
-      qname = "adec:CT_Decorative/adec:decorative",
-      qname = "aclsh:CT_ClassificationOutcome/aclsh:classification",
-      qname = "asl:CT_ScriptLink/asl:scriptLink"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "a14:CT_CompatExt/a14:compatExt",
+    qname = "a15:CT_BackgroundPr/a15:backgroundPr",
+    qname = "a16:CT_CreationId/a16:creationId",
+    qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef",
+    qname = "adec:CT_Decorative/adec:decorative",
+    qname = "aclsh:CT_ClassificationOutcome/aclsh:classification",
+    qname = "asl:CT_ScriptLink/asl:scriptLink",
+    any
+  ))]
   pub xml_children: Option<NonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the PictureLocks Class.
@@ -15299,17 +15214,14 @@ pub struct NonVisualPicturePropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "a14:CT_CameraTool/a14:cameraTool",
-      qname = "a15:CT_SignatureLine/a15:signatureLine",
-      qname = "a15:CT_ObjectPr/a15:objectPr",
-      qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps",
-      qname = "aif:CT_ImageFormula/aif:imageFormula"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "a14:CT_CameraTool/a14:cameraTool",
+    qname = "a15:CT_SignatureLine/a15:signatureLine",
+    qname = "a15:CT_ObjectPr/a15:objectPr",
+    qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps",
+    qname = "aif:CT_ImageFormula/aif:imageFormula",
+    any
+  ))]
   pub xml_children: Option<NonVisualPicturePropertiesExtensionChoice>,
 }
 /// Future extensions..
@@ -15344,19 +15256,16 @@ pub struct BlipExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "a14:CT_Photo/a14:imgProps",
-      qname = "a14:CT_UseLocalDpi/a14:useLocalDpi",
-      qname = "wp15:CT_WebVideoPr/wp15:webVideoPr",
-      qname = "asvg:CT_SVGBlip/asvg:svgBlip",
-      qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl",
-      qname = "woe:CT_OEmbed/woe:oembed",
-      qname = "aoe:CT_OEmbedShared/aoe:oembedShared"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "a14:CT_Photo/a14:imgProps",
+    qname = "a14:CT_UseLocalDpi/a14:useLocalDpi",
+    qname = "wp15:CT_WebVideoPr/wp15:webVideoPr",
+    qname = "asvg:CT_SVGBlip/asvg:svgBlip",
+    qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl",
+    qname = "woe:CT_OEmbed/woe:oembed",
+    qname = "aoe:CT_OEmbedShared/aoe:oembedShared",
+    any
+  ))]
   pub xml_children: Option<BlipExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -18195,7 +18104,6 @@ pub enum ParagraphChoice {
   ABr(std::boxed::Box<Break>),
   #[sdk(child(qname = "a:CT_TextField/a:fld"))]
   AFld(std::boxed::Box<Field>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the TextMath Class.
   #[sdk(empty_child(qname = "a14:CT_TextMath/a14:m"))]
   A14M,
@@ -18244,38 +18152,32 @@ pub enum TextSpacingTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_FillProperties/a14:hiddenFill"))]
   A14HiddenFill(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenFillProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_LineProperties/a14:hiddenLine"))]
   A14HiddenLine(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenLineProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_EffectProperties/a14:hiddenEffects"))]
   A14HiddenEffects(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenEffectsProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_Scene3D/a14:hiddenScene3d"))]
   A14HiddenScene3d(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenScene3D>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_Shape3D/a14:hiddenSp3d"))]
   A14HiddenSp3d(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenShape3D>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_ShadowObscured/a14:shadowObscured"))]
   A14ShadowObscured(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ShadowObscured>,
@@ -18285,7 +18187,6 @@ pub enum ShapePropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GvmlGroupShapeExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas"))]
   A14IsCanvas(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::IsCanvas>,
@@ -18326,7 +18227,6 @@ pub enum GroupShapeChoice {
   ACxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   APic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
   A14ContentPart(
     std::boxed::Box<
@@ -18346,7 +18246,6 @@ pub enum GroupShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"))]
   A15NonVisualGroupProps(
     std::boxed::Box<
@@ -18358,7 +18257,6 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeStyleSheetExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "thm15:CT_ThemeFamily/thm15:themeFamily"))]
   Thm15ThemeFamily(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_thememl_2012_main::ThemeFamily>,
@@ -18384,14 +18282,12 @@ pub enum HyperlinkTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataModelExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt"))]
   DspDataModelExt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::DataModelExtensionBlock,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "dgm14:CT_Boolean/dgm14:recolorImg"))]
   Dgm14RecolorImg(
     std::boxed::Box<
@@ -18403,7 +18299,6 @@ pub enum DataModelExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PtExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr"))]
   Dgm14CNvPr(
     std::boxed::Box<
@@ -18415,7 +18310,6 @@ pub enum PtExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HyperlinkExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr"))]
   AhypHlinkClr(
     std::boxed::Box<
@@ -18427,8 +18321,7 @@ pub enum HyperlinkExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"))]
+  #[sdk(child(qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"))]
     AskLineSketchStyleProps(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2018_sketchyshapes::LineSketchStyleProperties,
@@ -18439,49 +18332,42 @@ pub enum LinePropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "a14:CT_CompatExt/a14:compatExt"))]
+  #[sdk(child(qname = "a14:CT_CompatExt/a14:compatExt"))]
     A14CompatExt(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2010_main::CompatExtension,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a15:CT_BackgroundPr/a15:backgroundPr"))]
     A15BackgroundPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2012_main::BackgroundProperties,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a16:CT_CreationId/a16:creationId"))]
     A16CreationId(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2014_main::CreationId,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef"))]
     A16PredDeRef(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2014_main::PredecessorDrawingElementReference,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "adec:CT_Decorative/adec:decorative"))]
     AdecDecorative(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2017_decorative::Decorative,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "aclsh:CT_ClassificationOutcome/aclsh:classification"))]
     AclshClassification(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2020_classification_shape::ClassificationOutcome,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "asl:CT_ScriptLink/asl:scriptLink"))]
     AslScriptLink(
         std::boxed::Box<
@@ -18493,31 +18379,26 @@ pub enum NonVisualDrawingPropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a14:CT_CameraTool/a14:cameraTool"))]
   A14CameraTool(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::CameraTool>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a15:CT_SignatureLine/a15:signatureLine"))]
   A15SignatureLine(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_main::SignatureLine>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a15:CT_ObjectPr/a15:objectPr"))]
   A15ObjectPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_main::ObjectProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps"))]
   AlfLiveFeedProps(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2021_livefeed::LiveFeedProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "aif:CT_ImageFormula/aif:imageFormula"))]
   AifImageFormula(
     std::boxed::Box<
@@ -18529,49 +18410,42 @@ pub enum NonVisualPicturePropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "a14:CT_Photo/a14:imgProps"))]
+  #[sdk(child(qname = "a14:CT_Photo/a14:imgProps"))]
     A14ImgProps(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ImageProperties,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a14:CT_UseLocalDpi/a14:useLocalDpi"))]
     A14UseLocalDpi(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2010_main::UseLocalDpi,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "wp15:CT_WebVideoPr/wp15:webVideoPr"))]
     Wp15WebVideoPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2012_wordprocessing_drawing::WebVideoProperty,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "asvg:CT_SVGBlip/asvg:svgBlip"))]
     AsvgSvgBlip(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2016_svg_main::SvgBlip,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl"))]
     A1611PicAttrSrcUrl(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_drawing_2016_11_main::PictureAttributionSourceUrl,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "woe:CT_OEmbed/woe:oembed"))]
     WoeOembed(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2020_oembed::OEmbed,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "aoe:CT_OEmbedShared/aoe:oembedShared"))]
     AoeOembedShared(
         std::boxed::Box<

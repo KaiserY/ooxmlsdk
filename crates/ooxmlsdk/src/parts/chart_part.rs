@@ -74,7 +74,6 @@ impl ChartPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/themeOverride",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn chart_style_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -88,7 +87,6 @@ impl ChartPart {
       "http://schemas.microsoft.com/office/2011/relationships/chartStyle",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn chart_color_style_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

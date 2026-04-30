@@ -13,9 +13,8 @@ categories.workspace = true
 readme.workspace = true
 
 [features]
-default = ["microsoft365", "parts"]
+default = ["parts"]
 parts = ["dep:base64", "dep:zip"]
-microsoft365 = []
 validators = ["dep:regex"]
 mce = ["parts"]
 

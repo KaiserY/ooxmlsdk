@@ -35,7 +35,6 @@ impl DrawingsPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -75,7 +74,6 @@ impl DrawingsPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn diagram_persist_layout_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -143,7 +141,6 @@ impl DrawingsPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn web_extension_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

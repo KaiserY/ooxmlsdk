@@ -733,7 +733,6 @@ pub enum TriggerEventValues {
   OnPrevious,
   #[sdk(rename = "onStopAudio")]
   OnStopAudio,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "onMediaBookmark")]
   OnMediaBookmark,
 }
@@ -1097,7 +1096,6 @@ pub struct BackgroundStyleReference {
   ))]
   pub xml_children: Option<BackgroundStyleReferenceChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Data for the Windows platform..
 ///
 /// Available in Office2021 and above.
@@ -1752,7 +1750,6 @@ pub struct ViewProperties {
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ContentPart Class.
 ///
 /// Available in Office2010 and above.
@@ -1957,12 +1954,9 @@ pub struct TargetElement {
     qname = "p:CT_Empty/p:sldTgt",
     qname = "a:CT_EmbeddedWAVAudioFile/p:sndTgt",
     qname = "p:CT_TLShapeTargetElement/p:spTgt",
-    qname = "p:CT_TLSubShapeId/p:inkTgt"
+    qname = "p:CT_TLSubShapeId/p:inkTgt",
+    qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"))
-  )]
   pub xml_children: Option<TargetElementChoice>,
 }
 /// Time Node.
@@ -2217,7 +2211,6 @@ pub struct Animate {
   #[sdk(attr(qname = ":valueType"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub value_type: Option<AnimateBehaviorValues>,
-  #[cfg(feature = "microsoft365")]
   /// bounceEnd
   ///
   /// Available in Office2010 and above.
@@ -2360,7 +2353,6 @@ pub struct AnimateMotion {
   /// Represents the following attribute in the schema: :ptsTypes
   #[sdk(attr(qname = ":ptsTypes"))]
   pub point_types: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// bounceEnd
   ///
   /// Available in Office2010 and above.
@@ -2422,7 +2414,6 @@ pub struct AnimateRotation {
   /// Represents the following attribute in the schema: :to
   #[sdk(attr(qname = ":to"))]
   pub to: Option<crate::simple_type::Int32Value>,
-  #[cfg(feature = "microsoft365")]
   /// bounceEnd
   ///
   /// Available in Office2010 and above.
@@ -2458,7 +2449,6 @@ pub struct AnimateScale {
   /// Represents the following attribute in the schema: :zoomContents
   #[sdk(attr(qname = ":zoomContents"))]
   pub zoom_contents: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// bounceEnd
   ///
   /// Available in Office2010 and above.
@@ -2757,7 +2747,6 @@ pub struct CommonTimeNode {
   /// Represents the following attribute in the schema: :nodePh
   #[sdk(attr(qname = ":nodePh"))]
   pub node_placeholder: Option<crate::simple_type::BooleanValue>,
-  #[cfg(feature = "microsoft365")]
   /// presetBounceEnd
   ///
   /// Available in Office2010 and above.
@@ -5832,15 +5821,12 @@ pub struct SlideExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
-      qname = "p14:CT_ShowEventRecordList/p14:showEvtLst",
-      qname = "p188:CT_CommentRelationship/p188:commentRel"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
+    qname = "p14:CT_ShowEventRecordList/p14:showEvtLst",
+    qname = "p188:CT_CommentRelationship/p188:commentRel",
+    any
+  ))]
   pub xml_children: Option<SlideExtensionChoice>,
 }
 /// Defines the CommonSlideDataExtension Class.
@@ -5862,11 +5848,7 @@ pub struct CommonSlideDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p14:CT_RandomId/p14:creationId"))
-  )]
+  #[sdk(choice(qname = "p14:CT_RandomId/p14:creationId", any))]
   pub xml_children: Option<CommonSlideDataExtensionChoice>,
 }
 /// Defines the ShowPropertiesExtension Class.
@@ -5888,15 +5870,12 @@ pub struct ShowPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "p14:CT_BrowseMode/p14:browseMode",
-      qname = "a:CT_Color/p14:laserClr",
-      qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "p14:CT_BrowseMode/p14:browseMode",
+    qname = "a:CT_Color/p14:laserClr",
+    qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls",
+    any
+  ))]
   pub xml_children: Option<ShowPropertiesExtensionChoice>,
 }
 /// Defines the Picture Class.
@@ -5980,7 +5959,6 @@ pub struct Transition {
   #[sdk(attr(qname = ":spd"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub speed: Option<TransitionSpeedValues>,
-  #[cfg(feature = "microsoft365")]
   /// dur
   ///
   /// Available in Office2010 and above.
@@ -6026,33 +6004,28 @@ pub struct Transition {
     qname = "p:CT_Empty/p:wedge",
     qname = "p:CT_WheelTransition/p:wheel",
     qname = "p:CT_SideDirectionTransition/p:wipe",
-    qname = "p:CT_InOutTransition/p:zoom"
+    qname = "p:CT_InOutTransition/p:zoom",
+    qname = "p:CT_Empty/p14:flash",
+    qname = "p:CT_SideDirectionTransition/p14:vortex",
+    qname = "p14:CT_LeftRightDirectionTransition/p14:switch",
+    qname = "p14:CT_LeftRightDirectionTransition/p14:flip",
+    qname = "p14:CT_RippleTransition/p14:ripple",
+    qname = "p14:CT_GlitterTransition/p14:glitter",
+    qname = "p:CT_Empty/p14:honeycomb",
+    qname = "p14:CT_PrismTransition/p14:prism",
+    qname = "p:CT_OrientationTransition/p14:doors",
+    qname = "p:CT_OrientationTransition/p14:window",
+    qname = "p14:CT_ShredTransition/p14:shred",
+    qname = "p14:CT_LeftRightDirectionTransition/p14:ferris",
+    qname = "p14:CT_FlyThroughTransition/p14:flythrough",
+    qname = "p:CT_InOutTransition/p14:warp",
+    qname = "p14:CT_LeftRightDirectionTransition/p14:gallery",
+    qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor",
+    qname = "p:CT_SideDirectionTransition/p14:pan",
+    qname = "p14:CT_RevealTransition/p14:reveal",
+    qname = "p:CT_WheelTransition/p14:wheelReverse",
+    qname = "p15:CT_PresetTransition/p15:prstTrans"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "p:CT_Empty/p14:flash",
-      qname = "p:CT_SideDirectionTransition/p14:vortex",
-      qname = "p14:CT_LeftRightDirectionTransition/p14:switch",
-      qname = "p14:CT_LeftRightDirectionTransition/p14:flip",
-      qname = "p14:CT_RippleTransition/p14:ripple",
-      qname = "p14:CT_GlitterTransition/p14:glitter",
-      qname = "p:CT_Empty/p14:honeycomb",
-      qname = "p14:CT_PrismTransition/p14:prism",
-      qname = "p:CT_OrientationTransition/p14:doors",
-      qname = "p:CT_OrientationTransition/p14:window",
-      qname = "p14:CT_ShredTransition/p14:shred",
-      qname = "p14:CT_LeftRightDirectionTransition/p14:ferris",
-      qname = "p14:CT_FlyThroughTransition/p14:flythrough",
-      qname = "p:CT_InOutTransition/p14:warp",
-      qname = "p14:CT_LeftRightDirectionTransition/p14:gallery",
-      qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor",
-      qname = "p:CT_SideDirectionTransition/p14:pan",
-      qname = "p14:CT_RevealTransition/p14:reveal",
-      qname = "p:CT_WheelTransition/p14:wheelReverse",
-      qname = "p15:CT_PresetTransition/p15:prstTrans"
-    ))
-  )]
   pub transition_choice: Option<TransitionChoice>,
   /// _
   #[sdk(child(qname = "p:CT_TransitionSoundAction/p:sndAc"))]
@@ -6136,13 +6109,10 @@ pub struct ShapeTree {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
+    qname = "p:CT_ContentPart/p:contentPart",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
-  )]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -6169,13 +6139,10 @@ pub struct GroupShape {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
+    qname = "p:CT_ContentPart/p:contentPart",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
-  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// _
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -6197,12 +6164,9 @@ pub struct GroupShapeType {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
+    qname = "p:CT_ContentPart/p:contentPart",
     qname = "p:CT_ExtensionListModify/p:extLst"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p:CT_ContentPart/p:contentPart"))
-  )]
   pub xml_children: Vec<GroupShapeTypeChoice>,
 }
 /// Customer Data List.
@@ -6495,11 +6459,7 @@ pub struct CommentAuthorExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo"))
-  )]
+  #[sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo", any))]
   pub xml_children: Option<CommentAuthorExtensionChoice>,
 }
 /// Defines the CommentExtension Class.
@@ -6521,11 +6481,7 @@ pub struct CommentExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo"))
-  )]
+  #[sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo", any))]
   pub xml_children: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
@@ -6547,11 +6503,7 @@ pub struct SlideLayoutExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
-  )]
+  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub xml_children: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
@@ -6573,11 +6525,7 @@ pub struct SlideMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
-  )]
+  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub xml_children: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
@@ -6599,11 +6547,7 @@ pub struct HandoutMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
-  )]
+  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub xml_children: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
@@ -6625,11 +6569,7 @@ pub struct NotesMasterExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))
-  )]
+  #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub xml_children: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
@@ -6714,11 +6654,11 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "p14:CT_Media/p14:media", qname = "p14:CT_RandomId/p14:modId"))
-  )]
+  #[sdk(choice(
+    qname = "p14:CT_Media/p14:media",
+    qname = "p14:CT_RandomId/p14:modId",
+    any
+  ))]
   pub xml_children: Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the Iterate Class.
@@ -7269,7 +7209,6 @@ pub struct ModificationVerifier {
   /// Represents the following attribute in the schema: :cryptProviderTypeExtSource
   #[sdk(attr(qname = ":cryptProviderTypeExtSource"))]
   pub cryptographic_provider_type_extensibility_source: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// algorithmName
   ///
   /// Available in Office2010 and above.
@@ -7277,7 +7216,6 @@ pub struct ModificationVerifier {
   /// Represents the following attribute in the schema: :algorithmName
   #[sdk(attr(qname = ":algorithmName"))]
   pub algorithm_name: Option<crate::simple_type::StringValue>,
-  #[cfg(feature = "microsoft365")]
   /// hashValue
   ///
   /// Available in Office2010 and above.
@@ -7285,7 +7223,6 @@ pub struct ModificationVerifier {
   /// Represents the following attribute in the schema: :hashValue
   #[sdk(attr(qname = ":hashValue"))]
   pub hash_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// saltValue
   ///
   /// Available in Office2010 and above.
@@ -7293,7 +7230,6 @@ pub struct ModificationVerifier {
   /// Represents the following attribute in the schema: :saltValue
   #[sdk(attr(qname = ":saltValue"))]
   pub salt_value: Option<crate::simple_type::Base64BinaryValue>,
-  #[cfg(feature = "microsoft365")]
   /// spinValue
   ///
   /// Available in Office2010 and above.
@@ -7334,16 +7270,13 @@ pub struct PresentationExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "p14:CT_SectionProperties/p14:sectionPr",
-      qname = "p14:CT_SectionList/p14:sectionLst",
-      qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst",
-      qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "p14:CT_SectionProperties/p14:sectionPr",
+    qname = "p14:CT_SectionList/p14:sectionLst",
+    qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst",
+    qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst",
+    any
+  ))]
   pub xml_children: Option<PresentationExtensionChoice>,
 }
 /// HTML Publishing Properties.
@@ -7620,16 +7553,13 @@ pub struct PresentationPropertiesExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
-      qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi",
-      qname = "a14:CT_TextMath/a14:m",
-      qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
+    qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi",
+    qname = "a14:CT_TextMath/a14:m",
+    qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased",
+    any
+  ))]
   pub xml_children: Option<PresentationPropertiesExtensionChoice>,
 }
 /// Defines the HeaderFooter Class.
@@ -8133,7 +8063,6 @@ pub struct SoundAction {
   ))]
   pub xml_children: Option<SoundActionChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the PlaceholderExtension Class.
 ///
 /// Available in Microsoft365 and above.
@@ -8254,7 +8183,6 @@ pub enum TargetElementChoice {
   /// Ink Target.
   #[sdk(child(qname = "p:CT_TLSubShapeId/p:inkTgt"))]
   PInkTgt(std::boxed::Box<InkTarget>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the BookmarkTarget Class.
   #[sdk(child(qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"))]
   P14BmkTgt(
@@ -8780,21 +8708,18 @@ pub enum TextListStyleTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LaserTraceList/p14:laserTraceLst"))]
   P14LaserTraceLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::LaserTraceList,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_ShowEventRecordList/p14:showEvtLst"))]
   P14ShowEvtLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::ShowEventRecordList,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p188:CT_CommentRelationship/p188:commentRel"))]
   P188CommentRel(
     std::boxed::Box<
@@ -8806,7 +8731,6 @@ pub enum SlideExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommonSlideDataExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_RandomId/p14:creationId"))]
   P14CreationId(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::CreationId>,
@@ -8816,17 +8740,14 @@ pub enum CommonSlideDataExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_BrowseMode/p14:browseMode"))]
   P14BrowseMode(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::BrowseMode>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_Color/p14:laserClr"))]
   P14LaserClr(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::LaserColor>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls"))]
   P14ShowMediaCtrls(
     std::boxed::Box<
@@ -8887,134 +8808,114 @@ pub enum TransitionChoice {
   PWipe(std::boxed::Box<WipeTransition>),
   #[sdk(child(qname = "p:CT_InOutTransition/p:zoom"))]
   PZoom(std::boxed::Box<ZoomTransition>),
-  #[cfg(feature = "microsoft365")]
   /// Defines the FlashTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p14:flash"))]
   P14Flash,
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p14:vortex"))]
   P14Vortex(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::VortexTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LeftRightDirectionTransition/p14:switch"))]
   P14Switch(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::SwitchTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LeftRightDirectionTransition/p14:flip"))]
   P14Flip(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::FlipTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_RippleTransition/p14:ripple"))]
   P14Ripple(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::RippleTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_GlitterTransition/p14:glitter"))]
   P14Glitter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::GlitterTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   /// Defines the HoneycombTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p14:honeycomb"))]
   P14Honeycomb,
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_PrismTransition/p14:prism"))]
   P14Prism(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::PrismTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_OrientationTransition/p14:doors"))]
   P14Doors(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::DoorsTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_OrientationTransition/p14:window"))]
   P14Window(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::WindowTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_ShredTransition/p14:shred"))]
   P14Shred(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::ShredTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LeftRightDirectionTransition/p14:ferris"))]
   P14Ferris(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::FerrisTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_FlyThroughTransition/p14:flythrough"))]
   P14Flythrough(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::FlythroughTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_InOutTransition/p14:warp"))]
   P14Warp(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::WarpTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LeftRightDirectionTransition/p14:gallery"))]
   P14Gallery(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::GalleryTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor"))]
   P14Conveyor(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::ConveyorTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p14:pan"))]
   P14Pan(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::PanTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_RevealTransition/p14:reveal"))]
   P14Reveal(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::RevealTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_WheelTransition/p14:wheelReverse"))]
   P14WheelReverse(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::WheelReverseTransition,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_PresetTransition/p15:prstTrans"))]
   P15PrstTrans(
     std::boxed::Box<
@@ -9043,7 +8944,6 @@ pub enum ShapeTreeChoice {
   PCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   PPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
@@ -9065,7 +8965,6 @@ pub enum GroupShapeChoice {
   PCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   PPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
@@ -9093,7 +8992,6 @@ pub enum GroupShapeTypeChoice {
   PCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   PPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
@@ -9154,7 +9052,6 @@ pub enum ShapeTargetChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentAuthorExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_PresenceInfo/p15:presenceInfo"))]
   P15PresenceInfo(
     std::boxed::Box<
@@ -9166,7 +9063,6 @@ pub enum CommentAuthorExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_CommentThreading/p15:threadingInfo"))]
   P15ThreadingInfo(
     std::boxed::Box<
@@ -9178,7 +9074,6 @@ pub enum CommentExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideLayoutExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -9190,7 +9085,6 @@ pub enum SlideLayoutExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideMasterExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -9202,7 +9096,6 @@ pub enum SlideMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HandoutMasterExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -9214,7 +9107,6 @@ pub enum HandoutMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NotesMasterExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -9226,12 +9118,10 @@ pub enum NotesMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_Media/p14:media"))]
   P14Media(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::Media>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_RandomId/p14:modId"))]
   P14ModId(
     std::boxed::Box<
@@ -9396,26 +9286,22 @@ pub enum TimeTypeListTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_SectionProperties/p14:sectionPr"))]
   P14SectionPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::SectionProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p14:CT_SectionList/p14:sectionLst"))]
   P14SectionLst(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::SectionList>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2012_main::SlideGuideList,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst"))]
   P15NotesGuideLst(
     std::boxed::Box<
@@ -9494,25 +9380,21 @@ pub enum ColorMostRecentlyUsedChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationPropertiesExtensionChoice {
-  #[cfg(feature = "microsoft365")]
-    #[sdk(child(qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData"))]
+  #[sdk(child(qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData"))]
     P14DiscardImageEditData(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::DiscardImageEditData,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi"))]
     P14DefaultImageDpi(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::DefaultImageDpi,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the TextMath Class.
     #[sdk(empty_child(qname = "a14:CT_TextMath/a14:m"))]
     A14M,
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased"))]
     P15ChartTrackingRefBased(
         std::boxed::Box<

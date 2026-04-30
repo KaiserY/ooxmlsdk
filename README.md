@@ -9,9 +9,8 @@
 
 The runtime crate exposes a small public feature surface:
 
-- `default`: enables `microsoft365` and `parts`; this is the recommended configuration for most users
+- `default`: enables `parts`; this is the recommended configuration for most users
 - `parts`: enables package-level OOXML read/write support such as `WordprocessingDocument`, `SpreadsheetDocument`, and `PresentationDocument`
-- `microsoft365`: enables the post-Office 2007 schema and part surface used by newer Office releases
 - `validators`: enables optional validator APIs
 
 The always-available modules in the crate root are:
@@ -29,14 +28,12 @@ Feature-gated modules are:
 
 ## Version Coverage
 
-This repository treats Office 2007 as the compatibility baseline for the narrower package surface:
+This repository treats Office 2007 as the compatibility baseline while always compiling the checked-in generated runtime for newer OOXML namespaces and parts:
 
-- `--no-default-features --features parts`: Office 2007-oriented package and schema coverage
-- default build: Office 2007 baseline plus the broader `microsoft365` surface
+- `--no-default-features --features parts`: package APIs without optional validators
+- default build: package APIs plus the full generated schema and part surface
 
-The `microsoft365` feature name is an umbrella label for everything newer than the Office 2007-oriented surface in this repository. It is not limited to Microsoft 365 subscription documents.
-
-When `microsoft365` is enabled, the checked-in generated runtime covers newer OOXML namespaces and parts associated with:
+The checked-in generated runtime covers OOXML namespaces and parts associated with:
 
 - Office 2010
 - Office 2013
@@ -45,7 +42,7 @@ When `microsoft365` is enabled, the checked-in generated runtime covers newer OO
 - Office 2021
 - Microsoft 365-era extensions and newer upstream namespace revisions currently present in the checked-in metadata, including 2022, 2023, and 2024-dated schema additions
 
-In practical terms, this is the feature that pulls in support for newer namespaces and package relationships such as later DrawingML, chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked in the upstream Open XML SDK metadata.
+In practical terms, the runtime includes support for newer namespaces and package relationships such as later DrawingML, chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked in the upstream Open XML SDK metadata.
 
 ## Quick Start
 
@@ -56,7 +53,7 @@ Most users should keep the default features enabled:
 ooxmlsdk = "0.5.1"
 ```
 
-If you want the narrower Office 2007-oriented package surface, disable default features and enable only `parts`:
+If you want package APIs without optional validators or MCE-specific behavior, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]

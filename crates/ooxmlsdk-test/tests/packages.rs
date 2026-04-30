@@ -3726,7 +3726,6 @@ fn presentation_child_accessors_resolve_repeated_parts() {
   assert!(presentation_part.slide_master_parts(&package).count() >= 1);
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
   // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
@@ -3748,7 +3747,6 @@ fn model3d_reference_relationship_parts_use_powerpoint_content_type() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 #[cfg(any())]
 fn wordprocessing_extended_chart_part_root_loads_from_office2016_unknown_element_test() {

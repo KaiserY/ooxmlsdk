@@ -3,15 +3,8 @@ use quote::quote;
 use syn::{Attribute, parse_quote};
 
 pub fn version_cfg_attrs(version: &str) -> Vec<Attribute> {
-  if is_microsoft365_version(version) {
-    vec![parse_quote!(#[cfg(feature = "microsoft365")])]
-  } else {
-    Vec::new()
-  }
-}
-
-pub fn not_microsoft365_cfg_attrs() -> Vec<Attribute> {
-  vec![parse_quote!(#[cfg(not(feature = "microsoft365"))])]
+  let _ = version;
+  Vec::new()
 }
 
 pub fn features_cfg_attrs(features: &[String]) -> Vec<Attribute> {
@@ -19,10 +12,6 @@ pub fn features_cfg_attrs(features: &[String]) -> Vec<Attribute> {
 
   if features.iter().any(|feature| feature == "parts") {
     attrs.push(parse_quote!(#[cfg(feature = "parts")]));
-  }
-
-  if features.iter().any(|feature| feature == "microsoft365") {
-    attrs.push(parse_quote!(#[cfg(feature = "microsoft365")]));
   }
 
   attrs

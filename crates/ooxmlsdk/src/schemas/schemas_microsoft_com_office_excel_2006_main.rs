@@ -129,7 +129,6 @@ pub struct Macrosheet {
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub x_ole_objects:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::OleObjects>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub x_drawing_hf:
@@ -157,14 +156,12 @@ pub struct WorksheetSortMap {
   #[sdk(child(qname = "xne:CT_ColSortMap/xne:colSortMap"))]
   pub column_sort_map: Option<ColumnSortMap>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the ReferenceSequence Class.
 ///
 /// Available in Office2010 and above.
 ///
 /// When the object is serialized out as xml, it's qualified name is xne:sqref.
 pub type ReferenceSequence = crate::simple_type::StringValue;
-#[cfg(feature = "microsoft365")]
 /// Defines the Formula Class.
 ///
 /// Available in Office2010 and above.

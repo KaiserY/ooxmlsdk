@@ -131,7 +131,6 @@ impl WorksheetPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn control_properties_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -238,7 +237,6 @@ impl WorksheetPart {
             "http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary",
         )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn slicers_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -252,7 +250,6 @@ impl WorksheetPart {
       "http://schemas.microsoft.com/office/2007/relationships/slicer",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn time_line_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -266,7 +263,6 @@ impl WorksheetPart {
       "http://schemas.microsoft.com/office/2011/relationships/timeline",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn worksheet_threaded_comments_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -282,7 +278,6 @@ impl WorksheetPart {
       "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn model3_d_reference_relationship_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -298,7 +293,6 @@ impl WorksheetPart {
       "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn named_sheet_views_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

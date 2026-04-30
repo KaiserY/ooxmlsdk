@@ -7,21 +7,16 @@
 pub mod alternative_format_import_part;
 pub mod calculation_chain_part;
 pub mod cell_metadata_part;
-#[cfg(feature = "microsoft365")]
 pub mod chart_color_style_part;
 pub mod chart_drawing_part;
 pub mod chart_part;
-#[cfg(feature = "microsoft365")]
 pub mod chart_style_part;
 pub mod chartsheet_part;
 pub mod comment_authors_part;
 pub mod connections_part;
-#[cfg(feature = "microsoft365")]
 pub mod control_properties_part;
 pub mod core_file_properties_part;
-#[cfg(feature = "microsoft365")]
 pub mod custom_data_part;
-#[cfg(feature = "microsoft365")]
 pub mod custom_data_properties_part;
 pub mod custom_file_properties_part;
 pub mod custom_property_part;
@@ -32,13 +27,11 @@ pub mod customization_part;
 pub mod diagram_colors_part;
 pub mod diagram_data_part;
 pub mod diagram_layout_definition_part;
-#[cfg(feature = "microsoft365")]
 pub mod diagram_persist_layout_part;
 pub mod diagram_style_part;
 pub mod dialogsheet_part;
 pub mod digital_signature_origin_part;
 pub mod document_settings_part;
-#[cfg(feature = "microsoft365")]
 pub mod document_tasks_part;
 pub mod drawings_part;
 pub mod embedded_control_persistence_binary_data_part;
@@ -47,12 +40,10 @@ pub mod embedded_object_part;
 pub mod embedded_package_part;
 pub mod endnotes_part;
 pub mod excel_attached_toolbars_part;
-#[cfg(feature = "microsoft365")]
 pub mod extended_chart_part;
 pub mod extended_file_properties_part;
 pub mod extended_part;
 pub mod external_workbook_part;
-#[cfg(feature = "microsoft365")]
 pub mod feature_property_bags_part;
 pub mod font_part;
 pub mod font_table_part;
@@ -63,16 +54,13 @@ pub mod handout_master_part;
 pub mod header_part;
 pub mod image_part;
 pub mod international_macro_sheet_part;
-#[cfg(feature = "microsoft365")]
 pub mod label_info_part;
 pub mod legacy_diagram_text_info_part;
 pub mod legacy_diagram_text_part;
 pub mod macro_sheet_part;
 pub mod mail_merge_recipient_data_part;
 pub mod main_document_part;
-#[cfg(feature = "microsoft365")]
 pub mod model3_d_reference_relationship_part;
-#[cfg(feature = "microsoft365")]
 pub mod named_sheet_views_part;
 pub mod notes_master_part;
 pub mod notes_slide_part;
@@ -80,39 +68,26 @@ pub mod numbering_definitions_part;
 pub mod pivot_table_cache_definition_part;
 pub mod pivot_table_cache_records_part;
 pub mod pivot_table_part;
-#[cfg(feature = "microsoft365")]
 pub mod power_point_authors_part;
-#[cfg(feature = "microsoft365")]
 pub mod power_point_comment_part;
 pub mod presentation_document;
 pub mod presentation_part;
 pub mod presentation_properties_part;
 pub mod query_table_part;
 pub mod quick_access_toolbar_customizations_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_array_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_rich_value_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_rich_value_structure_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_rich_value_types_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_rich_value_web_image_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_supporting_property_bag_part;
-#[cfg(feature = "microsoft365")]
 pub mod rd_supporting_property_bag_structure_part;
-#[cfg(feature = "microsoft365")]
 pub mod ribbon_and_backstage_customizations_part;
 pub mod ribbon_extensibility_part;
-#[cfg(feature = "microsoft365")]
 pub mod rich_styles_part;
 pub mod shared_string_table_part;
 pub mod single_cell_table_part;
-#[cfg(feature = "microsoft365")]
 pub mod slicer_cache_part;
-#[cfg(feature = "microsoft365")]
 pub mod slicers_part;
 pub mod slide_comments_part;
 pub mod slide_layout_part;
@@ -122,16 +97,13 @@ pub mod slide_sync_data_part;
 pub mod spreadsheet_document;
 pub mod spreadsheet_printer_settings_part;
 pub mod style_definitions_part;
-#[cfg(feature = "microsoft365")]
 pub mod styles_with_effects_part;
 pub mod table_definition_part;
 pub mod table_styles_part;
 pub mod theme_override_part;
 pub mod theme_part;
 pub mod thumbnail_part;
-#[cfg(feature = "microsoft365")]
 pub mod time_line_cache_part;
-#[cfg(feature = "microsoft365")]
 pub mod time_line_part;
 pub mod user_defined_tags_part;
 pub mod vba_data_part;
@@ -139,25 +111,18 @@ pub mod vba_project_part;
 pub mod view_properties_part;
 pub mod vml_drawing_part;
 pub mod volatile_dependencies_part;
-#[cfg(feature = "microsoft365")]
 pub mod web_ex_taskpanes_part;
-#[cfg(feature = "microsoft365")]
 pub mod web_extension_part;
 pub mod web_settings_part;
 pub mod word_attached_toolbars_part;
-#[cfg(feature = "microsoft365")]
 pub mod word_comments_extensible_part;
-#[cfg(feature = "microsoft365")]
 pub mod wordprocessing_comments_ex_part;
-#[cfg(feature = "microsoft365")]
 pub mod wordprocessing_comments_ids_part;
 pub mod wordprocessing_comments_part;
 pub mod wordprocessing_document;
-#[cfg(feature = "microsoft365")]
 pub mod wordprocessing_people_part;
 pub mod wordprocessing_printer_settings_part;
 pub mod workbook_part;
-#[cfg(feature = "microsoft365")]
 pub mod workbook_person_part;
 pub mod workbook_revision_header_part;
 pub mod workbook_revision_log_part;
@@ -166,7 +131,6 @@ pub mod workbook_user_data_part;
 pub mod worksheet_comments_part;
 pub mod worksheet_part;
 pub mod worksheet_sort_map_part;
-#[cfg(feature = "microsoft365")]
 pub mod worksheet_threaded_comments_part;
 pub mod xml_signature_part;
 macro_rules! define_part_ref {
@@ -183,20 +147,18 @@ define_part_ref! {
     AlternativeFormatImportPart(crate
     ::parts::alternative_format_import_part::AlternativeFormatImportPart),
     CalculationChainPart(crate ::parts::calculation_chain_part::CalculationChainPart),
-    CellMetadataPart(crate ::parts::cell_metadata_part::CellMetadataPart), #[cfg(feature
-    = "microsoft365")] ChartColorStylePart(crate
-    ::parts::chart_color_style_part::ChartColorStylePart), ChartDrawingPart(crate
-    ::parts::chart_drawing_part::ChartDrawingPart), ChartPart(crate
-    ::parts::chart_part::ChartPart), #[cfg(feature = "microsoft365")]
-    ChartStylePart(crate ::parts::chart_style_part::ChartStylePart), ChartsheetPart(crate
+    CellMetadataPart(crate ::parts::cell_metadata_part::CellMetadataPart),
+    ChartColorStylePart(crate ::parts::chart_color_style_part::ChartColorStylePart),
+    ChartDrawingPart(crate ::parts::chart_drawing_part::ChartDrawingPart),
+    ChartPart(crate ::parts::chart_part::ChartPart), ChartStylePart(crate
+    ::parts::chart_style_part::ChartStylePart), ChartsheetPart(crate
     ::parts::chartsheet_part::ChartsheetPart), CommentAuthorsPart(crate
     ::parts::comment_authors_part::CommentAuthorsPart), ConnectionsPart(crate
-    ::parts::connections_part::ConnectionsPart), #[cfg(feature = "microsoft365")]
-    ControlPropertiesPart(crate ::parts::control_properties_part::ControlPropertiesPart),
+    ::parts::connections_part::ConnectionsPart), ControlPropertiesPart(crate
+    ::parts::control_properties_part::ControlPropertiesPart),
     CoreFilePropertiesPart(crate
-    ::parts::core_file_properties_part::CoreFilePropertiesPart), #[cfg(feature =
-    "microsoft365")] CustomDataPart(crate ::parts::custom_data_part::CustomDataPart),
-    #[cfg(feature = "microsoft365")] CustomDataPropertiesPart(crate
+    ::parts::core_file_properties_part::CoreFilePropertiesPart), CustomDataPart(crate
+    ::parts::custom_data_part::CustomDataPart), CustomDataPropertiesPart(crate
     ::parts::custom_data_properties_part::CustomDataPropertiesPart),
     CustomFilePropertiesPart(crate
     ::parts::custom_file_properties_part::CustomFilePropertiesPart),
@@ -209,17 +171,17 @@ define_part_ref! {
     DiagramColorsPart(crate ::parts::diagram_colors_part::DiagramColorsPart),
     DiagramDataPart(crate ::parts::diagram_data_part::DiagramDataPart),
     DiagramLayoutDefinitionPart(crate
-    ::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart), #[cfg(feature
-    = "microsoft365")] DiagramPersistLayoutPart(crate
+    ::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart),
+    DiagramPersistLayoutPart(crate
     ::parts::diagram_persist_layout_part::DiagramPersistLayoutPart),
     DiagramStylePart(crate ::parts::diagram_style_part::DiagramStylePart),
     DialogsheetPart(crate ::parts::dialogsheet_part::DialogsheetPart),
     DigitalSignatureOriginPart(crate
     ::parts::digital_signature_origin_part::DigitalSignatureOriginPart),
     DocumentSettingsPart(crate ::parts::document_settings_part::DocumentSettingsPart),
-    #[cfg(feature = "microsoft365")] DocumentTasksPart(crate
-    ::parts::document_tasks_part::DocumentTasksPart), DrawingsPart(crate
-    ::parts::drawings_part::DrawingsPart), EmbeddedControlPersistenceBinaryDataPart(crate
+    DocumentTasksPart(crate ::parts::document_tasks_part::DocumentTasksPart),
+    DrawingsPart(crate ::parts::drawings_part::DrawingsPart),
+    EmbeddedControlPersistenceBinaryDataPart(crate
     ::parts::embedded_control_persistence_binary_data_part::EmbeddedControlPersistenceBinaryDataPart),
     EmbeddedControlPersistencePart(crate
     ::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart),
@@ -227,12 +189,12 @@ define_part_ref! {
     EmbeddedPackagePart(crate ::parts::embedded_package_part::EmbeddedPackagePart),
     EndnotesPart(crate ::parts::endnotes_part::EndnotesPart),
     ExcelAttachedToolbarsPart(crate
-    ::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart), #[cfg(feature =
-    "microsoft365")] ExtendedChartPart(crate
-    ::parts::extended_chart_part::ExtendedChartPart), ExtendedFilePropertiesPart(crate
+    ::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart),
+    ExtendedChartPart(crate ::parts::extended_chart_part::ExtendedChartPart),
+    ExtendedFilePropertiesPart(crate
     ::parts::extended_file_properties_part::ExtendedFilePropertiesPart),
     ExternalWorkbookPart(crate ::parts::external_workbook_part::ExternalWorkbookPart),
-    #[cfg(feature = "microsoft365")] FeaturePropertyBagsPart(crate
+    FeaturePropertyBagsPart(crate
     ::parts::feature_property_bags_part::FeaturePropertyBagsPart), FontPart(crate
     ::parts::font_part::FontPart), FontTablePart(crate
     ::parts::font_table_part::FontTablePart), FooterPart(crate
@@ -242,59 +204,54 @@ define_part_ref! {
     ::parts::handout_master_part::HandoutMasterPart), HeaderPart(crate
     ::parts::header_part::HeaderPart), ImagePart(crate ::parts::image_part::ImagePart),
     InternationalMacroSheetPart(crate
-    ::parts::international_macro_sheet_part::InternationalMacroSheetPart), #[cfg(feature
-    = "microsoft365")] LabelInfoPart(crate ::parts::label_info_part::LabelInfoPart),
+    ::parts::international_macro_sheet_part::InternationalMacroSheetPart),
+    LabelInfoPart(crate ::parts::label_info_part::LabelInfoPart),
     LegacyDiagramTextInfoPart(crate
     ::parts::legacy_diagram_text_info_part::LegacyDiagramTextInfoPart),
     LegacyDiagramTextPart(crate
     ::parts::legacy_diagram_text_part::LegacyDiagramTextPart), MacroSheetPart(crate
     ::parts::macro_sheet_part::MacroSheetPart), MailMergeRecipientDataPart(crate
     ::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart),
-    MainDocumentPart(crate ::parts::main_document_part::MainDocumentPart), #[cfg(feature
-    = "microsoft365")] Model3DReferenceRelationshipPart(crate
+    MainDocumentPart(crate ::parts::main_document_part::MainDocumentPart),
+    Model3DReferenceRelationshipPart(crate
     ::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart),
-    #[cfg(feature = "microsoft365")] NamedSheetViewsPart(crate
-    ::parts::named_sheet_views_part::NamedSheetViewsPart), NotesMasterPart(crate
-    ::parts::notes_master_part::NotesMasterPart), NotesSlidePart(crate
-    ::parts::notes_slide_part::NotesSlidePart), NumberingDefinitionsPart(crate
+    NamedSheetViewsPart(crate ::parts::named_sheet_views_part::NamedSheetViewsPart),
+    NotesMasterPart(crate ::parts::notes_master_part::NotesMasterPart),
+    NotesSlidePart(crate ::parts::notes_slide_part::NotesSlidePart),
+    NumberingDefinitionsPart(crate
     ::parts::numbering_definitions_part::NumberingDefinitionsPart),
     PivotTableCacheDefinitionPart(crate
     ::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart),
     PivotTableCacheRecordsPart(crate
     ::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart),
-    PivotTablePart(crate ::parts::pivot_table_part::PivotTablePart), #[cfg(feature =
-    "microsoft365")] PowerPointAuthorsPart(crate
-    ::parts::power_point_authors_part::PowerPointAuthorsPart), #[cfg(feature =
-    "microsoft365")] PowerPointCommentPart(crate
+    PivotTablePart(crate ::parts::pivot_table_part::PivotTablePart),
+    PowerPointAuthorsPart(crate
+    ::parts::power_point_authors_part::PowerPointAuthorsPart),
+    PowerPointCommentPart(crate
     ::parts::power_point_comment_part::PowerPointCommentPart), PresentationPart(crate
     ::parts::presentation_part::PresentationPart), PresentationPropertiesPart(crate
     ::parts::presentation_properties_part::PresentationPropertiesPart),
     QueryTablePart(crate ::parts::query_table_part::QueryTablePart),
     QuickAccessToolbarCustomizationsPart(crate
     ::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart),
-    #[cfg(feature = "microsoft365")] RdArrayPart(crate
-    ::parts::rd_array_part::RdArrayPart), #[cfg(feature = "microsoft365")]
-    RdRichValuePart(crate ::parts::rd_rich_value_part::RdRichValuePart), #[cfg(feature =
-    "microsoft365")] RdRichValueStructurePart(crate
-    ::parts::rd_rich_value_structure_part::RdRichValueStructurePart), #[cfg(feature =
-    "microsoft365")] RdRichValueTypesPart(crate
-    ::parts::rd_rich_value_types_part::RdRichValueTypesPart), #[cfg(feature =
-    "microsoft365")] RdRichValueWebImagePart(crate
-    ::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart), #[cfg(feature =
-    "microsoft365")] RdSupportingPropertyBagPart(crate
-    ::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart), #[cfg(feature
-    = "microsoft365")] RdSupportingPropertyBagStructurePart(crate
+    RdArrayPart(crate ::parts::rd_array_part::RdArrayPart), RdRichValuePart(crate
+    ::parts::rd_rich_value_part::RdRichValuePart), RdRichValueStructurePart(crate
+    ::parts::rd_rich_value_structure_part::RdRichValueStructurePart),
+    RdRichValueTypesPart(crate ::parts::rd_rich_value_types_part::RdRichValueTypesPart),
+    RdRichValueWebImagePart(crate
+    ::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart),
+    RdSupportingPropertyBagPart(crate
+    ::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart),
+    RdSupportingPropertyBagStructurePart(crate
     ::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart),
-    #[cfg(feature = "microsoft365")] RibbonAndBackstageCustomizationsPart(crate
+    RibbonAndBackstageCustomizationsPart(crate
     ::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart),
     RibbonExtensibilityPart(crate
-    ::parts::ribbon_extensibility_part::RibbonExtensibilityPart), #[cfg(feature =
-    "microsoft365")] RichStylesPart(crate ::parts::rich_styles_part::RichStylesPart),
-    SharedStringTablePart(crate
+    ::parts::ribbon_extensibility_part::RibbonExtensibilityPart), RichStylesPart(crate
+    ::parts::rich_styles_part::RichStylesPart), SharedStringTablePart(crate
     ::parts::shared_string_table_part::SharedStringTablePart), SingleCellTablePart(crate
-    ::parts::single_cell_table_part::SingleCellTablePart), #[cfg(feature =
-    "microsoft365")] SlicerCachePart(crate ::parts::slicer_cache_part::SlicerCachePart),
-    #[cfg(feature = "microsoft365")] SlicersPart(crate
+    ::parts::single_cell_table_part::SingleCellTablePart), SlicerCachePart(crate
+    ::parts::slicer_cache_part::SlicerCachePart), SlicersPart(crate
     ::parts::slicers_part::SlicersPart), SlideCommentsPart(crate
     ::parts::slide_comments_part::SlideCommentsPart), SlideLayoutPart(crate
     ::parts::slide_layout_part::SlideLayoutPart), SlideMasterPart(crate
@@ -304,42 +261,39 @@ define_part_ref! {
     SpreadsheetPrinterSettingsPart(crate
     ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart),
     StyleDefinitionsPart(crate ::parts::style_definitions_part::StyleDefinitionsPart),
-    #[cfg(feature = "microsoft365")] StylesWithEffectsPart(crate
+    StylesWithEffectsPart(crate
     ::parts::styles_with_effects_part::StylesWithEffectsPart), TableDefinitionPart(crate
     ::parts::table_definition_part::TableDefinitionPart), TableStylesPart(crate
     ::parts::table_styles_part::TableStylesPart), ThemeOverridePart(crate
     ::parts::theme_override_part::ThemeOverridePart), ThemePart(crate
     ::parts::theme_part::ThemePart), ThumbnailPart(crate
-    ::parts::thumbnail_part::ThumbnailPart), #[cfg(feature = "microsoft365")]
-    TimeLineCachePart(crate ::parts::time_line_cache_part::TimeLineCachePart),
-    #[cfg(feature = "microsoft365")] TimeLinePart(crate
+    ::parts::thumbnail_part::ThumbnailPart), TimeLineCachePart(crate
+    ::parts::time_line_cache_part::TimeLineCachePart), TimeLinePart(crate
     ::parts::time_line_part::TimeLinePart), UserDefinedTagsPart(crate
     ::parts::user_defined_tags_part::UserDefinedTagsPart), VbaDataPart(crate
     ::parts::vba_data_part::VbaDataPart), VbaProjectPart(crate
     ::parts::vba_project_part::VbaProjectPart), ViewPropertiesPart(crate
     ::parts::view_properties_part::ViewPropertiesPart), VmlDrawingPart(crate
     ::parts::vml_drawing_part::VmlDrawingPart), VolatileDependenciesPart(crate
-    ::parts::volatile_dependencies_part::VolatileDependenciesPart), #[cfg(feature =
-    "microsoft365")] WebExTaskpanesPart(crate
-    ::parts::web_ex_taskpanes_part::WebExTaskpanesPart), #[cfg(feature = "microsoft365")]
+    ::parts::volatile_dependencies_part::VolatileDependenciesPart),
+    WebExTaskpanesPart(crate ::parts::web_ex_taskpanes_part::WebExTaskpanesPart),
     WebExtensionPart(crate ::parts::web_extension_part::WebExtensionPart),
     WebSettingsPart(crate ::parts::web_settings_part::WebSettingsPart),
     WordAttachedToolbarsPart(crate
-    ::parts::word_attached_toolbars_part::WordAttachedToolbarsPart), #[cfg(feature =
-    "microsoft365")] WordCommentsExtensiblePart(crate
-    ::parts::word_comments_extensible_part::WordCommentsExtensiblePart), #[cfg(feature =
-    "microsoft365")] WordprocessingCommentsExPart(crate
+    ::parts::word_attached_toolbars_part::WordAttachedToolbarsPart),
+    WordCommentsExtensiblePart(crate
+    ::parts::word_comments_extensible_part::WordCommentsExtensiblePart),
+    WordprocessingCommentsExPart(crate
     ::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart),
-    #[cfg(feature = "microsoft365")] WordprocessingCommentsIdsPart(crate
+    WordprocessingCommentsIdsPart(crate
     ::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart),
     WordprocessingCommentsPart(crate
-    ::parts::wordprocessing_comments_part::WordprocessingCommentsPart), #[cfg(feature =
-    "microsoft365")] WordprocessingPeoplePart(crate
+    ::parts::wordprocessing_comments_part::WordprocessingCommentsPart),
+    WordprocessingPeoplePart(crate
     ::parts::wordprocessing_people_part::WordprocessingPeoplePart),
     WordprocessingPrinterSettingsPart(crate
     ::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart),
-    WorkbookPart(crate ::parts::workbook_part::WorkbookPart), #[cfg(feature =
-    "microsoft365")] WorkbookPersonPart(crate
+    WorkbookPart(crate ::parts::workbook_part::WorkbookPart), WorkbookPersonPart(crate
     ::parts::workbook_person_part::WorkbookPersonPart), WorkbookRevisionHeaderPart(crate
     ::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart),
     WorkbookRevisionLogPart(crate
@@ -349,7 +303,7 @@ define_part_ref! {
     WorksheetCommentsPart(crate ::parts::worksheet_comments_part::WorksheetCommentsPart),
     WorksheetPart(crate ::parts::worksheet_part::WorksheetPart),
     WorksheetSortMapPart(crate ::parts::worksheet_sort_map_part::WorksheetSortMapPart),
-    #[cfg(feature = "microsoft365")] WorksheetThreadedCommentsPart(crate
+    WorksheetThreadedCommentsPart(crate
     ::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart),
     XmlSignaturePart(crate ::parts::xml_signature_part::XmlSignaturePart),
 }
@@ -536,7 +490,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/customData" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/binary" {
           return Some(
             <crate::parts::custom_data_part::CustomDataPart>::make_part_ref(
@@ -548,7 +501,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/customDataProps" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.customDataProperties+xml" {
           return Some(
             <crate::parts::custom_data_properties_part::CustomDataPropertiesPart>::make_part_ref(
@@ -560,7 +512,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.drawingml.diagramDrawing+xml" {
           return Some(
             <crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart>::make_part_ref(
@@ -572,7 +523,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/slicer" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.slicer+xml" {
           return Some(<crate::parts::slicers_part::SlicersPart>::make_part_ref(
             storage,
@@ -582,7 +532,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/slicerCache" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.slicerCache+xml" {
           return Some(
             <crate::parts::slicer_cache_part::SlicerCachePart>::make_part_ref(
@@ -594,7 +543,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-word.stylesWithEffects+xml" {
           return Some(
             <crate::parts::styles_with_effects_part::StylesWithEffectsPart>::make_part_ref(
@@ -606,7 +554,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/xml" {
           return Some(
                         <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
@@ -618,7 +565,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartcolorstyle+xml" {
           return Some(
             <crate::parts::chart_color_style_part::ChartColorStylePart>::make_part_ref(
@@ -630,7 +576,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/chartStyle" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartstyle+xml" {
           return Some(
             <crate::parts::chart_style_part::ChartStylePart>::make_part_ref(
@@ -642,7 +587,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/commentsExtended" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml"
         {
@@ -656,7 +600,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/people" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml"
         {
@@ -670,7 +613,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/timeline" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.timeline+xml" {
           return Some(<crate::parts::time_line_part::TimeLinePart>::make_part_ref(
             storage,
@@ -680,7 +622,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/timelineCache" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.timelineCache+xml" {
           return Some(
             <crate::parts::time_line_cache_part::TimeLineCachePart>::make_part_ref(
@@ -692,7 +633,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/webextension" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.webextension+xml" {
           return Some(
             <crate::parts::web_extension_part::WebExtensionPart>::make_part_ref(
@@ -704,7 +644,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.webextensiontaskpanes+xml" {
           return Some(
             <crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>::make_part_ref(
@@ -716,7 +655,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2014/relationships/chartEx" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.chartex+xml" {
           return Some(
             <crate::parts::extended_chart_part::ExtendedChartPart>::make_part_ref(
@@ -728,7 +666,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml"
         {
@@ -742,7 +679,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/model3d" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "model/gltf-binary" {
           return Some(
                         <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
@@ -754,7 +690,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdarray+xml" {
           return Some(<crate::parts::rd_array_part::RdArrayPart>::make_part_ref(
             storage,
@@ -764,7 +699,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvalue+xml" {
           return Some(
             <crate::parts::rd_rich_value_part::RdRichValuePart>::make_part_ref(
@@ -776,7 +710,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluestructure+xml" {
           return Some(
             <crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart>::make_part_ref(
@@ -788,7 +721,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluetypes+xml" {
           return Some(
             <crate::parts::rd_rich_value_types_part::RdRichValueTypesPart>::make_part_ref(
@@ -800,7 +732,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdsupportingpropertybag+xml" {
           return Some(
                         <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
@@ -811,9 +742,7 @@ impl PartRef {
                     );
         }
       }
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure" =>
-      {
-        #[cfg(feature = "microsoft365")]
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure" => {
         if part.content_type() == "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml" {
           return Some(
                         <crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart>::make_part_ref(
@@ -825,7 +754,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/richStyles" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.richstyles+xml" {
           return Some(
             <crate::parts::rich_styles_part::RichStylesPart>::make_part_ref(
@@ -837,7 +765,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/10/relationships/person" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.person+xml" {
           return Some(
             <crate::parts::workbook_person_part::WorkbookPersonPart>::make_part_ref(
@@ -849,7 +776,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.threadedcomments+xml" {
           return Some(
                         <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
@@ -861,7 +787,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml"
         {
@@ -875,7 +800,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2018/10/relationships/authors" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-powerpoint.authors+xml" {
           return Some(
             <crate::parts::power_point_authors_part::PowerPointAuthorsPart>::make_part_ref(
@@ -887,7 +811,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2018/10/relationships/comments" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-powerpoint.comments+xml" {
           return Some(
             <crate::parts::power_point_comment_part::PowerPointCommentPart>::make_part_ref(
@@ -899,7 +822,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.namedsheetviews+xml" {
           return Some(
             <crate::parts::named_sheet_views_part::NamedSheetViewsPart>::make_part_ref(
@@ -911,7 +833,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.documenttasks+xml" {
           return Some(
             <crate::parts::document_tasks_part::DocumentTasksPart>::make_part_ref(
@@ -923,7 +844,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-office.classificationlabels+xml" {
           return Some(
             <crate::parts::label_info_part::LabelInfoPart>::make_part_ref(
@@ -935,7 +855,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.rdrichvaluewebimage+xml" {
           return Some(
             <crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart>::make_part_ref(
@@ -947,7 +866,6 @@ impl PartRef {
         }
       }
       "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.featurepropertybag+xml" {
           return Some(
             <crate::parts::feature_property_bags_part::FeaturePropertyBagsPart>::make_part_ref(
@@ -1092,7 +1010,6 @@ impl PartRef {
         }
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp" => {
-        #[cfg(feature = "microsoft365")]
         if part.content_type() == "application/vnd.ms-excel.controlproperties+xml" {
           return Some(
             <crate::parts::control_properties_part::ControlPropertiesPart>::make_part_ref(
@@ -1940,7 +1857,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -1990,7 +1906,6 @@ impl PartRef {
             relationship_id,
           ));
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2059,7 +1974,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2094,7 +2008,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2112,7 +2025,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2283,7 +2195,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2369,7 +2280,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2502,7 +2412,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2554,7 +2463,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2717,7 +2625,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2820,7 +2727,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2838,7 +2744,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2958,7 +2863,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -2976,7 +2880,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3062,7 +2965,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3078,7 +2980,6 @@ impl PartRef {
             relationship_id,
           ));
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3096,7 +2997,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3114,7 +3014,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3132,7 +3031,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3150,7 +3048,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3168,7 +3065,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3186,7 +3082,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3221,7 +3116,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3273,7 +3167,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3291,7 +3184,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3424,7 +3316,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3525,7 +3416,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3543,7 +3433,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3659,7 +3548,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3677,7 +3565,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3729,7 +3616,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3747,7 +3633,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3765,7 +3650,6 @@ impl PartRef {
                         ),
                     );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3800,7 +3684,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3850,7 +3733,6 @@ impl PartRef {
             relationship_id,
           ));
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -3987,7 +3869,6 @@ impl PartRef {
             ),
           );
         }
-        #[cfg(feature = "microsoft365")]
         if crate::common::part_descriptor_matches(
           relationship_type,
           part.content_type(),
@@ -4084,7 +3965,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Metadata,
     as_cell_metadata_part, as_cell_metadata_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"),
-    #[cfg(feature = "microsoft365")] ChartColorStylePart(crate
+    ChartColorStylePart(crate
     ::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ColorStyle,
     as_chart_color_style_part, as_chart_color_style_part_mut,
     "application/vnd.ms-office.chartcolorstyle+xml"), ChartDrawingPart(crate
@@ -4094,8 +3975,8 @@ define_part_root_element! {
     ChartPart(crate
     ::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartSpace,
     as_chart_part, as_chart_part_mut,
-    "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"), #[cfg(feature =
-    "microsoft365")] ChartStylePart(crate
+    "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"),
+    ChartStylePart(crate
     ::schemas::schemas_microsoft_com_office_drawing_2012_chart_style::ChartStyle,
     as_chart_style_part, as_chart_style_part_mut,
     "application/vnd.ms-office.chartstyle+xml"), ChartsheetPart(crate
@@ -4110,14 +3991,14 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Connections,
     as_connections_part, as_connections_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"),
-    #[cfg(feature = "microsoft365")] ControlPropertiesPart(crate
+    ControlPropertiesPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FormControlProperties,
     as_control_properties_part, as_control_properties_part_mut,
     "application/vnd.ms-excel.controlproperties+xml"), CoreFilePropertiesPart(crate
     ::schemas::opc_core_properties::CoreProperties, as_core_file_properties_part,
     as_core_file_properties_part_mut,
-    "application/vnd.openxmlformats-package.core-properties+xml"), #[cfg(feature =
-    "microsoft365")] CustomDataPropertiesPart(crate
+    "application/vnd.openxmlformats-package.core-properties+xml"),
+    CustomDataPropertiesPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DatastoreItem,
     as_custom_data_properties_part, as_custom_data_properties_part_mut,
     "application/vnd.ms-excel.customDataProperties+xml"), CustomFilePropertiesPart(crate
@@ -4146,7 +4027,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::LayoutDefinition,
     as_diagram_layout_definition_part, as_diagram_layout_definition_part_mut,
     "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml"),
-    #[cfg(feature = "microsoft365")] DiagramPersistLayoutPart(crate
+    DiagramPersistLayoutPart(crate
     ::schemas::schemas_microsoft_com_office_drawing_2008_diagram::Drawing,
     as_diagram_persist_layout_part, as_diagram_persist_layout_part_mut,
     "application/vnd.ms-office.drawingml.diagramDrawing+xml"), DiagramStylePart(crate
@@ -4161,7 +4042,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Settings,
     as_document_settings_part, as_document_settings_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"),
-    #[cfg(feature = "microsoft365")] DocumentTasksPart(crate
+    DocumentTasksPart(crate
     ::schemas::schemas_microsoft_com_office_tasks_2019_documenttasks::Tasks,
     as_document_tasks_part, as_document_tasks_part_mut,
     "application/vnd.ms-office.documenttasks+xml"), DrawingsPart(crate
@@ -4171,7 +4052,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Endnotes,
     as_endnotes_part, as_endnotes_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"),
-    #[cfg(feature = "microsoft365")] ExtendedChartPart(crate
+    ExtendedChartPart(crate
     ::schemas::schemas_microsoft_com_office_drawing_2014_chartex::ChartSpace,
     as_extended_chart_part, as_extended_chart_part_mut,
     "application/vnd.ms-office.chartex+xml"), ExtendedFilePropertiesPart(crate
@@ -4182,7 +4063,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExternalLink,
     as_external_workbook_part, as_external_workbook_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"),
-    #[cfg(feature = "microsoft365")] FeaturePropertyBagsPart(crate
+    FeaturePropertyBagsPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
     as_feature_property_bags_part, as_feature_property_bags_part_mut,
     "application/vnd.ms-excel.featurepropertybag+xml"), FontTablePart(crate
@@ -4209,7 +4090,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Header,
     as_header_part, as_header_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"),
-    #[cfg(feature = "microsoft365")] LabelInfoPart(crate
+    LabelInfoPart(crate
     ::schemas::schemas_microsoft_com_office_2020_mip_label_metadata::ClassificationLabelList,
     as_label_info_part, as_label_info_part_mut,
     "application/vnd.ms-office.classificationlabels+xml"), MacroSheetPart(crate
@@ -4219,7 +4100,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Document,
     as_main_document_part, as_main_document_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"),
-    #[cfg(feature = "microsoft365")] NamedSheetViewsPart(crate
+    NamedSheetViewsPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
     as_named_sheet_views_part, as_named_sheet_views_part_mut,
     "application/vnd.ms-excel.namedsheetviews+xml"), NotesMasterPart(crate
@@ -4246,11 +4127,10 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinition,
     as_pivot_table_part, as_pivot_table_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"),
-    #[cfg(feature = "microsoft365")] PowerPointAuthorsPart(crate
+    PowerPointAuthorsPart(crate
     ::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::AuthorList,
     as_power_point_authors_part, as_power_point_authors_part_mut,
-    "application/vnd.ms-powerpoint.authors+xml"), #[cfg(feature = "microsoft365")]
-    PowerPointCommentPart(crate
+    "application/vnd.ms-powerpoint.authors+xml"), PowerPointCommentPart(crate
     ::schemas::schemas_microsoft_com_office_powerpoint_2018_8_main::CommentList,
     as_power_point_comment_part, as_power_point_comment_part_mut,
     "application/vnd.ms-powerpoint.comments+xml"), PresentationPart(crate
@@ -4265,39 +4145,36 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QueryTable,
     as_query_table_part, as_query_table_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"),
-    #[cfg(feature = "microsoft365")] RdArrayPart(crate
+    RdArrayPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::ArrayData,
     as_rd_array_part, as_rd_array_part_mut, "application/vnd.ms-excel.rdarray+xml"),
-    #[cfg(feature = "microsoft365")] RdRichValuePart(crate
+    RdRichValuePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueData,
     as_rd_rich_value_part, as_rd_rich_value_part_mut,
-    "application/vnd.ms-excel.rdrichvalue+xml"), #[cfg(feature = "microsoft365")]
-    RdRichValueStructurePart(crate
+    "application/vnd.ms-excel.rdrichvalue+xml"), RdRichValueStructurePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata::RichValueStructures,
     as_rd_rich_value_structure_part, as_rd_rich_value_structure_part_mut,
-    "application/vnd.ms-excel.rdrichvaluestructure+xml"), #[cfg(feature =
-    "microsoft365")] RdRichValueTypesPart(crate
+    "application/vnd.ms-excel.rdrichvaluestructure+xml"), RdRichValueTypesPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichValueTypesInfo,
     as_rd_rich_value_types_part, as_rd_rich_value_types_part_mut,
-    "application/vnd.ms-excel.rdrichvaluetypes+xml"), #[cfg(feature = "microsoft365")]
-    RdRichValueWebImagePart(crate
+    "application/vnd.ms-excel.rdrichvaluetypes+xml"), RdRichValueWebImagePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
     as_rd_rich_value_web_image_part, as_rd_rich_value_web_image_part_mut,
-    "application/vnd.ms-excel.rdrichvaluewebimage+xml"), #[cfg(feature = "microsoft365")]
+    "application/vnd.ms-excel.rdrichvaluewebimage+xml"),
     RdSupportingPropertyBagPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
     as_rd_supporting_property_bag_part, as_rd_supporting_property_bag_part_mut,
-    "application/vnd.ms-excel.rdsupportingpropertybag+xml"), #[cfg(feature =
-    "microsoft365")] RdSupportingPropertyBagStructurePart(crate
+    "application/vnd.ms-excel.rdsupportingpropertybag+xml"),
+    RdSupportingPropertyBagStructurePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBagStructures,
     as_rd_supporting_property_bag_structure_part,
     as_rd_supporting_property_bag_structure_part_mut,
-    "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml"), #[cfg(feature =
-    "microsoft365")] RibbonAndBackstageCustomizationsPart(crate
+    "application/vnd.ms-excel.rdsupportingpropertybagstructure+xml"),
+    RibbonAndBackstageCustomizationsPart(crate
     ::schemas::schemas_microsoft_com_office_2009_07_customui::CustomUi,
     as_ribbon_and_backstage_customizations_part,
-    as_ribbon_and_backstage_customizations_part_mut, "application/xml"), #[cfg(feature =
-    "microsoft365")] RichStylesPart(crate
+    as_ribbon_and_backstage_customizations_part_mut, "application/xml"),
+    RichStylesPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::RichStylesheet,
     as_rich_styles_part, as_rich_styles_part_mut,
     "application/vnd.ms-excel.richstyles+xml"), SharedStringTablePart(crate
@@ -4308,11 +4185,10 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SingleXmlCells,
     as_single_cell_table_part, as_single_cell_table_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.tableSingleCells+xml"),
-    #[cfg(feature = "microsoft365")] SlicerCachePart(crate
+    SlicerCachePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheDefinition,
     as_slicer_cache_part, as_slicer_cache_part_mut,
-    "application/vnd.ms-excel.slicerCache+xml"), #[cfg(feature = "microsoft365")]
-    SlicersPart(crate
+    "application/vnd.ms-excel.slicerCache+xml"), SlicersPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Slicers,
     as_slicers_part, as_slicers_part_mut, "application/vnd.ms-excel.slicer+xml"),
     SlideCommentsPart(crate
@@ -4339,7 +4215,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
     as_style_definitions_part, as_style_definitions_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"),
-    #[cfg(feature = "microsoft365")] StylesWithEffectsPart(crate
+    StylesWithEffectsPart(crate
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Styles,
     as_styles_with_effects_part, as_styles_with_effects_part_mut,
     "application/vnd.ms-word.stylesWithEffects+xml"), TableDefinitionPart(crate
@@ -4356,11 +4232,10 @@ define_part_root_element! {
     "application/vnd.openxmlformats-officedocument.themeOverride+xml"), ThemePart(crate
     ::schemas::schemas_openxmlformats_org_drawingml_2006_main::Theme, as_theme_part,
     as_theme_part_mut, "application/vnd.openxmlformats-officedocument.theme+xml"),
-    #[cfg(feature = "microsoft365")] TimeLineCachePart(crate
+    TimeLineCachePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
     as_time_line_cache_part, as_time_line_cache_part_mut,
-    "application/vnd.ms-excel.timelineCache+xml"), #[cfg(feature = "microsoft365")]
-    TimeLinePart(crate
+    "application/vnd.ms-excel.timelineCache+xml"), TimeLinePart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Timelines,
     as_time_line_part, as_time_line_part_mut, "application/vnd.ms-excel.timeline+xml"),
     UserDefinedTagsPart(crate
@@ -4378,26 +4253,25 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::VolatileTypes,
     as_volatile_dependencies_part, as_volatile_dependencies_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml"),
-    #[cfg(feature = "microsoft365")] WebExTaskpanesPart(crate
+    WebExTaskpanesPart(crate
     ::schemas::schemas_microsoft_com_office_webextensions_taskpanes_2010_11::Taskpanes,
     as_web_ex_taskpanes_part, as_web_ex_taskpanes_part_mut,
-    "application/vnd.ms-office.webextensiontaskpanes+xml"), #[cfg(feature =
-    "microsoft365")] WebExtensionPart(crate
+    "application/vnd.ms-office.webextensiontaskpanes+xml"), WebExtensionPart(crate
     ::schemas::schemas_microsoft_com_office_webextensions_webextension_2010_11::WebExtension,
     as_web_extension_part, as_web_extension_part_mut,
     "application/vnd.ms-office.webextension+xml"), WebSettingsPart(crate
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::WebSettings,
     as_web_settings_part, as_web_settings_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml"),
-    #[cfg(feature = "microsoft365")] WordCommentsExtensiblePart(crate
+    WordCommentsExtensiblePart(crate
     ::schemas::schemas_microsoft_com_office_word_2018_wordml_cex::CommentsExtensible,
     as_word_comments_extensible_part, as_word_comments_extensible_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtensible+xml"),
-    #[cfg(feature = "microsoft365")] WordprocessingCommentsExPart(crate
+    WordprocessingCommentsExPart(crate
     ::schemas::schemas_microsoft_com_office_word_2012_wordml::CommentsEx,
     as_wordprocessing_comments_ex_part, as_wordprocessing_comments_ex_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml"),
-    #[cfg(feature = "microsoft365")] WordprocessingCommentsIdsPart(crate
+    WordprocessingCommentsIdsPart(crate
     ::schemas::schemas_microsoft_com_office_word_2016_wordml_cid::CommentsIds,
     as_wordprocessing_comments_ids_part, as_wordprocessing_comments_ids_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml"),
@@ -4405,7 +4279,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Comments,
     as_wordprocessing_comments_part, as_wordprocessing_comments_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"),
-    #[cfg(feature = "microsoft365")] WordprocessingPeoplePart(crate
+    WordprocessingPeoplePart(crate
     ::schemas::schemas_microsoft_com_office_word_2012_wordml::People,
     as_wordprocessing_people_part, as_wordprocessing_people_part_mut,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml"),
@@ -4413,7 +4287,7 @@ define_part_root_element! {
     ::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workbook,
     as_workbook_part, as_workbook_part_mut,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"),
-    #[cfg(feature = "microsoft365")] WorkbookPersonPart(crate
+    WorkbookPersonPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::PersonList,
     as_workbook_person_part, as_workbook_person_part_mut,
     "application/vnd.ms-excel.person+xml"), WorkbookRevisionHeaderPart(crate
@@ -4443,8 +4317,7 @@ define_part_root_element! {
     WorksheetSortMapPart(crate
     ::schemas::schemas_microsoft_com_office_excel_2006_main::WorksheetSortMap,
     as_worksheet_sort_map_part, as_worksheet_sort_map_part_mut,
-    "application/vnd.ms-excel.wsSortMap+xml"), #[cfg(feature = "microsoft365")]
-    WorksheetThreadedCommentsPart(crate
+    "application/vnd.ms-excel.wsSortMap+xml"), WorksheetThreadedCommentsPart(crate
     ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
     as_worksheet_threaded_comments_part, as_worksheet_threaded_comments_part_mut,
     "application/vnd.ms-excel.threadedcomments+xml"),

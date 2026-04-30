@@ -22,7 +22,6 @@ impl CustomDataPropertiesPart {
     as_custom_data_properties_part,
     as_custom_data_properties_part_mut
   );
-  #[cfg(feature = "microsoft365")]
   pub fn custom_data_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,

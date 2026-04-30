@@ -2093,26 +2093,21 @@ pub struct OfficeMathArgumentType {
     qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd",
     qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart",
     qname = "w:CT_Markup/w:customXmlMoveToRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
+    qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
     qname = "w:CT_RunTrackChange/w:ins",
     qname = "w:CT_RunTrackChange/w:del",
     qname = "w:CT_RunTrackChange/w:moveFrom",
     qname = "w:CT_RunTrackChange/w:moveTo",
+    qname = "w:CT_ContentPart/w:contentPart",
+    qname = "w:CT_RunTrackChange/w14:conflictIns",
+    qname = "w:CT_RunTrackChange/w14:conflictDel",
     qname = "m:CT_OMathPara/m:oMathPara",
     qname = "m:CT_OMath/m:oMath",
     qname = "m:CT_CtrlPr/m:ctrlPr"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd",
-      qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart",
-      qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd",
-      qname = "w:CT_ContentPart/w:contentPart",
-      qname = "w:CT_RunTrackChange/w14:conflictIns",
-      qname = "w:CT_RunTrackChange/w14:conflictDel"
-    ))
-  )]
   pub xml_children: Vec<OfficeMathArgumentTypeChoice>,
 }
 /// Position (Bar).
@@ -3481,7 +3476,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -3489,7 +3483,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -3497,7 +3490,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -3505,7 +3497,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -3541,7 +3532,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -3549,7 +3539,6 @@ pub enum ParagraphChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -3717,7 +3706,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -3725,7 +3713,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -3733,7 +3720,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -3741,7 +3727,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -3777,7 +3762,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -3785,7 +3769,6 @@ pub enum OfficeMathChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -4166,7 +4149,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -4174,7 +4156,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -4182,7 +4163,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -4190,7 +4170,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -4226,7 +4205,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -4234,7 +4212,6 @@ pub enum BaseChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -4553,7 +4530,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -4561,7 +4537,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -4569,7 +4544,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -4577,7 +4551,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -4613,7 +4586,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -4621,7 +4593,6 @@ pub enum NumeratorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -4940,7 +4911,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -4948,7 +4918,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -4956,7 +4925,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -4964,7 +4932,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -5000,7 +4967,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -5008,7 +4974,6 @@ pub enum DenominatorChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -5327,7 +5292,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -5335,7 +5299,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -5343,7 +5306,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -5351,7 +5313,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -5387,7 +5348,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -5395,7 +5355,6 @@ pub enum FunctionNameChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -5714,7 +5673,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -5722,7 +5680,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -5730,7 +5687,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -5738,7 +5694,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -5774,7 +5729,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -5782,7 +5736,6 @@ pub enum LimitChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -6101,7 +6054,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -6109,7 +6061,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -6117,7 +6068,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -6125,7 +6075,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -6161,7 +6110,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -6169,7 +6117,6 @@ pub enum SubArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -6488,7 +6435,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -6496,7 +6442,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -6504,7 +6449,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -6512,7 +6456,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -6548,7 +6491,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -6556,7 +6498,6 @@ pub enum SuperArgumentChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -6875,7 +6816,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
@@ -6883,7 +6823,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictInsertionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
@@ -6891,7 +6830,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeStart Class.
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
@@ -6899,7 +6837,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the CustomXmlConflictDeletionRangeEnd Class.
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
@@ -6935,7 +6872,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Defines the ContentPart Class.
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
@@ -6943,7 +6879,6 @@ pub enum DegreeChoice2 {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     /// Sequence of w14:conflictIns, w14:conflictDel
     #[sdk(sequence)]
     Sequence {
@@ -7310,28 +7245,24 @@ pub enum OfficeMathArgumentTypeChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlMoveToRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"))]
     W14CustomXmlConflictInsRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
     W14CustomXmlConflictInsRangeEnd(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictInsertionRangeEnd,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"))]
     W14CustomXmlConflictDelRangeStart(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::CustomXmlConflictDeletionRangeStart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
     W14CustomXmlConflictDelRangeEnd(
         std::boxed::Box<
@@ -7362,21 +7293,18 @@ pub enum OfficeMathArgumentTypeChoice {
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::MoveToRun,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_ContentPart/w:contentPart"))]
     WContentPart(
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ContentPart,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictIns"))]
     W14ConflictIns(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::RunConflictInsertion,
         >,
     ),
-    #[cfg(feature = "microsoft365")]
     #[sdk(child(qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     W14ConflictDel(
         std::boxed::Box<

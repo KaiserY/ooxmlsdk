@@ -2,7 +2,6 @@
 
 use std::io::{Cursor, Read};
 
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringTable;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   BodyChoice, Document, Paragraph, ParagraphChoice, ParagraphProperties, Run, Text,
@@ -122,7 +121,6 @@ fn mcsupport_load_ignorable() {
   );
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn mcsupport_load_process_content() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs

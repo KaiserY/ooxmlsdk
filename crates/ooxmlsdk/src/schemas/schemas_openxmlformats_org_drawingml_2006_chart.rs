@@ -2196,11 +2196,7 @@ pub struct ChartSpace {
   /// _
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
-  #[sdk(choice(qname = "c:CT_Style/c:style"))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c14:CT_Style/c14:style"))
-  )]
+  #[sdk(choice(qname = "c14:CT_Style/c14:style", qname = "c:CT_Style/c:style"))]
   pub chart_space_choice: Option<ChartSpaceChoice>,
   /// _
   #[sdk(child(qname = "a:CT_ColorMapping/c:clrMapOvr"))]
@@ -4672,11 +4668,7 @@ pub struct StockChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub xml_children: Option<StockChartExtensionChoice>,
 }
 /// Defines the PieChartExtension Class.
@@ -4698,11 +4690,7 @@ pub struct PieChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
   pub xml_children: Option<PieChartExtensionChoice>,
 }
 /// Defines the Pie3DChartExtension Class.
@@ -4724,11 +4712,7 @@ pub struct Pie3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
   pub xml_children: Option<Pie3DChartExtensionChoice>,
 }
 /// Defines the NumRefExtension Class.
@@ -4750,15 +4734,12 @@ pub struct NumRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FullRef/c15:fullRef",
-      qname = "c15:CT_LevelRef/c15:levelRef",
-      qname = "c15:CT_FormulaRef/c15:formulaRef"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FullRef/c15:fullRef",
+    qname = "c15:CT_LevelRef/c15:levelRef",
+    qname = "c15:CT_FormulaRef/c15:formulaRef",
+    any
+  ))]
   pub xml_children: Option<NumRefExtensionChoice>,
 }
 /// Defines the StrDataExtension Class.
@@ -4780,11 +4761,7 @@ pub struct StrDataExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c:CT_Boolean/c15:autoCat"))
-  )]
+  #[sdk(choice(qname = "c:CT_Boolean/c15:autoCat", any))]
   pub xml_children: Option<StrDataExtensionChoice>,
 }
 /// Defines the StrRefExtension Class.
@@ -4806,15 +4783,12 @@ pub struct StrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FullRef/c15:fullRef",
-      qname = "c15:CT_LevelRef/c15:levelRef",
-      qname = "c15:CT_FormulaRef/c15:formulaRef"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FullRef/c15:fullRef",
+    qname = "c15:CT_LevelRef/c15:levelRef",
+    qname = "c15:CT_FormulaRef/c15:formulaRef",
+    any
+  ))]
   pub xml_children: Option<StrRefExtensionChoice>,
 }
 /// Defines the MultiLvlStrRefExtension Class.
@@ -4836,15 +4810,12 @@ pub struct MultiLvlStrRefExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FullRef/c15:fullRef",
-      qname = "c15:CT_LevelRef/c15:levelRef",
-      qname = "c15:CT_FormulaRef/c15:formulaRef"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FullRef/c15:fullRef",
+    qname = "c15:CT_LevelRef/c15:levelRef",
+    qname = "c15:CT_FormulaRef/c15:formulaRef",
+    any
+  ))]
   pub xml_children: Option<MultiLvlStrRefExtensionChoice>,
 }
 /// Defines the DLblsExtension Class.
@@ -4866,19 +4837,16 @@ pub struct DLblsExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c:CT_Tx/c15:tx",
-      qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
-      qname = "c:CT_Boolean/c15:showDataLabelsRange",
-      qname = "a:CT_ShapeProperties/c15:spPr",
-      qname = "c:CT_Layout/c15:layout",
-      qname = "c:CT_Boolean/c15:showLeaderLines",
-      qname = "c:CT_ChartLines/c15:leaderLines"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c:CT_Tx/c15:tx",
+    qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
+    qname = "c:CT_Boolean/c15:showDataLabelsRange",
+    qname = "a:CT_ShapeProperties/c15:spPr",
+    qname = "c:CT_Layout/c15:layout",
+    qname = "c:CT_Boolean/c15:showLeaderLines",
+    qname = "c:CT_ChartLines/c15:leaderLines",
+    any
+  ))]
   pub xml_children: Option<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
@@ -4900,11 +4868,7 @@ pub struct LineChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub xml_children: Option<LineChartExtensionChoice>,
 }
 /// Defines the Line3DChartExtension Class.
@@ -4926,11 +4890,7 @@ pub struct Line3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub xml_children: Option<Line3DChartExtensionChoice>,
 }
 /// Defines the ScatterChartExtension Class.
@@ -4952,11 +4912,7 @@ pub struct ScatterChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries", any))]
   pub xml_children: Option<ScatterChartExtensionChoice>,
 }
 /// Defines the RadarChartExtension Class.
@@ -4978,11 +4934,7 @@ pub struct RadarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries", any))]
   pub xml_children: Option<RadarChartExtensionChoice>,
 }
 /// Defines the BarChartExtension Class.
@@ -5004,11 +4956,7 @@ pub struct BarChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
   pub xml_children: Option<BarChartExtensionChoice>,
 }
 /// Defines the Bar3DChartExtension Class.
@@ -5030,11 +4978,7 @@ pub struct Bar3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
   pub xml_children: Option<Bar3DChartExtensionChoice>,
 }
 /// Defines the AreaChartExtension Class.
@@ -5056,11 +5000,7 @@ pub struct AreaChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
   pub xml_children: Option<AreaChartExtensionChoice>,
 }
 /// Defines the Area3DChartExtension Class.
@@ -5082,11 +5022,7 @@ pub struct Area3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
   pub xml_children: Option<Area3DChartExtensionChoice>,
 }
 /// Defines the BubbleChartExtension Class.
@@ -5108,11 +5044,7 @@ pub struct BubbleChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries", any))]
   pub xml_children: Option<BubbleChartExtensionChoice>,
 }
 /// Defines the SurfaceChartExtension Class.
@@ -5134,11 +5066,7 @@ pub struct SurfaceChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
   pub xml_children: Option<SurfaceChartExtensionChoice>,
 }
 /// Defines the Surface3DChartExtension Class.
@@ -5160,11 +5088,7 @@ pub struct Surface3DChartExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))
-  )]
+  #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
   pub xml_children: Option<Surface3DChartExtensionChoice>,
 }
 /// Defines the CatAxExtension Class.
@@ -5186,11 +5110,7 @@ pub struct CatAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c:CT_NumFmt/c15:numFmt"))
-  )]
+  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub xml_children: Option<CatAxExtensionChoice>,
 }
 /// Defines the DateAxExtension Class.
@@ -5212,11 +5132,7 @@ pub struct DateAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c:CT_NumFmt/c15:numFmt"))
-  )]
+  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub xml_children: Option<DateAxExtensionChoice>,
 }
 /// Defines the SerAxExtension Class.
@@ -5238,11 +5154,7 @@ pub struct SerAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c:CT_NumFmt/c15:numFmt"))
-  )]
+  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub xml_children: Option<SerAxExtensionChoice>,
 }
 /// Defines the ValAxExtension Class.
@@ -5264,11 +5176,7 @@ pub struct ValAxExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "c:CT_NumFmt/c15:numFmt"))
-  )]
+  #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub xml_children: Option<ValAxExtensionChoice>,
 }
 /// Defines the UpDownBars Class.
@@ -6137,18 +6045,15 @@ pub struct DLblExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
-      qname = "c:CT_Boolean/c15:xForSave",
-      qname = "c:CT_Boolean/c15:showDataLabelsRange",
-      qname = "a:CT_ShapeProperties/c15:spPr",
-      qname = "c:CT_Layout/c15:layout",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
+    qname = "c:CT_Boolean/c15:xForSave",
+    qname = "c:CT_Boolean/c15:showDataLabelsRange",
+    qname = "a:CT_ShapeProperties/c15:spPr",
+    qname = "c:CT_Layout/c15:layout",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
@@ -6348,19 +6253,16 @@ pub struct LineSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<LineSerExtensionChoice>,
 }
 /// Defines the ScatterSerExtensionList Class.
@@ -6395,19 +6297,16 @@ pub struct ScatterSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<ScatterSerExtensionChoice>,
 }
 /// Defines the RadarSerExtensionList Class.
@@ -6442,19 +6341,16 @@ pub struct RadarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<RadarSerExtensionChoice>,
 }
 /// Defines the BarSerExtensionList Class.
@@ -6489,20 +6385,17 @@ pub struct BarSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<BarSerExtensionChoice>,
 }
 /// Defines the AreaSerExtensionList Class.
@@ -6537,19 +6430,16 @@ pub struct AreaSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<AreaSerExtensionChoice>,
 }
 /// Defines the PieSerExtensionList Class.
@@ -6584,19 +6474,16 @@ pub struct PieSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<PieSerExtensionChoice>,
 }
 /// Defines the BubbleSerExtensionList Class.
@@ -6631,19 +6518,16 @@ pub struct BubbleSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<BubbleSerExtensionChoice>,
 }
 /// Defines the SurfaceSerExtensionList Class.
@@ -6678,21 +6562,17 @@ pub struct SurfaceSerExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
-      qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
-      qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
-      qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
-      qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
-      qname = "c16:CT_ChartUniqueID/c16:uniqueId"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
+    qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle",
+    qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions",
+    qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions",
+    qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap",
+    qname = "c16:CT_ChartUniqueID/c16:uniqueId",
+    any
+  ))]
   pub xml_children: Option<SurfaceSerExtensionChoice>,
 }
-#[cfg(feature = "microsoft365")]
 /// Defines the DataDisplayOptions16 Class.
 ///
 /// Available in Office2019 and above.
@@ -6931,7 +6811,6 @@ pub struct ChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  #[cfg(feature = "microsoft365")]
   /// _
   #[sdk(child(qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
@@ -7256,15 +7135,12 @@ pub struct ChartSpaceExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "c14:CT_PivotOptions/c14:pivotOptions",
-      qname = "c14:CT_SketchOptions/c14:sketchOptions",
-      qname = "c:CT_PivotSource/c15:pivotSource"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "c14:CT_PivotOptions/c14:pivotOptions",
+    qname = "c14:CT_SketchOptions/c14:sketchOptions",
+    qname = "c:CT_PivotSource/c15:pivotSource",
+    any
+  ))]
   pub xml_children: Option<ChartSpaceExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -7399,7 +7275,6 @@ pub enum DataLabelsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c14:CT_Style/c14:style"))]
   C14Style(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::Style>,
@@ -7634,7 +7509,6 @@ pub enum SeriesAxisChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StockChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -7646,7 +7520,6 @@ pub enum StockChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
@@ -7658,7 +7531,6 @@ pub enum PieChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
@@ -7670,19 +7542,16 @@ pub enum Pie3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -7694,7 +7563,6 @@ pub enum NumRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Boolean/c15:autoCat"))]
   C15AutoCat(
     std::boxed::Box<
@@ -7706,19 +7574,16 @@ pub enum StrDataExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -7730,19 +7595,16 @@ pub enum StrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -7754,45 +7616,38 @@ pub enum MultiLvlStrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Tx/c15:tx"))]
   C15Tx(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ChartText>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Boolean/c15:showLeaderLines"))]
   C15ShowLeaderLines(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowLeaderLines,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_ChartLines/c15:leaderLines"))]
   C15LeaderLines(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LeaderLines>,
@@ -7802,7 +7657,6 @@ pub enum DLblsExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -7814,7 +7668,6 @@ pub enum LineChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -7826,7 +7679,6 @@ pub enum Line3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"))]
   C15FilteredScatterSeries(
     std::boxed::Box<
@@ -7838,7 +7690,6 @@ pub enum ScatterChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
   C15FilteredRadarSeries(
     std::boxed::Box<
@@ -7850,7 +7701,6 @@ pub enum RadarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
@@ -7862,7 +7712,6 @@ pub enum BarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
@@ -7874,7 +7723,6 @@ pub enum Bar3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
@@ -7886,7 +7734,6 @@ pub enum AreaChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
@@ -7898,7 +7745,6 @@ pub enum Area3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"))]
   C15FilteredBubbleSeries(
     std::boxed::Box<
@@ -7910,7 +7756,6 @@ pub enum BubbleChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))]
   C15FilteredSurfaceSeries(
     std::boxed::Box<
@@ -7922,7 +7767,6 @@ pub enum SurfaceChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"))]
   C15FilteredSurfaceSeries(
     std::boxed::Box<
@@ -7934,7 +7778,6 @@ pub enum Surface3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -7946,7 +7789,6 @@ pub enum CatAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -7958,7 +7800,6 @@ pub enum DateAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -7970,7 +7811,6 @@ pub enum SerAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -7989,40 +7829,34 @@ pub enum DisplayUnitsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Boolean/c15:xForSave"))]
   C15XForSave(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ExceptionForSave,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8088,49 +7922,42 @@ pub enum AxisDataSourceTypeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8142,49 +7969,42 @@ pub enum LineSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8196,49 +8016,42 @@ pub enum ScatterSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8250,56 +8063,48 @@ pub enum RadarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8311,49 +8116,42 @@ pub enum BarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8365,49 +8163,42 @@ pub enum AreaSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8419,49 +8210,42 @@ pub enum PieSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8473,42 +8257,36 @@ pub enum BubbleSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"))]
   C15FilteredSeriesTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"))]
   C15FilteredCategoryTitle(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"))]
   C15CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"))]
   C16CategoryFilterExceptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"))]
   C16Datapointuniqueidmap(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -8580,21 +8358,18 @@ pub enum PlotAreaChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c14:CT_PivotOptions/c14:pivotOptions"))]
   C14PivotOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::PivotOptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c14:CT_SketchOptions/c14:sketchOptions"))]
   C14SketchOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::SketchOptions,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "c:CT_PivotSource/c15:pivotSource"))]
   C15PivotSource(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::PivotSource>,

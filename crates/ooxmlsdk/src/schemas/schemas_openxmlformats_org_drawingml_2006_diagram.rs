@@ -877,13 +877,10 @@ pub enum VerticalAlignmentValues {
   Bottom,
   #[sdk(rename = "none")]
   None,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "top")]
   Top2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "center")]
   Middle2010,
-  #[cfg(feature = "microsoft365")]
   #[sdk(rename = "bottom")]
   Bottom2010,
 }
@@ -3854,14 +3851,11 @@ pub struct DiagramDefinitionExtension {
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
-  #[sdk(choice(any))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(
-      qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst",
-      qname = "a:CT_TextListStyle/dgm1612:lstStyle"
-    ))
-  )]
+  #[sdk(choice(
+    qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst",
+    qname = "a:CT_TextListStyle/dgm1612:lstStyle",
+    any
+  ))]
   pub xml_children: Option<DiagramDefinitionExtensionChoice>,
 }
 /// Defines the SampleData Class.
@@ -4478,14 +4472,12 @@ pub enum ShapePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DiagramDefinitionExtensionChoice {
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"))]
   Dgm1611AutoBuNodeInfoLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2016_11_diagram::NumberDiagramInfoList,
     >,
   ),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "a:CT_TextListStyle/dgm1612:lstStyle"))]
   Dgm1612LstStyle(
     std::boxed::Box<

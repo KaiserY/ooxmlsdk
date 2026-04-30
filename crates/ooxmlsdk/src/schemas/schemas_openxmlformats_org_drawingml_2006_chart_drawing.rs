@@ -26,12 +26,9 @@ pub struct RelativeAnchorSize {
     qname = "cdr:CT_GroupShape/cdr:grpSp",
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic"
+    qname = "cdr:CT_Picture/cdr:pic",
+    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))
-  )]
   pub relative_anchor_size_choice: Option<RelativeAnchorSizeChoice>,
 }
 /// Absolute Anchor Shape Size.
@@ -55,12 +52,9 @@ pub struct AbsoluteAnchorSize {
     qname = "cdr:CT_GroupShape/cdr:grpSp",
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic"
+    qname = "cdr:CT_Picture/cdr:pic",
+    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))
-  )]
   pub absolute_anchor_size_choice: Option<AbsoluteAnchorSizeChoice>,
 }
 /// Shape Definition.
@@ -134,13 +128,10 @@ pub struct GroupShape {
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
     qname = "cdr:CT_Picture/cdr:pic",
+    qname = "cdr14:CT_ContentPart/cdr14:contentPart",
     text,
     any
   ))]
-  #[cfg_attr(
-    feature = "microsoft365",
-    sdk(choice(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))
-  )]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
@@ -848,7 +839,6 @@ pub enum RelativeAnchorSizeChoice {
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
   Cdr14ContentPart(
     std::boxed::Box<
@@ -868,7 +858,6 @@ pub enum AbsoluteAnchorSizeChoice {
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
   Cdr14ContentPart(
     std::boxed::Box<
@@ -888,7 +877,6 @@ pub enum GroupShapeChoice {
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
-  #[cfg(feature = "microsoft365")]
   #[sdk(child(qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
   Cdr14ContentPart(
     std::boxed::Box<

@@ -65,7 +65,6 @@ pub struct PresentationDocument {
   ))]
   pub(crate) ribbon_extensibility_part:
     Option<Box<crate::parts::ribbon_extensibility_part::RibbonExtensibilityPart>>,
-  #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2007/relationships/ui/extensibility",
     kind = "optional"
@@ -75,14 +74,12 @@ pub struct PresentationDocument {
       crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart,
     >,
   >,
-  #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes",
     kind = "optional"
   ))]
   pub(crate) web_ex_taskpanes_part:
     Option<Box<crate::parts::web_ex_taskpanes_part::WebExTaskpanesPart>>,
-  #[cfg(feature = "microsoft365")]
   #[sdk(part_child(
     relationship_type = "http://schemas.microsoft.com/office/2020/02/relationships/classificationlabels",
     kind = "optional"

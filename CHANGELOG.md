@@ -1,5 +1,11 @@
 # Change Log
 
+## Unreleased
+
+### Breaking Changes
+
+- Removed the `microsoft365` Cargo feature. Newer Office schema modules, generated types, parts, and document sample coverage now compile as part of the normal runtime surface instead of being hidden behind a version-oriented feature gate.
+
 ## 0.5.1
 
 ### Package API

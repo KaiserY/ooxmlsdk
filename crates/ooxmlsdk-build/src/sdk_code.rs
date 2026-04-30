@@ -16,7 +16,6 @@ use crate::sdk_code::parts::{gen_part_module, gen_parts_mod};
 use crate::sdk_code::schemas::{
   CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
 };
-use crate::sdk_code::versioning::version_cfg_attrs;
 use crate::sdk_data::sdk_data_model::Schema as SdkDataSchema;
 
 pub mod codegen_ir;
@@ -163,17 +162,14 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", loaded_schema.ir.module_name));
     write_generated_module(
       &schema_path,
-      gen_schema_from_ir_with_type_graph(
-        &loaded_schema.ir,
-        schema_module_is_microsoft365_only_ir(&loaded_schema.ir),
-        &schema_graph,
-      )
-      .map_err(|err| {
-        format!(
-          "failed to generate schema {}: {err:?}",
-          loaded_schema.ir.module_name
-        )
-      })?,
+      gen_schema_from_ir_with_type_graph(&loaded_schema.ir, false, &schema_graph).map_err(
+        |err| {
+          format!(
+            "failed to generate schema {}: {err:?}",
+            loaded_schema.ir.module_name
+          )
+        },
+      )?,
     )?;
 
     push_module_decl(
@@ -353,51 +349,8 @@ fn push_module_decl(
 }
 
 fn schema_module_cfg_attrs_ir(schema: &SchemaModuleDecl) -> Vec<Attribute> {
-  if schema_module_is_microsoft365_only_ir(schema) {
-    version_cfg_attrs("Microsoft365")
-  } else {
-    Vec::new()
-  }
-}
-
-fn schema_module_is_microsoft365_only_ir(schema: &SchemaModuleDecl) -> bool {
-  let concrete_type_count = schema
-    .types
-    .iter()
-    .filter(|schema_type| {
-      !schema_type.is_abstract
-        && matches!(
-          schema_type.kind,
-          crate::sdk_code::codegen_ir::TypeKind::ElementStruct
-            | crate::sdk_code::codegen_ir::TypeKind::LeafTextAlias
-        )
-    })
-    .count();
-
-  (concrete_type_count > 0 || !schema.enums.is_empty())
-    && schema
-      .types
-      .iter()
-      .filter(|schema_type| {
-        !schema_type.is_abstract
-          && matches!(
-            schema_type.kind,
-            crate::sdk_code::codegen_ir::TypeKind::ElementStruct
-              | crate::sdk_code::codegen_ir::TypeKind::LeafTextAlias
-          )
-      })
-      .all(|schema_type| {
-        schema_type
-          .version
-          .as_deref()
-          .is_some_and(versioning::is_microsoft365_version)
-      })
-    && schema.enums.iter().all(|schema_enum| {
-      schema_enum
-        .version
-        .as_deref()
-        .is_some_and(versioning::is_microsoft365_version)
-    })
+  let _ = schema;
+  Vec::new()
 }
 
 fn clear_generated_rs_files(out_dir_path: &Path) -> Result<()> {

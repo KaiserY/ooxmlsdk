@@ -22,7 +22,6 @@ impl WebExTaskpanesPart {
     as_web_ex_taskpanes_part,
     as_web_ex_taskpanes_part_mut
   );
-  #[cfg(feature = "microsoft365")]
   pub fn web_extension_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

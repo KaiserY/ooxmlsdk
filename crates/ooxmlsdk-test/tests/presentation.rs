@@ -1,5 +1,4 @@
 use ooxmlsdk::common::XmlHeaderType;
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_drawing_2013_main_command::ResetShapeProperties;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   NonVisualDrawingProperties, Presentation, SlideSize,
@@ -67,7 +66,6 @@ fn static_empty_element_serialization_uses_upstream_slash_spacing() {
 }
 
 #[test]
-#[cfg(feature = "microsoft365")]
 fn empty_child_unit_fields_are_serialized() {
   let parsed = r#"<oac:spPr xmlns:oac="http://schemas.microsoft.com/office/drawing/2013/main/command"><oac:fill/></oac:spPr>"#
     .parse::<ResetShapeProperties>()

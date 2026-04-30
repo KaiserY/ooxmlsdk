@@ -114,7 +114,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn styles_with_effects_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -208,7 +207,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn wordprocessing_comments_ex_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -222,7 +220,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn wordprocessing_people_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -236,7 +233,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2011/relationships/people",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn wordprocessing_comments_ids_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -250,7 +246,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn document_tasks_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -264,7 +259,6 @@ impl GlossaryDocumentPart {
       "http://schemas.microsoft.com/office/2019/05/relationships/documenttasks",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn word_comments_extensible_part<P: crate::sdk::SdkPackage>(
     &self,
     package: &P,
@@ -305,7 +299,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn extended_chart_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -345,7 +338,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn diagram_persist_layout_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,
@@ -441,7 +433,6 @@ impl GlossaryDocumentPart {
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
     )
   }
-  #[cfg(feature = "microsoft365")]
   pub fn model3_d_reference_relationship_parts<'a, P: crate::sdk::SdkPackage>(
     &'a self,
     package: &'a P,

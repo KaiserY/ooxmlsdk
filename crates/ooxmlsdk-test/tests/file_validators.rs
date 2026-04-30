@@ -43,7 +43,6 @@ fn assert_wordprocessing_document_validates(file_name: &str) {
     .unwrap();
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn youtube_xlsx_validation_from_web_extension_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ConformanceTest/WebExtension/WebExtensionTest.cs :: WebExtensionAcceptance
@@ -64,14 +63,12 @@ fn additional_spreadsheet_doc_samples_validate() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
-fn microsoft365_spreadsheet_doc_samples_validate() {
+fn newer_spreadsheet_doc_samples_validate() {
   // Source: upstream Open XML SDK test assets under test/DocumentFormat.OpenXml.Tests.Assets/TestFiles
   assert_spreadsheet_document_validates("Spreadsheet.xlsx");
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn office2016_pptx_validation_from_test_office2016() {
   // Source: test/DocumentFormat.OpenXml.Tests/TestOffice2016.cs :: OF16_002_ValidatePptx_2016
@@ -80,7 +77,6 @@ fn office2016_pptx_validation_from_test_office2016() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn office2013_pptx_validation_from_test_office2016() {
   // Source: test/DocumentFormat.OpenXml.Tests/TestOffice2016.cs :: OF16_004_ValidatePptx_2013
@@ -109,9 +105,8 @@ fn additional_wordprocessing_doc_samples_validate() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
-fn microsoft365_wordprocessing_doc_samples_validate() {
+fn newer_wordprocessing_doc_samples_validate() {
   // Source: upstream Open XML SDK test assets under test/DocumentFormat.OpenXml.Tests.Assets/TestFiles
   for file_name in ["HelloWorld.docx", "Hyperlink.docx", "Notes.docx"] {
     assert_wordprocessing_document_validates(file_name);
@@ -138,9 +133,8 @@ fn additional_presentation_doc_samples_validate() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
-fn microsoft365_presentation_doc_samples_validate() {
+fn newer_presentation_doc_samples_validate() {
   // Source: upstream Open XML SDK test assets under test/DocumentFormat.OpenXml.Tests.Assets/TestFiles
   for file_name in ["Algn_tab_TabAlignment.pptx", "Presentation.potx"] {
     assert_presentation_document_validates(file_name);

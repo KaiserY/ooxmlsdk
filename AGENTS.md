@@ -12,7 +12,7 @@ This Rust workspace has four crates:
 - `crates/ooxmlsdk-derive`: procedural macros used by generated/runtime schema types.
 - `crates/ooxmlsdk-test`: integration tests, fixtures, doc samples, upstream coverage matrix, and performance benches.
 
-Runtime features are `microsoft365`, `parts`, and `validators`; defaults are `microsoft365` and `parts`. There is no Cargo `strict` feature. Strict OOXML is handled as fixture/document behavior.
+Runtime features are `parts`, `validators`, and `mce`; the default feature is `parts`. There is no Cargo `strict` feature. Strict OOXML is handled as fixture/document behavior.
 
 ## Upstream Alignment
 This project broadly mirrors the API, package model, schema behavior, validators, fixtures, and tests of upstream `dotnet/Open-XML-SDK`.
@@ -41,7 +41,7 @@ Avoid editing generated runtime files directly unless also changing generator/in
 - `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
 - `cargo test --workspace`: default full test lane.
 - `cargo test --workspace --no-default-features`: no-default-features lane.
-- `cargo test --workspace --no-default-features --features parts`: Office2007-oriented parts lane without `microsoft365`.
+- `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
 - `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
 - `cargo fmt --all`: format.
 - `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
@@ -91,7 +91,7 @@ Place tests near the behavior they protect:
 
 Prefer upstream-derived fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, asserting the first Rust-side validation error is acceptable if the implementation intentionally stops at first failure.
 
-The Office2007 parts lane must not include fixtures that require Office 2010+ relationships, ChartEx, model3d, `stylesWithEffects`, Word 2013+ settings, or other `microsoft365`-gated coverage. Gate only the smallest affected test/assertion with `#[cfg(feature = "microsoft365")]`.
+The parts-only lane should avoid fixtures that require validators or MCE-specific behavior. Gate only the smallest affected test/assertion with the relevant active feature such as `validators` or `mce`.
 
 `crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` as `open_failure`, `open_valid`, or `round_trip`. Promote a sample to `round_trip` only when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid`.
 

@@ -356,7 +356,6 @@ fn text_direction_attribute_translation_test() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 #[cfg(any())]
 fn level_justification_attribute_translation_test() {

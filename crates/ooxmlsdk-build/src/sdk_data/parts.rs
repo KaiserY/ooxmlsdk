@@ -180,13 +180,8 @@ fn resolve_content_kind(
 }
 
 fn gen_part_features(version: &str) -> Vec<String> {
-  let mut features = vec!["parts".to_string()];
-
-  if !version.is_empty() && version != "Office2007" {
-    features.push("microsoft365".to_string());
-  }
-
-  features
+  let _ = version;
+  vec!["parts".to_string()]
 }
 
 fn validate_parts(parts: &[Part]) {

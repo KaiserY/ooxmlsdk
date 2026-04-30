@@ -6,9 +6,8 @@ publish = false
 build = "build.rs"
 
 [features]
-default = ["microsoft365", "parts"]
+default = ["parts"]
 parts = ["ooxmlsdk/parts"]
-microsoft365 = ["ooxmlsdk/microsoft365"]
 validators = ["ooxmlsdk/validators"]
 mce = ["ooxmlsdk/mce"]
 
@@ -26,4 +25,4 @@ zip = { workspace = true }
 [[bench]]
 name = "perf"
 harness = false
-required-features = ["microsoft365", "parts"]
+required-features = ["parts"]

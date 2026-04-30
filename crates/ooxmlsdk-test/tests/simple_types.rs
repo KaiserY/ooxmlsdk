@@ -1,5 +1,4 @@
 use ooxmlsdk::schemas::schemas_microsoft_com_office_office::ShapeDefaults;
-#[cfg(feature = "microsoft365")]
 use ooxmlsdk::schemas::schemas_microsoft_com_office_word_2012_wordml::ChartTrackingRefBased;
 use ooxmlsdk::schemas::schemas_microsoft_com_vml::Shape;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::{
@@ -263,7 +262,6 @@ fn true_false_blank_attribute_accepts_empty_string_and_writes_canonical_form() {
   }
 }
 
-#[cfg(feature = "microsoft365")]
 #[test]
 fn on_off_attribute_accepts_upstream_lexical_forms_and_writes_canonical_form() {
   for (raw, expected, canonical) in [

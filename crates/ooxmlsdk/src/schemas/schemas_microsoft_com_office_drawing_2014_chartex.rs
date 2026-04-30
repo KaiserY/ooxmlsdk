@@ -263,6 +263,7 @@ pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
   /// version
   ///
   /// Available in Office2016 and above.
@@ -286,7 +287,7 @@ pub struct ChartSpace {
   pub fallback_img: Option<crate::simple_type::StringValue>,
   /// _
   #[sdk(child(qname = "cx:CT_ChartData/cx:chartData"))]
-  pub chart_data: std::boxed::Box<ChartData>,
+  pub chart_data: Option<std::boxed::Box<ChartData>>,
   /// _
   #[sdk(child(qname = "cx:CT_Chart/cx:chart"))]
   pub chart: std::boxed::Box<Chart>,

@@ -68,7 +68,14 @@ fn main_document_body_child_count(
   document
     .body
     .as_ref()
-    .map(|body| body.body_choice.len() + usize::from(body.w_sect_pr.is_some()))
+    .map(|body| {
+      body
+        .body_choice
+        .iter()
+        .filter(|choice| !matches!(choice, BodyChoice::XmlText(text) if text.trim().is_empty()))
+        .count()
+        + usize::from(body.w_sect_pr.is_some())
+    })
     .unwrap_or_default()
 }
 
@@ -433,19 +440,24 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
   let sdt = root
     .body
     .as_mut()
-    .and_then(|body| body.body_choice.first_mut())
-    .and_then(|choice| match choice {
-      BodyChoice::WSdt(sdt) => Some(sdt.as_mut()),
-      _ => None,
+    .and_then(|body| {
+      body.body_choice.iter_mut().find_map(|choice| match choice {
+        BodyChoice::WSdt(sdt) => Some(sdt.as_mut()),
+        _ => None,
+      })
     })
     .unwrap();
   let alias = sdt
     .sdt_properties
     .as_mut()
-    .and_then(|properties| properties.xml_children.first_mut())
-    .and_then(|choice| match choice {
-      SdtPropertiesChoice::WAlias(alias) => Some(alias.as_mut()),
-      _ => None,
+    .and_then(|properties| {
+      properties
+        .xml_children
+        .iter_mut()
+        .find_map(|choice| match choice {
+          SdtPropertiesChoice::WAlias(alias) => Some(alias.as_mut()),
+          _ => None,
+        })
     })
     .unwrap();
 
@@ -463,16 +475,21 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
   let reopened_alias = reopened_root
     .body
     .as_ref()
-    .and_then(|body| body.body_choice.first())
-    .and_then(|choice| match choice {
-      BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
-      _ => None,
+    .and_then(|body| {
+      body.body_choice.iter().find_map(|choice| match choice {
+        BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
+        _ => None,
+      })
     })
     .and_then(|sdt| sdt.sdt_properties.as_ref())
-    .and_then(|properties| properties.xml_children.first())
-    .and_then(|choice| match choice {
-      SdtPropertiesChoice::WAlias(alias) => Some(alias.as_ref()),
-      _ => None,
+    .and_then(|properties| {
+      properties
+        .xml_children
+        .iter()
+        .find_map(|choice| match choice {
+          SdtPropertiesChoice::WAlias(alias) => Some(alias.as_ref()),
+          _ => None,
+        })
     })
     .unwrap();
 

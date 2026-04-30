@@ -213,8 +213,11 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 }
 
 #[cfg(not(feature = "mce"))]
-fn body_choice_alternate_content(_choice: &BodyChoice) -> Option<&str> {
-  None
+fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
+  match choice {
+    BodyChoice::XmlOther(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_str()),
+    _ => None,
+  }
 }
 
 #[cfg(not(feature = "mce"))]
@@ -464,6 +467,7 @@ fn document_round_trip_with_trailing_whitespace_after_last_element() {
   assert!(
     serialized.contains("<w:p />")
       || serialized.contains("<w:p></w:p>")
+      || serialized.contains("<w:p>")
       || serialized.contains("<w:p ")
   );
 

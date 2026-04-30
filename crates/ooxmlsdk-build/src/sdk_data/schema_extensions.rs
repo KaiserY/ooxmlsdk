@@ -20,6 +20,8 @@ pub struct SchemaTypeExtension {
   pub have_xmlns_fields: Option<bool>,
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
+  pub have_direct_xml_other_children: Option<bool>,
+  pub parent_have_xml_other_children: Option<bool>,
   pub children: Vec<SchemaTypeChildExtension>,
 }
 
@@ -97,6 +99,12 @@ pub fn apply_schema_extensions(
       if let Some(have_xml_other_children) = extension.have_xml_other_children {
         schema_type.have_xml_other_children = have_xml_other_children;
       }
+      if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
+        schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
+      }
+      if let Some(parent_have_xml_other_children) = extension.parent_have_xml_other_children {
+        schema_type.parent_have_xml_other_children = parent_have_xml_other_children;
+      }
 
       for child_extension in &extension.children {
         let Some(child) = find_child_mut(&mut schema_type.children, child_extension) else {
@@ -160,6 +168,8 @@ mod tests {
       SchemaExtensions {
         types: vec![SchemaTypeExtension {
           class_name: "Parent".to_string(),
+          have_direct_xml_other_children: Some(true),
+          parent_have_xml_other_children: Some(true),
           children: vec![SchemaTypeChildExtension {
             property_name: "Child".to_string(),
             optional: Some(true),
@@ -173,5 +183,7 @@ mod tests {
     apply_schema_extensions(&mut schemas, &extensions).unwrap();
 
     assert!(schemas[0].types[0].children[0].optional);
+    assert!(schemas[0].types[0].have_direct_xml_other_children);
+    assert!(schemas[0].types[0].parent_have_xml_other_children);
   }
 }

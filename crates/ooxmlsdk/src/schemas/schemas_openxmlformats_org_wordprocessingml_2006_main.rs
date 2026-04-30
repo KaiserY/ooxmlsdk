@@ -10131,10 +10131,8 @@ pub struct Fonts {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  /// _
-  #[sdk(child(qname = "w:CT_Font/w:font"))]
-  pub w_font: Vec<Font>,
+  #[sdk(choice(qname = "w:CT_Font/w:font", any))]
+  pub xml_children: Vec<FontsChoice>,
 }
 /// Numbering Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -21784,6 +21782,14 @@ pub enum FooterChoice {
     /// Unknown XML text.
     #[sdk(text)]
     XmlText(crate::simple_type::StringValue),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum FontsChoice {
+  #[sdk(child(qname = "w:CT_Font/w:font"))]
+  WFont(std::boxed::Box<Font>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PreviousTableCellPropertiesChoice {

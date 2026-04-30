@@ -2724,8 +2724,6 @@ fn expand_named_struct(
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
-  let mut child_bearing_field_count = 0usize;
-  let mut occurrence_slot_candidate = false;
   for (field_ident, _, field_kind) in &ordered_field_specs {
     if matches!(
       field_kind,
@@ -2736,25 +2734,13 @@ fn expand_named_struct(
         | SdkTypeFieldKind::Any
     ) {
       xml_child_slot_count += 1usize;
-      child_bearing_field_count += 1usize;
       xml_child_slot_by_field.insert(field_ident.to_string(), xml_child_slot_count);
     }
   }
-  for (_, field_ty, field_kind) in &ordered_field_specs {
-    occurrence_slot_candidate |=
-      matches!(field_kind, SdkTypeFieldKind::Child { .. }) && contains_vec_type(field_ty);
-  }
-  let use_xml_other_children_occurrence_slots =
-    has_xml_other_children_field && child_bearing_field_count == 1 && occurrence_slot_candidate;
 
   let xml_child_slot_assign_tokens = |xml_child_slot: usize| {
     if !has_xml_other_children_field {
       quote! {}
-    } else if use_xml_other_children_occurrence_slots {
-      quote! {
-        let _ = #xml_child_slot;
-        __xml_child_slot += 1usize;
-      }
     } else {
       quote! {
         __xml_child_slot = #xml_child_slot;
@@ -4874,50 +4860,14 @@ fn expand_named_struct(
     }
   };
   let mut ordered_write_tokens = Vec::new();
-  let xml_other_children_write_slot_decl_tokens =
-    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
-      quote! {
-        let mut __xml_write_child_slot = 0usize;
-      }
-    } else {
-      quote! {}
-    };
-  let xml_other_children_write_current_slot_tokens =
-    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
-      quote! {
-        for (_, xml) in self
-          .xml_other_children
-          .iter()
-          .filter(|(slot, _)| *slot == __xml_write_child_slot)
-        {
-          writer.write_all(xml.as_bytes())?;
-        }
-      }
-    } else {
-      quote! {}
-    };
-  let xml_other_children_advance_slot_tokens =
-    if has_xml_other_children_field && use_xml_other_children_occurrence_slots {
-      quote! {
-        __xml_write_child_slot += 1usize;
-      }
-    } else {
-      quote! {}
-    };
   let xml_other_children_write_trailing_tokens = if has_xml_other_children_field {
-    if use_xml_other_children_occurrence_slots {
-      quote! {
-        #xml_other_children_write_current_slot_tokens
-      }
-    } else {
-      quote! {
-        for (_, xml) in self
-          .xml_other_children
-          .iter()
-          .filter(|(slot, _)| *slot == #xml_child_slot_count)
-        {
-          writer.write_all(xml.as_bytes())?;
-        }
+    quote! {
+      for (_, xml) in self
+        .xml_other_children
+        .iter()
+        .filter(|(slot, _)| *slot == #xml_child_slot_count)
+      {
+        writer.write_all(xml.as_bytes())?;
       }
     }
   } else {
@@ -4925,7 +4875,6 @@ fn expand_named_struct(
   };
   for (field_ident, field_ty, field_kind) in &ordered_field_specs {
     if has_xml_other_children_field
-      && !use_xml_other_children_occurrence_slots
       && matches!(
         field_kind,
         SdkTypeFieldKind::Child { .. }
@@ -4968,24 +4917,18 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for child in &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               #child_write_call
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(child) = &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               #child_write_call
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            #xml_other_children_write_current_slot_tokens
             #self_write_call
-            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5013,24 +4956,18 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for choice in &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(choice) = &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               <#choice_ty as crate::sdk::SdkChoice>::write_xml(choice, writer, xmlns_prefix)?;
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            #xml_other_children_write_current_slot_tokens
             <#choice_ty as crate::sdk::SdkChoice>::write_xml(&self.#field_ident, writer, xmlns_prefix)?;
-            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5040,24 +4977,18 @@ fn expand_named_struct(
         if repeated {
           ordered_write_tokens.push(quote! {
             for value in &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               writer.write_all(value.as_bytes())?;
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else if optional {
           ordered_write_tokens.push(quote! {
             if let Some(value) = &self.#field_ident {
-              #xml_other_children_write_current_slot_tokens
               writer.write_all(value.as_bytes())?;
-              #xml_other_children_advance_slot_tokens
             }
           });
         } else {
           ordered_write_tokens.push(quote! {
-            #xml_other_children_write_current_slot_tokens
             writer.write_all(self.#field_ident.as_bytes())?;
-            #xml_other_children_advance_slot_tokens
           });
         }
       }
@@ -5705,7 +5636,6 @@ fn expand_named_struct(
         #xml_other_attrs_write_tokens
         if #has_body {
           writer.write_all(b">")?;
-          #xml_other_children_write_slot_decl_tokens
           #( #ordered_write_tokens )*
           crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
         } else {

@@ -219,6 +219,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             have_xmlns_fields,
             have_xml_other_attrs,
             have_xml_other_children,
+            have_direct_xml_other_children: false,
+            parent_have_xml_other_children: false,
             text_value_type: String::new(),
             api_kind: resolve_api_kind(ty, &type_map),
             attributes: ty

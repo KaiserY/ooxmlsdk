@@ -560,8 +560,11 @@ fn build_type_decl(
     }
   };
 
-  let route_xml_other_children_to_choice =
-    add_xml_other_variants_to_single_repeated_choice(schema_type, &members, &mut extra_types);
+  let route_xml_other_children_to_choice = if schema_type.parent_have_xml_other_children {
+    route_parent_xml_other_children(schema_type, &mut members, &mut extra_types)
+  } else {
+    add_xml_other_variants_to_single_repeated_choice(schema_type, &members, &mut extra_types)
+  };
 
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
   let content_model =
@@ -603,14 +606,26 @@ fn build_type_decl(
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
         have_xml_other_attrs: schema_type.have_xml_other_attrs,
-        have_xml_other_children: schema_type.have_xml_other_children
-          && !route_xml_other_children_to_choice,
+        have_xml_other_children: if schema_type.parent_have_xml_other_children {
+          schema_type.have_direct_xml_other_children && !route_xml_other_children_to_choice
+        } else {
+          schema_type.have_xml_other_children && !route_xml_other_children_to_choice
+        },
       },
       content_structure: None,
       members,
     },
     extra_types,
   ))
+}
+
+fn route_parent_xml_other_children(
+  schema_type: &SchemaType,
+  members: &mut Vec<MemberDecl>,
+  extra_types: &mut Vec<TypeDecl>,
+) -> bool {
+  add_xml_other_variant_to_single_repeated_choice(members, extra_types)
+    || promote_single_repeated_child_to_xml_other_choice(schema_type, members, extra_types)
 }
 
 fn add_xml_other_variants_to_single_repeated_choice(
@@ -622,6 +637,51 @@ fn add_xml_other_variants_to_single_repeated_choice(
     return false;
   }
 
+  if !add_xml_other_variant_to_single_repeated_choice(members, extra_types) {
+    return false;
+  }
+
+  let choice_fields = members
+    .iter()
+    .filter_map(|member| match member {
+      MemberDecl::Field(field)
+        if matches!(field.wire, FieldWireDecl::Choice)
+          && field.cardinality == Cardinality::Many =>
+      {
+        Some(field)
+      }
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+
+  let [choice_field] = choice_fields.as_slice() else {
+    return false;
+  };
+
+  let Some(choice_type) = extra_types
+    .iter_mut()
+    .find(|ty| ty.rust_name == choice_field.type_ref.rust_type && ty.kind == TypeKind::ChoiceEnum)
+  else {
+    return false;
+  };
+
+  add_choice_variant_if_missing(
+    choice_type,
+    "XmlText",
+    "Unknown XML text.",
+    VariantWireDecl::Text,
+    TypeRefDecl {
+      rust_type: "StringValue".to_string(),
+      module_path: Some("crate::simple_type".to_string()),
+    },
+  );
+  true
+}
+
+fn add_xml_other_variant_to_single_repeated_choice(
+  members: &[MemberDecl],
+  extra_types: &mut [TypeDecl],
+) -> bool {
   let choice_fields = members
     .iter()
     .filter_map(|member| match member {
@@ -656,16 +716,82 @@ fn add_xml_other_variants_to_single_repeated_choice(
       module_path: None,
     },
   );
-  add_choice_variant_if_missing(
-    choice_type,
-    "XmlText",
-    "Unknown XML text.",
-    VariantWireDecl::Text,
-    TypeRefDecl {
-      rust_type: "StringValue".to_string(),
-      module_path: Some("crate::simple_type".to_string()),
+  true
+}
+
+fn promote_single_repeated_child_to_xml_other_choice(
+  schema_type: &SchemaType,
+  members: &mut Vec<MemberDecl>,
+  extra_types: &mut Vec<TypeDecl>,
+) -> bool {
+  let [MemberDecl::Field(field)] = members.as_slice() else {
+    return false;
+  };
+  let field = field.clone();
+
+  if field.cardinality != Cardinality::Many {
+    return false;
+  }
+
+  let FieldWireDecl::Child { qname } = &field.wire else {
+    return false;
+  };
+  let qname = qname.clone();
+
+  let choice_name = format!("{}Choice", schema_type.class_name);
+  let mut choice_members = vec![
+    MemberDecl::Variant(VariantDecl {
+      rust_name: child_variant_rust_name(&qname),
+      docs: field.docs.clone(),
+      version: field.version.clone(),
+      wire: VariantWireDecl::Child {
+        qnames: vec![qname],
+      },
+      payload: field.type_ref.clone(),
+    }),
+    MemberDecl::Variant(VariantDecl {
+      rust_name: "XmlOther".to_string(),
+      docs: "Unknown XML child.".to_string(),
+      version: String::new(),
+      wire: VariantWireDecl::Any,
+      payload: TypeRefDecl {
+        rust_type: "String".to_string(),
+        module_path: None,
+      },
+    }),
+  ];
+  disambiguate_choice_variant_names(&mut choice_members);
+
+  members.clear();
+  members.push(MemberDecl::Field(FieldDecl {
+    rust_name: "xml_children".to_string(),
+    docs: field.docs.clone(),
+    version: field.version.clone(),
+    wire: FieldWireDecl::Choice,
+    cardinality: Cardinality::Many,
+    type_ref: TypeRefDecl {
+      rust_type: choice_name.clone(),
+      module_path: None,
     },
-  );
+    validators: field.validators.clone(),
+  }));
+
+  extra_types.push(TypeDecl {
+    rust_name: choice_name,
+    xml_qname: None,
+    docs: field.docs.clone(),
+    version: schema_type.version.clone(),
+    is_abstract: false,
+    kind: TypeKind::ChoiceEnum,
+    element_kind: None,
+    content_model: None,
+    base_rust_name: None,
+    xml_content: None,
+    support: SystemSupportDecl::default(),
+    content_structure: None,
+    members: choice_members,
+  });
+
   true
 }
 
@@ -1344,6 +1470,11 @@ fn refine_content_model_decl(
     } else {
       source_content_model
     }
+  } else if source_content_model == Some(ContentModelDecl::SequenceDirectChildren)
+    && xml_content.is_none()
+    && has_choice_only_member_shape(members)
+  {
+    Some(ContentModelDecl::ChoiceOnly)
   } else {
     source_content_model
   }

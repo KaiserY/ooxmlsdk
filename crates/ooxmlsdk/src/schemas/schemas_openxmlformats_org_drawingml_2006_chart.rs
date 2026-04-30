@@ -463,18 +463,6 @@ pub struct RichText {
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
-/// Defines the TextBodyType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBody/")]
-pub struct TextBodyType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  #[sdk(choice(
-    qname = "a:CT_TextBodyProperties/a:bodyPr",
-    qname = "a:CT_TextListStyle/a:lstStyle",
-    qname = "a:CT_TextParagraph/a:p"
-  ))]
-  pub xml_children: Vec<TextBodyTypeChoice>,
-}
 /// Data Label Position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLblPos/c:dLblPos")]
@@ -803,14 +791,6 @@ pub struct RoundedCorners {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the BooleanType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Boolean/")]
-pub struct BooleanType {
-  /// Boolean Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<crate::simple_type::BooleanValue>,
-}
 /// Separator.
 pub type Separator = crate::simple_type::StringValue;
 /// Trendline Name.
@@ -887,14 +867,6 @@ pub struct HighLowLines {
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
-/// Defines the ChartLinesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_ChartLines/")]
-pub struct ChartLinesType {
-  /// _
-  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Vec<ChartShapeProperties>,
-}
 /// Index.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:idx")]
@@ -955,14 +927,6 @@ pub struct Explosion {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UnsignedInt/c:fmtId")]
 pub struct FormatId {
-  /// Integer Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::UInt32Value,
-}
-/// Defines the UnsignedIntegerType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_UnsignedInt/")]
-pub struct UnsignedIntegerType {
   /// Integer Value
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
@@ -1306,14 +1270,6 @@ pub struct MinorTickMark {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TickMarkValues>,
 }
-/// Defines the TickMarkType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_TickMark/")]
-pub struct TickMarkType {
-  /// Tick Mark Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<TickMarkValues>,
-}
 /// Tick Label Position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_TickLblPos/c:tickLblPos")]
@@ -1434,14 +1390,6 @@ pub struct MinAxisValue {
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::DoubleValue,
 }
-/// Defines the DoubleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Double/")]
-pub struct DoubleType {
-  /// Floating Point Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DoubleValue,
-}
 /// Chart Space.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartSpace/c:chartSpace")]
@@ -1534,14 +1482,6 @@ pub struct LegacyDrawingHeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RelId/c:userShapes")]
 pub struct UserShapesReference {
-  /// Relationship Reference
-  #[sdk(attr(qname = "r:id"))]
-  pub id: crate::simple_type::StringValue,
-}
-/// Defines the RelationshipIdType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_RelId/")]
-pub struct RelationshipIdType {
   /// Relationship Reference
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -1647,18 +1587,6 @@ pub struct NumberingCache {
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
-/// Defines the NumberDataType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_NumData/")]
-pub struct NumberDataType {
-  #[sdk(choice(
-    qname = "c:ST_Xstring/c:formatCode",
-    qname = "c:CT_UnsignedInt/c:ptCount",
-    qname = "c:CT_NumVal/c:pt",
-    qname = "c:CT_ExtensionList/c:extLst"
-  ))]
-  pub xml_children: Vec<NumberDataTypeChoice>,
-}
 /// Level.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Lvl/c:lvl")]
@@ -1723,17 +1651,6 @@ pub struct StringCache {
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
   pub c_ext_lst: Option<StrDataExtensionList>,
 }
-/// Defines the StringDataType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_StrData/")]
-pub struct StringDataType {
-  #[sdk(choice(
-    qname = "c:CT_UnsignedInt/c:ptCount",
-    qname = "c:CT_StrVal/c:pt",
-    qname = "c:CT_StrDataExtensionList/c:extLst"
-  ))]
-  pub xml_children: Vec<StringDataTypeChoice>,
-}
 /// Layout Target.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutTarget/c:layoutTarget")]
@@ -1770,14 +1687,6 @@ pub struct WidthMode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LayoutMode/c:hMode")]
 pub struct HeightMode {
-  /// Layout Mode Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<LayoutModeValues>,
-}
-/// Defines the LayoutModeType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_LayoutMode/")]
-pub struct LayoutModeType {
   /// Layout Mode Value
   #[sdk(attr(qname = ":val"))]
   pub val: Option<LayoutModeValues>,
@@ -2067,13 +1976,6 @@ pub struct BubbleSize {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
   pub xml_children: Option<BubbleSizeChoice>,
 }
-/// Defines the NumberDataSourceType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_NumDataSource/")]
-pub struct NumberDataSourceType {
-  #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<NumberDataSourceTypeChoice>,
-}
 /// Gap Width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_GapAmount/c:gapWidth")]
@@ -2104,21 +2006,6 @@ pub struct GapDepth {
   ))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
-/// Defines the GapAmountType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_GapAmount/")]
-pub struct GapAmountType {
-  /// Gap Size Value
-  #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub val: Option<crate::simple_type::UInt16Value>,
-}
 /// Up Bars.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/c:upBars")]
@@ -2134,14 +2021,6 @@ pub struct DownBars {
   /// _
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-}
-/// Defines the UpDownBarType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_UpDownBar/")]
-pub struct UpDownBarType {
-  /// _
-  #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Vec<ChartShapeProperties>,
 }
 /// Pie of Pie or Bar of Pie Type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4037,15 +3916,6 @@ pub struct TickMarkSkip {
   #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
   pub val: crate::simple_type::Int32Value,
 }
-/// Defines the SkipType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Skip/")]
-pub struct SkipType {
-  /// Tick Skip Value
-  #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
-  pub val: crate::simple_type::Int32Value,
-}
 /// Defines the CatAxExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CatAxExtensionList/c:extLst")]
@@ -4079,14 +3949,6 @@ pub struct MinorTimeUnit {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<TimeUnitValues>,
 }
-/// Defines the TimeUnitType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_TimeUnit/")]
-pub struct TimeUnitType {
-  /// Time Unit Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<TimeUnitValues>,
-}
 /// Defines the MajorUnit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxisUnit/c:majorUnit")]
@@ -4100,15 +3962,6 @@ pub struct MajorUnit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AxisUnit/c:minorUnit")]
 pub struct MinorUnit {
-  /// Major Unit Value
-  #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
-  pub val: crate::simple_type::DoubleValue,
-}
-/// Defines the AxisUnitType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_AxisUnit/")]
-pub struct AxisUnitType {
   /// Major Unit Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
@@ -4323,19 +4176,6 @@ pub struct XValues {
     qname = "c:CT_StrData/c:strLit"
   ))]
   pub xml_children: Option<XValuesChoice>,
-}
-/// Defines the AxisDataSourceType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_AxDataSource/")]
-pub struct AxisDataSourceType {
-  #[sdk(choice(
-    qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef",
-    qname = "c:CT_NumRef/c:numRef",
-    qname = "c:CT_NumData/c:numLit",
-    qname = "c:CT_StrRef/c:strRef",
-    qname = "c:CT_StrData/c:strLit"
-  ))]
-  pub xml_children: Option<AxisDataSourceTypeChoice>,
 }
 /// Defines the LineSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4686,18 +4526,6 @@ pub struct BackWall {
   /// Chart Extensibility
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub extension_list: Option<ExtensionList>,
-}
-/// Defines the SurfaceType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Surface/")]
-pub struct SurfaceType {
-  #[sdk(choice(
-    qname = "c:CT_WallThickness/c:thickness",
-    qname = "a:CT_ShapeProperties/c:spPr",
-    qname = "c:CT_PictureOptions/c:pictureOptions",
-    qname = "c:CT_ExtensionList/c:extLst"
-  ))]
-  pub xml_children: Vec<SurfaceTypeChoice>,
 }
 /// Plot data and formatting.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5055,21 +4883,6 @@ pub enum ChartShapePropertiesChoice3 {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextBodyTypeChoice {
-  /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  ABodyPr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
-  ),
-  /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  ALstStyle(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  ),
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  AP(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartTextChoice {
   /// Defines the StringReference Class.
   #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
@@ -5166,28 +4979,6 @@ pub enum UserShapesChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NumberDataTypeChoice {
-  /// Format Code
-  #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
-  CFormatCode(crate::simple_type::StringValue),
-  /// Point Count
-  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  CPtCount(std::boxed::Box<PointCount>),
-  #[sdk(child(qname = "c:CT_NumVal/c:pt"))]
-  CPt(std::boxed::Box<NumericPoint>),
-  #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  CExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StringDataTypeChoice {
-  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  CPtCount(std::boxed::Box<PointCount>),
-  #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  CPt(std::boxed::Box<StringPoint>),
-  #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  CExtLst(std::boxed::Box<StrDataExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlusChoice {
   /// Number Reference.
   #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
@@ -5225,15 +5016,6 @@ pub enum YValuesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSizeChoice {
-  /// Number Reference.
-  #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
-  CNumRef(std::boxed::Box<NumberReference>),
-  /// Number Literal.
-  #[sdk(child(qname = "c:CT_NumData/c:numLit"))]
-  CNumLit(std::boxed::Box<NumberLiteral>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NumberDataSourceTypeChoice {
   /// Number Reference.
   #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
   CNumRef(std::boxed::Box<NumberReference>),
@@ -5783,24 +5565,6 @@ pub enum XValuesChoice {
   CStrLit(std::boxed::Box<StringLiteral>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum AxisDataSourceTypeChoice {
-  /// Multi Level String Reference.
-  #[sdk(child(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef"))]
-  CMultiLvlStrRef(std::boxed::Box<MultiLevelStringReference>),
-  /// Number Reference.
-  #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
-  CNumRef(std::boxed::Box<NumberReference>),
-  /// Number Literal.
-  #[sdk(child(qname = "c:CT_NumData/c:numLit"))]
-  CNumLit(std::boxed::Box<NumberLiteral>),
-  /// Defines the StringReference Class.
-  #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
-  CStrRef(std::boxed::Box<StringReference>),
-  /// String Literal.
-  #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
-  CStrLit(std::boxed::Box<StringLiteral>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSerExtensionChoice {
   #[sdk(child(
     office2013,
@@ -6292,20 +6056,6 @@ pub enum SurfaceSerExtensionChoice {
   ),
   #[sdk(any)]
   XmlOther(String),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SurfaceTypeChoice {
-  /// Thickness
-  #[sdk(child(qname = "c:CT_WallThickness/c:thickness"))]
-  CThickness(std::boxed::Box<Thickness>),
-  #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
-  CSpPr(std::boxed::Box<ShapeProperties>),
-  /// Picture Options
-  #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  CPictureOptions(std::boxed::Box<PictureOptions>),
-  /// Chart Extensibility
-  #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  CExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlotAreaChoice {

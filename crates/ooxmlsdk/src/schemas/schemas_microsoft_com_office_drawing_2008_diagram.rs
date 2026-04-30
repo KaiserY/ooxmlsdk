@@ -369,20 +369,6 @@ pub struct ShapeTree {
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub dsp_ext_lst: Option<OfficeArtExtensionList>,
 }
-/// Defines the GroupShapeType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "dsp:CT_GroupShape/")]
-pub struct GroupShapeType {
-  #[sdk(choice(
-    microsoft365,
-    qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr",
-    qname = "a:CT_GroupShapeProperties/dsp:grpSpPr",
-    qname = "dsp:CT_Shape/dsp:sp",
-    qname = "dsp:CT_GroupShape/dsp:grpSp",
-    qname = "a:CT_OfficeArtExtensionList/dsp:extLst"
-  ))]
-  pub xml_children: Vec<GroupShapeTypeChoice>,
-}
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
@@ -477,17 +463,4 @@ pub enum ShapeTreeChoice {
   DspSp(std::boxed::Box<Shape>),
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum GroupShapeTypeChoice {
-  #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
-  DspNvGrpSpPr(std::boxed::Box<GroupShapeNonVisualProperties>),
-  #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
-  DspGrpSpPr(std::boxed::Box<GroupShapeProperties>),
-  #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
-  DspSp(std::boxed::Box<Shape>),
-  #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
-  DspGrpSp(std::boxed::Box<GroupShape>),
-  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
-  DspExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }

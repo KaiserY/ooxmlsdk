@@ -136,15 +136,6 @@ pub struct TimelineCachePivotCaches {
   pub x_pivot_cache:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
 }
-/// Defines the OpenXmlPivotCachesElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_PivotCaches/")]
-pub struct OpenXmlPivotCachesElement {
-  /// PivotCache.
-  #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
-  pub pivot_cache:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
-}
 /// Defines the PivotTableReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(
@@ -1094,38 +1085,6 @@ pub struct QuestionPrSurveyElementPr {
   #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the OpenXmlSurveyElementPrElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_SurveyElementPr/")]
-pub struct OpenXmlSurveyElementPrElement {
-  /// cssClass
-  #[sdk(attr(office2013, qname = ":cssClass"))]
-  pub css_class: Option<crate::simple_type::StringValue>,
-  /// bottom
-  #[sdk(attr(office2013, qname = ":bottom"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
-  /// top
-  #[sdk(attr(office2013, qname = ":top"))]
-  pub top: Option<crate::simple_type::Int32Value>,
-  /// left
-  #[sdk(attr(office2013, qname = ":left"))]
-  pub left: Option<crate::simple_type::Int32Value>,
-  /// right
-  #[sdk(attr(office2013, qname = ":right"))]
-  pub right: Option<crate::simple_type::Int32Value>,
-  /// width
-  #[sdk(attr(office2013, qname = ":width"))]
-  pub width: Option<crate::simple_type::UInt32Value>,
-  /// height
-  #[sdk(attr(office2013, qname = ":height"))]
-  pub height: Option<crate::simple_type::UInt32Value>,
-  /// position
-  #[sdk(attr(office2013, qname = ":position"))]
-  pub position: Option<SurveyPosition>,
-  /// _
-  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
-  pub extension_list: Vec<ExtensionList>,
-}
 /// Defines the SurveyQuestions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_SurveyQuestions/x15:questions")]
@@ -1242,17 +1201,6 @@ pub struct SelectionTimelineRange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_TimelineRange/x15:bounds")]
 pub struct BoundsTimelineRange {
-  /// startDate
-  #[sdk(attr(office2013, qname = ":startDate"))]
-  pub start_date: crate::simple_type::DateTimeValue,
-  /// endDate
-  #[sdk(attr(office2013, qname = ":endDate"))]
-  pub end_date: crate::simple_type::DateTimeValue,
-}
-/// Defines the TimelineRange Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "x15:CT_TimelineRange/")]
-pub struct TimelineRange {
   /// startDate
   #[sdk(attr(office2013, qname = ":startDate"))]
   pub start_date: crate::simple_type::DateTimeValue,

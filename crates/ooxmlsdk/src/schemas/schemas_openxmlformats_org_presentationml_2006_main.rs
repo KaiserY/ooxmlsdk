@@ -777,17 +777,6 @@ pub struct ParagraphIndexRange {
   #[sdk(attr(qname = ":end"))]
   pub end: crate::simple_type::UInt32Value,
 }
-/// Defines the IndexRangeType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_IndexRange/")]
-pub struct IndexRangeType {
-  /// Start
-  #[sdk(attr(qname = ":st"))]
-  pub start: crate::simple_type::UInt32Value,
-  /// End
-  #[sdk(attr(qname = ":end"))]
-  pub end: crate::simple_type::UInt32Value,
-}
 /// Custom Show.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CustomShowId/p:custShow")]
@@ -1454,20 +1443,6 @@ pub struct SoundTarget {
   #[sdk(attr(qname = ":builtIn"))]
   pub built_in: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the EmbeddedWavAudioFileType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EmbeddedWAVAudioFile/")]
-pub struct EmbeddedWavAudioFileType {
-  /// Embedded Audio File Relationship ID
-  #[sdk(attr(qname = "r:embed"))]
-  pub embed: crate::simple_type::StringValue,
-  /// Sound Name
-  #[sdk(attr(qname = ":name"))]
-  pub name: Option<crate::simple_type::StringValue>,
-  /// Recognized Built-In Sound
-  #[sdk(attr(qname = ":builtIn"))]
-  pub built_in: Option<crate::simple_type::BooleanValue>,
-}
 /// Start Sound Action.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TransitionStartSoundAction/p:stSnd")]
@@ -1575,28 +1550,6 @@ pub struct EndSync {
     qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
   ))]
   pub xml_children: Option<EndSyncChoice>,
-}
-/// Defines the TimeListConditionalType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TLTimeCondition/")]
-pub struct TimeListConditionalType {
-  /// Trigger Event
-  #[sdk(attr(qname = ":evt"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub event: Option<TriggerEventValues>,
-  /// Trigger Delay
-  #[sdk(attr(qname = ":delay"))]
-  #[sdk(number_type(source = 0u32, union = 0u64, type_name = "xsd:unsignedInt"))]
-  #[sdk(string_set(source = 1u32, union = 0u64, values = &["indefinite"]))]
-  #[sdk(string_format(source = 2u32, union = 1u64, kind = "token"))]
-  #[sdk(string_set(source = 3u32, union = 1u64, values = &["indefinite"]))]
-  pub delay: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "p:CT_TLTimeTargetElement/p:tgtEl",
-    qname = "p:CT_TLTriggerTimeNodeID/p:tn",
-    qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
-  ))]
-  pub xml_children: Option<TimeListConditionalTypeChoice>,
 }
 /// Parallel Time Node.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2045,14 +1998,6 @@ pub struct EndConditionList {
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub p_cond: Vec<Condition>,
 }
-/// Defines the TimeListTimeConditionalListType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TLTimeConditionList/")]
-pub struct TimeListTimeConditionalListType {
-  /// Condition.
-  #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
-  pub condition: Vec<Condition>,
-}
 /// Attribute Name.
 pub type AttributeName = crate::simple_type::StringValue;
 /// Defines the Text Class.
@@ -2128,22 +2073,6 @@ pub struct PenColor {
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub xml_children: Option<PenColorChoice>,
-}
-/// Defines the ColorType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Color/")]
-pub struct ColorType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<ColorTypeChoice>,
 }
 /// Time Animate Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2308,19 +2237,6 @@ pub struct VariantValue {
     qname = "a:CT_Color/p:clrVal"
   ))]
   pub xml_children: Option<VariantValueChoice>,
-}
-/// Defines the TimeListAnimationVariantType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TLAnimVariant/")]
-pub struct TimeListAnimationVariantType {
-  #[sdk(choice(
-    qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal",
-    qname = "p:CT_TLAnimVariantIntegerVal/p:intVal",
-    qname = "p:CT_TLAnimVariantFloatVal/p:fltVal",
-    qname = "p:CT_TLAnimVariantStringVal/p:strVal",
-    qname = "a:CT_Color/p:clrVal"
-  ))]
-  pub xml_children: Option<TimeListAnimationVariantTypeChoice>,
 }
 /// Common Media Node Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2567,22 +2483,6 @@ pub struct ToColor {
   ))]
   pub xml_children: Option<ToColorChoice>,
 }
-/// Defines the Color3Type Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Color3/")]
-pub struct Color3Type {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<Color3TypeChoice>,
-}
 /// Presentation Slide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideRelationshipListEntry/p:sld")]
@@ -2803,14 +2703,6 @@ pub struct ItalicFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_EmbeddedFontDataId/p:boldItalic")]
 pub struct BoldItalicFont {
-  /// Relationship Identifier
-  #[sdk(attr(qname = "r:id"))]
-  pub id: crate::simple_type::StringValue,
-}
-/// Defines the EmbeddedFontDataIdType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_EmbeddedFontDataId/")]
-pub struct EmbeddedFontDataIdType {
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -3627,25 +3519,6 @@ pub struct NotesStyle {
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
 }
-/// Defines the TextListStyleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextListStyle/")]
-pub struct TextListStyleType {
-  #[sdk(choice(
-    qname = "a:CT_TextParagraphProperties/a:defPPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl1pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl2pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl3pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl4pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl5pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl6pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl7pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl8pPr",
-    qname = "a:CT_TextParagraphProperties/a:lvl9pPr",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<TextListStyleTypeChoice>,
-}
 /// Slide Layout Id.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutIdListEntry/p:sldLayoutId")]
@@ -3736,24 +3609,6 @@ pub struct RestoredTop {
   #[sdk(attr(qname = ":autoAdjust"))]
   pub auto_adjust: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the NormalViewPortionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_NormalViewPortion/")]
-pub struct NormalViewPortionType {
-  /// Normal View Dimension Size
-  #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub size: crate::simple_type::Int32Value,
-  /// Auto Adjust Normal View
-  #[sdk(attr(qname = ":autoAdjust"))]
-  pub auto_adjust: Option<crate::simple_type::BooleanValue>,
-}
 /// View Scale.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Scale2D/p:scale")]
@@ -3796,31 +3651,6 @@ pub struct Origin {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Point2D/p:pos")]
 pub struct Position {
-  /// X-Axis Coordinate
-  #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub x: crate::simple_type::Int64Value,
-  /// Y-Axis Coordinate
-  #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub y: crate::simple_type::Int64Value,
-}
-/// Defines the Point2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point2D/")]
-pub struct Point2DType {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(
@@ -4036,31 +3866,6 @@ pub struct GridSpacing {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/p:notesSz")]
 pub struct NotesSize {
-  /// Extent Length
-  #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub cx: crate::simple_type::Int64Value,
-  /// Extent Width
-  #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub cy: crate::simple_type::Int64Value,
-}
-/// Defines the PositiveSize2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_PositiveSize2D/")]
-pub struct PositiveSize2DType {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(
@@ -4340,23 +4145,6 @@ pub struct GroupShape {
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
 }
-/// Defines the GroupShapeType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_GroupShape/")]
-pub struct GroupShapeType {
-  #[sdk(choice(
-    qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr",
-    qname = "a:CT_GroupShapeProperties/p:grpSpPr",
-    qname = "p:CT_Shape/p:sp",
-    qname = "p:CT_GroupShape/p:grpSp",
-    qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
-    qname = "p:CT_Connector/p:cxnSp",
-    qname = "p:CT_Picture/p:pic",
-    qname = "p:CT_ContentPart/p:contentPart",
-    qname = "p:CT_ExtensionListModify/p:extLst"
-  ))]
-  pub xml_children: Vec<GroupShapeTypeChoice>,
-}
 /// Customer Data List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CustomerDataList/p:custDataLst")]
@@ -4538,15 +4326,6 @@ pub struct InkTarget {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLSubShapeId/p:subSp")]
 pub struct SubShape {
-  /// Shape ID
-  #[sdk(attr(qname = ":spid"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub shape_id: crate::simple_type::StringValue,
-}
-/// Defines the TimeListSubShapeIdType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TLSubShapeId/")]
-pub struct TimeListSubShapeIdType {
   /// Shape ID
   #[sdk(attr(qname = ":spid"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
@@ -4754,30 +4533,6 @@ pub struct SubTimeNodeList {
   ))]
   pub xml_children: Vec<SubTimeNodeListChoice>,
 }
-/// Defines the TimeTypeListType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TimeNodeList/")]
-pub struct TimeTypeListType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  #[sdk(choice(
-    qname = "p:CT_TLTimeNodeParallel/p:par",
-    qname = "p:CT_TLTimeNodeSequence/p:seq",
-    qname = "p:CT_TLTimeNodeExclusive/p:excl",
-    qname = "p:CT_TLAnimateBehavior/p:anim",
-    qname = "p:CT_TLAnimateColorBehavior/p:animClr",
-    qname = "p:CT_TLAnimateEffectBehavior/p:animEffect",
-    qname = "p:CT_TLAnimateMotionBehavior/p:animMotion",
-    qname = "p:CT_TLAnimateRotationBehavior/p:animRot",
-    qname = "p:CT_TLAnimateScaleBehavior/p:animScale",
-    qname = "p:CT_TLCommandBehavior/p:cmd",
-    qname = "p:CT_TLSetBehavior/p:set",
-    qname = "p:CT_TLMediaNodeAudio/p:audio",
-    qname = "p:CT_TLMediaNodeVideo/p:video",
-    text,
-    any
-  ))]
-  pub xml_children: Vec<TimeTypeListTypeChoice>,
-}
 /// Defines the TimeAnimateValueList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeAnimateValueList/p:tavLst")]
@@ -4823,17 +4578,6 @@ pub struct ToPosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLPoint/p:rCtr")]
 pub struct RotationCenter {
-  /// X coordinate
-  #[sdk(attr(qname = ":x"))]
-  pub x: crate::simple_type::Int32Value,
-  /// Y coordinate
-  #[sdk(attr(qname = ":y"))]
-  pub y: crate::simple_type::Int32Value,
-}
-/// Defines the TimeListType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_TLPoint/")]
-pub struct TimeListType {
   /// X coordinate
   #[sdk(attr(qname = ":x"))]
   pub x: crate::simple_type::Int32Value,
@@ -5368,15 +5112,6 @@ pub struct RandomBarTransition {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub direction: Option<DirectionValues>,
 }
-/// Defines the OrientationTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_OrientationTransition/")]
-pub struct OrientationTransitionType {
-  /// Transition Direction
-  #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub direction: Option<DirectionValues>,
-}
 /// Defines the CoverTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_EightDirectionTransition/p:cover")]
@@ -5391,16 +5126,6 @@ pub struct CoverTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_EightDirectionTransition/p:pull")]
 pub struct PullTransition {
-  /// Direction
-  #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_set(source = 0u32, union = 0u64, values = &["l", "u", "r", "d"]))]
-  #[sdk(string_set(source = 1u32, union = 0u64, values = &["lu", "ru", "ld", "rd"]))]
-  pub direction: Option<crate::simple_type::StringValue>,
-}
-/// Defines the EightDirectionTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_EightDirectionTransition/")]
-pub struct EightDirectionTransitionType {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_set(source = 0u32, union = 0u64, values = &["l", "u", "r", "d"]))]
@@ -5423,14 +5148,6 @@ pub struct FadeTransition {
   #[sdk(attr(qname = ":thruBlk"))]
   pub through_black: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the OptionalBlackTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_OptionalBlackTransition/")]
-pub struct OptionalBlackTransitionType {
-  /// Transition Through Black
-  #[sdk(attr(qname = ":thruBlk"))]
-  pub through_black: Option<crate::simple_type::BooleanValue>,
-}
 /// Defines the PushTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SideDirectionTransition/p:push")]
@@ -5444,15 +5161,6 @@ pub struct PushTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SideDirectionTransition/p:wipe")]
 pub struct WipeTransition {
-  /// Direction
-  #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub direction: Option<TransitionSlideDirectionValues>,
-}
-/// Defines the SideDirectionTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_SideDirectionTransition/")]
-pub struct SideDirectionTransitionType {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
@@ -5658,18 +5366,6 @@ pub enum EndSyncChoice {
   PRtn(std::boxed::Box<RuntimeNodeTrigger>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TimeListConditionalTypeChoice {
-  /// Target Element Trigger Choice.
-  #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
-  PTgtEl(std::boxed::Box<TargetElement>),
-  /// Time Node.
-  #[sdk(child(qname = "p:CT_TLTriggerTimeNodeID/p:tn"))]
-  PTn(std::boxed::Box<TimeNode>),
-  /// Runtime Node Trigger Choice.
-  #[sdk(child(qname = "p:CT_TLTriggerRuntimeNode/p:rtn"))]
-  PRtn(std::boxed::Box<RuntimeNodeTrigger>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorValueChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
@@ -5744,43 +5440,6 @@ pub enum PenColorChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ColorTypeChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ToVariantValueChoice {
   /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
@@ -5800,24 +5459,6 @@ pub enum ToVariantValueChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum VariantValueChoice {
-  /// Boolean Variant.
-  #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
-  PBoolVal(std::boxed::Box<BooleanVariantValue>),
-  /// Integer.
-  #[sdk(child(qname = "p:CT_TLAnimVariantIntegerVal/p:intVal"))]
-  PIntVal(std::boxed::Box<IntegerVariantValue>),
-  /// Float Value.
-  #[sdk(child(qname = "p:CT_TLAnimVariantFloatVal/p:fltVal"))]
-  PFltVal(std::boxed::Box<FloatVariantValue>),
-  /// String Value.
-  #[sdk(child(qname = "p:CT_TLAnimVariantStringVal/p:strVal"))]
-  PStrVal(std::boxed::Box<StringVariantValue>),
-  /// Color Value.
-  #[sdk(child(qname = "a:CT_Color/p:clrVal"))]
-  PClrVal(std::boxed::Box<ColorValue>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TimeListAnimationVariantTypeChoice {
   /// Boolean Variant.
   #[sdk(child(qname = "p:CT_TLAnimVariantBooleanVal/p:boolVal"))]
   PBoolVal(std::boxed::Box<BooleanVariantValue>),
@@ -5955,43 +5596,6 @@ pub enum ToColorChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum Color3TypeChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
   AAudioCd(
@@ -6069,83 +5673,6 @@ pub enum BlipFillChoice {
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
   AStretch(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextListStyleTypeChoice {
-  /// Default Paragraph Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:defPPr"))]
-  ADefPPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::DefaultParagraphProperties,
-    >,
-  ),
-  /// List Level 1 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl1pPr"))]
-  ALvl1pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level1ParagraphProperties,
-    >,
-  ),
-  /// List Level 2 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl2pPr"))]
-  ALvl2pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level2ParagraphProperties,
-    >,
-  ),
-  /// List Level 3 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl3pPr"))]
-  ALvl3pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level3ParagraphProperties,
-    >,
-  ),
-  /// List Level 4 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl4pPr"))]
-  ALvl4pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level4ParagraphProperties,
-    >,
-  ),
-  /// List Level 5 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl5pPr"))]
-  ALvl5pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level5ParagraphProperties,
-    >,
-  ),
-  /// List Level 6 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl6pPr"))]
-  ALvl6pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level6ParagraphProperties,
-    >,
-  ),
-  /// List Level 7 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl7pPr"))]
-  ALvl7pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level7ParagraphProperties,
-    >,
-  ),
-  /// List Level 8 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl8pPr"))]
-  ALvl8pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level8ParagraphProperties,
-    >,
-  ),
-  /// List Level 9 Text Style
-  #[sdk(child(qname = "a:CT_TextParagraphProperties/a:lvl9pPr"))]
-  ALvl9pPr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
-    >,
-  ),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -6417,29 +5944,6 @@ pub enum GroupShapeChoice {
   XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum GroupShapeTypeChoice {
-  /// Non-Visual Properties for a Group Shape
-  #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  PNvGrpSpPr(std::boxed::Box<NonVisualGroupShapeProperties>),
-  /// Group Shape Properties
-  #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  PGrpSpPr(std::boxed::Box<GroupShapeProperties>),
-  #[sdk(child(qname = "p:CT_Shape/p:sp"))]
-  PSp(std::boxed::Box<Shape>),
-  #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
-  PGrpSp(std::boxed::Box<GroupShape>),
-  #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
-  PGraphicFrame(std::boxed::Box<GraphicFrame>),
-  #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
-  PCxnSp(std::boxed::Box<ConnectionShape>),
-  #[sdk(child(qname = "p:CT_Picture/p:pic"))]
-  PPic(std::boxed::Box<Picture>),
-  #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
-  PContentPart(std::boxed::Box<ContentPart>),
-  #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
-  PExtLst(std::boxed::Box<ExtensionListWithModification>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
@@ -6632,54 +6136,6 @@ pub enum ChildTimeNodeListChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubTimeNodeListChoice {
-  /// Parallel Time Node.
-  #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
-  PPar(std::boxed::Box<ParallelTimeNode>),
-  /// Sequence Time Node.
-  #[sdk(child(qname = "p:CT_TLTimeNodeSequence/p:seq"))]
-  PSeq(std::boxed::Box<SequenceTimeNode>),
-  /// Exclusive.
-  #[sdk(child(qname = "p:CT_TLTimeNodeExclusive/p:excl"))]
-  PExcl(std::boxed::Box<ExclusiveTimeNode>),
-  /// Animate.
-  #[sdk(child(qname = "p:CT_TLAnimateBehavior/p:anim"))]
-  PAnim(std::boxed::Box<Animate>),
-  /// Animate Color Behavior.
-  #[sdk(child(qname = "p:CT_TLAnimateColorBehavior/p:animClr"))]
-  PAnimClr(std::boxed::Box<AnimateColor>),
-  /// Animate Effect.
-  #[sdk(child(qname = "p:CT_TLAnimateEffectBehavior/p:animEffect"))]
-  PAnimEffect(std::boxed::Box<AnimateEffect>),
-  /// Animate Motion.
-  #[sdk(child(qname = "p:CT_TLAnimateMotionBehavior/p:animMotion"))]
-  PAnimMotion(std::boxed::Box<AnimateMotion>),
-  /// Animate Rotation.
-  #[sdk(child(qname = "p:CT_TLAnimateRotationBehavior/p:animRot"))]
-  PAnimRot(std::boxed::Box<AnimateRotation>),
-  /// Animate Scale.
-  #[sdk(child(qname = "p:CT_TLAnimateScaleBehavior/p:animScale"))]
-  PAnimScale(std::boxed::Box<AnimateScale>),
-  /// Command.
-  #[sdk(child(qname = "p:CT_TLCommandBehavior/p:cmd"))]
-  PCmd(std::boxed::Box<Command>),
-  /// Set Time Node Behavior.
-  #[sdk(child(qname = "p:CT_TLSetBehavior/p:set"))]
-  PSet(std::boxed::Box<SetBehavior>),
-  /// Audio.
-  #[sdk(child(qname = "p:CT_TLMediaNodeAudio/p:audio"))]
-  PAudio(std::boxed::Box<Audio>),
-  /// Video.
-  #[sdk(child(qname = "p:CT_TLMediaNodeVideo/p:video"))]
-  PVideo(std::boxed::Box<Video>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlOther(String),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TimeTypeListTypeChoice {
   /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
   PPar(std::boxed::Box<ParallelTimeNode>),

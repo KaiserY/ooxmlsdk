@@ -168,21 +168,6 @@ pub struct BottomBorder {
   #[sdk(attr(qname = ":shadow"))]
   pub shadow: Option<crate::simple_type::TrueFalseValue>,
 }
-/// Defines the BorderType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w10:CT_Border/")]
-pub struct BorderType {
-  /// Border Style
-  #[sdk(attr(qname = ":type"))]
-  pub r#type: Option<BorderValues>,
-  /// Border Width
-  #[sdk(attr(qname = ":width"))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
-  pub width: Option<crate::simple_type::IntegerValue>,
-  /// Border shadow
-  #[sdk(attr(qname = ":shadow"))]
-  pub shadow: Option<crate::simple_type::TrueFalseValue>,
-}
 /// Text Wrapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w10:CT_Wrap/w10:wrap")]

@@ -133,17 +133,6 @@ pub struct PanTransition {
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
     >,
 }
-/// Defines the SideDirectionTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_SideDirectionTransition/")]
-pub struct SideDirectionTransitionType {
-    /// Direction
-    #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
-    >,
-}
 /// Defines the SwitchTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:switch")]
@@ -184,15 +173,6 @@ pub struct GalleryTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/p14:conveyor")]
 pub struct ConveyorTransition {
-  /// dir
-  #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub direction: Option<TransitionLeftRightDirectionTypeValues>,
-}
-/// Defines the LeftRightDirectionTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_LeftRightDirectionTransition/")]
-pub struct LeftRightDirectionTransitionType {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
@@ -239,16 +219,6 @@ pub struct DoorsTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p:CT_OrientationTransition/p14:window")]
 pub struct WindowTransition {
-  /// Transition Direction
-  #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub direction:
-    Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
-}
-/// Defines the OrientationTransitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "p:CT_OrientationTransition/")]
-pub struct OrientationTransitionType {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
@@ -430,14 +400,6 @@ pub struct CreationId {
 #[sdk(office2010, qname = "p14:CT_RandomId/p14:modId")]
 pub struct ModificationId {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// val
-  #[sdk(attr(office2010, qname = ":val"))]
-  pub val: crate::simple_type::UInt32Value,
-}
-/// Defines the RandomIdType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_RandomId/")]
-pub struct RandomIdType {
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
@@ -775,17 +737,6 @@ pub struct PauseEventRecord {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/p14:resumeEvt")]
 pub struct ResumeEventRecord {
-  /// time
-  #[sdk(attr(office2010, qname = ":time"))]
-  pub time: crate::simple_type::StringValue,
-  /// objId
-  #[sdk(attr(office2010, qname = ":objId"))]
-  pub object_id: crate::simple_type::UInt32Value,
-}
-/// Defines the MediaPlaybackEventRecordType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "p14:CT_MediaPlaybackEventRecord/")]
-pub struct MediaPlaybackEventRecordType {
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
   pub time: crate::simple_type::StringValue,

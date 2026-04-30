@@ -95,14 +95,3 @@ pub struct BlipWebImageSupportingRichDataRelationship {
   #[sdk(attr(office2021, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
-/// Defines the OpenXmlWebImageSupportingRichDataRelationshipElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2021,
-  qname = "xlrdwi:CT_WebImageSupportingRichDataRelationship/"
-)]
-pub struct OpenXmlWebImageSupportingRichDataRelationshipElement {
-  /// id
-  #[sdk(attr(office2021, qname = "r:id"))]
-  pub r_id: crate::simple_type::StringValue,
-}

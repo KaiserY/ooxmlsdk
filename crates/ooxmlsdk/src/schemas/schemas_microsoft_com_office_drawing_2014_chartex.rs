@@ -360,22 +360,6 @@ pub struct MaxColorSolidColorFillProperties {
   ))]
   pub xml_children: Option<MaxColorSolidColorFillPropertiesChoice>,
 }
-/// Defines the OpenXmlSolidColorFillPropertiesElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_SolidColorFillProperties/")]
-pub struct OpenXmlSolidColorFillPropertiesElement {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<OpenXmlSolidColorFillPropertiesElementChoice>,
-}
 /// Defines the ChartStringValue Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_StringValue/cx:pt")]
@@ -400,16 +384,6 @@ pub struct Formula {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_Formula/cx:nf")]
 pub struct NfFormula {
-  /// dir
-  #[sdk(attr(office2016, qname = ":dir"))]
-  pub dir: Option<FormulaDirection>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
-/// Defines the OpenXmlFormulaElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Formula/")]
-pub struct OpenXmlFormulaElement {
   /// dir
   #[sdk(attr(office2016, qname = ":dir"))]
   pub dir: Option<FormulaDirection>,
@@ -584,18 +558,6 @@ pub struct TxPrTextBody {
   /// _
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
-}
-/// Defines the TextBodyType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextBody/")]
-pub struct TextBodyType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  #[sdk(choice(
-    qname = "a:CT_TextBodyProperties/a:bodyPr",
-    qname = "a:CT_TextListStyle/a:lstStyle",
-    qname = "a:CT_TextParagraph/a:p"
-  ))]
-  pub xml_children: Vec<TextBodyTypeChoice>,
 }
 /// Defines the Text Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -796,17 +758,6 @@ pub struct MinorGridlinesGridlines {
   #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the OpenXmlGridlinesElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_Gridlines/")]
-pub struct OpenXmlGridlinesElement {
-  #[sdk(choice(
-    microsoft365,
-    qname = "a:CT_ShapeProperties/cx:spPr",
-    qname = "cx:CT_ExtensionList/cx:extLst"
-  ))]
-  pub xml_children: Vec<OpenXmlGridlinesElementChoice>,
-}
 /// Defines the MajorTickMarksTickMarks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_TickMarks/cx:majorTickMarks")]
@@ -828,17 +779,6 @@ pub struct MinorTickMarksTickMarks {
   /// _
   #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
   pub extension_list: Option<ExtensionList>,
-}
-/// Defines the OpenXmlTickMarksElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_TickMarks/")]
-pub struct OpenXmlTickMarksElement {
-  /// type
-  #[sdk(attr(office2016, qname = ":type"))]
-  pub r#type: Option<TickMarksType>,
-  /// _
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
-  pub extension_list: Vec<ExtensionList>,
 }
 /// Defines the TickLabels Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1441,17 +1381,6 @@ pub struct MaxValueColorEndPosition {
     qname = "cx:CT_PercentageColorPosition/cx:percent"
   ))]
   pub xml_children: Option<MaxValueColorEndPositionChoice>,
-}
-/// Defines the OpenXmlValueColorEndPositionElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "cx:CT_ValueColorEndPosition/")]
-pub struct OpenXmlValueColorEndPositionElement {
-  #[sdk(choice(
-    qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue",
-    qname = "cx:CT_NumberColorPosition/cx:number",
-    qname = "cx:CT_PercentageColorPosition/cx:percent"
-  ))]
-  pub xml_children: Option<OpenXmlValueColorEndPositionElementChoice>,
 }
 /// Defines the ValueColorMiddlePosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2180,43 +2109,6 @@ pub enum MaxColorSolidColorFillPropertiesChoice {
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
   ),
 }
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OpenXmlSolidColorFillPropertiesElementChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-}
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct NumericDimensionChoiceSequence {
   /// Defines the Formula Class.
@@ -2280,21 +2172,6 @@ pub enum TextDataChoice {
   CxV(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextBodyTypeChoice {
-  /// Body Properties
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  ABodyPr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
-  ),
-  /// Text List Styles
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  ALstStyle(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  ),
-  #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  AP(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextChoice {
   /// Defines the TextData Class.
   #[sdk(child(office2016, qname = "cx:CT_TextData/cx:txData"))]
@@ -2350,13 +2227,6 @@ pub enum ShapePropertiesChoice3 {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OpenXmlGridlinesElementChoice {
-  #[sdk(child(office2016, qname = "a:CT_ShapeProperties/cx:spPr"))]
-  CxSpPr(std::boxed::Box<ShapeProperties>),
-  #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
-  CxExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GeoCacheChoice {
   /// Defines the Xsdbase64Binary Class.
   #[sdk(text_child(office2016, qname = "xsd:base64Binary/cx:binary"))]
@@ -2388,18 +2258,6 @@ pub enum MinValueColorEndPositionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MaxValueColorEndPositionChoice {
-  /// Defines the ExtremeValueColorPosition Class.
-  #[sdk(empty_child(office2016, qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue"))]
-  CxExtremeValue,
-  /// Defines the NumberColorPosition Class.
-  #[sdk(child(office2016, qname = "cx:CT_NumberColorPosition/cx:number"))]
-  CxNumber(std::boxed::Box<NumberColorPosition>),
-  /// Defines the PercentageColorPosition Class.
-  #[sdk(child(office2016, qname = "cx:CT_PercentageColorPosition/cx:percent"))]
-  CxPercent(std::boxed::Box<PercentageColorPosition>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OpenXmlValueColorEndPositionElementChoice {
   /// Defines the ExtremeValueColorPosition Class.
   #[sdk(empty_child(office2016, qname = "cx:CT_ExtremeValueColorPosition/cx:extremeValue"))]
   CxExtremeValue,

@@ -1980,20 +1980,6 @@ pub struct HyperlinkSound {
   #[sdk(attr(qname = ":builtIn"))]
   pub built_in: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the EmbeddedWavAudioFileType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EmbeddedWAVAudioFile/")]
-pub struct EmbeddedWavAudioFileType {
-  /// Embedded Audio File Relationship ID
-  #[sdk(attr(qname = "r:embed"))]
-  pub embed: crate::simple_type::StringValue,
-  /// Sound Name
-  #[sdk(attr(qname = ":name"))]
-  pub name: Option<crate::simple_type::StringValue>,
-  /// Recognized Built-In Sound
-  #[sdk(attr(qname = ":builtIn"))]
-  pub built_in: Option<crate::simple_type::BooleanValue>,
-}
 /// Audio from File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioFile/a:audioFile")]
@@ -2072,21 +2058,6 @@ pub struct Alpha {
   ))]
   pub val: crate::simple_type::Int32Value,
 }
-/// Defines the PositiveFixedPercentageType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_PositiveFixedPercentage/")]
-pub struct PositiveFixedPercentageType {
-  /// Value
-  #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub val: crate::simple_type::Int32Value,
-}
 /// Alpha Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FixedPercentage/a:alphaOff")]
@@ -2115,15 +2086,6 @@ pub struct AlphaModulation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositivePercentage/a:hueMod")]
 pub struct HueModulation {
-  /// Value
-  #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
-  pub val: crate::simple_type::Int32Value,
-}
-/// Defines the PositivePercentageType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_PositivePercentage/")]
-pub struct PositivePercentageType {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
@@ -2268,14 +2230,6 @@ pub struct BlueOffset {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Percentage/a:blueMod")]
 pub struct BlueModulation {
-  /// Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
-}
-/// Defines the PercentageType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Percentage/")]
-pub struct PercentageType {
   /// Value
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::Int32Value,
@@ -2885,52 +2839,6 @@ pub struct EffectDag {
     qname = "a:CT_TransformEffect/a:xfrm"
   ))]
   pub xml_children: Vec<EffectDagChoice>,
-}
-/// Defines the EffectContainerType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_EffectContainer/")]
-pub struct EffectContainerType {
-  /// Effect Container Type
-  #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub r#type: Option<EffectContainerValues>,
-  /// Name
-  #[sdk(attr(qname = ":name"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub name: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_EffectContainer/a:cont",
-    qname = "a:CT_EffectReference/a:effect",
-    qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
-    qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
-    qname = "a:CT_AlphaFloorEffect/a:alphaFloor",
-    qname = "a:CT_AlphaInverseEffect/a:alphaInv",
-    qname = "a:CT_AlphaModulateEffect/a:alphaMod",
-    qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix",
-    qname = "a:CT_AlphaOutsetEffect/a:alphaOutset",
-    qname = "a:CT_AlphaReplaceEffect/a:alphaRepl",
-    qname = "a:CT_BiLevelEffect/a:biLevel",
-    qname = "a:CT_BlendEffect/a:blend",
-    qname = "a:CT_BlurEffect/a:blur",
-    qname = "a:CT_ColorChangeEffect/a:clrChange",
-    qname = "a:CT_ColorReplaceEffect/a:clrRepl",
-    qname = "a:CT_DuotoneEffect/a:duotone",
-    qname = "a:CT_FillEffect/a:fill",
-    qname = "a:CT_FillOverlayEffect/a:fillOverlay",
-    qname = "a:CT_GlowEffect/a:glow",
-    qname = "a:CT_GrayscaleEffect/a:grayscl",
-    qname = "a:CT_HSLEffect/a:hsl",
-    qname = "a:CT_InnerShadowEffect/a:innerShdw",
-    qname = "a:CT_LuminanceEffect/a:lum",
-    qname = "a:CT_OuterShadowEffect/a:outerShdw",
-    qname = "a:CT_PresetShadowEffect/a:prstShdw",
-    qname = "a:CT_ReflectionEffect/a:reflection",
-    qname = "a:CT_RelativeOffsetEffect/a:relOff",
-    qname = "a:CT_SoftEdgesEffect/a:softEdge",
-    qname = "a:CT_TintEffect/a:tint",
-    qname = "a:CT_TransformEffect/a:xfrm"
-  ))]
-  pub xml_children: Vec<EffectContainerTypeChoice>,
 }
 /// Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3789,25 +3697,6 @@ pub struct LineReference {
   ))]
   pub xml_children: Option<LineReferenceChoice>,
 }
-/// Defines the StyleMatrixReferenceType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_StyleMatrixReference/")]
-pub struct StyleMatrixReferenceType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  /// Style Matrix Index
-  #[sdk(attr(qname = ":idx"))]
-  pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<StyleMatrixReferenceTypeChoice>,
-}
 /// Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_EffectProperties/a:effect")]
@@ -3877,19 +3766,6 @@ pub struct MinorFont {
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst: Option<ExtensionList>,
-}
-/// Defines the FontCollectionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_FontCollection/")]
-pub struct FontCollectionType {
-  #[sdk(choice(
-    qname = "a:CT_TextFont/a:latin",
-    qname = "a:CT_TextFont/a:ea",
-    qname = "a:CT_TextFont/a:cs",
-    qname = "a:CT_SupplementalFont/a:font",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<FontCollectionTypeChoice>,
 }
 /// Defines the FontReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4070,22 +3946,6 @@ pub struct Highlight {
   ))]
   pub xml_children: Option<HighlightChoice>,
 }
-/// Defines the ColorType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Color/")]
-pub struct ColorType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<ColorTypeChoice>,
-}
 /// Bullet Size Percentage.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextBulletSizePercent/a:buSzPct")]
@@ -4195,24 +4055,6 @@ pub struct ComplexScriptFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextFont/a:sym")]
 pub struct SymbolFont {
-  /// Text Typeface
-  #[sdk(attr(qname = ":typeface"))]
-  pub typeface: Option<crate::simple_type::StringValue>,
-  /// Panose Setting
-  #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
-  pub panose: Option<crate::simple_type::HexBinaryValue>,
-  /// Similar Font Family
-  #[sdk(attr(qname = ":pitchFamily"))]
-  pub pitch_family: Option<crate::simple_type::SByteValue>,
-  /// Similar Character Set
-  #[sdk(attr(qname = ":charset"))]
-  pub character_set: Option<crate::simple_type::SByteValue>,
-}
-/// Defines the TextFontType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextFont/")]
-pub struct TextFontType {
   /// Text Typeface
   #[sdk(attr(qname = ":typeface"))]
   pub typeface: Option<crate::simple_type::StringValue>,
@@ -4708,49 +4550,6 @@ pub struct BottomLeftToTopRightBorderLineProperties {
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<LinePropertiesExtensionList>,
 }
-/// Defines the LinePropertiesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_LineProperties/")]
-pub struct LinePropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// line width
-  #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub width: Option<crate::simple_type::Int32Value>,
-  /// line cap
-  #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub cap_type: Option<LineCapValues>,
-  /// compound line type
-  #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub compound_line_type: Option<CompoundLineValues>,
-  /// pen alignment
-  #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub alignment: Option<PenAlignmentValues>,
-  #[sdk(choice(
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_PresetLineDashProperties/a:prstDash",
-    qname = "a:CT_DashStopList/a:custDash",
-    qname = "a:CT_LineJoinRound/a:round",
-    qname = "a:CT_LineJoinBevel/a:bevel",
-    qname = "a:CT_LineJoinMiterProperties/a:miter",
-    qname = "a:CT_LineEndProperties/a:headEnd",
-    qname = "a:CT_LineEndProperties/a:tailEnd",
-    qname = "a:CT_LinePropertiesExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<LinePropertiesTypeChoice>,
-}
 /// Underline Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill")]
@@ -4967,17 +4766,6 @@ pub struct StartTime {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AudioCDTime/a:end")]
 pub struct EndTime {
-  /// Track
-  #[sdk(attr(qname = ":track"))]
-  pub track: crate::simple_type::ByteValue,
-  /// Time
-  #[sdk(attr(qname = ":time"))]
-  pub time: Option<crate::simple_type::UInt32Value>,
-}
-/// Defines the AudioCDTimeType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_AudioCDTime/")]
-pub struct AudioCdTimeType {
   /// Track
   #[sdk(attr(qname = ":track"))]
   pub track: crate::simple_type::ByteValue,
@@ -5356,21 +5144,6 @@ pub struct FollowedHyperlinkColor {
   ))]
   pub xml_children: Option<FollowedHyperlinkColorChoice>,
 }
-/// Defines the Color2Type Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Color2/")]
-pub struct Color2Type {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<Color2TypeChoice>,
-}
 /// Horizontal Ratio.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/a:sx")]
@@ -5386,17 +5159,6 @@ pub struct ScaleX {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Ratio/a:sy")]
 pub struct ScaleY {
-  /// Numerator
-  #[sdk(attr(qname = ":n"))]
-  pub numerator: crate::simple_type::Int32Value,
-  /// Denominator
-  #[sdk(attr(qname = ":d"))]
-  pub denominator: crate::simple_type::Int32Value,
-}
-/// Defines the RatioType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Ratio/")]
-pub struct RatioType {
   /// Numerator
   #[sdk(attr(qname = ":n"))]
   pub numerator: crate::simple_type::Int32Value,
@@ -5454,31 +5216,6 @@ pub struct ChildOffset {
   ))]
   pub y: crate::simple_type::Int64Value,
 }
-/// Defines the Point2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point2D/")]
-pub struct Point2DType {
-  /// X-Axis Coordinate
-  #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub x: crate::simple_type::Int64Value,
-  /// Y-Axis Coordinate
-  #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub y: crate::simple_type::Int64Value,
-}
 /// Extents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/a:ext")]
@@ -5508,31 +5245,6 @@ pub struct Extents {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/a:chExt")]
 pub struct ChildExtents {
-  /// Extent Length
-  #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub cx: crate::simple_type::Int64Value,
-  /// Extent Width
-  #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub cy: crate::simple_type::Int64Value,
-}
-/// Defines the PositiveSize2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_PositiveSize2D/")]
-pub struct PositiveSize2DType {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(
@@ -5649,17 +5361,6 @@ pub struct StartConnection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Connection/a:endCxn")]
 pub struct EndConnection {
-  /// Identifier
-  #[sdk(attr(qname = ":id"))]
-  pub id: crate::simple_type::UInt32Value,
-  /// Index
-  #[sdk(attr(qname = ":idx"))]
-  pub index: crate::simple_type::UInt32Value,
-}
-/// Defines the ConnectionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Connection/")]
-pub struct ConnectionType {
   /// Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -6234,41 +5935,6 @@ pub struct UpVector {
   ))]
   pub dz: crate::simple_type::Int64Value,
 }
-/// Defines the Vector3DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Vector3D/")]
-pub struct Vector3DType {
-  /// Distance along X-axis in 3D
-  #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dx: crate::simple_type::Int64Value,
-  /// Distance along Y-axis in 3D
-  #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dy: crate::simple_type::Int64Value,
-  /// Distance along Z-axis in 3D
-  #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dz: crate::simple_type::Int64Value,
-}
 /// Top Bevel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/a:bevelT")]
@@ -6331,35 +5997,6 @@ pub struct BevelBottom {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bevel/a:bevel")]
 pub struct Bevel {
-  /// Width
-  #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub width: Option<crate::simple_type::Int64Value>,
-  /// Height
-  #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub height: Option<crate::simple_type::Int64Value>,
-  /// Preset Bevel
-  #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub preset: Option<BevelPresetValues>,
-}
-/// Defines the BevelType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Bevel/")]
-pub struct BevelType {
   /// Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(
@@ -6453,23 +6090,6 @@ pub struct SourceRectangle {
   #[sdk(attr(qname = ":b"))]
   pub bottom: Option<crate::simple_type::Int32Value>,
 }
-/// Defines the RelativeRectangleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_RelativeRect/")]
-pub struct RelativeRectangleType {
-  /// Left Offset
-  #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::Int32Value>,
-  /// Top Offset
-  #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::Int32Value>,
-  /// Right Offset
-  #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::Int32Value>,
-  /// Bottom Offset
-  #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
-}
 /// Gradient stops.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GradientStop/a:gs")]
@@ -6549,35 +6169,6 @@ pub struct Position {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AdjPoint2D/a:pt")]
 pub struct Point {
-  /// X-Coordinate
-  #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    union = 0u64,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
-  pub x: crate::simple_type::StringValue,
-  /// Y-Coordinate
-  #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    union = 0u64,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
-  pub y: crate::simple_type::StringValue,
-}
-/// Defines the AdjustPoint2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_AdjPoint2D/")]
-pub struct AdjustPoint2DType {
   /// X-Coordinate
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(
@@ -6860,14 +6451,6 @@ pub struct ShapeGuideList {
   /// _
   #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
   pub a_gd: Vec<ShapeGuide>,
-}
-/// Defines the GeometryGuideListType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_GeomGuideList/")]
-pub struct GeometryGuideListType {
-  /// Shape Guide.
-  #[sdk(child(qname = "a:CT_GeomGuide/a:gd"))]
-  pub shape_guide: Vec<ShapeGuide>,
 }
 /// List of Shape Adjust Handles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7179,19 +6762,6 @@ pub struct TextDefault {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the DefaultShapeDefinitionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_DefaultShapeDefinition/")]
-pub struct DefaultShapeDefinitionType {
-  #[sdk(choice(
-    qname = "a:CT_ShapeProperties/a:spPr",
-    qname = "a:CT_TextBodyProperties/a:bodyPr",
-    qname = "a:CT_TextListStyle/a:lstStyle",
-    qname = "a:CT_ShapeStyle/a:style",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<DefaultShapeDefinitionTypeChoice>,
-}
 /// Override Color Mapping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMapping/a:overrideClrMapping")]
@@ -7303,62 +6873,6 @@ pub struct ColorMap {
   /// _
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list: Option<ExtensionList>,
-}
-/// Defines the ColorMappingType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ColorMapping/")]
-pub struct ColorMappingType {
-  /// Background 1
-  #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub background1: ColorSchemeIndexValues,
-  /// Text 1
-  #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub text1: ColorSchemeIndexValues,
-  /// Background 2
-  #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub background2: ColorSchemeIndexValues,
-  /// Text 2
-  #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub text2: ColorSchemeIndexValues,
-  /// Accent 1
-  #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent1: ColorSchemeIndexValues,
-  /// Accent 2
-  #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent2: ColorSchemeIndexValues,
-  /// Accent 3
-  #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent3: ColorSchemeIndexValues,
-  /// Accent 4
-  #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent4: ColorSchemeIndexValues,
-  /// Accent 5
-  #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent5: ColorSchemeIndexValues,
-  /// Accent 6
-  #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub accent6: ColorSchemeIndexValues,
-  /// Hyperlink
-  #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub hyperlink: ColorSchemeIndexValues,
-  /// Followed Hyperlink
-  #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub followed_hyperlink: ColorSchemeIndexValues,
-  /// _
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub extension_list: Vec<ExtensionList>,
 }
 /// Extra Color Scheme.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7621,40 +7135,6 @@ pub struct TableStyleEntry {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the TableStyleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TableStyle/")]
-pub struct TableStyleType {
-  /// Style ID
-  #[sdk(attr(qname = ":styleId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub style_id: crate::simple_type::StringValue,
-  /// Name
-  #[sdk(attr(qname = ":styleName"))]
-  pub style_name: crate::simple_type::StringValue,
-  #[sdk(choice(
-    qname = "a:CT_TableBackgroundStyle/a:tblBg",
-    qname = "a:CT_TablePartStyle/a:wholeTbl",
-    qname = "a:CT_TablePartStyle/a:band1H",
-    qname = "a:CT_TablePartStyle/a:band2H",
-    qname = "a:CT_TablePartStyle/a:band1V",
-    qname = "a:CT_TablePartStyle/a:band2V",
-    qname = "a:CT_TablePartStyle/a:lastCol",
-    qname = "a:CT_TablePartStyle/a:firstCol",
-    qname = "a:CT_TablePartStyle/a:lastRow",
-    qname = "a:CT_TablePartStyle/a:seCell",
-    qname = "a:CT_TablePartStyle/a:swCell",
-    qname = "a:CT_TablePartStyle/a:firstRow",
-    qname = "a:CT_TablePartStyle/a:neCell",
-    qname = "a:CT_TablePartStyle/a:nwCell",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<TableStyleTypeChoice>,
-}
 /// Table Style ID.
 pub type TableStyleId = crate::simple_type::StringValue;
 /// Table Grid Column.
@@ -7831,16 +7311,6 @@ pub struct TopRightToBottomLeftBorder {
     qname = "a:CT_StyleMatrixReference/a:lnRef"
   ))]
   pub xml_children: Option<TopRightToBottomLeftBorderChoice>,
-}
-/// Defines the ThemeableLineStyleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_ThemeableLineStyle/")]
-pub struct ThemeableLineStyleType {
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_StyleMatrixReference/a:lnRef"
-  ))]
-  pub xml_children: Option<ThemeableLineStyleTypeChoice>,
 }
 /// Table Cell Borders.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8079,16 +7549,6 @@ pub struct NorthwestCell {
   /// Table Cell Style
   #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
   pub table_cell_style: Option<std::boxed::Box<TableCellStyle>>,
-}
-/// Defines the TablePartStyleType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TablePartStyle/")]
-pub struct TablePartStyleType {
-  #[sdk(choice(
-    qname = "a:CT_TableStyleTextStyle/a:tcTxStyle",
-    qname = "a:CT_TableStyleCellStyle/a:tcStyle"
-  ))]
-  pub xml_children: Vec<TablePartStyleTypeChoice>,
 }
 /// Text Paragraph Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9290,95 +8750,6 @@ pub struct Level9ParagraphProperties {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst: Option<ExtensionList>,
 }
-/// Defines the TextParagraphPropertiesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextParagraphProperties/")]
-pub struct TextParagraphPropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// Left Margin
-  #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub left_margin: Option<crate::simple_type::Int32Value>,
-  /// Right Margin
-  #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub right_margin: Option<crate::simple_type::Int32Value>,
-  /// Level
-  #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub level: Option<crate::simple_type::Int32Value>,
-  /// Indent
-  #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub indent: Option<crate::simple_type::Int32Value>,
-  /// Alignment
-  #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub alignment: Option<TextAlignmentTypeValues>,
-  /// Default Tab Size
-  #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
-  /// Right To Left
-  #[sdk(attr(qname = ":rtl"))]
-  pub right_to_left: Option<crate::simple_type::BooleanValue>,
-  /// East Asian Line Break
-  #[sdk(attr(qname = ":eaLnBrk"))]
-  pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
-  /// Font Alignment
-  #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub font_alignment: Option<TextFontAlignmentValues>,
-  /// Latin Line Break
-  #[sdk(attr(qname = ":latinLnBrk"))]
-  pub latin_line_break: Option<crate::simple_type::BooleanValue>,
-  /// Hanging Punctuation
-  #[sdk(attr(qname = ":hangingPunct"))]
-  pub height: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_TextSpacing/a:lnSpc",
-    qname = "a:CT_TextSpacing/a:spcBef",
-    qname = "a:CT_TextSpacing/a:spcAft",
-    qname = "a:CT_TextBulletColorFollowText/a:buClrTx",
-    qname = "a:CT_Color/a:buClr",
-    qname = "a:CT_TextBulletSizeFollowText/a:buSzTx",
-    qname = "a:CT_TextBulletSizePercent/a:buSzPct",
-    qname = "a:CT_TextBulletSizePoint/a:buSzPts",
-    qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx",
-    qname = "a:CT_TextFont/a:buFont",
-    qname = "a:CT_TextNoBullet/a:buNone",
-    qname = "a:CT_TextAutonumberBullet/a:buAutoNum",
-    qname = "a:CT_TextCharBullet/a:buChar",
-    qname = "a:CT_TextBlipBullet/a:buBlip",
-    qname = "a:CT_TextTabStopList/a:tabLst",
-    qname = "a:CT_TextCharacterProperties/a:defRPr",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<TextParagraphPropertiesTypeChoice>,
-}
 /// End Paragraph Run Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextCharacterProperties/a:endParaRPr")]
@@ -9802,118 +9173,6 @@ pub struct DefaultRunProperties {
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst: Option<ExtensionList>,
 }
-/// Defines the TextCharacterPropertiesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextCharacterProperties/")]
-pub struct TextCharacterPropertiesType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// kumimoji
-  #[sdk(attr(qname = ":kumimoji"))]
-  pub kumimoji: Option<crate::simple_type::BooleanValue>,
-  /// lang
-  #[sdk(attr(qname = ":lang"))]
-  pub language: Option<crate::simple_type::StringValue>,
-  /// altLang
-  #[sdk(attr(qname = ":altLang"))]
-  pub alternative_language: Option<crate::simple_type::StringValue>,
-  /// sz
-  #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub font_size: Option<crate::simple_type::Int32Value>,
-  /// b
-  #[sdk(attr(qname = ":b"))]
-  pub bold: Option<crate::simple_type::BooleanValue>,
-  /// i
-  #[sdk(attr(qname = ":i"))]
-  pub italic: Option<crate::simple_type::BooleanValue>,
-  /// u
-  #[sdk(attr(qname = ":u"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub underline: Option<TextUnderlineValues>,
-  /// strike
-  #[sdk(attr(qname = ":strike"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub strike: Option<TextStrikeValues>,
-  /// kern
-  #[sdk(attr(qname = ":kern"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub kerning: Option<crate::simple_type::Int32Value>,
-  /// cap
-  #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub capital: Option<TextCapsValues>,
-  /// spc
-  #[sdk(attr(qname = ":spc"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-400000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub spacing: Option<crate::simple_type::Int32Value>,
-  /// normalizeH
-  #[sdk(attr(qname = ":normalizeH"))]
-  pub normalize_height: Option<crate::simple_type::BooleanValue>,
-  /// baseline
-  #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::Int32Value>,
-  /// noProof
-  #[sdk(attr(qname = ":noProof"))]
-  pub no_proof: Option<crate::simple_type::BooleanValue>,
-  /// dirty
-  #[sdk(attr(qname = ":dirty"))]
-  pub dirty: Option<crate::simple_type::BooleanValue>,
-  /// err
-  #[sdk(attr(qname = ":err"))]
-  pub spelling_error: Option<crate::simple_type::BooleanValue>,
-  /// smtClean
-  #[sdk(attr(qname = ":smtClean"))]
-  pub smart_tag_clean: Option<crate::simple_type::BooleanValue>,
-  /// smtId
-  #[sdk(attr(qname = ":smtId"))]
-  pub smart_tag_id: Option<crate::simple_type::UInt32Value>,
-  /// bmk
-  #[sdk(attr(qname = ":bmk"))]
-  pub bookmark: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(
-    qname = "a:CT_LineProperties/a:ln",
-    qname = "a:CT_NoFillProperties/a:noFill",
-    qname = "a:CT_SolidColorFillProperties/a:solidFill",
-    qname = "a:CT_GradientFillProperties/a:gradFill",
-    qname = "a:CT_BlipFillProperties/a:blipFill",
-    qname = "a:CT_PatternFillProperties/a:pattFill",
-    qname = "a:CT_GroupFillProperties/a:grpFill",
-    qname = "a:CT_EffectList/a:effectLst",
-    qname = "a:CT_EffectContainer/a:effectDag",
-    qname = "a:CT_Color/a:highlight",
-    qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
-    qname = "a:CT_LineProperties/a:uLn",
-    qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
-    qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill",
-    qname = "a:CT_TextFont/a:latin",
-    qname = "a:CT_TextFont/a:ea",
-    qname = "a:CT_TextFont/a:cs",
-    qname = "a:CT_TextFont/a:sym",
-    qname = "a:CT_Hyperlink/a:hlinkClick",
-    qname = "a:CT_Hyperlink/a:hlinkMouseOver",
-    qname = "a:CT_Bool/a:rtl",
-    qname = "a:CT_OfficeArtExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<TextCharacterPropertiesTypeChoice>,
-}
 /// Text Paragraphs.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TextParagraph/a:p")]
@@ -10007,16 +9266,6 @@ pub struct SpaceAfter {
     qname = "a:CT_TextSpacingPoint/a:spcPts"
   ))]
   pub xml_children: Option<SpaceAfterChoice>,
-}
-/// Defines the TextSpacingType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_TextSpacing/")]
-pub struct TextSpacingType {
-  #[sdk(choice(
-    qname = "a:CT_TextSpacingPercent/a:spcPct",
-    qname = "a:CT_TextSpacingPoint/a:spcPts"
-  ))]
-  pub xml_children: Option<TextSpacingTypeChoice>,
 }
 /// Tab List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10458,40 +9707,6 @@ pub struct HyperlinkOnHover {
   #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
   pub hyperlink_extension_list: Option<HyperlinkExtensionList>,
 }
-/// Defines the HyperlinkType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Hyperlink/")]
-pub struct HyperlinkType {
-  /// relationship identifier to find target URI
-  #[sdk(attr(qname = "r:id"))]
-  pub id: Option<crate::simple_type::StringValue>,
-  /// In case the url is invalid so we can't create a relationship, we'll save it here, r:id will point to a NULL one
-  #[sdk(attr(qname = ":invalidUrl"))]
-  pub invalid_url: Option<crate::simple_type::StringValue>,
-  /// Action to take, it may still need r:id to specify an action target
-  #[sdk(attr(qname = ":action"))]
-  pub action: Option<crate::simple_type::StringValue>,
-  /// target frame for navigating to the URI
-  #[sdk(attr(qname = ":tgtFrame"))]
-  pub target_frame: Option<crate::simple_type::StringValue>,
-  /// tooltip for display
-  #[sdk(attr(qname = ":tooltip"))]
-  pub tooltip: Option<crate::simple_type::StringValue>,
-  /// whether to add this URI to the history when navigating to it
-  #[sdk(attr(qname = ":history"))]
-  pub history: Option<crate::simple_type::BooleanValue>,
-  /// Whether to highlight it when click on a shape
-  #[sdk(attr(qname = ":highlightClick"))]
-  pub highlight_click: Option<crate::simple_type::BooleanValue>,
-  /// Whether to stop previous sound when click on it
-  #[sdk(attr(qname = ":endSnd"))]
-  pub end_sound: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "a:CT_EmbeddedWAVAudioFile/a:snd",
-    qname = "a:CT_HyperlinkExtensionList/a:extLst"
-  ))]
-  pub xml_children: Vec<HyperlinkTypeChoice>,
-}
 /// Defines the RightToLeft Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Bool/a:rtl")]
@@ -10611,23 +9826,6 @@ pub struct HeadEnd {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_LineEndProperties/a:tailEnd")]
 pub struct TailEnd {
-  /// Line Head/End Type
-  #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub r#type: Option<LineEndValues>,
-  /// Width of Head/End
-  #[sdk(attr(qname = ":w"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub width: Option<LineEndWidthValues>,
-  /// Length of Head/End
-  #[sdk(attr(qname = ":len"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub length: Option<LineEndLengthValues>,
-}
-/// Defines the LineEndPropertiesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_LineEndProperties/")]
-pub struct LineEndPropertiesType {
   /// Line Head/End Type
   #[sdk(attr(qname = ":type"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
@@ -11382,99 +10580,6 @@ pub enum EffectDagChoice {
   AXfrm(std::boxed::Box<TransformEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum EffectContainerTypeChoice {
-  /// Effect Container.
-  #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
-  ACont(std::boxed::Box<EffectContainer>),
-  /// Effect.
-  #[sdk(child(qname = "a:CT_EffectReference/a:effect"))]
-  AEffect(std::boxed::Box<Effect>),
-  /// Defines the AlphaBiLevel Class.
-  #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
-  AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
-  /// Alpha Ceiling Effect.
-  #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
-  AAlphaCeiling,
-  /// Alpha Floor Effect.
-  #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
-  AAlphaFloor,
-  /// Alpha Inverse Effect.
-  #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
-  AAlphaInv(std::boxed::Box<AlphaInverse>),
-  /// Alpha Modulate Effect.
-  #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
-  AAlphaMod(std::boxed::Box<AlphaModulationEffect>),
-  /// Defines the AlphaModulationFixed Class.
-  #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
-  AAlphaModFix(std::boxed::Box<AlphaModulationFixed>),
-  /// Alpha Inset/Outset Effect.
-  #[sdk(child(qname = "a:CT_AlphaOutsetEffect/a:alphaOutset"))]
-  AAlphaOutset(std::boxed::Box<AlphaOutset>),
-  /// Alpha Replace Effect.
-  #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
-  AAlphaRepl(std::boxed::Box<AlphaReplace>),
-  /// Defines the BiLevel Class.
-  #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
-  ABiLevel(std::boxed::Box<BiLevel>),
-  /// Blend Effect.
-  #[sdk(child(qname = "a:CT_BlendEffect/a:blend"))]
-  ABlend(std::boxed::Box<Blend>),
-  /// Defines the Blur Class.
-  #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
-  ABlur(std::boxed::Box<Blur>),
-  /// Color Change Effect.
-  #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
-  AClrChange(std::boxed::Box<ColorChange>),
-  /// Defines the ColorReplacement Class.
-  #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
-  AClrRepl(std::boxed::Box<ColorReplacement>),
-  /// Duotone Effect.
-  #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
-  ADuotone(std::boxed::Box<Duotone>),
-  /// Fill.
-  #[sdk(child(qname = "a:CT_FillEffect/a:fill"))]
-  AFill(std::boxed::Box<Fill>),
-  /// Fill Overlay Effect.
-  #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
-  AFillOverlay(std::boxed::Box<FillOverlay>),
-  /// Glow Effect.
-  #[sdk(child(qname = "a:CT_GlowEffect/a:glow"))]
-  AGlow(std::boxed::Box<Glow>),
-  /// Gray Scale Effect.
-  #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
-  AGrayscl,
-  /// Hue Saturation Luminance Effect.
-  #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
-  AHsl(std::boxed::Box<Hsl>),
-  /// Inner Shadow Effect.
-  #[sdk(child(qname = "a:CT_InnerShadowEffect/a:innerShdw"))]
-  AInnerShdw(std::boxed::Box<InnerShadow>),
-  /// Luminance.
-  #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
-  ALum(std::boxed::Box<LuminanceEffect>),
-  /// Outer Shadow Effect.
-  #[sdk(child(qname = "a:CT_OuterShadowEffect/a:outerShdw"))]
-  AOuterShdw(std::boxed::Box<OuterShadow>),
-  /// Preset Shadow.
-  #[sdk(child(qname = "a:CT_PresetShadowEffect/a:prstShdw"))]
-  APrstShdw(std::boxed::Box<PresetShadow>),
-  /// Reflection Effect.
-  #[sdk(child(qname = "a:CT_ReflectionEffect/a:reflection"))]
-  AReflection(std::boxed::Box<Reflection>),
-  /// Relative Offset Effect.
-  #[sdk(child(qname = "a:CT_RelativeOffsetEffect/a:relOff"))]
-  ARelOff(std::boxed::Box<RelativeOffset>),
-  /// Soft Edge Effect.
-  #[sdk(child(qname = "a:CT_SoftEdgesEffect/a:softEdge"))]
-  ASoftEdge(std::boxed::Box<SoftEdge>),
-  /// Defines the TintEffect Class.
-  #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
-  ATint(std::boxed::Box<TintEffect>),
-  /// Transform Effect.
-  #[sdk(child(qname = "a:CT_TransformEffect/a:xfrm"))]
-  AXfrm(std::boxed::Box<TransformEffect>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AlphaInverseChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
@@ -11748,27 +10853,6 @@ pub enum LineReferenceChoice {
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StyleMatrixReferenceTypeChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<RgbColorModelHex>),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<HslColor>),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<SystemColor>),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<SchemeColor>),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<PresetColor>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectPropertiesTypeChoice {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
@@ -11776,22 +10860,6 @@ pub enum EffectPropertiesTypeChoice {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FontCollectionTypeChoice {
-  /// Latin Font
-  #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  ALatin(std::boxed::Box<LatinFont>),
-  /// East Asian Font
-  #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  AEa(std::boxed::Box<EastAsianFont>),
-  /// Complex Script Font
-  #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  ACs(std::boxed::Box<ComplexScriptFont>),
-  #[sdk(child(qname = "a:CT_SupplementalFont/a:font"))]
-  AFont(std::boxed::Box<SupplementalFont>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
@@ -11963,27 +11031,6 @@ pub enum BackgroundColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HighlightChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<RgbColorModelHex>),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<HslColor>),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<SystemColor>),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(std::boxed::Box<SchemeColor>),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<PresetColor>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
@@ -12234,45 +11281,6 @@ pub enum BottomLeftToTopRightBorderLinePropertiesChoice3 {
   ABevel,
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<Miter>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum LinePropertiesTypeChoice {
-  /// Defines the NoFill Class.
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<NoFill>),
-  /// Defines the SolidFill Class.
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<SolidFill>),
-  /// Defines the GradientFill Class.
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<GradientFill>),
-  /// Pattern Fill.
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<PatternFill>),
-  /// Preset Dash.
-  #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
-  APrstDash(std::boxed::Box<PresetDash>),
-  /// Custom Dash.
-  #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
-  ACustDash(std::boxed::Box<CustomDash>),
-  /// Round Line Join.
-  #[sdk(empty_child(qname = "a:CT_LineJoinRound/a:round"))]
-  ARound,
-  /// Line Join Bevel.
-  #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
-  ABevel,
-  /// Miter Line Join.
-  #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
-  AMiter(std::boxed::Box<Miter>),
-  /// default head line end style is none.
-  #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
-  AHeadEnd(std::boxed::Box<HeadEnd>),
-  /// default tail line end style is none.
-  #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
-  ATailEnd(std::boxed::Box<TailEnd>),
-  /// Future extensions..
-  #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<LinePropertiesExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnderlineFillChoice {
@@ -12612,24 +11620,6 @@ pub enum FollowedHyperlinkColorChoice {
   APrstClr(std::boxed::Box<PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum Color2TypeChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(std::boxed::Box<RgbColorModelPercentage>),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(std::boxed::Box<RgbColorModelHex>),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(std::boxed::Box<HslColor>),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(std::boxed::Box<SystemColor>),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(std::boxed::Box<PresetColor>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(std::boxed::Box<CustomGeometry>),
@@ -12736,20 +11726,6 @@ pub enum BodyPropertiesChoice2 {
   AFlatTx(std::boxed::Box<FlatText>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DefaultShapeDefinitionTypeChoice {
-  /// Visual Properties
-  #[sdk(child(qname = "a:CT_ShapeProperties/a:spPr"))]
-  ASpPr(std::boxed::Box<ShapeProperties>),
-  #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  ABodyPr(std::boxed::Box<BodyProperties>),
-  #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  ALstStyle(std::boxed::Box<ListStyle>),
-  #[sdk(child(qname = "a:CT_ShapeStyle/a:style"))]
-  AStyle(std::boxed::Box<ShapeStyle>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -12764,53 +11740,6 @@ pub enum TableCellPropertiesChoice {
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TableStyleTypeChoice {
-  /// Table Background
-  #[sdk(child(qname = "a:CT_TableBackgroundStyle/a:tblBg"))]
-  ATblBg(std::boxed::Box<TableBackground>),
-  /// Whole Table
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:wholeTbl"))]
-  AWholeTbl(std::boxed::Box<WholeTable>),
-  /// Band 1 Horizontal
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:band1H"))]
-  ABand1H(std::boxed::Box<Band1Horizontal>),
-  /// Band 2 Horizontal
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:band2H"))]
-  ABand2H(std::boxed::Box<Band2Horizontal>),
-  /// Band 1 Vertical
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:band1V"))]
-  ABand1V(std::boxed::Box<Band1Vertical>),
-  /// Band 2 Vertical
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:band2V"))]
-  ABand2V(std::boxed::Box<Band2Vertical>),
-  /// Last Column
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:lastCol"))]
-  ALastCol(std::boxed::Box<LastColumn>),
-  /// First Column
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:firstCol"))]
-  AFirstCol(std::boxed::Box<FirstColumn>),
-  /// Last Row
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:lastRow"))]
-  ALastRow(std::boxed::Box<LastRow>),
-  /// Southeast Cell
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:seCell"))]
-  ASeCell(std::boxed::Box<SoutheastCell>),
-  /// Southwest Cell
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:swCell"))]
-  ASwCell(std::boxed::Box<SouthwestCell>),
-  /// First Row
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:firstRow"))]
-  AFirstRow(std::boxed::Box<FirstRow>),
-  /// Northeast Cell
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:neCell"))]
-  ANeCell(std::boxed::Box<NortheastCell>),
-  /// Northwest Cell
-  #[sdk(child(qname = "a:CT_TablePartStyle/a:nwCell"))]
-  ANwCell(std::boxed::Box<NorthwestCell>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TablePropertiesChoice {
@@ -12915,15 +11844,6 @@ pub enum TopRightToBottomLeftBorderChoice {
   ALnRef(std::boxed::Box<LineReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ThemeableLineStyleTypeChoice {
-  /// Defines the Outline Class.
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  ALn(std::boxed::Box<Outline>),
-  /// Defines the LineReference Class.
-  #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
-  ALnRef(std::boxed::Box<LineReference>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellTextStyleChoice {
   #[sdk(child(qname = "a:CT_FontCollection/a:font"))]
   AFont(std::boxed::Box<Fonts>),
@@ -12965,15 +11885,6 @@ pub enum TableBackgroundChoice2 {
   AEffect(std::boxed::Box<EffectPropertiesType>),
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
   AEffectRef(std::boxed::Box<EffectReference>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TablePartStyleTypeChoice {
-  /// Table Cell Text Style
-  #[sdk(child(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle"))]
-  ATcTxStyle(std::boxed::Box<TableCellTextStyle>),
-  /// Table Cell Style
-  #[sdk(child(qname = "a:CT_TableStyleCellStyle/a:tcStyle"))]
-  ATcStyle(std::boxed::Box<TableCellStyle>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphPropertiesChoice {
@@ -13394,50 +12305,6 @@ pub enum Level9ParagraphPropertiesChoice4 {
   ABuBlip(std::boxed::Box<PictureBullet>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextParagraphPropertiesTypeChoice {
-  /// Line Spacing
-  #[sdk(child(qname = "a:CT_TextSpacing/a:lnSpc"))]
-  ALnSpc(std::boxed::Box<LineSpacing>),
-  /// Space Before
-  #[sdk(child(qname = "a:CT_TextSpacing/a:spcBef"))]
-  ASpcBef(std::boxed::Box<SpaceBefore>),
-  /// Space After
-  #[sdk(child(qname = "a:CT_TextSpacing/a:spcAft"))]
-  ASpcAft(std::boxed::Box<SpaceAfter>),
-  /// Follow Text.
-  #[sdk(empty_child(qname = "a:CT_TextBulletColorFollowText/a:buClrTx"))]
-  ABuClrTx,
-  #[sdk(child(qname = "a:CT_Color/a:buClr"))]
-  ABuClr(std::boxed::Box<BulletColor>),
-  /// Bullet Size Follows Text.
-  #[sdk(empty_child(qname = "a:CT_TextBulletSizeFollowText/a:buSzTx"))]
-  ABuSzTx,
-  #[sdk(child(qname = "a:CT_TextBulletSizePercent/a:buSzPct"))]
-  ABuSzPct(std::boxed::Box<BulletSizePercentage>),
-  #[sdk(child(qname = "a:CT_TextBulletSizePoint/a:buSzPts"))]
-  ABuSzPts(std::boxed::Box<BulletSizePoints>),
-  /// Follow text.
-  #[sdk(empty_child(qname = "a:CT_TextBulletTypefaceFollowText/a:buFontTx"))]
-  ABuFontTx,
-  #[sdk(child(qname = "a:CT_TextFont/a:buFont"))]
-  ABuFont(std::boxed::Box<BulletFont>),
-  /// No Bullet.
-  #[sdk(empty_child(qname = "a:CT_TextNoBullet/a:buNone"))]
-  ABuNone,
-  #[sdk(child(qname = "a:CT_TextAutonumberBullet/a:buAutoNum"))]
-  ABuAutoNum(std::boxed::Box<AutoNumberedBullet>),
-  #[sdk(child(qname = "a:CT_TextCharBullet/a:buChar"))]
-  ABuChar(std::boxed::Box<CharacterBullet>),
-  #[sdk(child(qname = "a:CT_TextBlipBullet/a:buBlip"))]
-  ABuBlip(std::boxed::Box<PictureBullet>),
-  #[sdk(child(qname = "a:CT_TextTabStopList/a:tabLst"))]
-  ATabLst(std::boxed::Box<TabStopList>),
-  #[sdk(child(qname = "a:CT_TextCharacterProperties/a:defRPr"))]
-  ADefRPr(std::boxed::Box<DefaultRunProperties>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EndParagraphRunPropertiesChoice {
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
@@ -13555,56 +12422,6 @@ pub enum DefaultRunPropertiesChoice4 {
   AUFill(std::boxed::Box<UnderlineFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextCharacterPropertiesTypeChoice {
-  #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  ALn(std::boxed::Box<Outline>),
-  #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<NoFill>),
-  #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<SolidFill>),
-  #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<GradientFill>),
-  #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<BlipFill>),
-  #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<PatternFill>),
-  /// Group Fill.
-  #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
-  #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<EffectList>),
-  #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<EffectDag>),
-  #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  AHighlight(std::boxed::Box<Highlight>),
-  /// Underline Follows Text.
-  #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx,
-  #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
-  AULn(std::boxed::Box<Underline>),
-  /// Underline Fill Properties Follow Text.
-  #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx,
-  #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
-  AUFill(std::boxed::Box<UnderlineFill>),
-  #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  ALatin(std::boxed::Box<LatinFont>),
-  #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  AEa(std::boxed::Box<EastAsianFont>),
-  #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  ACs(std::boxed::Box<ComplexScriptFont>),
-  #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  ASym(std::boxed::Box<SymbolFont>),
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  AHlinkClick(std::boxed::Box<HyperlinkOnClick>),
-  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  AHlinkMouseOver(std::boxed::Box<HyperlinkOnMouseOver>),
-  #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  ARtl(std::boxed::Box<RightToLeft>),
-  #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
   #[sdk(child(qname = "a:CT_RegularTextRun/a:r"))]
   AR(std::boxed::Box<Run>),
@@ -13642,15 +12459,6 @@ pub enum SpaceBeforeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SpaceAfterChoice {
-  /// Spacing Percent.
-  #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
-  ASpcPct(std::boxed::Box<SpacingPercent>),
-  /// Spacing Points.
-  #[sdk(child(qname = "a:CT_TextSpacingPoint/a:spcPts"))]
-  ASpcPts(std::boxed::Box<SpacingPoints>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TextSpacingTypeChoice {
   /// Spacing Percent.
   #[sdk(child(qname = "a:CT_TextSpacingPercent/a:spcPct"))]
   ASpcPct(std::boxed::Box<SpacingPercent>),
@@ -13781,15 +12589,6 @@ pub enum ConnectorLockingExtensionChoice {
   AGraphic(std::boxed::Box<Graphic>),
   #[sdk(any)]
   XmlOther(String),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum HyperlinkTypeChoice {
-  /// Sound to play.
-  #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:snd"))]
-  ASnd(std::boxed::Box<HyperlinkSound>),
-  /// Future extensions.
-  #[sdk(child(qname = "a:CT_HyperlinkExtensionList/a:extLst"))]
-  AExtLst(std::boxed::Box<HyperlinkExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataModelExtensionChoice {

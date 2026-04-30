@@ -517,17 +517,6 @@ pub struct ToAnchor {
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
   pub y_position: crate::simple_type::DoubleValue,
 }
-/// Defines the MarkerType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "cdr:CT_Marker/")]
-pub struct MarkerType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  #[sdk(choice(
-    qname = "cdr:ST_MarkerCoordinate/cdr:x",
-    qname = "cdr:ST_MarkerCoordinate/cdr:y"
-  ))]
-  pub xml_children: Vec<MarkerTypeChoice>,
-}
 /// Shape Extent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PositiveSize2D/cdr:ext")]
@@ -720,15 +709,6 @@ pub enum BlipFillChoice {
   AStretch(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
   ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum MarkerTypeChoice {
-  /// Relative X Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
-  CdrX(crate::simple_type::DoubleValue),
-  /// Relative Y Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
-  CdrY(crate::simple_type::DoubleValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {

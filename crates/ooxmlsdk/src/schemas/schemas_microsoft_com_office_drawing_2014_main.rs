@@ -71,11 +71,3 @@ pub struct ColIdIdentifier {
   #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::UInt32Value,
 }
-/// Defines the OpenXmlIdentifierElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "a16:CT_Identifier/")]
-pub struct OpenXmlIdentifierElement {
-  /// val
-  #[sdk(attr(office2016, qname = ":val"))]
-  pub val: crate::simple_type::UInt32Value,
-}

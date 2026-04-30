@@ -141,14 +141,6 @@ pub struct DoNotAllowInsertDeleteSection {
   #[sdk(attr(qname = "w:val"))]
   pub val: Option<crate::simple_type::OnOffValue>,
 }
-/// Defines the OnOffType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOff/")]
-pub struct OnOffType {
-  /// On/Off Value
-  #[sdk(attr(qname = "w:val"))]
-  pub val: Option<crate::simple_type::OnOffValue>,
-}
 /// Defines the PersistentDocumentId Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_Guid/w15:docId")]

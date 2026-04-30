@@ -442,27 +442,6 @@ pub struct EffectReference {
   #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
   pub cs_style_clr: Option<StyleColor>,
 }
-/// Defines the StyleReference Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:CT_StyleReference/")]
-pub struct StyleReference {
-  /// idx
-  #[sdk(attr(office2013, qname = ":idx"))]
-  pub index: crate::simple_type::UInt32Value,
-  /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    qname = "cs:CT_StyleColor/cs:styleClr"
-  ))]
-  pub xml_children: Vec<StyleReferenceChoice>,
-}
 /// Defines the LineWidthScale Class.
 pub type LineWidthScale = crate::simple_type::DoubleValue;
 /// Defines the FontReference Class.
@@ -878,39 +857,6 @@ pub struct SeriesAxisProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "cs:CT_AxisProps/cs:valueAxis")]
 pub struct ValueAxisProperties {
-  /// visible
-  #[sdk(attr(office2013, qname = ":visible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub visible: Option<Boolean>,
-  /// majorTick
-  #[sdk(attr(office2013, qname = ":majorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub major_tick: Option<TickMarkNinch>,
-  /// minorTick
-  #[sdk(attr(office2013, qname = ":minorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub minor_tick_prop: Option<TickMarkNinch>,
-  /// labelPosition
-  #[sdk(attr(office2013, qname = ":labelPosition"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub label_position: Option<TickLabelPositionNinch>,
-  /// majorGridlines
-  #[sdk(attr(office2013, qname = ":majorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub major_gridlines: Option<Boolean>,
-  /// minorGridlines
-  #[sdk(attr(office2013, qname = ":minorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub minor_gridlines_prop: Option<Boolean>,
-  /// title
-  #[sdk(attr(office2013, qname = ":title"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub title_prop: Option<Boolean>,
-}
-/// Defines the AxisProperties Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:CT_AxisProps/")]
-pub struct AxisProperties {
   /// visible
   #[sdk(attr(office2013, qname = ":visible"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
@@ -2203,27 +2149,6 @@ pub struct Wall {
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/cs:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
-/// Defines the StyleEntry Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "cs:CT_StyleEntry/")]
-pub struct StyleEntry {
-  /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  #[sdk(choice(
-    microsoft365,
-    qname = "cs:CT_StyleReference/cs:lnRef",
-    qname = "xsd:double/cs:lineWidthScale",
-    qname = "cs:CT_StyleReference/cs:fillRef",
-    qname = "cs:CT_StyleReference/cs:effectRef",
-    qname = "cs:CT_FontReference/cs:fontRef",
-    qname = "a:CT_ShapeProperties/cs:spPr",
-    qname = "a:CT_TextCharacterProperties/cs:defRPr",
-    qname = "a:CT_TextBodyProperties/cs:bodyPr",
-    qname = "a:CT_OfficeArtExtensionList/cs:extLst"
-  ))]
-  pub xml_children: Vec<StyleEntryChoice>,
-}
 /// Defines the MarkerLayoutProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "cs:CT_MarkerLayout/cs:dataPointMarkerLayout")]
@@ -2576,46 +2501,6 @@ pub enum EffectReferenceChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StyleReferenceChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-  /// Defines the StyleColor Class.
-  #[sdk(child(office2013, qname = "cs:CT_StyleColor/cs:styleClr"))]
-  CsStyleClr(std::boxed::Box<StyleColor>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
@@ -2769,25 +2654,4 @@ pub enum TextBodyPropertiesChoice2 {
   AFlatTx(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FlatText>,
   ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StyleEntryChoice {
-  #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
-  CsLnRef(std::boxed::Box<LineReference>),
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
-  CsLineWidthScale(crate::simple_type::DoubleValue),
-  #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
-  CsFillRef(std::boxed::Box<FillReference>),
-  #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:effectRef"))]
-  CsEffectRef(std::boxed::Box<EffectReference>),
-  #[sdk(child(office2013, qname = "cs:CT_FontReference/cs:fontRef"))]
-  CsFontRef(std::boxed::Box<FontReference>),
-  #[sdk(child(office2013, qname = "a:CT_ShapeProperties/cs:spPr"))]
-  CsSpPr(std::boxed::Box<ShapeProperties>),
-  #[sdk(child(office2013, qname = "a:CT_TextCharacterProperties/cs:defRPr"))]
-  CsDefRPr(std::boxed::Box<TextCharacterPropertiesType>),
-  #[sdk(child(office2013, qname = "a:CT_TextBodyProperties/cs:bodyPr"))]
-  CsBodyPr(std::boxed::Box<TextBodyProperties>),
-  #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/cs:extLst"))]
-  CsExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }

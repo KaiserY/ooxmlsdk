@@ -301,14 +301,6 @@ pub struct Bubble3D {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the BooleanType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Boolean/")]
-pub struct BooleanType {
-  /// Boolean Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<crate::simple_type::BooleanValue>,
-}
 /// Defines the ChartText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "c:CT_Tx/c15:tx")]
@@ -895,17 +887,6 @@ pub struct DataLabelFieldTableCache {
   pub c_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
 }
-/// Defines the StringDataType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_StrData/")]
-pub struct StringDataType {
-  #[sdk(choice(
-    qname = "c:CT_UnsignedInt/c:ptCount",
-    qname = "c:CT_StrVal/c:pt",
-    qname = "c:CT_StrDataExtensionList/c:extLst"
-  ))]
-  pub xml_children: Vec<StringDataTypeChoice>,
-}
 /// Defines the Explosion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "c:CT_UnsignedInt/c15:explosion")]
@@ -1106,23 +1087,6 @@ pub enum AxisDataSourceTypeChoice {
   #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
   CStrLit(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringLiteral>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StringDataTypeChoice {
-  #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  CPtCount(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
-  ),
-  #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  CPt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
-  ),
-  #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  CExtLst(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList,
-    >,
   ),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

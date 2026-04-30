@@ -40,11 +40,3 @@ pub struct RelativeUrlAlternateUrl {
   #[sdk(attr(microsoft365, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
 }
-/// Defines the OpenXmlAlternateUrlElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xxl21:CT_AlternateUrl/")]
-pub struct OpenXmlAlternateUrlElement {
-  /// id
-  #[sdk(attr(microsoft365, qname = "r:id"))]
-  pub r_id: crate::simple_type::StringValue,
-}

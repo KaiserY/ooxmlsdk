@@ -83,14 +83,6 @@ pub struct Bubble3DBoolean {
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the BooleanType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "c:CT_Boolean/")]
-pub struct BooleanType {
-  /// Boolean Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<crate::simple_type::BooleanValue>,
-}
 /// Defines the Marker Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c:CT_Marker/c16:marker")]
@@ -195,14 +187,6 @@ pub struct UniqueIdChartUniqueId {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID")]
 pub struct UniqueId {
-  /// val
-  #[sdk(attr(office2016, qname = ":val"))]
-  pub val: crate::simple_type::StringValue,
-}
-/// Defines the UniqueIDChart Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "c16:CT_ChartUniqueID/")]
-pub struct UniqueIdChart {
   /// val
   #[sdk(attr(office2016, qname = ":val"))]
   pub val: crate::simple_type::StringValue,

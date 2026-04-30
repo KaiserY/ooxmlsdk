@@ -62,15 +62,6 @@ pub struct AsgnTaskAssignUnassignUser {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
 }
-/// Defines the OpenXmlTaskAssignUnassignUserElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "p228:CT_TaskAssignUnassignUser/")]
-pub struct OpenXmlTaskAssignUnassignUserElement {
-  /// authorId
-  #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  pub author_id: crate::simple_type::StringValue,
-}
 /// Defines the TaskAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "p228:CT_TaskAnchor/p228:anchr")]

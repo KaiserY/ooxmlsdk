@@ -290,20 +290,3 @@ pub struct DestinationLink {
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:unsignedInt"))]
   pub reference: Option<crate::simple_type::StringValue>,
 }
-/// Defines the ContextLinkType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "msink:CT_CtxLink/")]
-pub struct ContextLinkType {
-  /// direction
-  #[sdk(attr(qname = ":direction"))]
-  pub direction: Option<LinkDirectionValues>,
-  /// ref
-  #[sdk(attr(qname = ":ref"))]
-  #[sdk(pattern(
-    source = 0u32,
-    union = 0u64,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(number_type(source = 1u32, union = 0u64, type_name = "xsd:unsignedInt"))]
-  pub reference: Option<crate::simple_type::StringValue>,
-}

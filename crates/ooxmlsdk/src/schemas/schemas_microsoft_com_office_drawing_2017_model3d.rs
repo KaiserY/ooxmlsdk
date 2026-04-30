@@ -86,17 +86,6 @@ pub struct SzRatio {
   #[sdk(attr(qname = ":d"))]
   pub denominator: crate::simple_type::Int32Value,
 }
-/// Defines the RatioType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Ratio/")]
-pub struct RatioType {
-  /// Numerator
-  #[sdk(attr(qname = ":n"))]
-  pub numerator: crate::simple_type::Int32Value,
-  /// Denominator
-  #[sdk(attr(qname = ":d"))]
-  pub denominator: crate::simple_type::Int32Value,
-}
 /// Defines the MeterPerModelUnitPositiveRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "am3d:CT_PositiveRatio/am3d:meterPerModelUnit")]
@@ -134,17 +123,6 @@ pub struct IlluminancePositiveRatio {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "am3d:CT_PositiveRatio/am3d:intensity")]
 pub struct IntensityPositiveRatio {
-  /// n
-  #[sdk(attr(office2019, qname = ":n"))]
-  pub n: crate::simple_type::UInt64Value,
-  /// d
-  #[sdk(attr(office2019, qname = ":d"))]
-  pub d: crate::simple_type::UInt64Value,
-}
-/// Defines the OpenXmlPositiveRatioElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2019, qname = "am3d:CT_PositiveRatio/")]
-pub struct OpenXmlPositiveRatioElement {
   /// n
   #[sdk(attr(office2019, qname = ":n"))]
   pub n: crate::simple_type::UInt64Value,
@@ -257,41 +235,6 @@ pub struct UpVector3D {
   ))]
   pub dz: crate::simple_type::Int64Value,
 }
-/// Defines the Vector3DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Vector3D/")]
-pub struct Vector3DType {
-  /// Distance along X-axis in 3D
-  #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dx: crate::simple_type::Int64Value,
-  /// Distance along Y-axis in 3D
-  #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dy: crate::simple_type::Int64Value,
-  /// Distance along Z-axis in 3D
-  #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub dz: crate::simple_type::Int64Value,
-}
 /// Defines the Scale3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "am3d:CT_Scale3D/am3d:scale")]
@@ -368,41 +311,6 @@ pub struct PosPoint3D {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "a:CT_Point3D/am3d:lookAt")]
 pub struct LookAtPoint3D {
-  /// X-Coordinate in 3D
-  #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub x: crate::simple_type::Int64Value,
-  /// Y-Coordinate in 3D
-  #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub y: crate::simple_type::Int64Value,
-  /// Z-Coordinate in 3D
-  #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub z: crate::simple_type::Int64Value,
-}
-/// Defines the OpenXmlPoint3DElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point3D/")]
-pub struct OpenXmlPoint3DElement {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(

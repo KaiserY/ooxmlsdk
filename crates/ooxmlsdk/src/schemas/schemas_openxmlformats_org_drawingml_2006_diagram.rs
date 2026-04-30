@@ -1296,31 +1296,6 @@ pub struct TextEffectColorList {
   ))]
   pub text_effect_color_list_choice: Vec<TextEffectColorListChoice>,
 }
-/// Defines the ColorsType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:CT_Colors/")]
-pub struct ColorsType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Color Application Method Type
-  #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub method: Option<ColorApplicationMethodValues>,
-  /// Hue Direction
-  #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  pub hue_direction: Option<HueDirectionValues>,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
-  ))]
-  pub xml_children: Vec<ColorsTypeChoice>,
-}
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OfficeArtExtensionList/dgm:extLst")]
@@ -2073,23 +2048,6 @@ pub struct PresentationLayoutVariables {
   /// Shape Resize Style
   #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
   pub resize_handles: Option<ResizeHandles>,
-}
-/// Defines the LayoutVariablePropertySetType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:CT_LayoutVariablePropertySet/")]
-pub struct LayoutVariablePropertySetType {
-  #[sdk(choice(
-    qname = "dgm:CT_OrgChart/dgm:orgChart",
-    qname = "dgm:CT_ChildMax/dgm:chMax",
-    qname = "dgm:CT_ChildPref/dgm:chPref",
-    qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled",
-    qname = "dgm:CT_Direction/dgm:dir",
-    qname = "dgm:CT_HierBranchStyle/dgm:hierBranch",
-    qname = "dgm:CT_AnimOne/dgm:animOne",
-    qname = "dgm:CT_AnimLvl/dgm:animLvl",
-    qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"
-  ))]
-  pub xml_children: Vec<LayoutVariablePropertySetTypeChoice>,
 }
 /// For Each.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2895,17 +2853,6 @@ pub struct ColorData {
   #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
   pub data_model: Option<std::boxed::Box<DataModel>>,
 }
-/// Defines the SampleDataType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "dgm:CT_SampleData/")]
-pub struct SampleDataType {
-  /// Use Default
-  #[sdk(attr(qname = ":useDef"))]
-  pub use_default: Option<crate::simple_type::BooleanValue>,
-  /// Data Model
-  #[sdk(child(qname = "dgm:CT_DataModel/dgm:dataModel"))]
-  pub data_model: Vec<DataModel>,
-}
 /// List of extensions to the CT_DiagramDefintions type..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtensionList/dgm:extLst")]
@@ -3136,79 +3083,6 @@ pub enum TextEffectColorListChoice {
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ColorsTypeChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlOther(String),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum LayoutVariablePropertySetTypeChoice {
-  /// Show Organization Chart User Interface
-  #[sdk(child(qname = "dgm:CT_OrgChart/dgm:orgChart"))]
-  DgmOrgChart(std::boxed::Box<OrganizationChart>),
-  /// Maximum Children
-  #[sdk(child(qname = "dgm:CT_ChildMax/dgm:chMax"))]
-  DgmChMax(std::boxed::Box<MaxNumberOfChildren>),
-  /// Preferred Number of Children
-  #[sdk(child(qname = "dgm:CT_ChildPref/dgm:chPref"))]
-  DgmChPref(std::boxed::Box<PreferredNumberOfChildren>),
-  /// Show Insert Bullet
-  #[sdk(child(qname = "dgm:CT_BulletEnabled/dgm:bulletEnabled"))]
-  DgmBulletEnabled(std::boxed::Box<BulletEnabled>),
-  /// Diagram Direction
-  #[sdk(child(qname = "dgm:CT_Direction/dgm:dir"))]
-  DgmDir(std::boxed::Box<Direction>),
-  /// Organization Chart Branch Style
-  #[sdk(child(qname = "dgm:CT_HierBranchStyle/dgm:hierBranch"))]
-  DgmHierBranch(std::boxed::Box<HierarchyBranch>),
-  /// One by One Animation String
-  #[sdk(child(qname = "dgm:CT_AnimOne/dgm:animOne"))]
-  DgmAnimOne(std::boxed::Box<AnimateOneByOne>),
-  /// Level Animation
-  #[sdk(child(qname = "dgm:CT_AnimLvl/dgm:animLvl"))]
-  DgmAnimLvl(std::boxed::Box<AnimationLevel>),
-  /// Shape Resize Style
-  #[sdk(child(qname = "dgm:CT_ResizeHandles/dgm:resizeHandles"))]
-  DgmResizeHandles(std::boxed::Box<ResizeHandles>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForEachChoice {

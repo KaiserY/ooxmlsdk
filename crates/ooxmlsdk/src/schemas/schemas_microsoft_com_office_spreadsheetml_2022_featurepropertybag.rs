@@ -44,20 +44,6 @@ pub struct FpbsFeaturePropertyBags {
   #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
   pub xfpb_ext_lst: Option<ExtensionList>,
 }
-/// Defines the OpenXmlFeaturePropertyBagsElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/")]
-pub struct OpenXmlFeaturePropertyBagsElement {
-  /// count
-  #[sdk(attr(microsoft365, qname = ":count"))]
-  pub count: Option<crate::simple_type::UInt32Value>,
-  #[sdk(choice(
-    qname = "xfpb:CT_BagExtensions/xfpb:bagExt",
-    qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag",
-    qname = "x:CT_ExtensionList/xfpb:extLst"
-  ))]
-  pub xml_children: Vec<OpenXmlFeaturePropertyBagsElementChoice>,
-}
 /// Defines the XfComplement Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "xfpb:CT_XfComplement/xfpb:xfComplement")]
@@ -183,17 +169,6 @@ pub struct ColumnTotalsRevDxfTableRevDxf {
   /// _
   #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
-}
-/// Defines the OpenXmlTableRevDxfElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xfpb:CT_TableRevDxf/")]
-pub struct OpenXmlTableRevDxfElement {
-  #[sdk(choice(
-    microsoft365,
-    qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs",
-    qname = "x:CT_Dxf/xfpb:dxf"
-  ))]
-  pub xml_children: Vec<OpenXmlTableRevDxfElementChoice>,
 }
 /// Defines the BagExtensions Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -365,25 +340,6 @@ pub type RelXsdstring = crate::simple_type::StringValue;
 pub type Xsdboolean = crate::simple_type::BooleanValue;
 /// Defines the Xsddouble Class.
 pub type Xsddouble = crate::simple_type::DoubleValue;
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OpenXmlFeaturePropertyBagsElementChoice {
-  /// Defines the BagExtensions Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_BagExtensions/xfpb:bagExt"))]
-  XfpbBagExt(std::boxed::Box<BagExtensions>),
-  /// Defines the FeaturePropertyBag Class.
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBag/xfpb:bag"))]
-  XfpbBag(std::boxed::Box<FeaturePropertyBag>),
-  /// Defines the ExtensionList Class.
-  #[sdk(child(microsoft365, qname = "x:CT_ExtensionList/xfpb:extLst"))]
-  XfpbExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OpenXmlTableRevDxfElementChoice {
-  #[sdk(child(microsoft365, qname = "xfpb:CT_FeaturePropertyBags/xfpb:fpbs"))]
-  XfpbFpbs(std::boxed::Box<FpbsFeaturePropertyBags>),
-  #[sdk(child(microsoft365, qname = "x:CT_Dxf/xfpb:dxf"))]
-  XfpbDxf(std::boxed::Box<DifferentialFormatType>),
-}
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FeaturePropertyBagChoice {
   /// Defines the ArrayFeatureProperty Class.

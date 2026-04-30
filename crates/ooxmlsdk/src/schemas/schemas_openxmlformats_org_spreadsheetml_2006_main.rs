@@ -3024,16 +3024,6 @@ pub struct Formula2 {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
-/// Defines the XstringType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Xstring/")]
-pub struct XstringType {
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
 /// XML Schema.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Schema/x:Schema")]
@@ -3657,17 +3647,6 @@ pub struct SortByTuple {
   #[sdk(child(qname = "x:CT_Tuple/x:tpl"))]
   pub x_tpl: Vec<Tuple>,
 }
-/// Defines the TuplesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Tuples/")]
-pub struct TuplesType {
-  /// Member Name Count
-  #[sdk(attr(qname = ":c"))]
-  pub member_name_count: Option<crate::simple_type::UInt32Value>,
-  /// Tuple.
-  #[sdk(child(qname = "x:CT_Tuple/x:tpl"))]
-  pub tuple: Vec<Tuple>,
-}
 /// Member Property Indexes.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_X/x:x")]
@@ -3680,14 +3659,6 @@ pub struct MemberPropertyIndex {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_X/x:mpMap")]
 pub struct MemberPropertiesMap {
-  /// Shared Items Index
-  #[sdk(attr(qname = ":v"))]
-  pub val: Option<crate::simple_type::Int32Value>,
-}
-/// Defines the XType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_X/")]
-pub struct XType {
   /// Shared Items Index
   #[sdk(attr(qname = ":v"))]
   pub val: Option<crate::simple_type::Int32Value>,
@@ -4420,14 +4391,6 @@ pub struct ColumnHierarchyUsage {
   #[sdk(attr(qname = ":hierarchyUsage"))]
   pub value: crate::simple_type::Int32Value,
 }
-/// Defines the HierarchyUsageType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_HierarchyUsage/")]
-pub struct HierarchyUsageType {
-  /// Hierarchy Usage
-  #[sdk(attr(qname = ":hierarchyUsage"))]
-  pub value: crate::simple_type::Int32Value,
-}
 /// OLAP Member Property.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_MemberProperty/x:mp")]
@@ -4903,18 +4866,6 @@ pub struct CommentText {
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr: Option<PhoneticProperties>,
 }
-/// Defines the RstType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Rst/")]
-pub struct RstType {
-  #[sdk(choice(
-    qname = "x:CT_Xstring/x:t",
-    qname = "x:CT_RElt/x:r",
-    qname = "x:CT_PhoneticRun/x:rPh",
-    qname = "x:CT_PhoneticPr/x:phoneticPr"
-  ))]
-  pub xml_children: Vec<RstTypeChoice>,
-}
 /// Bold.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_BooleanProperty/x:b")]
@@ -4967,14 +4918,6 @@ pub struct Outline {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_BooleanProperty/x:shadow")]
 pub struct Shadow {
-  /// Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: Option<crate::simple_type::BooleanValue>,
-}
-/// Defines the BooleanPropertyType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_BooleanProperty/")]
-pub struct BooleanPropertyType {
   /// Value
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
@@ -5087,27 +5030,6 @@ pub struct BackgroundColor {
   #[sdk(attr(qname = ":tint"))]
   pub tint: Option<crate::simple_type::DoubleValue>,
 }
-/// Defines the ColorType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/")]
-pub struct ColorType {
-  /// Automatic
-  #[sdk(attr(qname = ":auto"))]
-  pub auto: Option<crate::simple_type::BooleanValue>,
-  /// Index
-  #[sdk(attr(qname = ":indexed"))]
-  pub indexed: Option<crate::simple_type::UInt32Value>,
-  /// Alpha Red Green Blue Color Value
-  #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
-  pub rgb: Option<crate::simple_type::HexBinaryValue>,
-  /// Theme Color
-  #[sdk(attr(qname = ":theme"))]
-  pub theme: Option<crate::simple_type::UInt32Value>,
-  /// Tint
-  #[sdk(attr(qname = ":tint"))]
-  pub tint: Option<crate::simple_type::DoubleValue>,
-}
 /// Font.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FontName/x:rFont")]
@@ -5128,14 +5050,6 @@ pub struct FontFamily {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_IntProperty/x:charset")]
 pub struct RunPropertyCharSet {
-  /// Value
-  #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
-}
-/// Defines the InternationalPropertyType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_IntProperty/")]
-pub struct InternationalPropertyType {
   /// Value
   #[sdk(attr(qname = ":val"))]
   pub val: crate::simple_type::Int32Value,
@@ -5843,37 +5757,6 @@ pub struct Cell {
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
-/// Defines the CellType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Cell/")]
-pub struct CellType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  /// Reference
-  #[sdk(attr(qname = ":r"))]
-  pub cell_reference: Option<crate::simple_type::StringValue>,
-  /// Style Index
-  #[sdk(attr(qname = ":s"))]
-  pub style_index: Option<crate::simple_type::UInt32Value>,
-  /// Cell Data Type
-  #[sdk(attr(qname = ":t"))]
-  pub data_type: Option<CellValues>,
-  /// Cell Metadata Index
-  #[sdk(attr(qname = ":cm"))]
-  pub cell_meta_index: Option<crate::simple_type::UInt32Value>,
-  /// Value Metadata Index
-  #[sdk(attr(qname = ":vm"))]
-  pub value_meta_index: Option<crate::simple_type::UInt32Value>,
-  /// Show Phonetic
-  #[sdk(attr(qname = ":ph"))]
-  pub show_phonetic: Option<crate::simple_type::BooleanValue>,
-  #[sdk(choice(
-    qname = "x:CT_CellFormula/x:f",
-    qname = "x:CT_Xstring/x:v",
-    qname = "x:CT_Rst/x:is",
-    qname = "x:CT_ExtensionList/x:extLst"
-  ))]
-  pub xml_children: Vec<CellTypeChoice>,
-}
 /// New Cell Data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_NewCell/x:nc")]
@@ -5987,21 +5870,6 @@ pub struct DifferentialFormat {
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
-}
-/// Defines the DifferentialFormatType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Dxf/")]
-pub struct DifferentialFormatType {
-  #[sdk(choice(
-    qname = "x:CT_Font/x:font",
-    qname = "x:CT_NumFmt/x:numFmt",
-    qname = "x:CT_Fill/x:fill",
-    qname = "x:CT_CellAlignment/x:alignment",
-    qname = "x:CT_Border/x:border",
-    qname = "x:CT_CellProtection/x:protection",
-    qname = "x:CT_ExtensionList/x:extLst"
-  ))]
-  pub xml_children: Vec<DifferentialFormatTypeChoice>,
 }
 /// Sheet Id.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6360,20 +6228,6 @@ pub struct ColumnBreaks {
   /// _
   #[sdk(child(qname = "x:CT_Break/x:brk"))]
   pub x_brk: Vec<Break>,
-}
-/// Defines the PageBreakType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_PageBreak/")]
-pub struct PageBreakType {
-  /// Page Break Count
-  #[sdk(attr(qname = ":count"))]
-  pub count: Option<crate::simple_type::UInt32Value>,
-  /// Manual Break Count
-  #[sdk(attr(qname = ":manualBreakCount"))]
-  pub manual_break_count: Option<crate::simple_type::UInt32Value>,
-  /// Break.
-  #[sdk(child(qname = "x:CT_Break/x:brk"))]
-  pub r#break: Vec<Break>,
 }
 /// Page Margins.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7253,17 +7107,6 @@ pub struct ValueMetadata {
   /// _
   #[sdk(child(qname = "x:CT_MetadataBlock/x:bk"))]
   pub x_bk: Vec<MetadataBlock>,
-}
-/// Defines the MetadataBlocksType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_MetadataBlocks/")]
-pub struct MetadataBlocksType {
-  /// Metadata Block Count
-  #[sdk(attr(qname = ":count"))]
-  pub count: Option<crate::simple_type::UInt32Value>,
-  /// Metadata Block.
-  #[sdk(child(qname = "x:CT_MetadataBlock/x:bk"))]
-  pub metadata_block: Vec<MetadataBlock>,
 }
 /// Metadata Type Information.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8212,19 +8055,6 @@ pub struct TotalsRowFormula {
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
-/// Defines the TableFormulaType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_TableFormula/")]
-pub struct TableFormulaType {
-  /// Array
-  #[sdk(attr(qname = ":array"))]
-  pub array: Option<crate::simple_type::BooleanValue>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
 /// XML Column Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_XmlColumnPr/x:xmlColumnPr")]
@@ -8609,18 +8439,6 @@ pub struct ToMarker {
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::simple_type::Int64Value,
 }
-/// Defines the MarkerType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Marker/")]
-pub struct MarkerType {
-  #[sdk(choice(
-    qname = "xdr:ST_ColID/xdr:col",
-    qname = "a:ST_Coordinate/xdr:colOff",
-    qname = "xdr:ST_RowID/xdr:row",
-    qname = "a:ST_Coordinate/xdr:rowOff"
-  ))]
-  pub xml_children: Vec<MarkerTypeChoice>,
-}
 /// Defines the ConditionalFormattingRuleExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRuleExtension/x:ext")]
@@ -8792,17 +8610,6 @@ pub struct HorizontalBorder {
   /// Color
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub color: Option<Color>,
-}
-/// Defines the BorderPropertiesType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_BorderPr/")]
-pub struct BorderPropertiesType {
-  /// Line Style
-  #[sdk(attr(qname = ":style"))]
-  pub style: Option<BorderStyleValues>,
-  /// Color
-  #[sdk(child(qname = "x:CT_Color/x:color"))]
-  pub color: Vec<Color>,
 }
 /// Defines the ControlProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8982,15 +8789,6 @@ pub struct LegacyDrawing {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF")]
 pub struct LegacyDrawingHeaderFooter {
-  /// Relationship Id
-  #[sdk(attr(qname = "r:id"))]
-  pub id: crate::simple_type::StringValue,
-}
-/// Defines the LegacyDrawingType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_LegacyDrawing/")]
-pub struct LegacyDrawingType {
-  pub xml_other_attrs: Vec<(String, String)>,
   /// Relationship Id
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
@@ -11540,18 +11338,6 @@ pub enum GroupItemsChoice {
   XD(std::boxed::Box<DateTimeItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RstTypeChoice {
-  /// Text
-  #[sdk(child(qname = "x:CT_Xstring/x:t"))]
-  XT(std::boxed::Box<Text>),
-  #[sdk(child(qname = "x:CT_RElt/x:r"))]
-  XR(std::boxed::Box<Run>),
-  #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
-  XRPh(std::boxed::Box<PhoneticRun>),
-  #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
-  XPhoneticPr(std::boxed::Box<PhoneticProperties>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionRowColumnChoice {
   /// Undo.
   #[sdk(child(qname = "x:CT_UndoInfo/x:undo"))]
@@ -11586,45 +11372,6 @@ pub enum RevisionMoveChoice {
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CellTypeChoice {
-  /// Formula
-  #[sdk(child(qname = "x:CT_CellFormula/x:f"))]
-  XF(std::boxed::Box<CellFormula>),
-  /// Cell Value
-  #[sdk(child(qname = "x:CT_Xstring/x:v"))]
-  XV(std::boxed::Box<CellValue>),
-  /// Rich Text Inline
-  #[sdk(child(qname = "x:CT_Rst/x:is"))]
-  XIs(std::boxed::Box<InlineString>),
-  /// Future Feature Data Storage Area
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  XExtLst(std::boxed::Box<ExtensionList>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DifferentialFormatTypeChoice {
-  /// Font Properties
-  #[sdk(child(qname = "x:CT_Font/x:font"))]
-  XFont(std::boxed::Box<Font>),
-  /// Number Format
-  #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
-  XNumFmt(std::boxed::Box<NumberingFormat>),
-  /// Fill
-  #[sdk(child(qname = "x:CT_Fill/x:fill"))]
-  XFill(std::boxed::Box<Fill>),
-  /// Alignment
-  #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
-  XAlignment(std::boxed::Box<Alignment>),
-  /// Border Properties
-  #[sdk(child(qname = "x:CT_Border/x:border"))]
-  XBorder(std::boxed::Box<Border>),
-  /// Protection Properties
-  #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
-  XProtection(std::boxed::Box<Protection>),
-  /// Future Feature Data Storage Area
-  #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  XExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MdxChoice {
@@ -11668,21 +11415,6 @@ pub enum OleItemsChoice {
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum MarkerTypeChoice {
-  /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
-  XdrCol(crate::simple_type::Int32Value),
-  /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
-  XdrColOff(crate::simple_type::Int64Value),
-  /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
-  XdrRow(crate::simple_type::Int32Value),
-  /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
-  XdrRowOff(crate::simple_type::Int64Value),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionalFormattingRuleExtensionChoice {

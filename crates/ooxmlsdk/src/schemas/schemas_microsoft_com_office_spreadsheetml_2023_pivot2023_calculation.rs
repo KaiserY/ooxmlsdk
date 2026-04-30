@@ -104,17 +104,6 @@ pub struct SubtotalLineItemPivotItemSubtotal {
   #[sdk(attr(microsoft365, qname = ":itemLocation"))]
   pub item_location: crate::simple_type::UInt32Value,
 }
-/// Defines the OpenXmlPivotItemSubtotalElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(microsoft365, qname = "xlpcalc:CT_PivotItemSubtotal/")]
-pub struct OpenXmlPivotItemSubtotalElement {
-  /// subtotalType
-  #[sdk(attr(microsoft365, qname = ":subtotalType"))]
-  pub subtotal_type: AggregationType,
-  /// itemLocation
-  #[sdk(attr(microsoft365, qname = ":itemLocation"))]
-  pub item_location: crate::simple_type::UInt32Value,
-}
 /// Defines the PivotSubtotalType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal")]

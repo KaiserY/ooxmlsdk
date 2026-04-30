@@ -161,14 +161,6 @@ pub struct InSketchMode {
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
-/// Defines the BooleanFalseType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "c14:CT_BooleanFalse/")]
-pub struct BooleanFalseType {
-  /// val
-  #[sdk(attr(office2010, qname = ":val"))]
-  pub val: Option<crate::simple_type::BooleanValue>,
-}
 /// Defines the ShowSketchButton Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "c14:CT_BooleanTrue/c14:showSketchBtn")]

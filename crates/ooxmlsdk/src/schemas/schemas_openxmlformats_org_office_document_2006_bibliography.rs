@@ -307,14 +307,6 @@ pub struct Writer {
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   pub name_list: std::boxed::Box<NameList>,
 }
-/// Defines the NameType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "b:CT_NameType/")]
-pub struct NameType {
-  /// Name List
-  #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
-  pub name_list: Vec<NameList>,
-}
 /// Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameOrCorporateType/b:Author")]
@@ -334,16 +326,6 @@ pub struct Performer {
     qname = "b:ST_String255/b:Corporate"
   ))]
   pub xml_children: Option<PerformerChoice>,
-}
-/// Defines the NameOrCorporateType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "b:CT_NameOrCorporateType/")]
-pub struct NameOrCorporateType {
-  #[sdk(choice(
-    qname = "b:CT_NameListType/b:NameList",
-    qname = "b:ST_String255/b:Corporate"
-  ))]
-  pub xml_children: Option<NameOrCorporateTypeChoice>,
 }
 /// Contributors List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -442,15 +424,6 @@ pub enum AuthorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PerformerChoice {
-  /// Name List.
-  #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
-  BNameList(std::boxed::Box<NameList>),
-  /// Corporate Author.
-  #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
-  BCorporate(crate::simple_type::StringValue),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NameOrCorporateTypeChoice {
   /// Name List.
   #[sdk(child(qname = "b:CT_NameListType/b:NameList"))]
   BNameList(std::boxed::Box<NameList>),

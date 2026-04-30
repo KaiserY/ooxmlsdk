@@ -89,14 +89,6 @@ pub struct WllMacroKeyboardCustomization {
   #[sdk(attr(qname = "wne:macroName"))]
   pub macro_name: Option<crate::simple_type::StringValue>,
 }
-/// Defines the MacroWllType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_MacroWll/")]
-pub struct MacroWllType {
-  /// macroName
-  #[sdk(attr(qname = "wne:macroName"))]
-  pub macro_name: Option<crate::simple_type::StringValue>,
-}
 /// Defines the AllocatedCommandKeyboardCustomization Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdKeymap/wne:acd")]
@@ -109,14 +101,6 @@ pub struct AllocatedCommandKeyboardCustomization {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wne:CT_AcdKeymap/wne:acdEntry")]
 pub struct AllocatedCommandManifestEntry {
-  /// acdName
-  #[sdk(attr(qname = "wne:acdName"))]
-  pub accelerator_name: Option<crate::simple_type::StringValue>,
-}
-/// Defines the AcceleratorKeymapType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_AcdKeymap/")]
-pub struct AcceleratorKeymapType {
   /// acdName
   #[sdk(attr(qname = "wne:acdName"))]
   pub accelerator_name: Option<crate::simple_type::StringValue>,
@@ -303,14 +287,6 @@ pub struct MismatchedKeyMapCustomization {
   /// _
   #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
   pub wne_keymap: Vec<KeyMapEntry>,
-}
-/// Defines the KeymapsType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "wne:CT_Keymaps/")]
-pub struct KeymapsType {
-  /// Defines the KeyMapEntry Class.
-  #[sdk(child(qname = "wne:CT_Keymap/wne:keymap"))]
-  pub key_map_entry: Vec<KeyMapEntry>,
 }
 /// Defines the Toolbars Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

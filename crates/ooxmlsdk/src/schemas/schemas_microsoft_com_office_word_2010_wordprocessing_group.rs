@@ -62,23 +62,6 @@ pub struct GroupShape {
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
 }
-/// Defines the WordprocessingGroupType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/")]
-pub struct WordprocessingGroupType {
-  #[sdk(choice(
-    qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr",
-    qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr",
-    qname = "a:CT_GroupShapeProperties/wpg:grpSpPr",
-    qname = "wps:CT_WordprocessingShape/wps:wsp",
-    qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
-    qname = "wpg:CT_GraphicFrame/wpg:graphicFrame",
-    qname = "pic:CT_Picture/pic:pic",
-    qname = "w14:CT_WordContentPart/w14:contentPart",
-    qname = "a:CT_OfficeArtExtensionList/wpg:extLst"
-  ))]
-  pub xml_children: Vec<WordprocessingGroupTypeChoice>,
-}
 /// Defines the NonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr")]
@@ -293,41 +276,6 @@ pub enum GroupShapeChoice {
             crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContentPart,
         >,
     ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum WordprocessingGroupTypeChoice {
-  #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
-    WpgCNvPr(std::boxed::Box<NonVisualDrawingProperties>),
-    #[sdk(
-        child(office2010, qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr")
-    )]
-    WpgCNvGrpSpPr(std::boxed::Box<NonVisualGroupDrawingShapeProperties>),
-    #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-    WpgGrpSpPr(std::boxed::Box<GroupShapeProperties>),
-    #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
-    WpsWsp(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_shape::WordprocessingShape,
-        >,
-    ),
-    #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
-    WpgGrpSp(std::boxed::Box<GroupShape>),
-    #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
-    WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
-    #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
-    PicPic(
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_picture::Picture,
-        >,
-    ),
-    #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
-    W14ContentPart(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_word_2010_wordml::ContentPart,
-        >,
-    ),
-    #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
-    WpgExtLst(std::boxed::Box<OfficeArtExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {

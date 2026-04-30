@@ -495,19 +495,6 @@ pub struct ToMarker {
   #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::simple_type::Int64Value,
 }
-/// Defines the MarkerType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xdr:CT_Marker/")]
-pub struct MarkerType {
-  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  #[sdk(choice(
-    qname = "xdr:ST_ColID/xdr:col",
-    qname = "a:ST_Coordinate/xdr:colOff",
-    qname = "xdr:ST_RowID/xdr:row",
-    qname = "a:ST_Coordinate/xdr:rowOff"
-  ))]
-  pub xml_children: Vec<MarkerTypeChoice>,
-}
 /// Client Data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_AnchorClientData/xdr:clientData")]
@@ -887,21 +874,6 @@ pub enum BlipFillChoice {
   AStretch(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
   ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum MarkerTypeChoice {
-  /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
-  XdrCol(crate::simple_type::Int32Value),
-  /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
-  XdrColOff(crate::simple_type::Int64Value),
-  /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
-  XdrRow(crate::simple_type::Int32Value),
-  /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
-  XdrRowOff(crate::simple_type::Int64Value),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {

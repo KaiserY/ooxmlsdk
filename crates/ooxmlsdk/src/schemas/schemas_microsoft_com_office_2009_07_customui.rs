@@ -5378,17 +5378,6 @@ pub struct DocumentControlsQatItems {
   ))]
   pub document_controls_qat_items_choice: Vec<DocumentControlsQatItemsChoice>,
 }
-/// Defines the QatItemsType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "mso14:CT_QatItems/")]
-pub struct QatItemsType {
-  #[sdk(choice(
-    qname = "mso14:CT_ControlCloneQat/mso14:control",
-    qname = "mso14:CT_ButtonRegular/mso14:button",
-    qname = "mso14:CT_Separator/mso14:separator"
-  ))]
-  pub xml_children: Vec<QatItemsTypeChoice>,
-}
 /// Defines the Tab Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_Tab/mso14:tab")]
@@ -5583,26 +5572,6 @@ pub struct ItemBackstageItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "mso14:CT_BackstageItem/mso14:radioButton")]
 pub struct RadioButtonBackstageItem {
-  /// id
-  #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
-  pub id: Option<crate::simple_type::StringValue>,
-  /// label
-  #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  pub label: Option<crate::simple_type::StringValue>,
-  /// getLabel
-  #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  pub get_label: Option<crate::simple_type::StringValue>,
-}
-/// Defines the BackstageItemType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "mso14:CT_BackstageItem/")]
-pub struct BackstageItemType {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
   #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
@@ -5882,25 +5851,6 @@ pub struct BottomItemsGroupControls {
     qname = "mso14:CT_ImageControl/mso14:imageControl"
   ))]
   pub xml_children: Vec<BottomItemsGroupControlsChoice>,
-}
-/// Defines the GroupControlsType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "mso14:CT_GroupControls/")]
-pub struct GroupControlsType {
-  #[sdk(choice(
-    qname = "mso14:CT_BackstageGroupButton/mso14:button",
-    qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
-    qname = "mso14:CT_BackstageEditBox/mso14:editBox",
-    qname = "mso14:CT_BackstageDropDown/mso14:dropDown",
-    qname = "mso14:CT_RadioGroup/mso14:radioGroup",
-    qname = "mso14:CT_BackstageComboBox/mso14:comboBox",
-    qname = "mso14:CT_Hyperlink/mso14:hyperlink",
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl",
-    qname = "mso14:CT_GroupBox/mso14:groupBox",
-    qname = "mso14:CT_LayoutContainer/mso14:layoutContainer",
-    qname = "mso14:CT_ImageControl/mso14:imageControl"
-  ))]
-  pub xml_children: Vec<GroupControlsTypeChoice>,
 }
 /// Defines the TaskGroupCategory Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6966,18 +6916,6 @@ pub enum DocumentControlsQatItemsChoice {
   Mso14Separator(std::boxed::Box<Separator>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum QatItemsTypeChoice {
-  /// Defines the ControlCloneQat Class.
-  #[sdk(child(office2010, qname = "mso14:CT_ControlCloneQat/mso14:control"))]
-  Mso14Control(std::boxed::Box<ControlCloneQat>),
-  /// Defines the ButtonRegular Class.
-  #[sdk(child(office2010, qname = "mso14:CT_ButtonRegular/mso14:button"))]
-  Mso14Button(std::boxed::Box<ButtonRegular>),
-  /// Defines the Separator Class.
-  #[sdk(child(office2010, qname = "mso14:CT_Separator/mso14:separator"))]
-  Mso14Separator(std::boxed::Box<Separator>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ContextMenuChoice {
   /// Defines the ControlCloneRegular Class.
   #[sdk(child(office2010, qname = "mso14:CT_ControlCloneRegular/mso14:control"))]
@@ -7090,45 +7028,6 @@ pub enum BottomItemsGroupControlsChoice {
   Mso14GroupBox(std::boxed::Box<GroupBox>),
   #[sdk(child(office2010, qname = "mso14:CT_LayoutContainer/mso14:layoutContainer"))]
   Mso14LayoutContainer(std::boxed::Box<LayoutContainer>),
-  #[sdk(child(office2010, qname = "mso14:CT_ImageControl/mso14:imageControl"))]
-  Mso14ImageControl(std::boxed::Box<ImageControl>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum GroupControlsTypeChoice {
-  /// Defines the BackstageGroupButton Class.
-  #[sdk(child(office2010, qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
-  Mso14Button(std::boxed::Box<BackstageGroupButton>),
-  /// Defines the BackstageCheckBox Class.
-  #[sdk(child(office2010, qname = "mso14:CT_BackstageCheckBox/mso14:checkBox"))]
-  Mso14CheckBox(std::boxed::Box<BackstageCheckBox>),
-  /// Defines the BackstageEditBox Class.
-  #[sdk(child(office2010, qname = "mso14:CT_BackstageEditBox/mso14:editBox"))]
-  Mso14EditBox(std::boxed::Box<BackstageEditBox>),
-  /// Defines the BackstageDropDown Class.
-  #[sdk(child(office2010, qname = "mso14:CT_BackstageDropDown/mso14:dropDown"))]
-  Mso14DropDown(std::boxed::Box<BackstageDropDown>),
-  /// Defines the RadioGroup Class.
-  #[sdk(child(office2010, qname = "mso14:CT_RadioGroup/mso14:radioGroup"))]
-  Mso14RadioGroup(std::boxed::Box<RadioGroup>),
-  /// Defines the BackstageComboBox Class.
-  #[sdk(child(office2010, qname = "mso14:CT_BackstageComboBox/mso14:comboBox"))]
-  Mso14ComboBox(std::boxed::Box<BackstageComboBox>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(office2010, qname = "mso14:CT_Hyperlink/mso14:hyperlink"))]
-  Mso14Hyperlink(std::boxed::Box<Hyperlink>),
-  /// Defines the BackstageLabelControl Class.
-  #[sdk(child(
-    office2010,
-    qname = "mso14:CT_BackstageLabelControl/mso14:labelControl"
-  ))]
-  Mso14LabelControl(std::boxed::Box<BackstageLabelControl>),
-  /// Defines the GroupBox Class.
-  #[sdk(child(office2010, qname = "mso14:CT_GroupBox/mso14:groupBox"))]
-  Mso14GroupBox(std::boxed::Box<GroupBox>),
-  /// Defines the LayoutContainer Class.
-  #[sdk(child(office2010, qname = "mso14:CT_LayoutContainer/mso14:layoutContainer"))]
-  Mso14LayoutContainer(std::boxed::Box<LayoutContainer>),
-  /// Defines the ImageControl Class.
   #[sdk(child(office2010, qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }

@@ -3888,17 +3888,6 @@ pub struct DocumentSpecificQuickAccessToolbarControls {
   pub document_specific_quick_access_toolbar_controls_choice:
     Vec<DocumentSpecificQuickAccessToolbarControlsChoice>,
 }
-/// Defines the QatItemsType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "mso:CT_QatItems/")]
-pub struct QatItemsType {
-  #[sdk(choice(
-    qname = "mso:CT_ControlCloneQat/mso:control",
-    qname = "mso:CT_ButtonRegular/mso:button",
-    qname = "mso:CT_Separator/mso:separator"
-  ))]
-  pub xml_children: Vec<QatItemsTypeChoice>,
-}
 /// Defines the Tab Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "mso:CT_Tab/mso:tab")]
@@ -4357,18 +4346,6 @@ pub enum DocumentSpecificQuickAccessToolbarControlsChoice {
   MsoControl(std::boxed::Box<QuickAccessToolbarControlClone>),
   #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
   MsoButton(std::boxed::Box<UnsizedButton>),
-  #[sdk(child(qname = "mso:CT_Separator/mso:separator"))]
-  MsoSeparator(std::boxed::Box<VerticalSeparator>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum QatItemsTypeChoice {
-  /// Defines the QuickAccessToolbarControlClone Class.
-  #[sdk(child(qname = "mso:CT_ControlCloneQat/mso:control"))]
-  MsoControl(std::boxed::Box<QuickAccessToolbarControlClone>),
-  /// Defines the UnsizedButton Class.
-  #[sdk(child(qname = "mso:CT_ButtonRegular/mso:button"))]
-  MsoButton(std::boxed::Box<UnsizedButton>),
-  /// Defines the VerticalSeparator Class.
   #[sdk(child(qname = "mso:CT_Separator/mso:separator"))]
   MsoSeparator(std::boxed::Box<VerticalSeparator>),
 }

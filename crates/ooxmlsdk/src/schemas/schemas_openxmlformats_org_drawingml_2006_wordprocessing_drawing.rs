@@ -367,31 +367,6 @@ pub struct SimplePosition {
   ))]
   pub y: crate::simple_type::Int64Value,
 }
-/// Defines the Point2DType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Point2D/")]
-pub struct Point2DType {
-  /// X-Axis Coordinate
-  #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub x: crate::simple_type::Int64Value,
-  /// Y-Axis Coordinate
-  #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  pub y: crate::simple_type::Int64Value,
-}
 /// Object Extents Including Effects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_EffectExtent/wp:effectExtent")]

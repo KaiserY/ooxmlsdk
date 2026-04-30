@@ -214,14 +214,3 @@ pub struct ColumnSortMapItem {
   #[sdk(attr(qname = ":oldVal"))]
   pub old_val: crate::simple_type::UInt32Value,
 }
-/// Defines the SortMapItemType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "xne:CT_SortMapItem/")]
-pub struct SortMapItemType {
-  /// New Value
-  #[sdk(attr(qname = ":newVal"))]
-  pub new_val: crate::simple_type::UInt32Value,
-  /// Old Value
-  #[sdk(attr(qname = ":oldVal"))]
-  pub old_val: crate::simple_type::UInt32Value,
-}

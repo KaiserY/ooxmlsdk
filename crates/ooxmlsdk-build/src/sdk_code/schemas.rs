@@ -925,8 +925,9 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
 ) -> Result<TokenStream> {
   let version_cfg = VersionCfgContext::new(suppress_version_cfg_attrs);
   let mut token_stream_list: Vec<TokenStream> = vec![];
-  let mut helper_token_stream_list: Vec<(String, bool, TokenStream)> = vec![];
+  let mut helper_token_stream_list: Vec<(String, bool, bool, TokenStream)> = vec![];
   let omitted_empty_leaf_marker_type_names = empty_leaf_marker_type_names_to_omit(ir);
+  let omitted_abstract_helper_type_names = omitted_abstract_helper_type_names(ir);
   let type_decl_by_name: std::collections::HashMap<_, _> = ir
     .types
     .iter()
@@ -937,6 +938,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
+    .filter(|ty| !ty.is_abstract)
     .map(|ty| ty.rust_name.as_str())
     .collect();
 
@@ -952,6 +954,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
+    .filter(|ty| !ty.is_abstract)
   {
     let attr_fields: Vec<&FieldDecl> = type_decl
       .members
@@ -1580,6 +1583,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         helper_token_stream_list.push((
           type_decl.rust_name.clone(),
           is_generated_anonymous_type_name(&type_decl.rust_name),
+          omitted_abstract_helper_type_names.contains(type_decl.rust_name.as_str()),
           gen_choice_type_decl(type_decl, ir, type_graph, version_cfg)?,
         ));
       }
@@ -1587,6 +1591,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         helper_token_stream_list.push((
           type_decl.rust_name.clone(),
           is_generated_anonymous_type_name(&type_decl.rust_name),
+          omitted_abstract_helper_type_names.contains(type_decl.rust_name.as_str()),
           gen_helper_struct_type_decl(type_decl, ir, type_graph, version_cfg)?,
         ));
       }
@@ -1613,7 +1618,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
   token_stream_list.extend(
     kept_helper_tokens
       .into_iter()
-      .map(|(_, _, tokens)| rename_token_stream_idents(tokens, &anonymous_type_rename_map)),
+      .map(|(_, _, _, tokens)| rename_token_stream_idents(tokens, &anonymous_type_rename_map)),
   );
   Ok(quote! {
     #( #token_stream_list )*
@@ -2680,8 +2685,8 @@ fn is_generated_anonymous_type_name(name: &str) -> bool {
 
 fn prune_unreferenced_anonymous_emitted_types(
   non_helper_tokens: &[TokenStream],
-  helper_tokens: Vec<(String, bool, TokenStream)>,
-) -> Vec<(String, bool, TokenStream)> {
+  helper_tokens: Vec<(String, bool, bool, TokenStream)>,
+) -> Vec<(String, bool, bool, TokenStream)> {
   let mut kept = helper_tokens;
 
   loop {
@@ -2689,12 +2694,12 @@ fn prune_unreferenced_anonymous_emitted_types(
       non_helper_tokens.iter().map(ToString::to_string).collect();
     let rendered_helper: Vec<String> = kept
       .iter()
-      .map(|(_, _, tokens)| tokens.to_string())
+      .map(|(_, _, _, tokens)| tokens.to_string())
       .collect();
     let before_len = kept.len();
 
-    kept.retain(|(rust_name, is_anonymous, _)| {
-      if !*is_anonymous {
+    kept.retain(|(rust_name, is_anonymous, prune_if_unreferenced, _)| {
+      if !*is_anonymous && !*prune_if_unreferenced {
         return true;
       }
 
@@ -2717,15 +2722,15 @@ fn prune_unreferenced_anonymous_emitted_types(
 
 fn anonymous_emitted_type_rename_map(
   non_helper_type_names: &HashSet<String>,
-  helper_tokens: &[(String, bool, TokenStream)],
+  helper_tokens: &[(String, bool, bool, TokenStream)],
 ) -> HashMap<String, String> {
   let helper_names: HashSet<String> = helper_tokens
     .iter()
-    .map(|(rust_name, _, _)| rust_name.clone())
+    .map(|(rust_name, _, _, _)| rust_name.clone())
     .collect();
   let mut groups: HashMap<String, Vec<String>> = HashMap::new();
 
-  for (rust_name, is_anonymous, _) in helper_tokens {
+  for (rust_name, is_anonymous, _, _) in helper_tokens {
     if !*is_anonymous {
       continue;
     }
@@ -3704,6 +3709,33 @@ fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }
 
+fn omitted_abstract_helper_type_names(ir: &SchemaModuleDecl) -> HashSet<&str> {
+  let helper_type_names: HashSet<&str> = ir
+    .types
+    .iter()
+    .filter(|type_decl| {
+      matches!(
+        type_decl.kind,
+        TypeKind::ChoiceEnum | TypeKind::HelperStruct
+      )
+    })
+    .map(|type_decl| type_decl.rust_name.as_str())
+    .collect();
+
+  ir.types
+    .iter()
+    .filter(|type_decl| type_decl.is_abstract)
+    .flat_map(|type_decl| &type_decl.members)
+    .filter_map(|member| match member {
+      MemberDecl::Field(field) if field.type_ref.module_path.is_none() => {
+        Some(field.type_ref.rust_type.as_str())
+      }
+      _ => None,
+    })
+    .filter(|rust_type| helper_type_names.contains(rust_type))
+    .collect()
+}
+
 fn child_field_name(child: &SchemaTypeChild, _child_type: &SchemaType) -> String {
   let raw_name = if child.property_name.is_empty() {
     child.name.split('/').nth(1).unwrap_or(child.name.as_str())
@@ -3870,6 +3902,20 @@ mod tests {
     assert!(
       generated.contains("# [sdk (empty_child (microsoft365 , qname = \"p:CT_Empty/p228:add\"))]")
     );
+  }
+
+  #[test]
+  fn omits_abstract_schema_base_structs_but_keeps_derived_support_fields() {
+    let schema = read_codegen_ir_schema_json(
+      "../../sdk_data/schemas/schemas_openxmlformats_org_drawingml_2006_main.json",
+    );
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(!generated.contains("pub struct StyleMatrixReferenceType"));
+    assert!(!generated.contains("pub enum StyleMatrixReferenceTypeChoice"));
+    assert!(generated.contains("pub struct FillReference"));
+    assert!(generated.contains("pub xml_other_attrs : Vec < (String , String) >"));
+    assert!(generated.contains("pub xml_other_children : Vec < (usize , String) >"));
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {

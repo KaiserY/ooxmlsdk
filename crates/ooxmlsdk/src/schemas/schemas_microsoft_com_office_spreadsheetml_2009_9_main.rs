@@ -1052,14 +1052,6 @@ pub struct DataValidationForumla2 {
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::simple_type::StringValue,
 }
-/// Defines the DataValidationFormulaType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2010, qname = "x14:CT_DataValidationFormula/")]
-pub struct DataValidationFormulaType {
-  /// _
-  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: Vec<crate::simple_type::StringValue>,
-}
 /// Defines the SparklineGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup")]
@@ -1423,27 +1415,6 @@ pub struct NegativeBorderColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x:CT_Color/x14:axisColor")]
 pub struct BarAxisColor {
-  /// Automatic
-  #[sdk(attr(qname = ":auto"))]
-  pub auto: Option<crate::simple_type::BooleanValue>,
-  /// Index
-  #[sdk(attr(qname = ":indexed"))]
-  pub indexed: Option<crate::simple_type::UInt32Value>,
-  /// Alpha Red Green Blue Color Value
-  #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
-  pub rgb: Option<crate::simple_type::HexBinaryValue>,
-  /// Theme Color
-  #[sdk(attr(qname = ":theme"))]
-  pub theme: Option<crate::simple_type::UInt32Value>,
-  /// Tint
-  #[sdk(attr(qname = ":tint"))]
-  pub tint: Option<crate::simple_type::DoubleValue>,
-}
-/// Defines the ColorType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "x:CT_Color/")]
-pub struct ColorType {
   /// Automatic
   #[sdk(attr(qname = ":auto"))]
   pub auto: Option<crate::simple_type::BooleanValue>,

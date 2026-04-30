@@ -62,16 +62,6 @@ pub struct NotesGuideList {
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
   pub p15_ext_lst: Option<ExtensionList>,
 }
-/// Defines the ExtendedGuideList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2013, qname = "p15:CT_ExtendedGuideList/")]
-pub struct ExtendedGuideList {
-  #[sdk(choice(
-    qname = "p15:CT_ExtendedGuide/p15:guide",
-    qname = "p:CT_ExtensionList/p15:extLst"
-  ))]
-  pub xml_children: Vec<ExtendedGuideListChoice>,
-}
 /// Defines the ChartTrackingReferenceBased Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(
@@ -146,15 +136,6 @@ pub struct ExtendedGuide {
   /// _
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ExtendedGuideListChoice {
-  /// Defines the ExtendedGuide Class.
-  #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
-  P15Guide(std::boxed::Box<ExtendedGuide>),
-  /// Defines the ExtensionList Class.
-  #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
-  P15ExtLst(std::boxed::Box<ExtensionList>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {

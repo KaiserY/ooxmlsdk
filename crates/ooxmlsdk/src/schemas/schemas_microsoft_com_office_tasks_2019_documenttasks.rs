@@ -150,20 +150,6 @@ pub struct UnassignTaskUser {
   #[sdk(attr(office2021, qname = ":userProvider"))]
   pub user_provider: crate::simple_type::StringValue,
 }
-/// Defines the OpenXmlTaskUserElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2021, qname = "t:CT_TaskUser/")]
-pub struct OpenXmlTaskUserElement {
-  /// userId
-  #[sdk(attr(office2021, qname = ":userId"))]
-  pub user_id: crate::simple_type::StringValue,
-  /// userName
-  #[sdk(attr(office2021, qname = ":userName"))]
-  pub user_name: crate::simple_type::StringValue,
-  /// userProvider
-  #[sdk(attr(office2021, qname = ":userProvider"))]
-  pub user_provider: crate::simple_type::StringValue,
-}
 /// Defines the TaskTitleEventInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "t:CT_TaskTitleEventInfo/t:SetTitle")]

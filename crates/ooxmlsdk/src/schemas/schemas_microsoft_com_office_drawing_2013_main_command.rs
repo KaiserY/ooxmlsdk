@@ -192,8 +192,6 @@ pub type ImgDataImgData = crate::simple_type::Base64BinaryValue;
 pub type OrigImgDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the SndDataImgData Class.
 pub type SndDataImgData = crate::simple_type::Base64BinaryValue;
-/// Defines the OpenXmlImgDataElement Class.
-pub type OpenXmlImgDataElement = crate::simple_type::Base64BinaryValue;
 /// Defines the ResourceUrl Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "oac:CT_ResourceUrl/oac:imgUrl")]
@@ -907,25 +905,6 @@ pub struct EffectRefStyleMatrixReference {
   ))]
   pub xml_children: Option<EffectRefStyleMatrixReferenceChoice>,
 }
-/// Defines the StyleMatrixReferenceType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_StyleMatrixReference/")]
-pub struct StyleMatrixReferenceType {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
-  /// Style Matrix Index
-  #[sdk(attr(qname = ":idx"))]
-  pub index: crate::simple_type::UInt32Value,
-  #[sdk(choice(
-    qname = "a:CT_ScRgbColor/a:scrgbClr",
-    qname = "a:CT_SRgbColor/a:srgbClr",
-    qname = "a:CT_HslColor/a:hslClr",
-    qname = "a:CT_SystemColor/a:sysClr",
-    qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr"
-  ))]
-  pub xml_children: Option<StyleMatrixReferenceTypeChoice>,
-}
 /// Defines the FontReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_FontReference/oac:fontRef")]
@@ -1011,23 +990,6 @@ pub struct FillRectRelativeRectProps {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "oac:CT_RelativeRectProps/oac:srcRect")]
 pub struct SrcRectRelativeRectProps {
-  /// l
-  #[sdk(attr(office2016, qname = ":l"))]
-  pub l: Option<crate::simple_type::Int32Value>,
-  /// t
-  #[sdk(attr(office2016, qname = ":t"))]
-  pub t: Option<crate::simple_type::Int32Value>,
-  /// r
-  #[sdk(attr(office2016, qname = ":r"))]
-  pub r: Option<crate::simple_type::Int32Value>,
-  /// b
-  #[sdk(attr(office2016, qname = ":b"))]
-  pub b: Option<crate::simple_type::Int32Value>,
-}
-/// Defines the OpenXmlRelativeRectPropsElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_RelativeRectProps/")]
-pub struct OpenXmlRelativeRectPropsElement {
   /// l
   #[sdk(attr(office2016, qname = ":l"))]
   pub l: Option<crate::simple_type::Int32Value>,
@@ -1249,17 +1211,6 @@ pub struct StCxnConnection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_Connection/oac:endCxn")]
 pub struct EndCxnConnection {
-  /// Identifier
-  #[sdk(attr(qname = ":id"))]
-  pub id: crate::simple_type::UInt32Value,
-  /// Index
-  #[sdk(attr(qname = ":idx"))]
-  pub index: crate::simple_type::UInt32Value,
-}
-/// Defines the ConnectionType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "a:CT_Connection/")]
-pub struct ConnectionType {
   /// Identifier
   #[sdk(attr(qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
@@ -1628,35 +1579,6 @@ pub struct HlinkHoverHyperlinkProps {
   #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
   pub snd_data_img_data: Option<crate::simple_type::Base64BinaryValue>,
 }
-/// Defines the OpenXmlHyperlinkPropsElement Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_HyperlinkProps/")]
-pub struct OpenXmlHyperlinkPropsElement {
-  /// source
-  #[sdk(attr(office2016, qname = ":source"))]
-  pub source: Option<crate::simple_type::StringValue>,
-  /// action
-  #[sdk(attr(office2016, qname = ":action"))]
-  pub action: Option<crate::simple_type::StringValue>,
-  /// tgtFrame
-  #[sdk(attr(office2016, qname = ":tgtFrame"))]
-  pub tgt_frame: Option<crate::simple_type::StringValue>,
-  /// tooltip
-  #[sdk(attr(office2016, qname = ":tooltip"))]
-  pub tooltip: Option<crate::simple_type::StringValue>,
-  /// highlightClick
-  #[sdk(attr(office2016, qname = ":highlightClick"))]
-  pub highlight_click: Option<crate::simple_type::BooleanValue>,
-  /// endSnd
-  #[sdk(attr(office2016, qname = ":endSnd"))]
-  pub end_snd: Option<crate::simple_type::BooleanValue>,
-  /// sndName
-  #[sdk(attr(office2016, qname = ":sndName"))]
-  pub snd_name: Option<crate::simple_type::StringValue>,
-  /// _
-  #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
-  pub snd_data_img_data: Vec<crate::simple_type::Base64BinaryValue>,
-}
 /// Defines the ModifyHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "oac:CT_ModifyHyperlinkProps/oac:hlink")]
@@ -1912,43 +1834,6 @@ pub enum FillRefStyleMatrixReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectRefStyleMatrixReferenceChoice {
-  /// RGB Color Model - Percentage Variant.
-  #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
-  /// RGB Color Model - Hex Variant.
-  #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
-  /// Hue, Saturation, Luminance Color Model.
-  #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
-  /// System Color.
-  #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
-  /// Scheme Color.
-  #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
-  /// Preset Color.
-  #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum StyleMatrixReferenceTypeChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(

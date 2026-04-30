@@ -159,16 +159,6 @@ pub struct HyperlinkList {
     crate::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VtVector,
   >,
 }
-/// Defines the VectorVariantType Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "ap:CT_VectorVariant/")]
-pub struct VectorVariantType {
-  /// Vector
-  #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
-  pub vt_vector: Vec<
-    crate::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VtVector,
-  >,
-}
 /// Part Titles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ap:CT_VectorLpstr/ap:TitlesOfParts")]

@@ -1631,7 +1631,7 @@ impl SdkPackageStorage {
 
   fn add_content_type_override(&mut self, path: &str, content_type: &str) {
     let part_name = format!("/{path}");
-    if self.content_types.xml_children.iter().any(|child| {
+    if self.content_types.types_choice.iter().any(|child| {
       matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
     }) {
       return;
@@ -1639,7 +1639,7 @@ impl SdkPackageStorage {
 
     self
       .content_types
-      .xml_children
+      .types_choice
       .push(TypesChoice::Override(Box::new(
         crate::schemas::opc_content_types::Override {
           content_type: content_type.to_string(),
@@ -1650,7 +1650,7 @@ impl SdkPackageStorage {
 
   fn remove_content_type_override(&mut self, path: &str) {
     let part_name = format!("/{path}");
-    self.content_types.xml_children.retain(|child| {
+    self.content_types.types_choice.retain(|child| {
       !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
     });
   }
@@ -1855,7 +1855,7 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
       "http://schemas.openxmlformats.org/package/2006/content-types",
     )],
     xml_header: super::XmlHeaderType::Standalone,
-    xml_children: raw_parts
+    types_choice: raw_parts
       .iter()
       .map(|part| {
         TypesChoice::Override(Box::new(crate::schemas::opc_content_types::Override {
@@ -2298,7 +2298,7 @@ fn content_type_for_part<'a>(content_types: &'a Types, path: &str) -> Option<&'a
   let extension = path.rsplit_once('.').map(|(_, extension)| extension);
   let mut default_content_type = None;
 
-  for child in &content_types.xml_children {
+  for child in &content_types.types_choice {
     match child {
       TypesChoice::Override(override_type) if override_type.part_name == normalized_part_name => {
         return Some(override_type.content_type.as_str());

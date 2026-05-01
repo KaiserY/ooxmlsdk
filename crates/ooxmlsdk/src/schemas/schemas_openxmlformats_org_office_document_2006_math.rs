@@ -259,7 +259,7 @@ pub struct Delimiter {
   /// Delimiter Properties
   #[sdk(child(qname = "m:CT_DPr/m:dPr"))]
   pub delimiter_properties: Option<std::boxed::Box<DelimiterProperties>>,
-  /// _
+  /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
   pub m_e: Vec<Base>,
 }
@@ -270,7 +270,7 @@ pub struct EquationArray {
   /// Equation Array Properties
   #[sdk(child(qname = "m:CT_EqArrPr/m:eqArrPr"))]
   pub equation_array_properties: Option<std::boxed::Box<EquationArrayProperties>>,
-  /// _
+  /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
   pub m_e: Vec<Base>,
 }
@@ -348,7 +348,7 @@ pub struct Matrix {
   /// Matrix Properties
   #[sdk(child(qname = "m:CT_MPr/m:mPr"))]
   pub matrix_properties: Option<std::boxed::Box<MatrixProperties>>,
-  /// _
+  /// Matrix Row.
   #[sdk(child(qname = "m:CT_MR/m:mr"))]
   pub m_mr: Vec<MatrixRow>,
 }
@@ -615,10 +615,10 @@ pub struct MathProperties {
     qname = "m:CT_OnOff/m:wrapRight"
   ))]
   pub math_properties_choice: Option<MathPropertiesChoice>,
-  /// _
+  /// Integral Limit Locations.
   #[sdk(child(qname = "m:CT_LimLoc/m:intLim"))]
   pub m_int_lim: Option<IntegralLimitLocation>,
-  /// _
+  /// n-ary Limit Location.
   #[sdk(child(qname = "m:CT_LimLoc/m:naryLim"))]
   pub m_nary_lim: Option<NaryLimitLocation>,
 }
@@ -900,10 +900,10 @@ pub struct RunProperties {
     qname = "m:CT_Style/m:sty"
   ))]
   pub run_properties_choice: Option<RunPropertiesChoice>,
-  /// _
+  /// Break.
   #[sdk(child(qname = "m:CT_ManualBreak/m:brk"))]
   pub m_brk: Option<Break>,
-  /// _
+  /// Align.
   #[sdk(child(qname = "m:CT_OnOff/m:aln"))]
   pub m_aln: Option<Alignment>,
 }
@@ -1048,7 +1048,7 @@ pub struct Base {
     any
   ))]
   pub base_choice: Vec<BaseChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1121,7 +1121,7 @@ pub struct Numerator {
     any
   ))]
   pub numerator_choice: Vec<NumeratorChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1194,7 +1194,7 @@ pub struct Denominator {
     any
   ))]
   pub denominator_choice: Vec<DenominatorChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1267,7 +1267,7 @@ pub struct FunctionName {
     any
   ))]
   pub function_name_choice: Vec<FunctionNameChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1340,7 +1340,7 @@ pub struct Limit {
     any
   ))]
   pub limit_choice: Vec<LimitChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1413,7 +1413,7 @@ pub struct SubArgument {
     any
   ))]
   pub sub_argument_choice: Vec<SubArgumentChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1486,7 +1486,7 @@ pub struct SuperArgument {
     any
   ))]
   pub super_argument_choice: Vec<SuperArgumentChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1559,7 +1559,7 @@ pub struct Degree {
     any
   ))]
   pub degree_choice: Vec<DegreeChoice>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub m_ctrl_pr: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1586,7 +1586,7 @@ pub struct BarProperties {
   /// Position (Bar)
   #[sdk(child(qname = "m:CT_TopBot/m:pos"))]
   pub position: Option<Position>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1609,7 +1609,7 @@ pub struct BoxProperties {
   /// Alignment
   #[sdk(child(qname = "m:CT_OnOff/m:aln"))]
   pub alignment: Option<Alignment>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1641,7 +1641,7 @@ pub struct BorderBoxProperties {
   /// Border Box Strikethrough Top-Left to Bottom-Right
   #[sdk(child(qname = "m:CT_OnOff/m:strikeTLBR"))]
   pub strike_top_left_to_bottom_right: Option<StrikeTopLeftToBottomRight>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1672,7 +1672,7 @@ pub struct DelimiterProperties {
   /// Shape (Delimiters)
   #[sdk(child(qname = "m:CT_Shp/m:shp"))]
   pub shape: Option<Shape>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1749,7 +1749,7 @@ pub struct EquationArrayProperties {
   /// Row Spacing (Equation Array)
   #[sdk(child(qname = "m:CT_UnSignedShort/m:rSp"))]
   pub row_spacing: Option<RowSpacing>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1768,7 +1768,7 @@ pub struct FractionProperties {
   /// Fraction type
   #[sdk(child(qname = "m:CT_FType/m:type"))]
   pub fraction_type: Option<FractionType>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1776,7 +1776,7 @@ pub struct FractionProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_FuncPr/m:funcPr")]
 pub struct FunctionProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1793,7 +1793,7 @@ pub struct GroupCharProperties {
   /// Vertical Justification
   #[sdk(child(qname = "m:CT_TopBot/m:vertJc"))]
   pub vertical_justification: Option<VerticalJustification>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1801,7 +1801,7 @@ pub struct GroupCharProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimLowPr/m:limLowPr")]
 pub struct LimitLowerProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1809,7 +1809,7 @@ pub struct LimitLowerProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_LimUppPr/m:limUppPr")]
 pub struct LimitUpperProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -1971,7 +1971,7 @@ pub struct WrapIndent {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MCS/m:mcs")]
 pub struct MatrixColumns {
-  /// _
+  /// Matrix Column.
   #[sdk(child(qname = "m:CT_MC/m:mc"))]
   pub m_mc: Vec<MatrixColumn>,
 }
@@ -2003,7 +2003,7 @@ pub struct MatrixProperties {
   /// Matrix Columns
   #[sdk(child(qname = "m:CT_MCS/m:mcs"))]
   pub matrix_columns: Option<MatrixColumns>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2011,7 +2011,7 @@ pub struct MatrixProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_MR/m:mr")]
 pub struct MatrixRow {
-  /// _
+  /// Base.
   #[sdk(child(qname = "m:CT_OMathArg/m:e"))]
   pub m_e: Vec<Base>,
 }
@@ -2058,7 +2058,7 @@ pub struct NaryProperties {
   /// Hide Superscript (n-ary)
   #[sdk(child(qname = "m:CT_OnOff/m:supHide"))]
   pub hide_super_argument: Option<HideSuperArgument>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2081,7 +2081,7 @@ pub struct PhantomProperties {
   /// Transparent (Phantom)
   #[sdk(child(qname = "m:CT_OnOff/m:transp"))]
   pub transparent: Option<Transparent>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2092,7 +2092,7 @@ pub struct RadicalProperties {
   /// Hide Degree
   #[sdk(child(qname = "m:CT_OnOff/m:degHide"))]
   pub hide_degree: Option<HideDegree>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2100,7 +2100,7 @@ pub struct RadicalProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SPrePr/m:sPrePr")]
 pub struct PreSubSuperProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2108,7 +2108,7 @@ pub struct PreSubSuperProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSubPr/m:sSubPr")]
 pub struct SubscriptProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2119,7 +2119,7 @@ pub struct SubSuperscriptProperties {
   /// Align Scripts
   #[sdk(child(qname = "m:CT_OnOff/m:alnScr"))]
   pub align_scripts: Option<AlignScripts>,
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2127,7 +2127,7 @@ pub struct SubSuperscriptProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_SSupPr/m:sSupPr")]
 pub struct SuperscriptProperties {
-  /// _
+  /// Control Properties.
   #[sdk(child(qname = "m:CT_CtrlPr/m:ctrlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -2601,7 +2601,35 @@ pub enum ParagraphChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -2948,35 +2976,9 @@ pub enum OfficeMathChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<OfficeMathChoice2>),
+  Choice2(std::boxed::Box<OfficeMathChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -3002,7 +3004,6 @@ pub struct RunPropertiesChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice {
-  /// Normal Text.
   #[sdk(child(qname = "m:CT_OnOff/m:nor"))]
   MNor(std::boxed::Box<NormalText>),
   /// Sequence of m:scr, m:sty
@@ -3012,7 +3013,7 @@ pub enum RunPropertiesChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ControlPropertiesChoice {
   #[sdk(child(qname = "w:CT_RPr/w:rPr"))]
-  EgRPr(
+  Sequence(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::RunProperties,
     >,
@@ -3048,7 +3049,35 @@ pub enum ControlPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -3395,35 +3424,9 @@ pub enum BaseChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<BaseChoice2>),
+  Choice2(std::boxed::Box<BaseChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -3433,7 +3436,35 @@ pub enum BaseChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -3780,35 +3811,9 @@ pub enum NumeratorChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<NumeratorChoice2>),
+  Choice2(std::boxed::Box<NumeratorChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -3818,7 +3823,35 @@ pub enum NumeratorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -4165,35 +4198,9 @@ pub enum DenominatorChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<DenominatorChoice2>),
+  Choice2(std::boxed::Box<DenominatorChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -4203,7 +4210,35 @@ pub enum DenominatorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -4550,35 +4585,9 @@ pub enum FunctionNameChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<FunctionNameChoice2>),
+  Choice2(std::boxed::Box<FunctionNameChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -4588,7 +4597,35 @@ pub enum FunctionNameChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -4935,35 +4972,9 @@ pub enum LimitChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<LimitChoice2>),
+  Choice2(std::boxed::Box<LimitChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -4973,7 +4984,35 @@ pub enum LimitChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -5320,35 +5359,9 @@ pub enum SubArgumentChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<SubArgumentChoice2>),
+  Choice2(std::boxed::Box<SubArgumentChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -5358,7 +5371,35 @@ pub enum SubArgumentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -5705,35 +5746,9 @@ pub enum SuperArgumentChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<SuperArgumentChoice2>),
+  Choice2(std::boxed::Box<SuperArgumentChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -5743,7 +5758,35 @@ pub enum SuperArgumentChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice2 {
-  /// Defines the ProofError Class.
+  /// Defines the CustomXmlRun Class.
+    #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+    WCustomXml(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
+        >,
+    ),
+    /// Defines the SimpleField Class.
+    #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+    WFldSimple(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
+        >,
+    ),
+    /// Defines the Hyperlink Class.
+    #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+    WHyperlink(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
+        >,
+    ),
+    /// Defines the SdtRun Class.
+    #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+    WSdt(
+        std::boxed::Box<
+            crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun,
+        >,
+    ),
+    /// Defines the ProofError Class.
     #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
     WProofErr(
         std::boxed::Box<
@@ -6090,35 +6133,9 @@ pub enum DegreeChoice {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<Run>),
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::CustomXmlRun,
-    >,
-  ),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SimpleField,
-    >,
-  ),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::Hyperlink,
-    >,
-  ),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::SdtRun>,
-  ),
-  /// Choice of choice1, choice2
+  /// Choice of w:customXml, w:fldSimple, w:hyperlink, w:sdt, w:proofErr, w:permStart, w:permEnd, w:bookmarkStart, w:bookmarkEnd, w:commentRangeStart, w:commentRangeEnd, w:moveFromRangeStart, w:moveFromRangeEnd, w:moveToRangeStart, w:moveToRangeEnd, w:customXmlInsRangeStart, w:customXmlInsRangeEnd, w:customXmlDelRangeStart, w:customXmlDelRangeEnd, w:customXmlMoveFromRangeStart, w:customXmlMoveFromRangeEnd, w:customXmlMoveToRangeStart, w:customXmlMoveToRangeEnd, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence33, m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
   #[sdk(choice)]
-  EgRunLevelElts(std::boxed::Box<DegreeChoice2>),
+  Choice2(std::boxed::Box<DegreeChoice2>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),

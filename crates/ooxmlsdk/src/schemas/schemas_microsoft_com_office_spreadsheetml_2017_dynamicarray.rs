@@ -17,7 +17,7 @@ pub struct DynamicArrayProperties {
   /// fCollapsed
   #[sdk(attr(office2019, qname = ":fCollapsed"))]
   pub f_collapsed: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xda:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -28,5 +28,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }

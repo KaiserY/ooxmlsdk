@@ -11,10 +11,10 @@ pub struct PersonList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Person Class.
   #[sdk(child(office2019, qname = "xltc:CT_Person/xltc:person"))]
   pub xltc_person: Vec<Person>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
   pub xltc_ext_lst: Option<ExtensionList>,
 }
@@ -25,10 +25,10 @@ pub struct ThreadedComments {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the ThreadedComment Class.
   #[sdk(child(office2019, qname = "xltc:CT_ThreadedComment/xltc:threadedComment"))]
   pub xltc_threaded_comment: Vec<ThreadedComment>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
   pub xltc_ext_lst: Option<ExtensionList>,
 }
@@ -53,7 +53,7 @@ pub struct Person {
   /// providerId
   #[sdk(attr(office2019, qname = ":providerId"))]
   pub provider_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -64,7 +64,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the ThreadedComment Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -103,13 +103,13 @@ pub struct ThreadedComment {
   /// done
   #[sdk(attr(office2019, qname = ":done"))]
   pub done: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ThreadedCommentText Class.
   #[sdk(text_child(office2019, qname = "x:ST_Xstring/xltc:text"))]
   pub threaded_comment_text: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ThreadedCommentMentions Class.
   #[sdk(child(office2019, qname = "xltc:CT_ThreadedCommentMentions/xltc:mentions"))]
   pub threaded_comment_mentions: Option<ThreadedCommentMentions>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xltc:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -119,7 +119,7 @@ pub type ThreadedCommentText = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xltc:CT_ThreadedCommentMentions/xltc:mentions")]
 pub struct ThreadedCommentMentions {
-  /// _
+  /// Defines the Mention Class.
   #[sdk(child(office2019, qname = "xltc:CT_Mention/xltc:mention"))]
   pub xltc_mention: Vec<Mention>,
 }

@@ -11,10 +11,10 @@ pub struct Tasks {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Task Class.
   #[sdk(child(office2021, qname = "t:CT_Task/t:Task"))]
   pub t_task: Vec<Task>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
   pub t_ext_lst: Option<ExtensionList>,
 }
@@ -30,13 +30,13 @@ pub struct Task {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
-  /// _
+  /// Defines the TaskHistory Class.
   #[sdk(child(office2021, qname = "t:CT_TaskHistory/t:History"))]
   pub task_history: Option<TaskHistory>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -45,7 +45,7 @@ pub struct Task {
 #[sdk(office2021, qname = "oel:CT_ExtensionList/t:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "oel:CT_Extension/oel:ext"))]
   pub oel_ext: Vec<crate::schemas::schemas_microsoft_com_office_2019_extlst::Extension>,
 }
@@ -53,10 +53,10 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "t:CT_TaskAnchor/t:Anchor")]
 pub struct TaskAnchor {
-  /// _
+  /// Defines the CommentAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_CommentAnchor/t:Comment"))]
   pub comment_anchor: Option<CommentAnchor>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -64,7 +64,7 @@ pub struct TaskAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "t:CT_TaskHistory/t:History")]
 pub struct TaskHistory {
-  /// _
+  /// Defines the TaskHistoryEvent Class.
   #[sdk(child(office2021, qname = "t:CT_TaskHistoryEvent/t:Event"))]
   pub t_event: Vec<TaskHistoryEvent>,
 }
@@ -83,10 +83,10 @@ pub struct TaskHistoryEvent {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the AttributionTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Attribution"))]
-  pub attribution_task_user: std::boxed::Box<AttributionTaskUser>,
-  /// _
+  pub attribution_task_user: Option<AttributionTaskUser>,
+  /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
   #[sdk(choice(
@@ -104,7 +104,7 @@ pub struct TaskHistoryEvent {
     qname = "t:CT_TaskUndo/t:Undo"
   ))]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
   pub t_ext_lst: Option<ExtensionList>,
 }

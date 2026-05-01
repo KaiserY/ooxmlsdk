@@ -28,7 +28,7 @@ pub struct TextBodyType {
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
   >,
-  /// _
+  /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
@@ -42,7 +42,7 @@ pub struct CommentPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Data for the Windows platform..
   #[sdk(child(office2021, qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
-  pub comment_properties_extension: Vec<
+  pub p_ext: Vec<
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentPropertiesExtension,
   >,
 }
@@ -53,7 +53,7 @@ pub struct AuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Author Class.
   #[sdk(child(office2021, qname = "p188:CT_Author/p188:author"))]
   pub p188_author: Vec<Author>,
 }
@@ -64,7 +64,7 @@ pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Comment Class.
   #[sdk(child(office2021, qname = "p188:CT_Comment/p188:cm"))]
   pub p188_cm: Vec<Comment>,
 }
@@ -83,8 +83,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension:
-    Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
 }
 /// Defines the Author Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -106,7 +105,7 @@ pub struct Author {
   /// providerId
   #[sdk(attr(office2021, qname = ":providerId"))]
   pub provider_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "p:CT_ExtensionList/p188:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -174,7 +173,7 @@ pub struct Point2DType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p188:CT_CommentReplyList/p188:replyLst")]
 pub struct CommentReplyList {
-  /// _
+  /// Defines the CommentReply Class.
   #[sdk(child(office2021, qname = "p188:CT_CommentReply/p188:reply"))]
   pub p188_reply: Vec<CommentReply>,
 }
@@ -249,21 +248,21 @@ pub struct Comment {
     qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"
   ))]
   pub comment_choice: Option<CommentChoice>,
-  /// _
+  /// Defines the Point2DType Class.
   #[sdk(child(office2021, qname = "a:CT_Point2D/p188:pos"))]
   pub p188_pos: Option<Point2DType>,
-  /// _
+  /// Defines the CommentReplyList Class.
   #[sdk(child(office2021, qname = "p188:CT_CommentReplyList/p188:replyLst"))]
   pub p188_reply_lst: Option<CommentReplyList>,
   /// Defines the TextBodyType Class.
   #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
-  pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
+  pub p188_tx_body: Option<std::boxed::Box<TextBodyType>>,
   /// Defines the CommentPropertiesExtensionList Class.
   #[sdk(child(
     office2021,
     qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
   ))]
-  pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
+  pub p188_ext_lst: Option<CommentPropertiesExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {

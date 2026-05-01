@@ -25,7 +25,7 @@ pub struct AdditionalCharacteristicsInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Single Characteristic.
   #[sdk(child(qname = "ac:CT_Characteristic/ac:characteristic"))]
   pub ac_characteristic: Vec<Characteristic>,
 }

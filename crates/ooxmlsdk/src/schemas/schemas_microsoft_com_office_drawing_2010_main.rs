@@ -44,16 +44,16 @@ pub struct GvmlContentPart {
   /// id
   #[sdk(attr(office2010, qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the NonVisualContentPartProperties Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_GvmlContentPartNonVisual/a14:nvContentPartPr"
   ))]
   pub non_visual_content_part_properties: Option<std::boxed::Box<NonVisualContentPartProperties>>,
-  /// _
+  /// Defines the Transform2D Class.
   #[sdk(child(office2010, qname = "a:CT_Transform2D/a14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -77,7 +77,7 @@ pub struct HiddenFillProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub xml_children: Option<HiddenFillPropertiesChoice>,
+  pub hidden_fill_properties_choice: Option<HiddenFillPropertiesChoice>,
 }
 /// Defines the HiddenLineProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -127,13 +127,13 @@ pub struct HiddenLineProperties {
     qname = "a:CT_LineJoinMiterProperties/a:miter"
   ))]
   pub hidden_line_properties_choice3: Option<HiddenLinePropertiesChoice3>,
-  /// _
+  /// default head line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:headEnd"))]
   pub a_head_end: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HeadEnd>,
-  /// _
+  /// default tail line end style is none.
   #[sdk(child(qname = "a:CT_LineEndProperties/a:tailEnd"))]
   pub a_tail_end: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TailEnd>,
-  /// _
+  /// Future extensions..
   #[sdk(child(qname = "a:CT_LinePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LinePropertiesExtensionList,
@@ -147,7 +147,7 @@ pub struct HiddenEffectsProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub xml_children: Option<HiddenEffectsPropertiesChoice>,
+  pub hidden_effects_properties_choice: Option<HiddenEffectsPropertiesChoice>,
 }
 /// Defines the HiddenScene3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -166,7 +166,7 @@ pub struct HiddenScene3D {
   pub backdrop: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Backdrop>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -228,7 +228,7 @@ pub struct HiddenShape3D {
   pub contour_color: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ContourColor>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -238,7 +238,7 @@ pub struct HiddenShape3D {
 #[sdk(office2010, qname = "a14:CT_Photo/a14:imgProps")]
 pub struct ImageProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ImageLayer Class.
   #[sdk(child(office2010, qname = "a14:CT_PictureLayer/a14:imgLayer"))]
   pub image_layer: std::boxed::Box<ImageLayer>,
 }
@@ -258,7 +258,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the ContentPartLocks Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -294,7 +294,7 @@ pub struct ContentPartLocks {
   /// Disallow Shape Type Change
   #[sdk(attr(qname = ":noChangeShapeType"))]
   pub no_change_shape_type: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -1032,13 +1032,13 @@ pub struct BackgroundRemoval {
     max_inclusive = true
   ))]
   pub marquee_right: crate::simple_type::Int32Value,
-  /// _
+  /// Defines the ForegroundMark Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_PictureEffectBackgroundRemovalForegroundMark/a14:foregroundMark"
   ))]
   pub a14_foreground_mark: Vec<ForegroundMark>,
-  /// _
+  /// Defines the BackgroundMark Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_PictureEffectBackgroundRemovalBackgroundMark/a14:backgroundMark"
@@ -1160,7 +1160,7 @@ pub struct ImageEffect {
     qname = "a14:CT_PictureEffectSaturation/a14:saturation",
     qname = "a14:CT_PictureEffectSharpenSoften/a14:sharpenSoften"
   ))]
-  pub xml_children: Option<ImageEffectChoice>,
+  pub image_effect_choice: Option<ImageEffectChoice>,
 }
 /// Defines the ImageLayer Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1169,7 +1169,7 @@ pub struct ImageLayer {
   /// embed
   #[sdk(attr(office2010, qname = "r:embed"))]
   pub embed: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ImageEffect Class.
   #[sdk(child(office2010, qname = "a14:CT_PictureEffect/a14:imgEffect"))]
   pub a14_img_effect: Vec<ImageEffect>,
 }
@@ -1223,10 +1223,10 @@ pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ContentPartLocks Class.
   #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
   pub content_part_locks: Option<std::boxed::Box<ContentPartLocks>>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -1237,10 +1237,10 @@ pub struct NonVisualInkContentPartProperties {
   qname = "a14:CT_GvmlContentPartNonVisual/a14:nvContentPartPr"
 )]
 pub struct NonVisualContentPartProperties {
-  /// _
+  /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/a14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  /// _
+  /// Defines the NonVisualInkContentPartProperties Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_NonVisualInkContentPartProperties/a14:cNvContentPartPr"
@@ -1300,16 +1300,20 @@ pub enum HiddenFillPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -1317,10 +1321,12 @@ pub enum HiddenLinePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HiddenLinePropertiesChoice2 {
+  /// Preset Dash.
   #[sdk(child(qname = "a:CT_PresetLineDashProperties/a:prstDash"))]
   APrstDash(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetDash>,
   ),
+  /// Custom Dash.
   #[sdk(child(qname = "a:CT_DashStopList/a:custDash"))]
   ACustDash(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomDash>,
@@ -1334,6 +1340,7 @@ pub enum HiddenLinePropertiesChoice3 {
   /// Line Join Bevel.
   #[sdk(empty_child(qname = "a:CT_LineJoinBevel/a:bevel"))]
   ABevel,
+  /// Miter Line Join.
   #[sdk(child(qname = "a:CT_LineJoinMiterProperties/a:miter"))]
   AMiter(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Miter>),
 }

@@ -35,7 +35,7 @@ pub struct SchemaReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ds:CT_DatastoreSchemaRefs/ds:schemaRefs")]
 pub struct SchemaReferences {
-  /// _
+  /// Associated XML Schema.
   #[sdk(child(qname = "ds:CT_DatastoreSchemaRef/ds:schemaRef"))]
   pub ds_schema_ref: Vec<SchemaReference>,
 }

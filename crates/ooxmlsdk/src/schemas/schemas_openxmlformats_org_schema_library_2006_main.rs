@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "sl:CT_SchemaLibrary/sl:schemaLibrary")]
 pub struct SchemaLibrary {
-  /// _
+  /// Custom XML Schema Reference.
   #[sdk(child(qname = "sl:CT_Schema/sl:schema"))]
   pub sl_schema: Vec<Schema>,
 }

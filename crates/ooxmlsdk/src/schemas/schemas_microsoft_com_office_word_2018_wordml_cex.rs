@@ -14,13 +14,13 @@ pub struct CommentsExtensible {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the CommentExtensible Class.
   #[sdk(child(
     office2021,
     qname = "w16cex:CT_CommentExtensible/w16cex:commentExtensible"
   ))]
   pub w16cex_comment_extensible: Vec<CommentExtensible>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst"))]
   pub w16cex_ext_lst: Option<ExtensionList>,
 }
@@ -41,7 +41,7 @@ pub struct CommentExtensible {
   /// intelligentPlaceholder
   #[sdk(attr(office2021, qname = "w16cex:intelligentPlaceholder"))]
   pub w16cex_intelligent_placeholder: Option<crate::simple_type::OnOffValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -50,7 +50,7 @@ pub struct CommentExtensible {
 #[sdk(office2021, qname = "w16cur:CT_ExtensionList/w16cex:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "w16cur:CT_Extension/w16cur:ext"))]
   pub w16cur_ext: Vec<crate::schemas::schemas_microsoft_com_office_word_2018_wordml::Extension>,
 }

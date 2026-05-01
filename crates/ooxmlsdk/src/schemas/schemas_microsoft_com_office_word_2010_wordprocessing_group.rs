@@ -8,19 +8,19 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:wgp")]
 pub struct WordprocessingGroup {
-  /// _
+  /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
-  /// _
+  /// Defines the NonVisualGroupDrawingShapeProperties Class.
   #[sdk(child(
     office2010,
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
-  /// _
+    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
+  /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
@@ -29,7 +29,7 @@ pub struct WordprocessingGroup {
     qname = "w14:CT_WordContentPart/w14:contentPart"
   ))]
   pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
 }
@@ -37,19 +37,19 @@ pub struct WordprocessingGroup {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp")]
 pub struct GroupShape {
-  /// _
+  /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
-  /// _
+  /// Defines the NonVisualGroupDrawingShapeProperties Class.
   #[sdk(child(
     office2010,
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
-  /// _
+    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
+  /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
@@ -58,7 +58,7 @@ pub struct GroupShape {
     qname = "w14:CT_WordContentPart/w14:contentPart"
   ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
 }
@@ -113,7 +113,7 @@ pub struct NonVisualGraphicFrameProperties {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GraphicFrameLocks,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -146,7 +146,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the NonVisualGroupDrawingShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -155,14 +155,14 @@ pub struct OfficeArtExtensionList {
   qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
 )]
 pub struct NonVisualGroupDrawingShapeProperties {
-    /// _
+    /// Defines the GroupShapeLocks Class.
     #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
     pub group_shape_locks: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupShapeLocks,
         >,
     >,
-    /// _
+    /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
     #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
     pub non_visual_group_drawing_shape_props_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupDrawingShapePropsExtensionList,
@@ -196,12 +196,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -210,20 +210,20 @@ pub struct GroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame")]
 pub struct GraphicFrame {
-  /// _
+  /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wpg:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  /// _
+  /// Defines the NonVisualGraphicFrameProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualGraphicFrameProperties/wpg:cNvFrPr"))]
   pub non_visual_graphic_frame_properties: std::boxed::Box<NonVisualGraphicFrameProperties>,
-  /// _
+  /// Defines the Transform2D Class.
   #[sdk(child(office2010, qname = "a:CT_Transform2D/wpg:xfrm"))]
   pub transform2_d: std::boxed::Box<Transform2D>,
-  /// _
+  /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -279,20 +279,25 @@ pub enum GroupShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -303,10 +308,12 @@ pub enum GroupShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,

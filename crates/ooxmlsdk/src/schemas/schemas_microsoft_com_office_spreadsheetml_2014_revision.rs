@@ -172,7 +172,7 @@ pub struct RevExHeaders {
   /// endpointId
   #[sdk(attr(office2016, qname = ":endpointId"))]
   pub endpoint_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the RevExHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_RevExHeader/xr:hdr"))]
   pub xr_hdr: Vec<RevExHeader>,
 }
@@ -196,7 +196,7 @@ pub struct RevExStream {
     qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR",
     qname = "xr:CT_RevGroup/xr:xrrg"
   ))]
-  pub xml_children: Vec<RevExStreamChoice>,
+  pub rev_ex_stream_choice: Vec<RevExStreamChoice>,
 }
 /// Defines the DifferentialFormatType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -257,7 +257,7 @@ pub struct StateBasedObject {
     qname = "x:CT_AutoFilter/xr:autoFilter",
     qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
   ))]
-  pub xml_children: Option<StateBasedObjectChoice>,
+  pub state_based_object_choice: Option<StateBasedObjectChoice>,
 }
 /// Defines the RevExHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -534,10 +534,10 @@ pub struct RevExChangeCell {
   /// w
   #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the RevCell Class.
   #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
   pub xr_c: Vec<RevCell>,
-  /// _
+  /// Defines the ChangeCellSubEdit Class.
   #[sdk(child(office2016, qname = "xr:CT_ChangeCellSubEdit/xr:ccse"))]
   pub xr_ccse: Vec<ChangeCellSubEdit>,
 }
@@ -622,10 +622,10 @@ pub struct RevExFormatting {
   /// applyProtection
   #[sdk(attr(office2016, qname = ":applyProtection"))]
   pub apply_protection: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2016, qname = "x:CT_Dxf/xr:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -696,10 +696,10 @@ pub struct RevExDefinedName {
   /// comment
   #[sdk(attr(office2016, qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the FormulaFormula Class.
   #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:formula"))]
   pub formula_formula: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -737,7 +737,7 @@ pub struct RevExDelObj {
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
-  /// _
+  /// Defines the StateBasedHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
   pub state_based_header: std::boxed::Box<StateBasedHeader>,
 }
@@ -775,9 +775,9 @@ pub struct RevExChgObj {
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
   pub ctx: Option<RevisionContext>,
-  /// _
+  /// Defines the StateBasedHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
-  pub state_based_header: std::boxed::Box<StateBasedHeader>,
+  pub state_based_header: Option<std::boxed::Box<StateBasedHeader>>,
   #[sdk(choice(
     microsoft365,
     qname = "xr:CT_RevisionStateLink/xr:link",
@@ -986,7 +986,7 @@ pub struct RevGroup {
     qname = "xr:CT_RevisionList/xr:xrrList",
     qname = "xr:CT_RevListAutoExpandRw/xr:xrrListExpR"
   ))]
-  pub xml_children: Vec<RevGroupChoice>,
+  pub rev_group_choice: Vec<RevGroupChoice>,
 }
 /// Defines the RevCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1004,13 +1004,13 @@ pub struct RevCell {
   /// rep
   #[sdk(attr(office2016, qname = ":rep"))]
   pub rep: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the FFormula Class.
   #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:f"))]
   pub f_formula: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the Xstring Class.
   #[sdk(text_child(office2016, qname = "x:ST_Xstring/xr:v"))]
   pub xstring: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the RstType Class.
   #[sdk(child(office2016, qname = "x:CT_Rst/xr:is"))]
   pub rst_type: Option<std::boxed::Box<RstType>>,
 }
@@ -1030,7 +1030,7 @@ pub struct ChangeCellSubEdit {
   /// w
   #[sdk(attr(office2016, qname = ":w"))]
   pub w: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the RevCell Class.
   #[sdk(child(office2016, qname = "xr:CT_RevCell/xr:c"))]
   pub xr_c: Vec<RevCell>,
 }
@@ -1041,7 +1041,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the FormulaFormula Class.
 pub type FormulaFormula = crate::simple_type::StringValue;
@@ -1071,7 +1071,7 @@ pub struct StateBasedHeader {
   /// seftx
   #[sdk(attr(office2016, qname = ":seftx"))]
   pub seftx: Option<ExtSubFeatureType>,
-  /// _
+  /// Defines the RefMap Class.
   #[sdk(child(office2016, qname = "xr:CT_RefMap/xr:refmap"))]
   pub ref_map: Option<RefMap>,
 }
@@ -1094,7 +1094,7 @@ pub struct RevisionState {
     qname = "xr:CT_FreezePanes/xr:freezePanes",
     qname = "xr:CT_Outlines/xr:outlines"
   ))]
-  pub xml_children: Option<RevisionStateChoice>,
+  pub revision_state_choice: Option<RevisionStateChoice>,
 }
 /// Defines the RefMap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1107,7 +1107,7 @@ pub struct RefMap {
     qname = "xr:CT_RefFuture/xr:future",
     qname = "xr:CT_RefTest/xr:test"
   ))]
-  pub xml_children: Vec<RefMapChoice>,
+  pub ref_map_choice: Vec<RefMapChoice>,
 }
 /// Defines the RowColVisualOps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1168,7 +1168,7 @@ pub struct Outlines {
   /// isRow
   #[sdk(attr(office2016, qname = ":isRow"))]
   pub is_row: crate::simple_type::BooleanValue,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(office2016, qname = "xr:CT_Outline/xr:outline"))]
   pub xr_outline: Vec<Outline>,
 }
@@ -1192,13 +1192,13 @@ pub struct RstType {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Text>,
-  /// _
+  /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
   pub x_r: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Run>,
-  /// _
+  /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
   pub x_r_ph: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticRun>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticProperties>,
@@ -1437,15 +1437,15 @@ pub struct DataValidation {
     pub sequence_of_references: crate::simple_type::ListValue<
         crate::simple_type::StringValue,
     >,
-    /// _
+    /// Defines the List Class.
     #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
     pub list: Option<crate::simple_type::StringValue>,
-    /// _
+    /// Defines the Formula1 Class.
     #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
     pub formula1: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formula1,
     >,
-    /// _
+    /// Defines the Formula2 Class.
     #[sdk(child(qname = "x:CT_Xstring/x:formula2"))]
     pub formula2: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formula2,
@@ -1534,50 +1534,50 @@ pub struct SparklineGroup {
     /// rightToLeft
     #[sdk(attr(office2010, qname = ":rightToLeft"))]
     pub right_to_left: Option<crate::simple_type::BooleanValue>,
-    /// _
+    /// Defines the SeriesColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
     pub series_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SeriesColor,
     >,
-    /// _
+    /// Defines the NegativeColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
     pub negative_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::NegativeColor,
     >,
-    /// _
+    /// Defines the AxisColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
     pub axis_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::AxisColor,
     >,
-    /// _
+    /// Defines the MarkersColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
     pub markers_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::MarkersColor,
     >,
-    /// _
+    /// Defines the FirstMarkerColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
     pub first_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FirstMarkerColor,
     >,
-    /// _
+    /// Defines the LastMarkerColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
     pub last_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LastMarkerColor,
     >,
-    /// _
+    /// Defines the HighMarkerColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
     pub high_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::HighMarkerColor,
     >,
-    /// _
+    /// Defines the LowMarkerColor Class.
     #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
     pub low_marker_color: Option<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LowMarkerColor,
     >,
-    /// _
+    /// Defines the Formula Class.
     #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
     pub formula: Option<crate::simple_type::StringValue>,
-    /// _
+    /// Defines the Sparklines Class.
     #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
     pub sparklines: std::boxed::Box<
         crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Sparklines,
@@ -1596,7 +1596,7 @@ pub struct Comments {
   pub comment_list: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CommentList,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -1608,16 +1608,16 @@ pub struct AutoFilter {
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
-  /// _
+  /// AutoFilter Column.
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
   pub x_filter_column:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterColumn>,
-  /// _
+  /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortState>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -1833,87 +1833,87 @@ pub struct PivotTableDefinition {
     /// customListSort
     #[sdk(attr(qname = ":customListSort"))]
     pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
-    /// _
+    /// Defines the Location Class.
     #[sdk(child(qname = "x:CT_Location/x:location"))]
     pub location: std::boxed::Box<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Location,
     >,
-    /// _
+    /// Defines the PivotFields Class.
     #[sdk(child(qname = "x:CT_PivotFields/x:pivotFields"))]
     pub pivot_fields: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotFields,
     >,
-    /// _
+    /// Defines the RowFields Class.
     #[sdk(child(qname = "x:CT_RowFields/x:rowFields"))]
     pub row_fields: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowFields,
     >,
-    /// _
+    /// Defines the RowItems Class.
     #[sdk(child(qname = "x:CT_rowItems/x:rowItems"))]
     pub row_items: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowItems,
     >,
-    /// _
+    /// Defines the ColumnFields Class.
     #[sdk(child(qname = "x:CT_ColFields/x:colFields"))]
     pub column_fields: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnFields,
     >,
-    /// _
+    /// Defines the ColumnItems Class.
     #[sdk(child(qname = "x:CT_colItems/x:colItems"))]
     pub column_items: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnItems,
     >,
-    /// _
+    /// Defines the PageFields Class.
     #[sdk(child(qname = "x:CT_PageFields/x:pageFields"))]
     pub page_fields: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageFields,
     >,
-    /// _
+    /// Defines the DataFields Class.
     #[sdk(child(qname = "x:CT_DataFields/x:dataFields"))]
     pub data_fields: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataFields,
     >,
-    /// _
+    /// Defines the Formats Class.
     #[sdk(child(qname = "x:CT_Formats/x:formats"))]
     pub formats: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formats,
     >,
-    /// _
+    /// Defines the ConditionalFormats Class.
     #[sdk(child(qname = "x:CT_ConditionalFormats/x:conditionalFormats"))]
     pub conditional_formats: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormats,
     >,
-    /// _
+    /// Defines the ChartFormats Class.
     #[sdk(child(qname = "x:CT_ChartFormats/x:chartFormats"))]
     pub chart_formats: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ChartFormats,
     >,
-    /// _
+    /// Defines the PivotHierarchies Class.
     #[sdk(child(qname = "x:CT_PivotHierarchies/x:pivotHierarchies"))]
     pub pivot_hierarchies: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotHierarchies,
     >,
-    /// _
+    /// Defines the PivotTableStyle Class.
     #[sdk(child(qname = "x:CT_PivotTableStyle/x:pivotTableStyleInfo"))]
     pub pivot_table_style: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableStyle,
     >,
-    /// _
+    /// Defines the PivotFilters Class.
     #[sdk(child(qname = "x:CT_PivotFilters/x:filters"))]
     pub pivot_filters: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotFilters,
     >,
-    /// _
+    /// Defines the RowHierarchiesUsage Class.
     #[sdk(child(qname = "x:CT_RowHierarchiesUsage/x:rowHierarchiesUsage"))]
     pub row_hierarchies_usage: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowHierarchiesUsage,
     >,
-    /// _
+    /// Defines the ColumnHierarchiesUsage Class.
     #[sdk(child(qname = "x:CT_ColHierarchiesUsage/x:colHierarchiesUsage"))]
     pub column_hierarchies_usage: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnHierarchiesUsage,
     >,
-    /// _
+    /// Defines the PivotTableDefinitionExtensionList Class.
     #[sdk(child(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst"))]
     pub pivot_table_definition_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinitionExtensionList,

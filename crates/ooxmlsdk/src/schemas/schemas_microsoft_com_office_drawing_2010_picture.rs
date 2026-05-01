@@ -8,15 +8,15 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_ShapeStyle/pic14:style")]
 pub struct ShapeStyle {
-  /// _
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   pub line_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineReference>,
-  /// _
+  /// Fill Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
   pub fill_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillReference>,
-  /// _
+  /// Effect Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
   pub effect_reference: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
@@ -33,5 +33,5 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }

@@ -33,7 +33,7 @@ pub struct ShapeProperties {
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -43,17 +43,17 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   pub a_sp3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   >,
-  /// _
+  /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
@@ -94,7 +94,7 @@ pub struct Marker {
   /// Size
   #[sdk(child(qname = "c:CT_MarkerSize/c:size"))]
   pub size: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Size>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<
     std::boxed::Box<
@@ -110,10 +110,9 @@ pub struct Marker {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c:CT_DLbl/c16:dLbl")]
 pub struct DLbl {
-  /// _
+  /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",
@@ -131,7 +130,7 @@ pub struct DLbl {
     qname = "xsd:string/c:separator"
   ))]
   pub d_lbl_choice: Option<DLblChoice>,
-  /// _
+  /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
   pub c_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DLblExtensionList>,
@@ -143,7 +142,7 @@ pub struct DLbl {
   qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
 )]
 pub struct CategoryFilterExceptions {
-  /// _
+  /// Defines the CategoryFilterException Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"
@@ -154,7 +153,7 @@ pub struct CategoryFilterExceptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c16:CT_PivotOptions16/c16:pivotOptions16")]
 pub struct PivotOptions16 {
-  /// _
+  /// Defines the BooleanFalse Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_BooleanFalse/c16:showExpandCollapseFieldButtons"
@@ -168,7 +167,7 @@ pub struct PivotOptions16 {
   qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
 )]
 pub struct ChartDataPointUniqueIdMap {
-  /// _
+  /// Defines the ChartDataPointUniqueIDMapEntry Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"
@@ -198,25 +197,25 @@ pub struct UniqueId {
   qname = "c16:CT_CategoryFilterException/c16:categoryFilterException"
 )]
 pub struct CategoryFilterException {
-  /// _
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   pub unique_id_chart_unique_id: std::boxed::Box<UniqueIdChartUniqueId>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(office2016, qname = "a:CT_ShapeProperties/c16:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
-  /// _
+  /// Defines the UnsignedIntegerType Class.
   #[sdk(child(office2016, qname = "c:CT_UnsignedInt/c16:explosion"))]
   pub unsigned_integer_type: Option<UnsignedIntegerType>,
-  /// _
+  /// Defines the InvertIfNegativeBoolean Class.
   #[sdk(child(office2016, qname = "c:CT_Boolean/c16:invertIfNegative"))]
   pub invert_if_negative_boolean: Option<InvertIfNegativeBoolean>,
-  /// _
+  /// Defines the Bubble3DBoolean Class.
   #[sdk(child(office2016, qname = "c:CT_Boolean/c16:bubble3D"))]
   pub bubble3_d_boolean: Option<Bubble3DBoolean>,
-  /// _
+  /// Defines the Marker Class.
   #[sdk(child(office2016, qname = "c:CT_Marker/c16:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
-  /// _
+  /// Defines the DLbl Class.
   #[sdk(child(office2016, qname = "c:CT_DLbl/c16:dLbl"))]
   pub d_lbl: Option<std::boxed::Box<DLbl>>,
 }
@@ -231,10 +230,10 @@ pub struct NumberDataType {
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
-  /// _
+  /// Numeric Point.
   #[sdk(child(qname = "c:CT_NumVal/c:pt"))]
   pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumericPoint>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
@@ -246,7 +245,7 @@ pub struct NumberDataType {
   qname = "c16:CT_NumFilteredLiteralCache/c16:filteredLitCache"
 )]
 pub struct NumFilteredLiteralCache {
-  /// _
+  /// Defines the NumberDataType Class.
   #[sdk(child(office2016, qname = "c:CT_NumData/c16:numCache"))]
   pub number_data_type: std::boxed::Box<NumberDataType>,
 }
@@ -254,14 +253,14 @@ pub struct NumFilteredLiteralCache {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c:CT_StrData/c16:strCache")]
 pub struct StringDataType {
-  /// _
+  /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
-  /// _
+  /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
   pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
-  /// _
+  /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
   pub c_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
@@ -273,7 +272,7 @@ pub struct StringDataType {
   qname = "c16:CT_StrFilteredLiteralCache/c16:filteredLitCache"
 )]
 pub struct StrFilteredLiteralCache {
-  /// _
+  /// Defines the StringDataType Class.
   #[sdk(child(office2016, qname = "c:CT_StrData/c16:strCache"))]
   pub string_data_type: std::boxed::Box<StringDataType>,
 }
@@ -281,14 +280,14 @@ pub struct StrFilteredLiteralCache {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache")]
 pub struct MultiLvlStrData {
-  /// _
+  /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
-  /// _
+  /// Level.
   #[sdk(child(qname = "c:CT_Lvl/c:lvl"))]
   pub c_lvl: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Level>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
@@ -300,7 +299,7 @@ pub struct MultiLvlStrData {
   qname = "c16:CT_MultiLvlStrFilteredLiteralCache/c16:filteredLitCache"
 )]
 pub struct MultiLvlStrFilteredLiteralCache {
-  /// _
+  /// Defines the MultiLvlStrData Class.
   #[sdk(child(office2016, qname = "c:CT_MultiLvlStrData/c16:multiLvlStrCache"))]
   pub multi_lvl_str_data: std::boxed::Box<MultiLvlStrData>,
 }
@@ -332,19 +331,21 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
   qname = "c16:CT_ChartDataPointUniqueIDMapEntry/c16:ptentry"
 )]
 pub struct ChartDataPointUniqueIdMapEntry {
-  /// _
+  /// Defines the XsdunsignedInt Class.
   #[sdk(text_child(office2016, qname = "xsd:unsignedInt/c16:ptidx"))]
   pub xsdunsigned_int: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the UniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
+  /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
   ),
+  /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
@@ -352,20 +353,25 @@ pub enum ShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -376,10 +382,12 @@ pub enum ShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -449,7 +457,6 @@ pub struct DLblChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblChoice {
-  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator

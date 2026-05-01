@@ -11,13 +11,17 @@ pub struct LockedCanvas {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupShapeProperties,
+  pub non_visual_group_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupShapeProperties,
+    >,
   >,
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
-  pub visual_group_shape_properties: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VisualGroupShapeProperties,
+  pub visual_group_shape_properties: Option<
+    std::boxed::Box<
+      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VisualGroupShapeProperties,
+    >,
   >,
   #[sdk(choice(
     qname = "a:CT_GvmlTextShape/a:txSp",
@@ -31,7 +35,7 @@ pub struct LockedCanvas {
     any
   ))]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
-  /// _
+  /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GvmlGroupShapeExtensionList,

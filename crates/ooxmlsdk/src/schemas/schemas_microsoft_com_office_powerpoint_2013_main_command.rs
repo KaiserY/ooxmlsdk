@@ -74,7 +74,7 @@ pub struct SlideMonikerList {
   /// Defines the DocumentMoniker Class.
   #[sdk(empty_child(office2016, qname = "pc:CT_DocumentMoniker/pc:docMk"))]
   pub document_moniker: (),
-  /// _
+  /// Defines the SlideMoniker Class.
   #[sdk(child(office2016, qname = "pc:CT_SlideMoniker/pc:sldMk"))]
   pub slide_moniker: std::boxed::Box<SlideMoniker>,
   /// _

@@ -11,7 +11,7 @@ pub struct Types {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   #[sdk(choice(qname = "CT_Default/Default", qname = "CT_Override/Override"))]
-  pub xml_children: Vec<TypesChoice>,
+  pub types_choice: Vec<TypesChoice>,
 }
 /// Default content type.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

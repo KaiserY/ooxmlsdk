@@ -12,7 +12,7 @@
 )]
 pub struct PlaceholderTypeExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PlaceholderTypeACB Class.
   #[sdk(child(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type"))]
   pub placeholder_type_acb: std::boxed::Box<PlaceholderTypeAcb>,
 }
@@ -21,7 +21,7 @@ pub struct PlaceholderTypeExtension {
 #[sdk(microsoft365, qname = "p232:CT_PlaceholderTypeACB/p232:type")]
 pub struct PlaceholderTypeAcb {
   #[sdk(choice(qname = "p:CT_Empty/p232:cameo", qname = "p:CT_Empty/p232:unknown"))]
-  pub xml_children: Option<PlaceholderTypeAcbChoice>,
+  pub placeholder_type_acb_choice: Option<PlaceholderTypeAcbChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlaceholderTypeAcbChoice {

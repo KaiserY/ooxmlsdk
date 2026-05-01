@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "lp:CT_LongProperties/lp:LongProperties")]
 pub struct LongProperties {
-  /// _
+  /// Defines the LongProperty Class.
   #[sdk(child(qname = "lp:CT_LongProp/lp:LongProp"))]
   pub lp_long_prop: Vec<LongProperty>,
 }

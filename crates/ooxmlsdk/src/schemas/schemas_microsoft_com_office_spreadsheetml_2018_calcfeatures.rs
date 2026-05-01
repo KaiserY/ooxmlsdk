@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xcalcf:CT_CalcFeatures/xcalcf:calcFeatures")]
 pub struct CalcFeatures {
-  /// _
+  /// Defines the CalcFeature Class.
   #[sdk(child(office2019, qname = "xcalcf:CT_CalcFeature/xcalcf:feature"))]
   pub xcalcf_feature: Vec<CalcFeature>,
 }

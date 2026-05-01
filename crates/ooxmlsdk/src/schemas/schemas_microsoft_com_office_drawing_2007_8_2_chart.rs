@@ -8,19 +8,19 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "c14:CT_PivotOptions/c14:pivotOptions")]
 pub struct PivotOptions {
-  /// _
+  /// Defines the DropZoneFilter Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneFilter"))]
   pub drop_zone_filter: Option<DropZoneFilter>,
-  /// _
+  /// Defines the DropZoneCategories Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneCategories"))]
   pub drop_zone_categories: Option<DropZoneCategories>,
-  /// _
+  /// Defines the DropZoneData Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneData"))]
   pub drop_zone_data: Option<DropZoneData>,
-  /// _
+  /// Defines the DropZoneSeries Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZoneSeries"))]
   pub drop_zone_series: Option<DropZoneSeries>,
-  /// _
+  /// Defines the DropZonesVisible Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:dropZonesVisible"))]
   pub drop_zones_visible: Option<DropZonesVisible>,
 }
@@ -28,10 +28,10 @@ pub struct PivotOptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "c14:CT_SketchOptions/c14:sketchOptions")]
 pub struct SketchOptions {
-  /// _
+  /// Defines the InSketchMode Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanFalse/c14:inSketchMode"))]
   pub in_sketch_mode: Option<InSketchMode>,
-  /// _
+  /// Defines the ShowSketchButton Class.
   #[sdk(child(office2010, qname = "c14:CT_BooleanTrue/c14:showSketchBtn"))]
   pub show_sketch_button: Option<ShowSketchButton>,
 }
@@ -39,7 +39,7 @@ pub struct SketchOptions {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt")]
 pub struct InvertSolidFillFormat {
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeProperties/c14:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
 }
@@ -87,7 +87,7 @@ pub struct ShapeProperties {
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -97,17 +97,17 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   pub a_sp3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   >,
-  /// _
+  /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
@@ -171,10 +171,12 @@ pub struct ShowSketchButton {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
+  /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
   ),
+  /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
@@ -182,20 +184,25 @@ pub enum ShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -206,10 +213,12 @@ pub enum ShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,

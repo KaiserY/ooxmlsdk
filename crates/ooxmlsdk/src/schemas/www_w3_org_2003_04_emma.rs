@@ -89,7 +89,7 @@ pub struct Lattice {
   #[sdk(attr(qname = "emma:time-ref-anchor-point"))]
   pub time_reference_anchor_point: Option<AnchorPointValues>,
   #[sdk(choice(qname = "emma:CT_Arc/emma:arc", qname = "emma:CT_Node/emma:node"))]
-  pub xml_children: Vec<LatticeChoice>,
+  pub lattice_choice: Vec<LatticeChoice>,
 }
 /// Defines the Literal Class.
 pub type Literal = crate::simple_type::StringValue;
@@ -199,7 +199,7 @@ pub struct Interpretation {
     qname = "emma:CT_Literal/emma:literal",
     qname = "msink:CT_CtxNode/msink:context"
   ))]
-  pub xml_children: Vec<InterpretationChoice>,
+  pub interpretation_choice: Vec<InterpretationChoice>,
 }
 /// Defines the OneOf Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -305,7 +305,7 @@ pub struct OneOf {
     qname = "emma:CT_Group/emma:group",
     qname = "emma:CT_Sequence/emma:sequence"
   ))]
-  pub xml_children: Vec<OneOfChoice>,
+  pub one_of_choice: Vec<OneOfChoice>,
 }
 /// Defines the Group Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -409,7 +409,7 @@ pub struct Group {
     qname = "emma:CT_Group/emma:group",
     qname = "emma:CT_Sequence/emma:sequence"
   ))]
-  pub xml_children: Vec<GroupChoice>,
+  pub group_choice: Vec<GroupChoice>,
 }
 /// Defines the Sequence Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -512,7 +512,7 @@ pub struct Sequence {
     qname = "emma:CT_Group/emma:group",
     qname = "emma:CT_Sequence/emma:sequence"
   ))]
-  pub xml_children: Vec<SequenceChoice>,
+  pub sequence_choice: Vec<SequenceChoice>,
 }
 /// Defines the GroupInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -535,7 +535,7 @@ pub struct Derivation {
     qname = "emma:CT_Sequence/emma:sequence",
     qname = "emma:CT_Group/emma:group"
   ))]
-  pub xml_children: Vec<DerivationChoice>,
+  pub derivation_choice: Vec<DerivationChoice>,
 }
 /// Defines the Grammar Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -736,7 +736,7 @@ pub struct Emma {
     qname = "emma:CT_Group/emma:group",
     qname = "emma:CT_Sequence/emma:sequence"
   ))]
-  pub xml_children: Vec<EmmaChoice>,
+  pub emma_choice: Vec<EmmaChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LatticeChoice {

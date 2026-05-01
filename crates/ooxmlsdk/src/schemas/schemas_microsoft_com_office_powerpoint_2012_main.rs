@@ -36,7 +36,7 @@ pub struct ThreadingInfo {
   /// timeZoneBias
   #[sdk(attr(office2013, qname = ":timeZoneBias"))]
   pub time_zone_bias: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the ParentCommentIdentifier Class.
   #[sdk(child(office2013, qname = "p15:CT_ParentCommentIdentifier/p15:parentCm"))]
   pub parent_comment_identifier: Option<ParentCommentIdentifier>,
 }
@@ -44,10 +44,10 @@ pub struct ThreadingInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst")]
 pub struct SlideGuideList {
-  /// _
+  /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
   pub p15_guide: Vec<ExtendedGuide>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
   pub p15_ext_lst: Option<ExtensionList>,
 }
@@ -55,10 +55,10 @@ pub struct SlideGuideList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst")]
 pub struct NotesGuideList {
-  /// _
+  /// Defines the ExtendedGuide Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuide/p15:guide"))]
   pub p15_guide: Vec<ExtendedGuide>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
   pub p15_ext_lst: Option<ExtensionList>,
 }
@@ -97,7 +97,7 @@ pub struct ColorType {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<ColorTypeChoice>,
+  pub color_type_choice: Option<ColorTypeChoice>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -106,8 +106,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension:
-    Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
 }
 /// Defines the ExtendedGuide Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -130,10 +129,10 @@ pub struct ExtendedGuide {
   /// userDrawn
   #[sdk(attr(office2013, qname = ":userDrawn"))]
   pub is_user_drawn: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ColorType Class.
   #[sdk(child(office2013, qname = "a:CT_Color/p15:clr"))]
   pub color_type: std::boxed::Box<ColorType>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2013, qname = "p:CT_ExtensionList/p15:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }

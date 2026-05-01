@@ -19,7 +19,7 @@ pub struct TracksInfo {
   /// displayLoc
   #[sdk(attr(office2019, qname = ":displayLoc"))]
   pub display_loc: DisplayLocation,
-  /// _
+  /// Defines the TrackList Class.
   #[sdk(child(office2019, qname = "p173:CT_TrackList/p173:trackLst"))]
   pub track_list: Option<TrackList>,
 }
@@ -52,7 +52,7 @@ pub struct Track {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "p173:CT_TrackList/p173:trackLst")]
 pub struct TrackList {
-  /// _
+  /// Defines the Track Class.
   #[sdk(child(office2019, qname = "p173:CT_Track/p173:track"))]
   pub p173_track: Vec<Track>,
 }

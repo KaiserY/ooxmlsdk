@@ -402,7 +402,7 @@ pub struct ChartShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill"
   ))]
   pub chart_shape_properties_choice2: Option<ChartShapePropertiesChoice2>,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -412,17 +412,17 @@ pub struct ChartShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub chart_shape_properties_choice3: Option<ChartShapePropertiesChoice3>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   pub a_sp3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -441,7 +441,7 @@ pub struct TextProperties {
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
   >,
-  /// _
+  /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
@@ -459,7 +459,7 @@ pub struct RichText {
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
   >,
-  /// _
+  /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
@@ -817,13 +817,13 @@ pub struct ChartText {
     qname = "a:CT_TextBody/c:rich",
     qname = "c:CT_StrData/c:strLit"
   ))]
-  pub xml_children: Option<ChartTextChoice>,
+  pub chart_text_choice: Option<ChartTextChoice>,
 }
 /// Leader Lines.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:leaderLines")]
 pub struct LeaderLines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -831,7 +831,7 @@ pub struct LeaderLines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:dropLines")]
 pub struct DropLines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -839,7 +839,7 @@ pub struct DropLines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:majorGridlines")]
 pub struct MajorGridlines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -847,7 +847,7 @@ pub struct MajorGridlines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:minorGridlines")]
 pub struct MinorGridlines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -855,7 +855,7 @@ pub struct MinorGridlines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:serLines")]
 pub struct SeriesLines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -863,7 +863,7 @@ pub struct SeriesLines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ChartLines/c:hiLowLines")]
 pub struct HighLowLines {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -936,7 +936,7 @@ pub struct FormatId {
 #[sdk(qname = "c:CT_SerTx/c:tx")]
 pub struct SeriesText {
   #[sdk(choice(qname = "c:CT_StrRef/c:strRef", qname = "c:ST_Xstring/c:v"))]
-  pub xml_children: Option<SeriesTextChoice>,
+  pub series_text_choice: Option<SeriesTextChoice>,
 }
 /// Grouping.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -962,34 +962,34 @@ pub struct LineChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
   pub c_trendline: Vec<Trendline>,
-  /// _
+  /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
   pub c_err_bars: Option<std::boxed::Box<ErrorBars>>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub c_cat: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub c_val: Option<std::boxed::Box<Values>>,
-  /// _
+  /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
   pub c_smooth: Option<Smooth>,
-  /// _
+  /// Defines the LineSerExtensionList Class.
   #[sdk(child(qname = "c:CT_LineSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<LineSerExtensionList>,
 }
@@ -997,7 +997,7 @@ pub struct LineChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLbls/c:dLbls")]
 pub struct DataLabels {
-  /// _
+  /// Data Label.
   #[sdk(child(qname = "c:CT_DLbl/c:dLbl"))]
   pub c_d_lbl: Vec<DataLabel>,
   #[sdk(choice(
@@ -1017,7 +1017,7 @@ pub struct DataLabels {
     qname = "c:CT_ChartLines/c:leaderLines"
   ))]
   pub data_labels_choice: Option<DataLabelsChoice>,
-  /// _
+  /// Defines the DLblsExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblsExtensionList/c:extLst"))]
   pub c_ext_lst: Option<DLblsExtensionList>,
 }
@@ -1053,34 +1053,34 @@ pub struct BarChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Invert if Negative.
   #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
   pub invert_if_negative: Option<InvertIfNegative>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
   pub c_trendline: Vec<Trendline>,
-  /// _
+  /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
   pub c_err_bars: Option<std::boxed::Box<ErrorBars>>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub c_cat: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub c_val: Option<std::boxed::Box<Values>>,
-  /// _
+  /// Defines the Shape Class.
   #[sdk(child(qname = "c:CT_Shape/c:shape"))]
   pub c_shape: Option<Shape>,
-  /// _
+  /// Defines the BarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BarSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<BarSerExtensionList>,
 }
@@ -1100,28 +1100,28 @@ pub struct AreaChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
   pub c_trendline: Vec<Trendline>,
-  /// _
+  /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
   pub c_err_bars: Vec<ErrorBars>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub c_cat: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub c_val: Option<std::boxed::Box<Values>>,
-  /// _
+  /// Defines the AreaSerExtensionList Class.
   #[sdk(child(qname = "c:CT_AreaSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<AreaSerExtensionList>,
 }
@@ -1141,25 +1141,25 @@ pub struct PieChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Explosion.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:explosion"))]
   pub explosion: Option<Explosion>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub c_cat: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub c_val: Option<std::boxed::Box<Values>>,
-  /// _
+  /// Defines the PieSerExtensionList Class.
   #[sdk(child(qname = "c:CT_PieSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<PieSerExtensionList>,
 }
@@ -1179,19 +1179,19 @@ pub struct SurfaceChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub category_axis_data: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub values: Option<std::boxed::Box<Values>>,
-  /// _
+  /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
   pub bubble3_d: Option<Bubble3D>,
-  /// _
+  /// Defines the SurfaceSerExtensionList Class.
   #[sdk(child(qname = "c:CT_SurfaceSerExtensionList/c:extLst"))]
   pub surface_ser_extension_list: Option<SurfaceSerExtensionList>,
 }
@@ -1199,7 +1199,7 @@ pub struct SurfaceChartSeries {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BandFmts/c:bandFmts")]
 pub struct BandFormats {
-  /// _
+  /// Band Format.
   #[sdk(child(qname = "c:CT_BandFmt/c:bandFmt"))]
   pub c_band_fmt: Vec<BandFormat>,
 }
@@ -1244,10 +1244,10 @@ pub struct Title {
   /// Overlay
   #[sdk(child(qname = "c:CT_Boolean/c:overlay"))]
   pub overlay: Option<Overlay>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Chart Extensibility
@@ -1407,45 +1407,45 @@ pub struct ChartSpace {
   /// A reference (in the form of a relationship ID) to a fallback image to be used if the chart cannot be loaded
   #[sdk(attr(qname = ":fallbackImg"))]
   pub fallback_img: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the Date1904 Class.
   #[sdk(child(qname = "c:CT_Boolean/c:date1904"))]
   pub date1904: Option<Date1904>,
-  /// _
+  /// Defines the EditingLanguage Class.
   #[sdk(child(qname = "c:CT_TextLanguageID/c:lang"))]
   pub editing_language: Option<EditingLanguage>,
-  /// _
+  /// Defines the RoundedCorners Class.
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
   #[sdk(choice(qname = "c14:CT_Style/c14:style", qname = "c:CT_Style/c:style"))]
   pub chart_space_choice: Option<ChartSpaceChoice>,
-  /// _
+  /// Defines the ColorMapOverride Class.
   #[sdk(child(qname = "a:CT_ColorMapping/c:clrMapOvr"))]
   pub c_clr_map_ovr: Option<std::boxed::Box<ColorMapOverride>>,
-  /// _
+  /// Defines the PivotSource Class.
   #[sdk(child(qname = "c:CT_PivotSource/c:pivotSource"))]
   pub c_pivot_source: Option<std::boxed::Box<PivotSource>>,
-  /// _
+  /// Defines the Protection Class.
   #[sdk(child(qname = "c:CT_Protection/c:protection"))]
   pub c_protection: Option<std::boxed::Box<Protection>>,
-  /// _
+  /// Defines the Chart Class.
   #[sdk(child(qname = "c:CT_Chart/c:chart"))]
-  pub c_chart: std::boxed::Box<Chart>,
-  /// _
+  pub c_chart: Option<std::boxed::Box<Chart>>,
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub c_sp_pr: Option<std::boxed::Box<ShapeProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub c_tx_pr: Option<std::boxed::Box<TextProperties>>,
-  /// _
+  /// Defines the ExternalData Class.
   #[sdk(child(qname = "c:CT_ExternalData/c:externalData"))]
   pub c_external_data: Option<std::boxed::Box<ExternalData>>,
-  /// _
+  /// Defines the PrintSettings Class.
   #[sdk(child(qname = "c:CT_PrintSettings/c:printSettings"))]
   pub c_print_settings: Option<std::boxed::Box<PrintSettings>>,
-  /// _
+  /// Defines the UserShapesReference Class.
   #[sdk(child(qname = "c:CT_RelId/c:userShapes"))]
   pub c_user_shapes: Option<UserShapesReference>,
-  /// _
+  /// Defines the ChartSpaceExtensionList Class.
   #[sdk(child(qname = "c:CT_ChartSpaceExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ChartSpaceExtensionList>,
 }
@@ -1535,7 +1535,7 @@ pub struct NumericPoint {
 #[sdk(qname = "c:CT_ExtensionList/c:extLst")]
 pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Extension.
   #[sdk(child(qname = "c:CT_Extension/c:ext"))]
   pub c_ext: Vec<Extension>,
 }
@@ -1543,13 +1543,13 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumRef/c:numRef")]
 pub struct NumberReference {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(qname = "xsd:string/c:f"))]
   pub formula: crate::simple_type::StringValue,
-  /// _
+  /// Defines the NumberingCache Class.
   #[sdk(child(qname = "c:CT_NumData/c:numCache"))]
   pub numbering_cache: Option<std::boxed::Box<NumberingCache>>,
-  /// _
+  /// Defines the NumRefExtensionList Class.
   #[sdk(child(qname = "c:CT_NumRefExtensionList/c:extLst"))]
   pub num_ref_extension_list: Option<NumRefExtensionList>,
 }
@@ -1563,10 +1563,10 @@ pub struct NumberLiteral {
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<PointCount>,
-  /// _
+  /// Numeric Point.
   #[sdk(child(qname = "c:CT_NumVal/c:pt"))]
   pub c_pt: Vec<NumericPoint>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -1580,10 +1580,10 @@ pub struct NumberingCache {
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<PointCount>,
-  /// _
+  /// Numeric Point.
   #[sdk(child(qname = "c:CT_NumVal/c:pt"))]
   pub c_pt: Vec<NumericPoint>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -1591,7 +1591,7 @@ pub struct NumberingCache {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Lvl/c:lvl")]
 pub struct Level {
-  /// _
+  /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
   pub c_pt: Vec<StringPoint>,
 }
@@ -1599,13 +1599,13 @@ pub struct Level {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef")]
 pub struct MultiLevelStringReference {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(qname = "xsd:string/c:f"))]
   pub formula: crate::simple_type::StringValue,
-  /// _
+  /// Defines the MultiLevelStringCache Class.
   #[sdk(child(qname = "c:CT_MultiLvlStrData/c:multiLvlStrCache"))]
   pub multi_level_string_cache: Option<std::boxed::Box<MultiLevelStringCache>>,
-  /// _
+  /// Defines the MultiLvlStrRefExtensionList Class.
   #[sdk(child(qname = "c:CT_MultiLvlStrRefExtensionList/c:extLst"))]
   pub multi_lvl_str_ref_extension_list: Option<MultiLvlStrRefExtensionList>,
 }
@@ -1613,13 +1613,13 @@ pub struct MultiLevelStringReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrRef/c:strRef")]
 pub struct StringReference {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(qname = "xsd:string/c:f"))]
   pub formula: crate::simple_type::StringValue,
-  /// _
+  /// Defines the StringCache Class.
   #[sdk(child(qname = "c:CT_StrData/c:strCache"))]
   pub string_cache: Option<std::boxed::Box<StringCache>>,
-  /// _
+  /// Defines the StrRefExtensionList Class.
   #[sdk(child(qname = "c:CT_StrRefExtensionList/c:extLst"))]
   pub str_ref_extension_list: Option<StrRefExtensionList>,
 }
@@ -1627,13 +1627,13 @@ pub struct StringReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/c:strLit")]
 pub struct StringLiteral {
-  /// _
+  /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<PointCount>,
-  /// _
+  /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
   pub c_pt: Vec<StringPoint>,
-  /// _
+  /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
   pub c_ext_lst: Option<StrDataExtensionList>,
 }
@@ -1641,13 +1641,13 @@ pub struct StringLiteral {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StrData/c:strCache")]
 pub struct StringCache {
-  /// _
+  /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<PointCount>,
-  /// _
+  /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
   pub c_pt: Vec<StringPoint>,
-  /// _
+  /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
   pub c_ext_lst: Option<StrDataExtensionList>,
 }
@@ -1835,7 +1835,7 @@ pub struct Marker {
   /// Size
   #[sdk(child(qname = "c:CT_MarkerSize/c:size"))]
   pub size: Option<Size>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
   /// Chart Extensibility
@@ -1901,16 +1901,16 @@ pub struct TrendlineLabel {
   /// Layout
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
   pub layout: Option<std::boxed::Box<Layout>>,
-  /// _
+  /// Defines the ChartText Class.
   #[sdk(child(qname = "c:CT_Tx/c:tx"))]
   pub chart_text: Option<std::boxed::Box<ChartText>>,
   /// Number Format
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Chart Extensibility
@@ -1946,35 +1946,35 @@ pub struct ErrorBarValueType {
 #[sdk(qname = "c:CT_NumDataSource/c:plus")]
 pub struct Plus {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<PlusChoice>,
+  pub plus_choice: Option<PlusChoice>,
 }
 /// Minus.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:minus")]
 pub struct Minus {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<MinusChoice>,
+  pub minus_choice: Option<MinusChoice>,
 }
 /// Defines the Values Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:val")]
 pub struct Values {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<ValuesChoice>,
+  pub values_choice: Option<ValuesChoice>,
 }
 /// Defines the YValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:yVal")]
 pub struct YValues {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<YValuesChoice>,
+  pub y_values_choice: Option<YValuesChoice>,
 }
 /// Defines the BubbleSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_NumDataSource/c:bubbleSize")]
 pub struct BubbleSize {
   #[sdk(choice(qname = "c:CT_NumRef/c:numRef", qname = "c:CT_NumData/c:numLit"))]
-  pub xml_children: Option<BubbleSizeChoice>,
+  pub bubble_size_choice: Option<BubbleSizeChoice>,
 }
 /// Gap Width.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2010,7 +2010,7 @@ pub struct GapDepth {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/c:upBars")]
 pub struct UpBars {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -2018,7 +2018,7 @@ pub struct UpBars {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_UpDownBar/c:downBars")]
 pub struct DownBars {
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -2042,7 +2042,7 @@ pub struct SplitType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_CustSplit/c:custSplit")]
 pub struct CustomSplit {
-  /// _
+  /// Second Pie Point.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:secondPiePt"))]
   pub c_second_pie_pt: Vec<SecondPiePoint>,
 }
@@ -2065,10 +2065,10 @@ pub struct SecondPieSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BandFmt/c:bandFmt")]
 pub struct BandFormat {
-  /// _
+  /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
 }
@@ -2104,13 +2104,13 @@ pub struct DisplayUnitsLabel {
   /// Layout
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
   pub layout: Option<std::boxed::Box<Layout>>,
-  /// _
+  /// Defines the ChartText Class.
   #[sdk(child(qname = "c:CT_Tx/c:tx"))]
   pub chart_text: Option<std::boxed::Box<ChartText>>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
 }
@@ -2144,7 +2144,7 @@ pub struct PivotFormat {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
   pub index: std::boxed::Box<Index>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Marker
@@ -2171,10 +2171,10 @@ pub struct LegendPosition {
 pub struct LegendEntry {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Option<Index>,
   #[sdk(choice(qname = "c:CT_Boolean/c:delete", qname = "a:CT_TextBody/c:txPr"))]
   pub legend_entry_choice: Option<LegendEntryChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -2294,7 +2294,7 @@ pub struct ShapeProperties {
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -2304,17 +2304,17 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   pub a_sp3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   >,
-  /// _
+  /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
@@ -2324,9 +2324,9 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_DLbl/c:dLbl")]
 pub struct DataLabel {
-  /// _
+  /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: std::boxed::Box<Index>,
+  pub index: Option<Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",
@@ -2344,7 +2344,7 @@ pub struct DataLabel {
     qname = "xsd:string/c:separator"
   ))]
   pub data_label_choice: Option<DataLabelChoice>,
-  /// _
+  /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
   pub c_ext_lst: Option<DLblExtensionList>,
 }
@@ -2360,17 +2360,17 @@ pub struct AreaChart {
   pub vary_colors: Option<VaryColors>,
   /// Area Chart Series.
   #[sdk(child(qname = "c:CT_AreaSer/c:ser"))]
-  pub area_chart_series: Vec<AreaChartSeries>,
+  pub c_ser: Vec<AreaChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
   /// Drop Lines.
   #[sdk(child(qname = "c:CT_ChartLines/c:dropLines"))]
-  pub drop_lines: Option<std::boxed::Box<DropLines>>,
-  /// _
+  pub c_drop_lines: Option<std::boxed::Box<DropLines>>,
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the AreaChartExtensionList Class.
   #[sdk(child(qname = "c:CT_AreaChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<AreaChartExtensionList>,
 }
@@ -2386,20 +2386,20 @@ pub struct Area3DChart {
   pub vary_colors: Option<VaryColors>,
   /// Area Chart Series.
   #[sdk(child(qname = "c:CT_AreaSer/c:ser"))]
-  pub area_chart_series: Vec<AreaChartSeries>,
+  pub c_ser: Vec<AreaChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
   /// Drop Lines.
   #[sdk(child(qname = "c:CT_ChartLines/c:dropLines"))]
-  pub drop_lines: Option<std::boxed::Box<DropLines>>,
-  /// _
+  pub c_drop_lines: Option<std::boxed::Box<DropLines>>,
+  /// Defines the GapDepth Class.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapDepth"))]
   pub c_gap_depth: Option<GapDepth>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the Area3DChartExtensionList Class.
   #[sdk(child(qname = "c:CT_Area3DChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<Area3DChartExtensionList>,
 }
@@ -2415,29 +2415,29 @@ pub struct LineChart {
   pub vary_colors: Option<VaryColors>,
   /// Defines the LineChartSeries Class.
   #[sdk(child(qname = "c:CT_LineSer/c:ser"))]
-  pub line_chart_series: Vec<LineChartSeries>,
+  pub c_ser: Vec<LineChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
   /// Drop Lines.
   #[sdk(child(qname = "c:CT_ChartLines/c:dropLines"))]
-  pub drop_lines: Option<std::boxed::Box<DropLines>>,
-  /// _
+  pub c_drop_lines: Option<std::boxed::Box<DropLines>>,
+  /// Defines the HighLowLines Class.
   #[sdk(child(qname = "c:CT_ChartLines/c:hiLowLines"))]
   pub c_hi_low_lines: Option<std::boxed::Box<HighLowLines>>,
-  /// _
+  /// Defines the UpDownBars Class.
   #[sdk(child(qname = "c:CT_UpDownBars/c:upDownBars"))]
   pub c_up_down_bars: Option<std::boxed::Box<UpDownBars>>,
-  /// _
+  /// Defines the ShowMarker Class.
   #[sdk(child(qname = "c:CT_Boolean/c:marker"))]
   pub c_marker: Option<ShowMarker>,
-  /// _
+  /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
   pub c_smooth: Option<Smooth>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the LineChartExtensionList Class.
   #[sdk(child(qname = "c:CT_LineChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<LineChartExtensionList>,
 }
@@ -2453,20 +2453,20 @@ pub struct Line3DChart {
   pub vary_colors: Option<VaryColors>,
   /// Defines the LineChartSeries Class.
   #[sdk(child(qname = "c:CT_LineSer/c:ser"))]
-  pub line_chart_series: Vec<LineChartSeries>,
+  pub c_ser: Vec<LineChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
   /// Drop Lines.
   #[sdk(child(qname = "c:CT_ChartLines/c:dropLines"))]
-  pub drop_lines: Option<std::boxed::Box<DropLines>>,
-  /// _
+  pub c_drop_lines: Option<std::boxed::Box<DropLines>>,
+  /// Defines the GapDepth Class.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapDepth"))]
   pub c_gap_depth: Option<GapDepth>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the Line3DChartExtensionList Class.
   #[sdk(child(qname = "c:CT_Line3DChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<Line3DChartExtensionList>,
 }
@@ -2474,25 +2474,25 @@ pub struct Line3DChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_StockChart/c:stockChart")]
 pub struct StockChart {
-  /// _
+  /// Defines the LineChartSeries Class.
   #[sdk(child(qname = "c:CT_LineSer/c:ser"))]
   pub c_ser: Vec<LineChartSeries>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Drop Lines.
   #[sdk(child(qname = "c:CT_ChartLines/c:dropLines"))]
   pub c_drop_lines: Option<std::boxed::Box<DropLines>>,
-  /// _
+  /// Defines the HighLowLines Class.
   #[sdk(child(qname = "c:CT_ChartLines/c:hiLowLines"))]
   pub c_hi_low_lines: Option<std::boxed::Box<HighLowLines>>,
-  /// _
+  /// Defines the UpDownBars Class.
   #[sdk(child(qname = "c:CT_UpDownBars/c:upDownBars"))]
   pub c_up_down_bars: Option<std::boxed::Box<UpDownBars>>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the StockChartExtensionList Class.
   #[sdk(child(qname = "c:CT_StockChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<StockChartExtensionList>,
 }
@@ -2500,22 +2500,22 @@ pub struct StockChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarChart/c:radarChart")]
 pub struct RadarChart {
-  /// _
+  /// Defines the RadarStyle Class.
   #[sdk(child(qname = "c:CT_RadarStyle/c:radarStyle"))]
   pub radar_style: std::boxed::Box<RadarStyle>,
-  /// _
+  /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:CT_Boolean/c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
-  /// _
+  /// Defines the RadarChartSeries Class.
   #[sdk(child(qname = "c:CT_RadarSer/c:ser"))]
   pub c_ser: Vec<RadarChartSeries>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the RadarChartExtensionList Class.
   #[sdk(child(qname = "c:CT_RadarChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<RadarChartExtensionList>,
 }
@@ -2523,22 +2523,22 @@ pub struct RadarChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterChart/c:scatterChart")]
 pub struct ScatterChart {
-  /// _
+  /// Defines the ScatterStyle Class.
   #[sdk(child(qname = "c:CT_ScatterStyle/c:scatterStyle"))]
   pub scatter_style: std::boxed::Box<ScatterStyle>,
-  /// _
+  /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:CT_Boolean/c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
-  /// _
+  /// Defines the ScatterChartSeries Class.
   #[sdk(child(qname = "c:CT_ScatterSer/c:ser"))]
   pub c_ser: Vec<ScatterChartSeries>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the ScatterChartExtensionList Class.
   #[sdk(child(qname = "c:CT_ScatterChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ScatterChartExtensionList>,
 }
@@ -2551,14 +2551,14 @@ pub struct PieChart {
   pub vary_colors: Option<VaryColors>,
   /// Pie Chart Series.
   #[sdk(child(qname = "c:CT_PieSer/c:ser"))]
-  pub pie_chart_series: Vec<PieChartSeries>,
+  pub c_ser: Vec<PieChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// First Slice Angle.
   #[sdk(child(qname = "c:CT_FirstSliceAng/c:firstSliceAng"))]
   pub c_first_slice_ang: Option<FirstSliceAngle>,
-  /// _
+  /// Defines the PieChartExtensionList Class.
   #[sdk(child(qname = "c:CT_PieChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<PieChartExtensionList>,
 }
@@ -2571,11 +2571,11 @@ pub struct Pie3DChart {
   pub vary_colors: Option<VaryColors>,
   /// Pie Chart Series.
   #[sdk(child(qname = "c:CT_PieSer/c:ser"))]
-  pub pie_chart_series: Vec<PieChartSeries>,
+  pub c_ser: Vec<PieChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// Defines the Pie3DChartExtensionList Class.
   #[sdk(child(qname = "c:CT_Pie3DChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<Pie3DChartExtensionList>,
 }
@@ -2588,17 +2588,17 @@ pub struct DoughnutChart {
   pub vary_colors: Option<VaryColors>,
   /// Pie Chart Series.
   #[sdk(child(qname = "c:CT_PieSer/c:ser"))]
-  pub pie_chart_series: Vec<PieChartSeries>,
+  pub c_ser: Vec<PieChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// First Slice Angle.
   #[sdk(child(qname = "c:CT_FirstSliceAng/c:firstSliceAng"))]
   pub c_first_slice_ang: Option<FirstSliceAngle>,
-  /// _
+  /// Hole Size.
   #[sdk(child(qname = "c:CT_HoleSize/c:holeSize"))]
   pub c_hole_size: std::boxed::Box<HoleSize>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -2617,23 +2617,23 @@ pub struct BarChart {
   pub vary_colors: Option<VaryColors>,
   /// Bar Chart Series.
   #[sdk(child(qname = "c:CT_BarSer/c:ser"))]
-  pub bar_chart_series: Vec<BarChartSeries>,
+  pub c_ser: Vec<BarChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// Gap Width.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapWidth"))]
   pub c_gap_width: Option<GapWidth>,
-  /// _
+  /// Defines the Overlap Class.
   #[sdk(child(qname = "c:CT_Overlap/c:overlap"))]
   pub c_overlap: Option<Overlap>,
-  /// _
+  /// Defines the SeriesLines Class.
   #[sdk(child(qname = "c:CT_ChartLines/c:serLines"))]
   pub c_ser_lines: Vec<SeriesLines>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the BarChartExtensionList Class.
   #[sdk(child(qname = "c:CT_BarChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<BarChartExtensionList>,
 }
@@ -2652,23 +2652,23 @@ pub struct Bar3DChart {
   pub vary_colors: Option<VaryColors>,
   /// Bar Chart Series.
   #[sdk(child(qname = "c:CT_BarSer/c:ser"))]
-  pub bar_chart_series: Vec<BarChartSeries>,
+  pub c_ser: Vec<BarChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// Gap Width.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapWidth"))]
   pub c_gap_width: Option<GapWidth>,
-  /// _
+  /// Defines the GapDepth Class.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapDepth"))]
   pub c_gap_depth: Option<GapDepth>,
-  /// _
+  /// Defines the Shape Class.
   #[sdk(child(qname = "c:CT_Shape/c:shape"))]
   pub c_shape: Option<Shape>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the Bar3DChartExtensionList Class.
   #[sdk(child(qname = "c:CT_Bar3DChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<Bar3DChartExtensionList>,
 }
@@ -2684,29 +2684,29 @@ pub struct OfPieChart {
   pub vary_colors: Option<VaryColors>,
   /// Pie Chart Series.
   #[sdk(child(qname = "c:CT_PieSer/c:ser"))]
-  pub pie_chart_series: Vec<PieChartSeries>,
+  pub c_ser: Vec<PieChartSeries>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub data_labels: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
+  /// Gap Width.
   #[sdk(child(qname = "c:CT_GapAmount/c:gapWidth"))]
   pub c_gap_width: Option<GapWidth>,
-  /// _
+  /// Split Type.
   #[sdk(child(qname = "c:CT_SplitType/c:splitType"))]
   pub c_split_type: Option<SplitType>,
-  /// _
+  /// Split Position.
   #[sdk(child(qname = "c:CT_Double/c:splitPos"))]
   pub c_split_pos: Option<SplitPosition>,
-  /// _
+  /// Custom Split.
   #[sdk(child(qname = "c:CT_CustSplit/c:custSplit"))]
   pub c_cust_split: Option<CustomSplit>,
-  /// _
+  /// Second Pie Size.
   #[sdk(child(qname = "c:CT_SecondPieSize/c:secondPieSize"))]
   pub c_second_pie_size: Option<SecondPieSize>,
-  /// _
+  /// Defines the SeriesLines Class.
   #[sdk(child(qname = "c:CT_ChartLines/c:serLines"))]
   pub c_ser_lines: Vec<SeriesLines>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -2719,14 +2719,14 @@ pub struct SurfaceChart {
   pub wireframe: Option<Wireframe>,
   /// Surface Chart Series.
   #[sdk(child(qname = "c:CT_SurfaceSer/c:ser"))]
-  pub surface_chart_series: Vec<SurfaceChartSeries>,
+  pub c_ser: Vec<SurfaceChartSeries>,
   /// Band Formats.
   #[sdk(child(qname = "c:CT_BandFmts/c:bandFmts"))]
-  pub band_formats: Option<BandFormats>,
-  /// _
+  pub c_band_fmts: Option<BandFormats>,
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the SurfaceChartExtensionList Class.
   #[sdk(child(qname = "c:CT_SurfaceChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<SurfaceChartExtensionList>,
 }
@@ -2734,22 +2734,22 @@ pub struct SurfaceChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_Surface3DChart/c:surface3DChart")]
 pub struct Surface3DChart {
-  /// _
+  /// Wireframe.
   #[sdk(child(qname = "c:CT_Boolean/c:wireframe"))]
   pub wireframe: Option<Wireframe>,
-  /// _
+  /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:CT_Boolean/c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
-  /// _
+  /// Surface Chart Series.
   #[sdk(child(qname = "c:CT_SurfaceSer/c:ser"))]
   pub c_ser: Vec<SurfaceChartSeries>,
-  /// _
+  /// Band Formats.
   #[sdk(child(qname = "c:CT_BandFmts/c:bandFmts"))]
   pub c_band_fmts: Option<BandFormats>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the Surface3DChartExtensionList Class.
   #[sdk(child(qname = "c:CT_Surface3DChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<Surface3DChartExtensionList>,
 }
@@ -2757,31 +2757,31 @@ pub struct Surface3DChart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleChart/c:bubbleChart")]
 pub struct BubbleChart {
-  /// _
+  /// Defines the VaryColors Class.
   #[sdk(child(qname = "c:CT_Boolean/c:varyColors"))]
   pub vary_colors: Option<VaryColors>,
-  /// _
+  /// Defines the BubbleChartSeries Class.
   #[sdk(child(qname = "c:CT_BubbleSer/c:ser"))]
   pub c_ser: Vec<BubbleChartSeries>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
   pub c_bubble3_d: Option<Bubble3D>,
-  /// _
+  /// Defines the BubbleScale Class.
   #[sdk(child(qname = "c:CT_BubbleScale/c:bubbleScale"))]
   pub c_bubble_scale: Option<BubbleScale>,
-  /// _
+  /// Defines the ShowNegativeBubbles Class.
   #[sdk(child(qname = "c:CT_Boolean/c:showNegBubbles"))]
   pub c_show_neg_bubbles: Option<ShowNegativeBubbles>,
-  /// _
+  /// Defines the SizeRepresents Class.
   #[sdk(child(qname = "c:CT_SizeRepresents/c:sizeRepresents"))]
   pub c_size_represents: Option<SizeRepresents>,
-  /// _
+  /// Axis ID.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
   pub c_ax_id: Vec<AxisId>,
-  /// _
+  /// Defines the BubbleChartExtensionList Class.
   #[sdk(child(qname = "c:CT_BubbleChartExtensionList/c:extLst"))]
   pub c_ext_lst: Option<BubbleChartExtensionList>,
 }
@@ -2791,16 +2791,16 @@ pub struct BubbleChart {
 pub struct ValueAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: Option<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: std::boxed::Box<Scaling>,
+  pub scaling: Option<std::boxed::Box<Scaling>>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: Option<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2830,22 +2830,22 @@ pub struct ValueAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: Option<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub value_axis_choice: Option<ValueAxisChoice>,
-  /// _
+  /// Defines the CrossBetween Class.
   #[sdk(child(qname = "c:CT_CrossBetween/c:crossBetween"))]
   pub c_cross_between: Option<CrossBetween>,
-  /// _
+  /// Defines the MajorUnit Class.
   #[sdk(child(qname = "c:CT_AxisUnit/c:majorUnit"))]
   pub c_major_unit: Option<MajorUnit>,
-  /// _
+  /// Defines the MinorUnit Class.
   #[sdk(child(qname = "c:CT_AxisUnit/c:minorUnit"))]
   pub c_minor_unit: Option<MinorUnit>,
-  /// _
+  /// Defines the DisplayUnits Class.
   #[sdk(child(qname = "c:CT_DispUnits/c:dispUnits"))]
   pub c_disp_units: Option<std::boxed::Box<DisplayUnits>>,
-  /// _
+  /// Defines the ValAxExtensionList Class.
   #[sdk(child(qname = "c:CT_ValAxExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ValAxExtensionList>,
 }
@@ -2855,16 +2855,16 @@ pub struct ValueAxis {
 pub struct CategoryAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: Option<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: std::boxed::Box<Scaling>,
+  pub scaling: Option<std::boxed::Box<Scaling>>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: Option<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2894,28 +2894,28 @@ pub struct CategoryAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: Option<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub category_axis_choice: Option<CategoryAxisChoice>,
-  /// _
+  /// Defines the AutoLabeled Class.
   #[sdk(child(qname = "c:CT_Boolean/c:auto"))]
   pub c_auto: Option<AutoLabeled>,
-  /// _
+  /// Defines the LabelAlignment Class.
   #[sdk(child(qname = "c:CT_LblAlgn/c:lblAlgn"))]
   pub c_lbl_algn: Option<LabelAlignment>,
-  /// _
+  /// Defines the LabelOffset Class.
   #[sdk(child(qname = "c:CT_LblOffset/c:lblOffset"))]
   pub c_lbl_offset: Option<LabelOffset>,
-  /// _
+  /// Defines the TickLabelSkip Class.
   #[sdk(child(qname = "c:CT_Skip/c:tickLblSkip"))]
   pub c_tick_lbl_skip: Option<TickLabelSkip>,
-  /// _
+  /// Defines the TickMarkSkip Class.
   #[sdk(child(qname = "c:CT_Skip/c:tickMarkSkip"))]
   pub c_tick_mark_skip: Option<TickMarkSkip>,
-  /// _
+  /// Defines the NoMultiLevelLabels Class.
   #[sdk(child(qname = "c:CT_Boolean/c:noMultiLvlLbl"))]
   pub c_no_multi_lvl_lbl: Option<NoMultiLevelLabels>,
-  /// _
+  /// Defines the CatAxExtensionList Class.
   #[sdk(child(qname = "c:CT_CatAxExtensionList/c:extLst"))]
   pub c_ext_lst: Option<CatAxExtensionList>,
 }
@@ -2925,16 +2925,16 @@ pub struct CategoryAxis {
 pub struct DateAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: Option<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: std::boxed::Box<Scaling>,
+  pub scaling: Option<std::boxed::Box<Scaling>>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: Option<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2964,31 +2964,31 @@ pub struct DateAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: Option<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub date_axis_choice: Option<DateAxisChoice>,
-  /// _
+  /// Defines the AutoLabeled Class.
   #[sdk(child(qname = "c:CT_Boolean/c:auto"))]
   pub c_auto: Option<AutoLabeled>,
-  /// _
+  /// Defines the LabelOffset Class.
   #[sdk(child(qname = "c:CT_LblOffset/c:lblOffset"))]
   pub c_lbl_offset: Option<LabelOffset>,
-  /// _
+  /// Defines the BaseTimeUnit Class.
   #[sdk(child(qname = "c:CT_TimeUnit/c:baseTimeUnit"))]
   pub c_base_time_unit: Option<BaseTimeUnit>,
-  /// _
+  /// Defines the MajorUnit Class.
   #[sdk(child(qname = "c:CT_AxisUnit/c:majorUnit"))]
   pub c_major_unit: Option<MajorUnit>,
-  /// _
+  /// Defines the MajorTimeUnit Class.
   #[sdk(child(qname = "c:CT_TimeUnit/c:majorTimeUnit"))]
   pub c_major_time_unit: Option<MajorTimeUnit>,
-  /// _
+  /// Defines the MinorUnit Class.
   #[sdk(child(qname = "c:CT_AxisUnit/c:minorUnit"))]
   pub c_minor_unit: Option<MinorUnit>,
-  /// _
+  /// Defines the MinorTimeUnit Class.
   #[sdk(child(qname = "c:CT_TimeUnit/c:minorTimeUnit"))]
   pub c_minor_time_unit: Option<MinorTimeUnit>,
-  /// _
+  /// Defines the DateAxExtensionList Class.
   #[sdk(child(qname = "c:CT_DateAxExtensionList/c:extLst"))]
   pub c_ext_lst: Option<DateAxExtensionList>,
 }
@@ -2998,16 +2998,16 @@ pub struct DateAxis {
 pub struct SeriesAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: std::boxed::Box<AxisId>,
+  pub axis_id: Option<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: std::boxed::Box<Scaling>,
+  pub scaling: Option<std::boxed::Box<Scaling>>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: std::boxed::Box<AxisPosition>,
+  pub axis_position: Option<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -3037,16 +3037,16 @@ pub struct SeriesAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: std::boxed::Box<CrossingAxis>,
+  pub crossing_axis: Option<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub series_axis_choice: Option<SeriesAxisChoice>,
-  /// _
+  /// Defines the TickLabelSkip Class.
   #[sdk(child(qname = "c:CT_Skip/c:tickLblSkip"))]
   pub c_tick_lbl_skip: Option<TickLabelSkip>,
-  /// _
+  /// Defines the TickMarkSkip Class.
   #[sdk(child(qname = "c:CT_Skip/c:tickMarkSkip"))]
   pub c_tick_mark_skip: Option<TickMarkSkip>,
-  /// _
+  /// Defines the SerAxExtensionList Class.
   #[sdk(child(qname = "c:CT_SerAxExtensionList/c:extLst"))]
   pub c_ext_lst: Option<SerAxExtensionList>,
 }
@@ -3066,7 +3066,7 @@ pub struct DataTable {
   /// Show Legend Keys
   #[sdk(child(qname = "c:CT_Boolean/c:showKeys"))]
   pub show_keys: Option<ShowKeys>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
   /// Text Properties
@@ -3144,7 +3144,7 @@ pub struct StockChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
-  pub xml_children: Option<StockChartExtensionChoice>,
+  pub stock_chart_extension_choice: Option<StockChartExtensionChoice>,
 }
 /// Defines the PieChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3158,7 +3158,7 @@ pub struct PieChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
-  pub xml_children: Option<PieChartExtensionChoice>,
+  pub pie_chart_extension_choice: Option<PieChartExtensionChoice>,
 }
 /// Defines the Pie3DChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3172,7 +3172,7 @@ pub struct Pie3DChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
-  pub xml_children: Option<Pie3DChartExtensionChoice>,
+  pub pie3_d_chart_extension_choice: Option<Pie3DChartExtensionChoice>,
 }
 /// Defines the NumRefExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3191,7 +3191,7 @@ pub struct NumRefExtension {
     qname = "c15:CT_FormulaRef/c15:formulaRef",
     any
   ))]
-  pub xml_children: Option<NumRefExtensionChoice>,
+  pub num_ref_extension_choice: Option<NumRefExtensionChoice>,
 }
 /// Defines the StrDataExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3205,7 +3205,7 @@ pub struct StrDataExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_Boolean/c15:autoCat", any))]
-  pub xml_children: Option<StrDataExtensionChoice>,
+  pub str_data_extension_choice: Option<StrDataExtensionChoice>,
 }
 /// Defines the StrRefExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3224,7 +3224,7 @@ pub struct StrRefExtension {
     qname = "c15:CT_FormulaRef/c15:formulaRef",
     any
   ))]
-  pub xml_children: Option<StrRefExtensionChoice>,
+  pub str_ref_extension_choice: Option<StrRefExtensionChoice>,
 }
 /// Defines the MultiLvlStrRefExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3243,7 +3243,7 @@ pub struct MultiLvlStrRefExtension {
     qname = "c15:CT_FormulaRef/c15:formulaRef",
     any
   ))]
-  pub xml_children: Option<MultiLvlStrRefExtensionChoice>,
+  pub multi_lvl_str_ref_extension_choice: Option<MultiLvlStrRefExtensionChoice>,
 }
 /// Defines the DLblsExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3266,7 +3266,7 @@ pub struct DLblsExtension {
     qname = "c:CT_ChartLines/c15:leaderLines",
     any
   ))]
-  pub xml_children: Option<DLblsExtensionChoice>,
+  pub d_lbls_extension_choice: Option<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3280,7 +3280,7 @@ pub struct LineChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
-  pub xml_children: Option<LineChartExtensionChoice>,
+  pub line_chart_extension_choice: Option<LineChartExtensionChoice>,
 }
 /// Defines the Line3DChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3294,7 +3294,7 @@ pub struct Line3DChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
-  pub xml_children: Option<Line3DChartExtensionChoice>,
+  pub line3_d_chart_extension_choice: Option<Line3DChartExtensionChoice>,
 }
 /// Defines the ScatterChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3308,7 +3308,7 @@ pub struct ScatterChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries", any))]
-  pub xml_children: Option<ScatterChartExtensionChoice>,
+  pub scatter_chart_extension_choice: Option<ScatterChartExtensionChoice>,
 }
 /// Defines the RadarChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3322,7 +3322,7 @@ pub struct RadarChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries", any))]
-  pub xml_children: Option<RadarChartExtensionChoice>,
+  pub radar_chart_extension_choice: Option<RadarChartExtensionChoice>,
 }
 /// Defines the BarChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3336,7 +3336,7 @@ pub struct BarChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
-  pub xml_children: Option<BarChartExtensionChoice>,
+  pub bar_chart_extension_choice: Option<BarChartExtensionChoice>,
 }
 /// Defines the Bar3DChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3350,7 +3350,7 @@ pub struct Bar3DChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
-  pub xml_children: Option<Bar3DChartExtensionChoice>,
+  pub bar3_d_chart_extension_choice: Option<Bar3DChartExtensionChoice>,
 }
 /// Defines the AreaChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3364,7 +3364,7 @@ pub struct AreaChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
-  pub xml_children: Option<AreaChartExtensionChoice>,
+  pub area_chart_extension_choice: Option<AreaChartExtensionChoice>,
 }
 /// Defines the Area3DChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3378,7 +3378,7 @@ pub struct Area3DChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
-  pub xml_children: Option<Area3DChartExtensionChoice>,
+  pub area3_d_chart_extension_choice: Option<Area3DChartExtensionChoice>,
 }
 /// Defines the BubbleChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3392,7 +3392,7 @@ pub struct BubbleChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries", any))]
-  pub xml_children: Option<BubbleChartExtensionChoice>,
+  pub bubble_chart_extension_choice: Option<BubbleChartExtensionChoice>,
 }
 /// Defines the SurfaceChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3406,7 +3406,7 @@ pub struct SurfaceChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
-  pub xml_children: Option<SurfaceChartExtensionChoice>,
+  pub surface_chart_extension_choice: Option<SurfaceChartExtensionChoice>,
 }
 /// Defines the Surface3DChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3420,7 +3420,7 @@ pub struct Surface3DChartExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
-  pub xml_children: Option<Surface3DChartExtensionChoice>,
+  pub surface3_d_chart_extension_choice: Option<Surface3DChartExtensionChoice>,
 }
 /// Defines the CatAxExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3434,7 +3434,7 @@ pub struct CatAxExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
-  pub xml_children: Option<CatAxExtensionChoice>,
+  pub cat_ax_extension_choice: Option<CatAxExtensionChoice>,
 }
 /// Defines the DateAxExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3448,7 +3448,7 @@ pub struct DateAxExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
-  pub xml_children: Option<DateAxExtensionChoice>,
+  pub date_ax_extension_choice: Option<DateAxExtensionChoice>,
 }
 /// Defines the SerAxExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3462,7 +3462,7 @@ pub struct SerAxExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
-  pub xml_children: Option<SerAxExtensionChoice>,
+  pub ser_ax_extension_choice: Option<SerAxExtensionChoice>,
 }
 /// Defines the ValAxExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3476,7 +3476,7 @@ pub struct ValAxExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
-  pub xml_children: Option<ValAxExtensionChoice>,
+  pub val_ax_extension_choice: Option<ValAxExtensionChoice>,
 }
 /// Defines the UpDownBars Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3500,7 +3500,7 @@ pub struct UpDownBars {
 #[sdk(qname = "c:CT_StockChartExtensionList/c:extLst")]
 pub struct StockChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the StockChartExtension Class.
   #[sdk(child(qname = "c:CT_StockChartExtension/c:ext"))]
   pub c_ext: Vec<StockChartExtension>,
 }
@@ -3509,7 +3509,7 @@ pub struct StockChartExtensionList {
 #[sdk(qname = "c:CT_PieChartExtensionList/c:extLst")]
 pub struct PieChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PieChartExtension Class.
   #[sdk(child(qname = "c:CT_PieChartExtension/c:ext"))]
   pub c_ext: Vec<PieChartExtension>,
 }
@@ -3518,7 +3518,7 @@ pub struct PieChartExtensionList {
 #[sdk(qname = "c:CT_Pie3DChartExtensionList/c:extLst")]
 pub struct Pie3DChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Pie3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Pie3DChartExtension/c:ext"))]
   pub c_ext: Vec<Pie3DChartExtension>,
 }
@@ -3527,7 +3527,7 @@ pub struct Pie3DChartExtensionList {
 #[sdk(qname = "c:CT_NumRefExtensionList/c:extLst")]
 pub struct NumRefExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the NumRefExtension Class.
   #[sdk(child(qname = "c:CT_NumRefExtension/c:ext"))]
   pub c_ext: Vec<NumRefExtension>,
 }
@@ -3536,7 +3536,7 @@ pub struct NumRefExtensionList {
 #[sdk(qname = "c:CT_StrDataExtensionList/c:extLst")]
 pub struct StrDataExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the StrDataExtension Class.
   #[sdk(child(qname = "c:CT_StrDataExtension/c:ext"))]
   pub c_ext: Vec<StrDataExtension>,
 }
@@ -3545,7 +3545,7 @@ pub struct StrDataExtensionList {
 #[sdk(qname = "c:CT_StrRefExtensionList/c:extLst")]
 pub struct StrRefExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the StrRefExtension Class.
   #[sdk(child(qname = "c:CT_StrRefExtension/c:ext"))]
   pub c_ext: Vec<StrRefExtension>,
 }
@@ -3553,13 +3553,13 @@ pub struct StrRefExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_MultiLvlStrData/c:multiLvlStrCache")]
 pub struct MultiLevelStringCache {
-  /// _
+  /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<PointCount>,
-  /// _
+  /// Level.
   #[sdk(child(qname = "c:CT_Lvl/c:lvl"))]
   pub c_lvl: Vec<Level>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -3568,7 +3568,7 @@ pub struct MultiLevelStringCache {
 #[sdk(qname = "c:CT_MultiLvlStrRefExtensionList/c:extLst")]
 pub struct MultiLvlStrRefExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the MultiLvlStrRefExtension Class.
   #[sdk(child(qname = "c:CT_MultiLvlStrRefExtension/c:ext"))]
   pub c_ext: Vec<MultiLvlStrRefExtension>,
 }
@@ -3577,7 +3577,7 @@ pub struct MultiLvlStrRefExtensionList {
 #[sdk(qname = "c:CT_DLblsExtensionList/c:extLst")]
 pub struct DLblsExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the DLblsExtension Class.
   #[sdk(child(qname = "c:CT_DLblsExtension/c:ext"))]
   pub c_ext: Vec<DLblsExtension>,
 }
@@ -3586,7 +3586,7 @@ pub struct DLblsExtensionList {
 #[sdk(qname = "c:CT_LineChartExtensionList/c:extLst")]
 pub struct LineChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the LineChartExtension Class.
   #[sdk(child(qname = "c:CT_LineChartExtension/c:ext"))]
   pub c_ext: Vec<LineChartExtension>,
 }
@@ -3595,7 +3595,7 @@ pub struct LineChartExtensionList {
 #[sdk(qname = "c:CT_Line3DChartExtensionList/c:extLst")]
 pub struct Line3DChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Line3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Line3DChartExtension/c:ext"))]
   pub c_ext: Vec<Line3DChartExtension>,
 }
@@ -3623,31 +3623,31 @@ pub struct ScatterChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
   pub c_trendline: Vec<Trendline>,
-  /// _
+  /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
   pub c_err_bars: Vec<ErrorBars>,
-  /// _
+  /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
   pub c_x_val: Option<std::boxed::Box<XValues>>,
-  /// _
+  /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
   pub c_y_val: Option<std::boxed::Box<YValues>>,
-  /// _
+  /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
   pub c_smooth: Option<Smooth>,
-  /// _
+  /// Defines the ScatterSerExtensionList Class.
   #[sdk(child(qname = "c:CT_ScatterSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ScatterSerExtensionList>,
 }
@@ -3656,7 +3656,7 @@ pub struct ScatterChartSeries {
 #[sdk(qname = "c:CT_ScatterChartExtensionList/c:extLst")]
 pub struct ScatterChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ScatterChartExtension Class.
   #[sdk(child(qname = "c:CT_ScatterChartExtension/c:ext"))]
   pub c_ext: Vec<ScatterChartExtension>,
 }
@@ -3684,25 +3684,25 @@ pub struct RadarChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
   pub marker: Option<std::boxed::Box<Marker>>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
   pub c_cat: Option<std::boxed::Box<CategoryAxisData>>,
-  /// _
+  /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
   pub c_val: Option<std::boxed::Box<Values>>,
-  /// _
+  /// Defines the RadarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_RadarSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<RadarSerExtensionList>,
 }
@@ -3711,7 +3711,7 @@ pub struct RadarChartSeries {
 #[sdk(qname = "c:CT_RadarChartExtensionList/c:extLst")]
 pub struct RadarChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the RadarChartExtension Class.
   #[sdk(child(qname = "c:CT_RadarChartExtension/c:ext"))]
   pub c_ext: Vec<RadarChartExtension>,
 }
@@ -3735,7 +3735,7 @@ pub struct Overlap {
 #[sdk(qname = "c:CT_BarChartExtensionList/c:extLst")]
 pub struct BarChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the BarChartExtension Class.
   #[sdk(child(qname = "c:CT_BarChartExtension/c:ext"))]
   pub c_ext: Vec<BarChartExtension>,
 }
@@ -3753,7 +3753,7 @@ pub struct Shape {
 #[sdk(qname = "c:CT_Bar3DChartExtensionList/c:extLst")]
 pub struct Bar3DChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Bar3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Bar3DChartExtension/c:ext"))]
   pub c_ext: Vec<Bar3DChartExtension>,
 }
@@ -3762,7 +3762,7 @@ pub struct Bar3DChartExtensionList {
 #[sdk(qname = "c:CT_AreaChartExtensionList/c:extLst")]
 pub struct AreaChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the AreaChartExtension Class.
   #[sdk(child(qname = "c:CT_AreaChartExtension/c:ext"))]
   pub c_ext: Vec<AreaChartExtension>,
 }
@@ -3771,7 +3771,7 @@ pub struct AreaChartExtensionList {
 #[sdk(qname = "c:CT_Area3DChartExtensionList/c:extLst")]
 pub struct Area3DChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Area3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Area3DChartExtension/c:ext"))]
   pub c_ext: Vec<Area3DChartExtension>,
 }
@@ -3791,37 +3791,37 @@ pub struct BubbleChartSeries {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
-  /// _
+  /// Invert if Negative.
   #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
   pub invert_if_negative: Option<InvertIfNegative>,
-  /// _
+  /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
   pub c_d_pt: Vec<DataPoint>,
-  /// _
+  /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
   pub c_d_lbls: Option<std::boxed::Box<DataLabels>>,
-  /// _
+  /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
   pub c_trendline: Vec<Trendline>,
-  /// _
+  /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
   pub c_err_bars: Vec<ErrorBars>,
-  /// _
+  /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
   pub c_x_val: Option<std::boxed::Box<XValues>>,
-  /// _
+  /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
   pub c_y_val: Option<std::boxed::Box<YValues>>,
-  /// _
+  /// Defines the BubbleSize Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:bubbleSize"))]
   pub c_bubble_size: Option<std::boxed::Box<BubbleSize>>,
-  /// _
+  /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
   pub c_bubble3_d: Option<Bubble3D>,
-  /// _
+  /// Defines the BubbleSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BubbleSerExtensionList/c:extLst"))]
   pub c_ext_lst: Option<BubbleSerExtensionList>,
 }
@@ -3853,7 +3853,7 @@ pub struct SizeRepresents {
 #[sdk(qname = "c:CT_BubbleChartExtensionList/c:extLst")]
 pub struct BubbleChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the BubbleChartExtension Class.
   #[sdk(child(qname = "c:CT_BubbleChartExtension/c:ext"))]
   pub c_ext: Vec<BubbleChartExtension>,
 }
@@ -3862,7 +3862,7 @@ pub struct BubbleChartExtensionList {
 #[sdk(qname = "c:CT_SurfaceChartExtensionList/c:extLst")]
 pub struct SurfaceChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SurfaceChartExtension Class.
   #[sdk(child(qname = "c:CT_SurfaceChartExtension/c:ext"))]
   pub c_ext: Vec<SurfaceChartExtension>,
 }
@@ -3871,7 +3871,7 @@ pub struct SurfaceChartExtensionList {
 #[sdk(qname = "c:CT_Surface3DChartExtensionList/c:extLst")]
 pub struct Surface3DChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the Surface3DChartExtension Class.
   #[sdk(child(qname = "c:CT_Surface3DChartExtension/c:ext"))]
   pub c_ext: Vec<Surface3DChartExtension>,
 }
@@ -3921,7 +3921,7 @@ pub struct TickMarkSkip {
 #[sdk(qname = "c:CT_CatAxExtensionList/c:extLst")]
 pub struct CatAxExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CatAxExtension Class.
   #[sdk(child(qname = "c:CT_CatAxExtension/c:ext"))]
   pub c_ext: Vec<CatAxExtension>,
 }
@@ -3972,7 +3972,7 @@ pub struct MinorUnit {
 #[sdk(qname = "c:CT_DateAxExtensionList/c:extLst")]
 pub struct DateAxExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the DateAxExtension Class.
   #[sdk(child(qname = "c:CT_DateAxExtension/c:ext"))]
   pub c_ext: Vec<DateAxExtension>,
 }
@@ -3981,7 +3981,7 @@ pub struct DateAxExtensionList {
 #[sdk(qname = "c:CT_SerAxExtensionList/c:extLst")]
 pub struct SerAxExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SerAxExtension Class.
   #[sdk(child(qname = "c:CT_SerAxExtension/c:ext"))]
   pub c_ext: Vec<SerAxExtension>,
 }
@@ -4002,10 +4002,10 @@ pub struct DisplayUnits {
     qname = "c:CT_BuiltInUnit/c:builtInUnit"
   ))]
   pub display_units_choice: Option<DisplayUnitsChoice>,
-  /// _
+  /// Display Units Label.
   #[sdk(child(qname = "c:CT_DispUnitsLbl/c:dispUnitsLbl"))]
   pub c_disp_units_lbl: Option<std::boxed::Box<DisplayUnitsLabel>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -4014,7 +4014,7 @@ pub struct DisplayUnits {
 #[sdk(qname = "c:CT_ValAxExtensionList/c:extLst")]
 pub struct ValAxExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ValAxExtension Class.
   #[sdk(child(qname = "c:CT_ValAxExtension/c:ext"))]
   pub c_ext: Vec<ValAxExtension>,
 }
@@ -4023,7 +4023,7 @@ pub struct ValAxExtensionList {
 #[sdk(qname = "c:CT_DLblExtensionList/c:extLst")]
 pub struct DLblExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the DLblExtension Class.
   #[sdk(child(qname = "c:CT_DLblExtension/c:ext"))]
   pub c_ext: Vec<DLblExtension>,
 }
@@ -4047,7 +4047,7 @@ pub struct DLblExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<DLblExtensionChoice>,
+  pub d_lbl_extension_choice: Option<DLblExtensionChoice>,
 }
 /// Defines the DataPoint Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4068,10 +4068,10 @@ pub struct DataPoint {
   /// Explosion
   #[sdk(child(qname = "c:CT_UnsignedInt/c:explosion"))]
   pub explosion: Option<Explosion>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
   pub picture_options: Option<std::boxed::Box<PictureOptions>>,
   /// Chart Extensibility
@@ -4085,7 +4085,7 @@ pub struct Trendline {
   /// Trendline Name
   #[sdk(text_child(qname = "xsd:string/c:name"))]
   pub trendline_name: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
   /// Trendline Type
@@ -4144,7 +4144,7 @@ pub struct ErrorBars {
   /// Error Bar Value
   #[sdk(child(qname = "c:CT_Double/c:val"))]
   pub error_bar_value: Option<ErrorBarValue>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub chart_shape_properties: Option<std::boxed::Box<ChartShapeProperties>>,
   /// Chart Extensibility
@@ -4162,7 +4162,7 @@ pub struct CategoryAxisData {
     qname = "c:CT_StrRef/c:strRef",
     qname = "c:CT_StrData/c:strLit"
   ))]
-  pub xml_children: Option<CategoryAxisDataChoice>,
+  pub category_axis_data_choice: Option<CategoryAxisDataChoice>,
 }
 /// Defines the XValues Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4175,14 +4175,14 @@ pub struct XValues {
     qname = "c:CT_StrRef/c:strRef",
     qname = "c:CT_StrData/c:strLit"
   ))]
-  pub xml_children: Option<XValuesChoice>,
+  pub x_values_choice: Option<XValuesChoice>,
 }
 /// Defines the LineSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_LineSerExtensionList/c:extLst")]
 pub struct LineSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the LineSerExtension Class.
   #[sdk(child(qname = "c:CT_LineSerExtension/c:ext"))]
   pub c_ext: Vec<LineSerExtension>,
 }
@@ -4207,14 +4207,14 @@ pub struct LineSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<LineSerExtensionChoice>,
+  pub line_ser_extension_choice: Option<LineSerExtensionChoice>,
 }
 /// Defines the ScatterSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_ScatterSerExtensionList/c:extLst")]
 pub struct ScatterSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ScatterSerExtension Class.
   #[sdk(child(qname = "c:CT_ScatterSerExtension/c:ext"))]
   pub c_ext: Vec<ScatterSerExtension>,
 }
@@ -4239,14 +4239,14 @@ pub struct ScatterSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<ScatterSerExtensionChoice>,
+  pub scatter_ser_extension_choice: Option<ScatterSerExtensionChoice>,
 }
 /// Defines the RadarSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_RadarSerExtensionList/c:extLst")]
 pub struct RadarSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the RadarSerExtension Class.
   #[sdk(child(qname = "c:CT_RadarSerExtension/c:ext"))]
   pub c_ext: Vec<RadarSerExtension>,
 }
@@ -4271,14 +4271,14 @@ pub struct RadarSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<RadarSerExtensionChoice>,
+  pub radar_ser_extension_choice: Option<RadarSerExtensionChoice>,
 }
 /// Defines the BarSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BarSerExtensionList/c:extLst")]
 pub struct BarSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the BarSerExtension Class.
   #[sdk(child(qname = "c:CT_BarSerExtension/c:ext"))]
   pub c_ext: Vec<BarSerExtension>,
 }
@@ -4304,14 +4304,14 @@ pub struct BarSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<BarSerExtensionChoice>,
+  pub bar_ser_extension_choice: Option<BarSerExtensionChoice>,
 }
 /// Defines the AreaSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_AreaSerExtensionList/c:extLst")]
 pub struct AreaSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the AreaSerExtension Class.
   #[sdk(child(qname = "c:CT_AreaSerExtension/c:ext"))]
   pub c_ext: Vec<AreaSerExtension>,
 }
@@ -4336,14 +4336,14 @@ pub struct AreaSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<AreaSerExtensionChoice>,
+  pub area_ser_extension_choice: Option<AreaSerExtensionChoice>,
 }
 /// Defines the PieSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PieSerExtensionList/c:extLst")]
 pub struct PieSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PieSerExtension Class.
   #[sdk(child(qname = "c:CT_PieSerExtension/c:ext"))]
   pub c_ext: Vec<PieSerExtension>,
 }
@@ -4368,14 +4368,14 @@ pub struct PieSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<PieSerExtensionChoice>,
+  pub pie_ser_extension_choice: Option<PieSerExtensionChoice>,
 }
 /// Defines the BubbleSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_BubbleSerExtensionList/c:extLst")]
 pub struct BubbleSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the BubbleSerExtension Class.
   #[sdk(child(qname = "c:CT_BubbleSerExtension/c:ext"))]
   pub c_ext: Vec<BubbleSerExtension>,
 }
@@ -4400,14 +4400,14 @@ pub struct BubbleSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<BubbleSerExtensionChoice>,
+  pub bubble_ser_extension_choice: Option<BubbleSerExtensionChoice>,
 }
 /// Defines the SurfaceSerExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_SurfaceSerExtensionList/c:extLst")]
 pub struct SurfaceSerExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SurfaceSerExtension Class.
   #[sdk(child(qname = "c:CT_SurfaceSerExtension/c:ext"))]
   pub c_ext: Vec<SurfaceSerExtension>,
 }
@@ -4431,13 +4431,13 @@ pub struct SurfaceSerExtension {
     qname = "c16:CT_ChartUniqueID/c16:uniqueId",
     any
   ))]
-  pub xml_children: Option<SurfaceSerExtensionChoice>,
+  pub surface_ser_extension_choice: Option<SurfaceSerExtensionChoice>,
 }
 /// Defines the DataDisplayOptions16 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext")]
 pub struct DataDisplayOptions16 {
-  /// _
+  /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
   pub boolean_false:
     Option<crate::schemas::schemas_microsoft_com_office_drawing_2017_03_chart::BooleanFalse>,
@@ -4446,7 +4446,7 @@ pub struct DataDisplayOptions16 {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "c:CT_PivotFmts/c:pivotFmts")]
 pub struct PivotFormats {
-  /// _
+  /// Pivot Format.
   #[sdk(child(qname = "c:CT_PivotFmt/c:pivotFmt"))]
   pub c_pivot_fmt: Vec<PivotFormat>,
 }
@@ -4483,7 +4483,7 @@ pub struct Floor {
   /// Thickness
   #[sdk(child(qname = "c:CT_WallThickness/c:thickness"))]
   pub thickness: Option<Thickness>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Picture Options
@@ -4500,7 +4500,7 @@ pub struct SideWall {
   /// Thickness
   #[sdk(child(qname = "c:CT_WallThickness/c:thickness"))]
   pub thickness: Option<Thickness>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Picture Options
@@ -4517,7 +4517,7 @@ pub struct BackWall {
   /// Thickness
   #[sdk(child(qname = "c:CT_WallThickness/c:thickness"))]
   pub thickness: Option<Thickness>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Picture Options
@@ -4560,13 +4560,13 @@ pub struct PlotArea {
     qname = "c:CT_SerAx/c:serAx"
   ))]
   pub plot_area_choice2: Vec<PlotAreaChoice2>,
-  /// _
+  /// Data Table.
   #[sdk(child(qname = "c:CT_DTable/c:dTable"))]
   pub c_d_table: Option<std::boxed::Box<DataTable>>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub c_sp_pr: Option<std::boxed::Box<ShapeProperties>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -4577,22 +4577,22 @@ pub struct Legend {
   /// Legend Position
   #[sdk(child(qname = "c:CT_LegendPos/c:legendPos"))]
   pub legend_position: Option<LegendPosition>,
-  /// _
+  /// Legend Entry.
   #[sdk(child(qname = "c:CT_LegendEntry/c:legendEntry"))]
   pub c_legend_entry: Vec<LegendEntry>,
-  /// _
+  /// Layout.
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
   pub c_layout: Option<std::boxed::Box<Layout>>,
-  /// _
+  /// Overlay.
   #[sdk(child(qname = "c:CT_Boolean/c:overlay"))]
   pub c_overlay: Option<Overlay>,
-  /// _
+  /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
   pub c_sp_pr: Option<std::boxed::Box<ChartShapeProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
   pub c_tx_pr: Option<std::boxed::Box<TextProperties>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
   pub c_ext_lst: Option<ExtensionList>,
 }
@@ -4611,7 +4611,7 @@ pub struct ChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Defines the DataDisplayOptions16 Class.
   #[sdk(child(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
 }
@@ -4700,7 +4700,7 @@ pub struct ColorMapOverride {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub followed_hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -4816,7 +4816,7 @@ pub struct PrintSettings {
 #[sdk(qname = "c:CT_ChartSpaceExtensionList/c:extLst")]
 pub struct ChartSpaceExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ChartSpaceExtension Class.
   #[sdk(child(qname = "c:CT_ChartSpaceExtension/c:ext"))]
   pub c_ext: Vec<ChartSpaceExtension>,
 }
@@ -4837,14 +4837,16 @@ pub struct ChartSpaceExtension {
     qname = "c:CT_PivotSource/c15:pivotSource",
     any
   ))]
-  pub xml_children: Option<ChartSpaceExtensionChoice>,
+  pub chart_space_extension_choice: Option<ChartSpaceExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartShapePropertiesChoice {
+  /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
   ),
+  /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
@@ -4852,20 +4854,25 @@ pub enum ChartShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartShapePropertiesChoice2 {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -4873,10 +4880,12 @@ pub enum ChartShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartShapePropertiesChoice3 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -4947,7 +4956,6 @@ pub struct DataLabelsChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelsChoice {
-  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   /// Sequence of c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator, c:showLeaderLines, c:leaderLines
@@ -4965,12 +4973,14 @@ pub enum ChartSpaceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UserShapesChoice {
+  /// Relative Anchor Shape Size.
   #[sdk(child(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor"))]
   CdrRelSizeAnchor(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart_drawing::RelativeAnchorSize,
     >,
   ),
+  /// Absolute Anchor Shape Size.
   #[sdk(child(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"))]
   CdrAbsSizeAnchor(
     std::boxed::Box<
@@ -5025,19 +5035,19 @@ pub enum BubbleSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LegendEntryChoice {
-  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
-  /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
-  CTxPr(std::boxed::Box<TextProperties>),
+  Sequence(std::boxed::Box<TextProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
+  /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
   ),
+  /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
@@ -5045,20 +5055,25 @@ pub enum ShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -5069,10 +5084,12 @@ pub enum ShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -5122,7 +5139,6 @@ pub struct DataLabelChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelChoice {
-  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
@@ -5159,6 +5175,7 @@ pub enum SeriesAxisChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StockChartExtensionChoice {
+  /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -5170,6 +5187,7 @@ pub enum StockChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
+  /// Defines the FilteredPieSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
@@ -5181,6 +5199,7 @@ pub enum PieChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
+  /// Defines the FilteredPieSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(
     std::boxed::Box<
@@ -5192,16 +5211,19 @@ pub enum Pie3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
+  /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
+  /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
+  /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -5213,6 +5235,7 @@ pub enum NumRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
+  /// Defines the AutoGeneneratedCategories Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:autoCat"))]
   C15AutoCat(
     std::boxed::Box<
@@ -5224,16 +5247,19 @@ pub enum StrDataExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
+  /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
+  /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
+  /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -5245,16 +5271,19 @@ pub enum StrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
+  /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
   C15FullRef(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
   ),
+  /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
   C15LevelRef(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
     >,
   ),
+  /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(
     std::boxed::Box<
@@ -5266,38 +5295,45 @@ pub enum MultiLvlStrRefExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
+  /// Defines the ChartText Class.
   #[sdk(child(office2013, qname = "c:CT_Tx/c15:tx"))]
   C15Tx(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ChartText>,
   ),
+  /// Defines the DataLabelFieldTable Class.
   #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
+  /// Defines the ShowDataLabelsRange Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
+  /// Defines the ShapeProperties Class.
   #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
+  /// Defines the Layout Class.
   #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
+  /// Defines the ShowLeaderLines Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showLeaderLines"))]
   C15ShowLeaderLines(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowLeaderLines,
     >,
   ),
+  /// Defines the LeaderLines Class.
   #[sdk(child(office2013, qname = "c:CT_ChartLines/c15:leaderLines"))]
   C15LeaderLines(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LeaderLines>,
@@ -5307,6 +5343,7 @@ pub enum DLblsExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
+  /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -5318,6 +5355,7 @@ pub enum LineChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
+  /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(
     std::boxed::Box<
@@ -5329,6 +5367,7 @@ pub enum Line3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
+  /// Defines the FilteredScatterSeries Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"
@@ -5343,6 +5382,7 @@ pub enum ScatterChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
+  /// Defines the FilteredRadarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
   C15FilteredRadarSeries(
     std::boxed::Box<
@@ -5354,6 +5394,7 @@ pub enum RadarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
+  /// Defines the FilteredBarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
@@ -5365,6 +5406,7 @@ pub enum BarChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
+  /// Defines the FilteredBarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(
     std::boxed::Box<
@@ -5376,6 +5418,7 @@ pub enum Bar3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
+  /// Defines the FilteredAreaSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
@@ -5387,6 +5430,7 @@ pub enum AreaChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
+  /// Defines the FilteredAreaSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(
     std::boxed::Box<
@@ -5398,6 +5442,7 @@ pub enum Area3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
+  /// Defines the FilteredBubbleSeries Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"
@@ -5412,6 +5457,7 @@ pub enum BubbleChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
+  /// Defines the FilteredSurfaceSeries Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
@@ -5426,6 +5472,7 @@ pub enum SurfaceChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
+  /// Defines the FilteredSurfaceSeries Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
@@ -5440,6 +5487,7 @@ pub enum Surface3DChartExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
+  /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -5451,6 +5499,7 @@ pub enum CatAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
+  /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -5462,6 +5511,7 @@ pub enum DateAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
+  /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -5473,6 +5523,7 @@ pub enum SerAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
+  /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(
     std::boxed::Box<
@@ -5491,34 +5542,40 @@ pub enum DisplayUnitsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblExtensionChoice {
+  /// Defines the DataLabelFieldTable Class.
   #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
   C15DlblFieldTable(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
     >,
   ),
+  /// Defines the ExceptionForSave Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:xForSave"))]
   C15XForSave(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ExceptionForSave,
     >,
   ),
+  /// Defines the ShowDataLabelsRange Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
   C15ShowDataLabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
     >,
   ),
+  /// Defines the ShapeProperties Class.
   #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
   C15SpPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
     >,
   ),
+  /// Defines the Layout Class.
   #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
   C15Layout(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5566,6 +5623,7 @@ pub enum XValuesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5575,6 +5633,7 @@ pub enum LineSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5584,12 +5643,14 @@ pub enum LineSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5599,6 +5660,7 @@ pub enum LineSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5608,6 +5670,7 @@ pub enum LineSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5617,6 +5680,7 @@ pub enum LineSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5628,6 +5692,7 @@ pub enum LineSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5637,6 +5702,7 @@ pub enum ScatterSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5646,12 +5712,14 @@ pub enum ScatterSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5661,6 +5729,7 @@ pub enum ScatterSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5670,6 +5739,7 @@ pub enum ScatterSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5679,6 +5749,7 @@ pub enum ScatterSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5690,6 +5761,7 @@ pub enum ScatterSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5699,6 +5771,7 @@ pub enum RadarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5708,12 +5781,14 @@ pub enum RadarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5723,6 +5798,7 @@ pub enum RadarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5732,6 +5808,7 @@ pub enum RadarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5741,6 +5818,7 @@ pub enum RadarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5752,12 +5830,14 @@ pub enum RadarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
+  /// Defines the InvertSolidFillFormat Class.
   #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5767,6 +5847,7 @@ pub enum BarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5776,12 +5857,14 @@ pub enum BarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5791,6 +5874,7 @@ pub enum BarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5800,6 +5884,7 @@ pub enum BarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5809,6 +5894,7 @@ pub enum BarSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5820,6 +5906,7 @@ pub enum BarSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5829,6 +5916,7 @@ pub enum AreaSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5838,12 +5926,14 @@ pub enum AreaSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5853,6 +5943,7 @@ pub enum AreaSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5862,6 +5953,7 @@ pub enum AreaSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5871,6 +5963,7 @@ pub enum AreaSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5882,6 +5975,7 @@ pub enum AreaSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -5891,6 +5985,7 @@ pub enum PieSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5900,12 +5995,14 @@ pub enum PieSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5915,6 +6012,7 @@ pub enum PieSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5924,6 +6022,7 @@ pub enum PieSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5933,6 +6032,7 @@ pub enum PieSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -5944,12 +6044,14 @@ pub enum PieSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
+  /// Defines the InvertSolidFillFormat Class.
   #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
   C14InvertSolidFillFmt(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -5959,12 +6061,14 @@ pub enum BubbleSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
   C15DatalabelsRange(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -5974,6 +6078,7 @@ pub enum BubbleSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -5983,6 +6088,7 @@ pub enum BubbleSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -5992,6 +6098,7 @@ pub enum BubbleSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -6003,6 +6110,7 @@ pub enum BubbleSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
+  /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
@@ -6012,6 +6120,7 @@ pub enum SurfaceSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
     >,
   ),
+  /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
@@ -6021,6 +6130,7 @@ pub enum SurfaceSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
@@ -6030,6 +6140,7 @@ pub enum SurfaceSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
@@ -6039,6 +6150,7 @@ pub enum SurfaceSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
     >,
   ),
+  /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
@@ -6048,6 +6160,7 @@ pub enum SurfaceSerExtensionChoice {
       crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
     >,
   ),
+  /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(
     std::boxed::Box<
@@ -6059,64 +6172,87 @@ pub enum SurfaceSerExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlotAreaChoice {
+  /// Area Charts.
   #[sdk(child(qname = "c:CT_AreaChart/c:areaChart"))]
   CAreaChart(std::boxed::Box<AreaChart>),
+  /// 3D Area Charts.
   #[sdk(child(qname = "c:CT_Area3DChart/c:area3DChart"))]
   CArea3DChart(std::boxed::Box<Area3DChart>),
+  /// Line Charts.
   #[sdk(child(qname = "c:CT_LineChart/c:lineChart"))]
   CLineChart(std::boxed::Box<LineChart>),
+  /// 3D Line Charts.
   #[sdk(child(qname = "c:CT_Line3DChart/c:line3DChart"))]
   CLine3DChart(std::boxed::Box<Line3DChart>),
+  /// Stock Charts.
   #[sdk(child(qname = "c:CT_StockChart/c:stockChart"))]
   CStockChart(std::boxed::Box<StockChart>),
+  /// Radar Charts.
   #[sdk(child(qname = "c:CT_RadarChart/c:radarChart"))]
   CRadarChart(std::boxed::Box<RadarChart>),
+  /// Scatter Charts.
   #[sdk(child(qname = "c:CT_ScatterChart/c:scatterChart"))]
   CScatterChart(std::boxed::Box<ScatterChart>),
+  /// Pie Charts.
   #[sdk(child(qname = "c:CT_PieChart/c:pieChart"))]
   CPieChart(std::boxed::Box<PieChart>),
+  /// 3D Pie Charts.
   #[sdk(child(qname = "c:CT_Pie3DChart/c:pie3DChart"))]
   CPie3DChart(std::boxed::Box<Pie3DChart>),
+  /// Doughnut Charts.
   #[sdk(child(qname = "c:CT_DoughnutChart/c:doughnutChart"))]
   CDoughnutChart(std::boxed::Box<DoughnutChart>),
+  /// Bar Charts.
   #[sdk(child(qname = "c:CT_BarChart/c:barChart"))]
   CBarChart(std::boxed::Box<BarChart>),
+  /// 3D Bar Charts.
   #[sdk(child(qname = "c:CT_Bar3DChart/c:bar3DChart"))]
   CBar3DChart(std::boxed::Box<Bar3DChart>),
+  /// Pie of Pie or Bar of Pie Charts.
   #[sdk(child(qname = "c:CT_OfPieChart/c:ofPieChart"))]
   COfPieChart(std::boxed::Box<OfPieChart>),
+  /// Surface Charts.
   #[sdk(child(qname = "c:CT_SurfaceChart/c:surfaceChart"))]
   CSurfaceChart(std::boxed::Box<SurfaceChart>),
+  /// 3D Surface Charts.
   #[sdk(child(qname = "c:CT_Surface3DChart/c:surface3DChart"))]
   CSurface3DChart(std::boxed::Box<Surface3DChart>),
+  /// Bubble Charts.
   #[sdk(child(qname = "c:CT_BubbleChart/c:bubbleChart"))]
   CBubbleChart(std::boxed::Box<BubbleChart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlotAreaChoice2 {
+  /// Value Axis.
   #[sdk(child(qname = "c:CT_ValAx/c:valAx"))]
   CValAx(std::boxed::Box<ValueAxis>),
+  /// Category Axis Data.
   #[sdk(child(qname = "c:CT_CatAx/c:catAx"))]
   CCatAx(std::boxed::Box<CategoryAxis>),
+  /// Date Axis.
   #[sdk(child(qname = "c:CT_DateAx/c:dateAx"))]
   CDateAx(std::boxed::Box<DateAxis>),
+  /// Series Axis.
   #[sdk(child(qname = "c:CT_SerAx/c:serAx"))]
   CSerAx(std::boxed::Box<SeriesAxis>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceExtensionChoice {
+  /// Defines the PivotOptions Class.
   #[sdk(child(office2010, qname = "c14:CT_PivotOptions/c14:pivotOptions"))]
   C14PivotOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::PivotOptions,
     >,
   ),
+  /// Defines the SketchOptions Class.
   #[sdk(child(office2010, qname = "c14:CT_SketchOptions/c14:sketchOptions"))]
   C14SketchOptions(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::SketchOptions,
     >,
   ),
+  /// Defines the PivotSource Class.
   #[sdk(child(office2013, qname = "c:CT_PivotSource/c15:pivotSource"))]
   C15PivotSource(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::PivotSource>,

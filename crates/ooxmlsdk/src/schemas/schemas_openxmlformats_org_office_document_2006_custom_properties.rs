@@ -11,7 +11,7 @@ pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Custom File Property.
   #[sdk(child(qname = "op:CT_Property/op:property"))]
   pub op_property: Vec<CustomDocumentProperty>,
 }
@@ -71,7 +71,7 @@ pub struct CustomDocumentProperty {
     qname = "vt:ST_Clsid/vt:clsid",
     qname = "vt:CT_Cf/vt:cf"
   ))]
-  pub xml_children: Option<CustomDocumentPropertyChoice>,
+  pub custom_document_property_choice: Option<CustomDocumentPropertyChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomDocumentPropertyChoice {

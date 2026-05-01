@@ -1,7 +1,7 @@
 use ooxmlsdk::common::XmlHeaderType;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, Document, Hyperlink, HyperlinkChoice, Paragraph,
-  ParagraphChoice, ParagraphChoice2, Run, RunChoice, Text,
+  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, Document, Hyperlink,
+  HyperlinkChoice, Paragraph, ParagraphChoice, Run, RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -39,7 +39,7 @@ fn first_hyperlink(paragraph: &Paragraph) -> &Hyperlink {
 
 fn first_hyperlink_run(hyperlink: &Hyperlink) -> &Run {
   hyperlink
-    .xml_children
+    .hyperlink_choice
     .iter()
     .find_map(|child| match child {
       HyperlinkChoice::WR(run) => Some(run.as_ref()),
@@ -97,7 +97,7 @@ fn paragraph_text(paragraph: &Paragraph) -> String {
     }
 
     if let Some(hyperlink) = paragraph_choice_hyperlink(child) {
-      for hyperlink_child in &hyperlink.xml_children {
+      for hyperlink_child in &hyperlink.hyperlink_choice {
         if let HyperlinkChoice::WR(run) = hyperlink_child {
           append_run_text(run.as_ref(), &mut text);
         }
@@ -256,37 +256,49 @@ fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
 }
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
-  paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice2::WBookmarkStart(_))
-  })
+  matches!(choice, ParagraphChoice::WBookmarkStart(_))
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
-  paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice2::WBookmarkEnd(_))
-  })
+  matches!(choice, ParagraphChoice::WBookmarkEnd(_))
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
-  paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice2::WCommentRangeStart(_))
-  })
+  matches!(choice, ParagraphChoice::WCommentRangeStart(_))
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
-  paragraph_choice_has_range_markup(choice, |choice| {
-    matches!(choice, ParagraphChoice2::WCommentRangeEnd(_))
-  })
+  matches!(choice, ParagraphChoice::WCommentRangeEnd(_))
 }
 
-fn paragraph_choice_has_range_markup(
-  choice: &ParagraphChoice,
-  predicate: impl Fn(&ParagraphChoice2) -> bool,
-) -> bool {
-  let ParagraphChoice::EgRunLevelElts(choice) = choice else {
-    return false;
-  };
-  predicate(choice.as_ref())
+#[test]
+fn deleted_run_flat_choice_parses_upstream_particle_shape() {
+  // Source: generated DocumentFormat.OpenXml Wordprocessing.DeletedRun particle,
+  // backed by wml.xsd CT_RunTrackChange / EG_ContentRunContent / EG_RunLevelElts.
+  let xml = r#"<w:del xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" w:id="1" w:author="author"><w:proofErr w:type="spellStart"/><w:bookmarkStart w:id="0" w:name="mark"/><w14:conflictIns w:id="2" w:author="author"/><w14:conflictDel w:id="3" w:author="author"/><w:r><w:t>deleted</w:t></w:r></w:del>"#;
+
+  let deleted_run = xml.parse::<DeletedRun>().unwrap();
+
+  assert_eq!(deleted_run.deleted_run_choice.len(), 4);
+  assert!(matches!(
+    deleted_run.deleted_run_choice[0],
+    DeletedRunChoice::WProofErr(_)
+  ));
+  assert!(matches!(
+    deleted_run.deleted_run_choice[1],
+    DeletedRunChoice::WBookmarkStart(_)
+  ));
+  assert!(matches!(
+    deleted_run.deleted_run_choice[2],
+    DeletedRunChoice::Sequence {
+      run_conflict_insertion: Some(_),
+      run_conflict_deletion: Some(_)
+    }
+  ));
+  assert!(matches!(
+    deleted_run.deleted_run_choice[3],
+    DeletedRunChoice::WR(_)
+  ));
 }
 
 #[test]
@@ -985,7 +997,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
   let Some(properties) = sdt.sdt_properties.as_ref() else {
     panic!("expected w:sdtPr");
   };
-  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.xml_children.first() else {
+  let Some(SdtPropertiesChoice::WAlias(alias)) = properties.sdt_properties_choice.first() else {
     panic!("expected sdt alias");
   };
   assert_eq!(alias.val.as_str(), "RichTextContentControl");
@@ -998,7 +1010,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
       paragraph.paragraph_choice.iter().find_map(|child| {
         let hyperlink = paragraph_choice_hyperlink(child)?;
         hyperlink
-          .xml_children
+          .hyperlink_choice
           .iter()
           .any(|hyperlink_child| match hyperlink_child {
             HyperlinkChoice::WR(run) => {

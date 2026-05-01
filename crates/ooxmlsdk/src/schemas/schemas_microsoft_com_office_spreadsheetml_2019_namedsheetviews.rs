@@ -11,10 +11,10 @@ pub struct NamedSheetViews {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the NamedSheetView Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NamedSheetView/xnsv:namedSheetView"))]
   pub xnsv_named_sheet_view: Vec<NamedSheetView>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
@@ -33,10 +33,10 @@ pub struct NamedSheetView {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the NsvFilter Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter"))]
   pub xnsv_nsv_filter: Vec<NsvFilter>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
@@ -47,7 +47,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the NsvFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -67,13 +67,13 @@ pub struct NsvFilter {
   /// tableId
   #[sdk(attr(office2021, qname = ":tableId"))]
   pub table_id: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the ColumnFilter Class.
   #[sdk(child(office2021, qname = "xnsv:CT_ColumnFilter/xnsv:columnFilter"))]
   pub xnsv_column_filter: Vec<ColumnFilter>,
-  /// _
+  /// Defines the SortRules Class.
   #[sdk(child(office2021, qname = "xnsv:CT_SortRules/xnsv:sortRules"))]
   pub xnsv_sort_rules: Option<std::boxed::Box<SortRules>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
@@ -92,13 +92,13 @@ pub struct ColumnFilter {
   ))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
-  /// _
+  /// Defines the FilterColumn Class.
   #[sdk(child(office2021, qname = "x:CT_FilterColumn/xnsv:filter"))]
   pub xnsv_filter: Vec<FilterColumn>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
@@ -113,10 +113,10 @@ pub struct SortRules {
   /// caseSensitive
   #[sdk(attr(office2021, qname = ":caseSensitive"))]
   pub case_sensitive: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the SortRule Class.
   #[sdk(child(office2021, qname = "xnsv:CT_SortRule/xnsv:sortRule"))]
   pub xnsv_sort_rule: Vec<SortRule>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xnsv:extLst"))]
   pub xnsv_ext_lst: Option<ExtensionList>,
 }
@@ -180,7 +180,7 @@ pub struct FilterColumn {
     qname = "x:CT_IconFilter/x:iconFilter",
     qname = "x:CT_ExtensionList/x:extLst"
   ))]
-  pub xml_children: Option<FilterColumnChoice>,
+  pub filter_column_choice: Option<FilterColumnChoice>,
 }
 /// Defines the SortRule Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -197,7 +197,7 @@ pub struct SortRule {
   ))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   #[sdk(choice(

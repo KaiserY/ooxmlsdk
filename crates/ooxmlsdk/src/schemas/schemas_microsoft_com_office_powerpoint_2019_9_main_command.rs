@@ -8,12 +8,12 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "pc2:CT_CommentV2MonikerList/pc2:cmMkLst")]
 pub struct CommentV2MonikerList {
-  /// _
+  /// Defines the SlideMonikerList Class.
   #[sdk(child(office2016, qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
   pub slide_moniker_list: std::boxed::Box<
     crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideMonikerList,
   >,
-  /// _
+  /// Defines the CommentV2Moniker Class.
   #[sdk(child(microsoft365, qname = "pc2:CT_CommentV2Moniker/pc2:cmMK"))]
   pub comment_v2_moniker: std::boxed::Box<CommentV2Moniker>,
 }
@@ -24,10 +24,10 @@ pub struct CommentV2MonikerList {
   qname = "pc2:CT_CommentReplyV2MonikerList/pc2:cmRplyMkLst"
 )]
 pub struct CommentReplyV2MonikerList {
-  /// _
+  /// Defines the CommentV2MonikerList Class.
   #[sdk(child(microsoft365, qname = "pc2:CT_CommentV2MonikerList/pc2:cmMkLst"))]
   pub comment_v2_moniker_list: std::boxed::Box<CommentV2MonikerList>,
-  /// _
+  /// Defines the CommentReplyV2Moniker Class.
   #[sdk(child(microsoft365, qname = "pc2:CT_CommentReplyV2Moniker/pc2:cmRplyMk"))]
   pub comment_reply_v2_moniker: std::boxed::Box<CommentReplyV2Moniker>,
 }

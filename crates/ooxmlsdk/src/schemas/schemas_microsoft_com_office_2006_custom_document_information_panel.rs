@@ -8,13 +8,13 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdip:CT_CustomPropertyEditors/cdip:customPropertyEditors")]
 pub struct CustomPropertyEditors {
-  /// _
+  /// Defines the ShowOnOpen Class.
   #[sdk(text_child(qname = "xsd:boolean/cdip:showOnOpen"))]
   pub show_on_open: crate::simple_type::BooleanValue,
-  /// _
+  /// Defines the DefaultPropertyEditorNamespace Class.
   #[sdk(text_child(qname = "xsd:anyURI/cdip:defaultPropertyEditorNamespace"))]
   pub default_property_editor_namespace: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CustomPropertyEditor Class.
   #[sdk(child(qname = "cdip:CT_CustomPropertyEditor/cdip:customPropertyEditor"))]
   pub cdip_custom_property_editor: Vec<CustomPropertyEditor>,
 }
@@ -30,10 +30,10 @@ pub type ShowOnOpen = crate::simple_type::BooleanValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdip:CT_CustomPropertyEditor/cdip:customPropertyEditor")]
 pub struct CustomPropertyEditor {
-  /// _
+  /// Defines the PropertyEditorNamespace Class.
   #[sdk(text_child(qname = "xsd:anyURI/cdip:XMLNamespace"))]
   pub property_editor_namespace: crate::simple_type::StringValue,
-  /// _
+  /// Defines the XsnFileLocation Class.
   #[sdk(text_child(qname = "xsd:string/cdip:XSNLocation"))]
   pub xsn_file_location: crate::simple_type::StringValue,
 }

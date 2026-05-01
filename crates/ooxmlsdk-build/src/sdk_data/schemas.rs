@@ -5,27 +5,11 @@ use crate::sdk_data::{
     SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
     SchemaTypeKind, SchemaTypeXmlHeader,
   },
-  xsd::{parse_named_groups, parse_xsd, resolve_named_group_leaf_sets},
 };
 
 use crate::sdk_code::versioning::effective_version;
-use heck::{ToSnakeCase, ToUpperCamelCase};
-use std::collections::{BTreeSet, HashMap};
-
-#[derive(Clone, Debug)]
-struct StableGroupSignature {
-  property_name: String,
-  leaf_qnames: BTreeSet<String>,
-  match_kind: StableGroupMatchKind,
-}
-
-#[derive(Clone, Debug)]
-enum StableGroupMatchKind {
-  Exact,
-  Compatible {
-    allowed_extra_leafs: BTreeSet<String>,
-  },
-}
+use heck::ToUpperCamelCase;
+use std::collections::HashMap;
 
 pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
   let mut namespaces: Vec<Namespace> = gen_context
@@ -56,7 +40,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .flat_map(|schema| schema.types.iter())
     .map(|ty| (ty.name.as_str(), ty))
     .collect();
-  let stable_group_signatures = load_stable_group_signatures(gen_context);
 
   let schemas: Vec<Schema> = gen_context
     .schemas
@@ -157,10 +140,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               }));
             }
           } else {
-            let preserve_nested_choice_wrappers = matches!(
-              composite_kind,
-              SchemaTypeCompositeKind::OneSequence | SchemaTypeCompositeKind::SdkSequence
-            );
             collect_choice_children(
               &ty.particle,
               &raw_child_map,
@@ -168,10 +147,9 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               &mut children,
               false,
               false,
-              preserve_nested_choice_wrappers,
+              false,
             );
           }
-          assign_stable_group_names(&mut children, &stable_group_signatures);
           mark_sequence_collection_children_repeated(ty, &mut children);
           mark_mixed_sequence_direct_children_optional(&mut children);
           let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
@@ -297,214 +275,6 @@ pub(crate) fn assign_schema_particle_ids(schemas: &mut [Schema]) {
     for schema_type in &mut schema.types {
       assign_particle_ids(&mut schema_type.children);
     }
-  }
-}
-
-fn load_stable_group_signatures(gen_context: &Context) -> Vec<StableGroupSignature> {
-  let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  let workspace_root = manifest_dir
-    .parent()
-    .and_then(|path| path.parent())
-    .expect("workspace root");
-  let xsd_dir = workspace_root.join("schemas/OfficeOpenXML-XMLSchema-Transitional");
-  let Ok(entries) = std::fs::read_dir(&xsd_dir) else {
-    return Vec::new();
-  };
-
-  let mut group_particles = std::collections::BTreeMap::new();
-
-  for entry in entries.flatten() {
-    let path = entry.path();
-    if !path.is_file() || path.extension() != Some(std::ffi::OsStr::new("xsd")) {
-      continue;
-    }
-
-    let Ok(source) = std::fs::read_to_string(&path) else {
-      continue;
-    };
-    let Ok(parsed_xsd) = parse_xsd(&source) else {
-      continue;
-    };
-    let Some(default_prefix) = gen_context
-      .namespace_uri_prefix_map
-      .get(parsed_xsd.target_namespace.as_str())
-    else {
-      continue;
-    };
-    let Ok(parsed_groups) = parse_named_groups(&source, default_prefix.as_str()) else {
-      continue;
-    };
-
-    group_particles.extend(parsed_groups.groups);
-  }
-
-  let group_leaf_sets = resolve_named_group_leaf_sets(&group_particles);
-  let omath_math_elements = group_leaf_sets
-    .get("m:EG_OMathMathElements")
-    .cloned()
-    .unwrap_or_default();
-
-  group_leaf_sets
-    .into_iter()
-    .filter_map(|(group_ref, leaf_qnames)| {
-      if !matches!(group_ref.split(':').next(), Some("w") | Some("m")) {
-        return None;
-      }
-
-      let local_name = group_ref.rsplit(':').next().unwrap_or(group_ref.as_str());
-      if !local_name.starts_with("EG_") || leaf_qnames.is_empty() {
-        return None;
-      }
-
-      let match_kind = if group_ref == "w:EG_RunLevelElts" {
-        StableGroupMatchKind::Compatible {
-          allowed_extra_leafs: omath_math_elements
-            .iter()
-            .cloned()
-            .chain(
-              [
-                "w:contentPart",
-                "w14:customXmlConflictInsRangeStart",
-                "w14:customXmlConflictInsRangeEnd",
-                "w14:customXmlConflictDelRangeStart",
-                "w14:customXmlConflictDelRangeEnd",
-                "w14:conflictIns",
-                "w14:conflictDel",
-              ]
-              .into_iter()
-              .map(str::to_string),
-            )
-            .collect(),
-        }
-      } else {
-        StableGroupMatchKind::Exact
-      };
-
-      Some(StableGroupSignature {
-        property_name: local_name.to_snake_case(),
-        leaf_qnames,
-        match_kind,
-      })
-    })
-    .collect()
-}
-
-fn assign_stable_group_names(
-  children: &mut [SchemaTypeChild],
-  signatures: &[StableGroupSignature],
-) {
-  for child in children {
-    assign_stable_group_name(child, signatures);
-  }
-}
-
-fn assign_stable_group_name(child: &mut SchemaTypeChild, signatures: &[StableGroupSignature]) {
-  for nested in &mut child.children {
-    assign_stable_group_name(nested, signatures);
-  }
-
-  if !child.property_name.is_empty()
-    || !matches!(
-      child.kind,
-      SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence
-    )
-  {
-    return;
-  }
-
-  if let Some(property_name) = infer_stable_group_name(child, signatures) {
-    child.property_name = property_name;
-  }
-}
-
-fn infer_stable_group_name(
-  child: &SchemaTypeChild,
-  signatures: &[StableGroupSignature],
-) -> Option<String> {
-  let leaf_qnames = child_leaf_qnames(child);
-  if leaf_qnames.is_empty() {
-    return None;
-  }
-
-  let exact_matches = signatures
-    .iter()
-    .filter(|signature| {
-      matches!(signature.match_kind, StableGroupMatchKind::Exact)
-        && signature.leaf_qnames == leaf_qnames
-    })
-    .collect::<Vec<_>>();
-  if let Some(property_name) = select_unique_group_name(exact_matches) {
-    return Some(property_name);
-  }
-
-  let mut compatible_matches = signatures
-    .iter()
-    .filter(|signature| match &signature.match_kind {
-      StableGroupMatchKind::Exact => false,
-      StableGroupMatchKind::Compatible {
-        allowed_extra_leafs,
-      } => {
-        signature.leaf_qnames.is_subset(&leaf_qnames)
-          && leaf_qnames
-            .difference(&signature.leaf_qnames)
-            .all(|leaf| allowed_extra_leafs.contains(leaf))
-      }
-    })
-    .collect::<Vec<_>>();
-
-  compatible_matches.sort_by_key(|right| std::cmp::Reverse(right.leaf_qnames.len()));
-
-  if compatible_matches.is_empty() {
-    return None;
-  }
-
-  let best_len = compatible_matches[0].leaf_qnames.len();
-  let best_matches = compatible_matches
-    .into_iter()
-    .take_while(|signature| signature.leaf_qnames.len() == best_len)
-    .collect::<Vec<_>>();
-
-  select_unique_group_name(best_matches)
-}
-
-fn select_unique_group_name(matches: Vec<&StableGroupSignature>) -> Option<String> {
-  let mut property_names = matches
-    .into_iter()
-    .map(|signature| signature.property_name.as_str())
-    .collect::<Vec<_>>();
-
-  property_names.sort_unstable();
-  property_names.dedup();
-
-  (property_names.len() == 1).then(|| property_names[0].to_string())
-}
-
-fn child_leaf_qnames(child: &SchemaTypeChild) -> BTreeSet<String> {
-  let mut leaf_qnames = BTreeSet::new();
-  collect_child_leaf_qnames(child, &mut leaf_qnames);
-  leaf_qnames
-}
-
-fn collect_child_leaf_qnames(child: &SchemaTypeChild, out: &mut BTreeSet<String>) {
-  match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
-      if !child.name.is_empty() {
-        out.insert(
-          child
-            .name
-            .rsplit('/')
-            .next()
-            .unwrap_or(child.name.as_str())
-            .to_string(),
-        );
-      }
-    }
-    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
-      for nested in &child.children {
-        collect_child_leaf_qnames(nested, out);
-      }
-    }
-    SchemaTypeChildKind::Any => {}
   }
 }
 
@@ -901,7 +671,7 @@ fn schema_child_from_particle(
 
   let kind = resolve_child_kind(particle.name.as_str(), type_map);
 
-  let (property_name, property_comments) = raw_child_map
+  let (property_name, mut property_comments) = raw_child_map
     .get(particle.name.as_str())
     .map(|child| (child.property_name.clone(), child.property_comments.clone()))
     .unwrap_or_else(|| {
@@ -917,6 +687,13 @@ fn schema_child_from_particle(
         });
       (fallback_name, String::new())
     });
+  if property_comments.is_empty()
+    && let Some(summary) = resolve_schema_type(particle.name.as_str(), type_map)
+      .map(|child_type| child_type.summary.as_str())
+      .filter(|summary| !summary.is_empty())
+  {
+    property_comments = summary.to_string();
+  }
   let is_collection_wrapper = kind == SchemaTypeChildKind::Child
     && property_name.is_empty()
     && particle.kind == "Sequence"

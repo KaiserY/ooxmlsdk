@@ -452,7 +452,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .as_mut()
     .and_then(|properties| {
       properties
-        .xml_children
+        .sdt_properties_choice
         .iter_mut()
         .find_map(|choice| match choice {
           SdtPropertiesChoice::WAlias(alias) => Some(alias.as_mut()),
@@ -484,7 +484,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .and_then(|sdt| sdt.sdt_properties.as_ref())
     .and_then(|properties| {
       properties
-        .xml_children
+        .sdt_properties_choice
         .iter()
         .find_map(|choice| match choice {
           SdtPropertiesChoice::WAlias(alias) => Some(alias.as_ref()),
@@ -3372,7 +3372,7 @@ fn add_part_from_package_imports_part_tree_relationships_and_data_parts() {
     imported_header
       .root_element(&mut target)
       .unwrap()
-      .xml_children
+      .header_choice
       .is_empty()
   );
 

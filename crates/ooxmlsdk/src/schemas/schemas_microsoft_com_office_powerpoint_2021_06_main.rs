@@ -19,10 +19,10 @@ pub struct TaskHistoryDetails {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the TaskHistory Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskHistory/p216:history"))]
   pub task_history: std::boxed::Box<TaskHistory>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p216:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -46,8 +46,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension:
-    Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
 }
 /// Defines the AtrbtnTaskAssignUnassignUser Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -80,10 +79,10 @@ pub struct UnAsgnTaskAssignUnassignUser {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "p216:CT_TaskAnchor/p216:anchr")]
 pub struct TaskAnchor {
-  /// _
+  /// Defines the CommentAnchor Class.
   #[sdk(child(microsoft365, qname = "p216:CT_CommentAnchor/p216:comment"))]
   pub comment_anchor: std::boxed::Box<CommentAnchor>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p216:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -164,10 +163,10 @@ pub struct TaskHistoryEvent {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the AtrbtnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAssignUnassignUser/p216:atrbtn"))]
-  pub atrbtn_task_assign_unassign_user: std::boxed::Box<AtrbtnTaskAssignUnassignUser>,
-  /// _
+  pub atrbtn_task_assign_unassign_user: Option<AtrbtnTaskAssignUnassignUser>,
+  /// Defines the TaskAnchor Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAnchor/p216:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
   #[sdk(choice(
@@ -184,7 +183,7 @@ pub struct TaskHistoryEvent {
     qname = "p216:CT_TaskUnknownRecord/p216:unknown"
   ))]
   pub task_history_event_choice: Option<TaskHistoryEventChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p216:extLst"))]
   pub p216_ext_lst: Option<ExtensionList>,
 }
@@ -192,7 +191,7 @@ pub struct TaskHistoryEvent {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "p216:CT_TaskHistory/p216:history")]
 pub struct TaskHistory {
-  /// _
+  /// Defines the TaskHistoryEvent Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskHistoryEvent/p216:event"))]
   pub p216_event: Vec<TaskHistoryEvent>,
 }

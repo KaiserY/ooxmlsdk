@@ -8,16 +8,16 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "ntns:CT_CustomXsn/ntns:customXsn")]
 pub struct CustomXsn {
-  /// _
+  /// Defines the XsnLocation Class.
   #[sdk(text_child(qname = "xsd:string/ntns:xsnLocation"))]
   pub xsn_location: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CachedView Class.
   #[sdk(text_child(qname = "xsd:string/ntns:cached"))]
   pub cached_view: crate::simple_type::StringValue,
-  /// _
+  /// Defines the OpenByDefault Class.
   #[sdk(text_child(qname = "xsd:string/ntns:openByDefault"))]
   pub open_by_default: crate::simple_type::StringValue,
-  /// _
+  /// Defines the Scope Class.
   #[sdk(text_child(qname = "xsd:string/ntns:xsnScope"))]
   pub scope: crate::simple_type::StringValue,
 }

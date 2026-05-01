@@ -149,7 +149,7 @@ pub struct ClientData {
     qname = "xsd:nonNegativeInteger/xvml:ScriptLocation",
     qname = "xsd:string/xvml:FmlaTxbx"
   ))]
-  pub xml_children: Vec<ClientDataChoice>,
+  pub client_data_choice: Vec<ClientDataChoice>,
 }
 /// Move with Cells.
 pub type MoveWithCells = BooleanEntryWithBlankValues;

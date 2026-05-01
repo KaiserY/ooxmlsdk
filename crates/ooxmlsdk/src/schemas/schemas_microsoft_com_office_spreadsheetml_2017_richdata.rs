@@ -54,10 +54,10 @@ pub struct RichValueData {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the RichValue Class.
   #[sdk(child(office2019, qname = "xlrd:CT_RichValue/xlrd:rv"))]
   pub xlrd_rv: Vec<RichValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
   pub xlrd_ext_lst: Option<ExtensionList>,
 }
@@ -71,10 +71,10 @@ pub struct RichValueStructures {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the RichValueStructure Class.
   #[sdk(child(office2019, qname = "xlrd:CT_RichValueStructure/xlrd:s"))]
   pub xlrd_s: Vec<RichValueStructure>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd:extLst"))]
   pub xlrd_ext_lst: Option<ExtensionList>,
 }
@@ -85,10 +85,10 @@ pub struct RichValue {
   /// s
   #[sdk(attr(office2019, qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the RichValueFallback Class.
   #[sdk(child(office2019, qname = "xlrd:CT_RichValueFallback/xlrd:fb"))]
   pub rich_value_fallback: Option<RichValueFallback>,
-  /// _
+  /// Defines the Value Class.
   #[sdk(text_child(office2019, qname = "xlrd:CT_Value/xlrd:v"))]
   pub xlrd_v: Vec<crate::simple_type::StringValue>,
 }
@@ -99,7 +99,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the RichValueFallback Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -120,7 +120,7 @@ pub struct RichValueStructure {
   /// t
   #[sdk(attr(office2019, qname = ":t"))]
   pub t: crate::simple_type::StringValue,
-  /// _
+  /// Defines the Key Class.
   #[sdk(child(office2019, qname = "xlrd:CT_Key/xlrd:k"))]
   pub xlrd_k: Vec<Key>,
 }

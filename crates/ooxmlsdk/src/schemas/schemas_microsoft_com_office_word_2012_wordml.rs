@@ -73,7 +73,7 @@ pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the CommentEx Class.
   #[sdk(child(office2013, qname = "w15:CT_CommentEx/w15:commentEx"))]
   pub w15_comment_ex: Vec<CommentEx>,
 }
@@ -84,7 +84,7 @@ pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Person Class.
   #[sdk(child(office2013, qname = "w15:CT_Person/w15:person"))]
   pub w15_person: Vec<Person>,
 }
@@ -92,10 +92,10 @@ pub struct People {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "w15:CT_SdtRepeatedSection/w15:repeatingSection")]
 pub struct SdtRepeatedSection {
-  /// _
+  /// Defines the SectionTitle Class.
   #[sdk(child(office2013, qname = "w:CT_String/w15:sectionTitle"))]
   pub section_title: Option<SectionTitle>,
-  /// _
+  /// Defines the DoNotAllowInsertDeleteSection Class.
   #[sdk(child(office2013, qname = "w:CT_OnOff/w15:doNotAllowInsertDeleteSection"))]
   pub do_not_allow_insert_delete_section: Option<DoNotAllowInsertDeleteSection>,
 }
@@ -186,7 +186,7 @@ pub struct Person {
   /// author
   #[sdk(attr(office2013, qname = "w15:author"))]
   pub author: crate::simple_type::StringValue,
-  /// _
+  /// Defines the PresenceInfo Class.
   #[sdk(child(office2013, qname = "w15:CT_PresenceInfo/w15:presenceInfo"))]
   pub presence_info: Option<PresenceInfo>,
 }

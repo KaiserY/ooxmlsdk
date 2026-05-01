@@ -830,7 +830,7 @@ pub(crate) fn one_sequence_choice_field_name(
       .filter(|child| child.kind == SchemaTypeChildKind::Choice)
       .nth(slot_index)
       .map(|child| child.property_name.as_str())
-      .filter(|property_name| !property_name.is_empty())
+      .filter(|property_name| !property_name.is_empty() && *property_name != "children")
   {
     return schema_child_field_rust_name(property_name);
   }

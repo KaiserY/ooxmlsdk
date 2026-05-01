@@ -28,7 +28,7 @@ pub struct ThemeFamily {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub vid: crate::simple_type::StringValue,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -39,7 +39,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the ThemeVariant Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -79,7 +79,7 @@ pub struct ThemeVariant {
   /// id
   #[sdk(attr(office2013, qname = "r:id"))]
   pub r_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/thm15:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -87,7 +87,7 @@ pub struct ThemeVariant {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "thm15:CT_ThemeVariantList/thm15:themeVariantLst")]
 pub struct ThemeVariantList {
-  /// _
+  /// Defines the ThemeVariant Class.
   #[sdk(child(office2013, qname = "thm15:CT_ThemeVariant/thm15:themeVariant"))]
   pub thm15_theme_variant: Vec<ThemeVariant>,
 }

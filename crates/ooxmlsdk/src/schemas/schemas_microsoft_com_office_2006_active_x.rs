@@ -32,7 +32,7 @@ pub struct ActiveXControlData {
   /// persistence
   #[sdk(attr(qname = "ax:persistence"))]
   pub persistence: PersistenceValues,
-  /// _
+  /// Defines the ActiveXObjectProperty Class.
   #[sdk(child(qname = "ax:CT_OcxPr/ax:ocxPr"))]
   pub ax_ocx_pr: Vec<ActiveXObjectProperty>,
 }
@@ -47,7 +47,7 @@ pub struct ActiveXObjectProperty {
   #[sdk(attr(qname = "ax:value"))]
   pub value: Option<crate::simple_type::StringValue>,
   #[sdk(choice(qname = "ax:CT_Font/ax:font", qname = "ax:CT_Picture/ax:picture"))]
-  pub xml_children: Option<ActiveXObjectPropertyChoice>,
+  pub active_x_object_property_choice: Option<ActiveXObjectPropertyChoice>,
 }
 /// Defines the SharedComFont Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -59,7 +59,7 @@ pub struct SharedComFont {
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ActiveXObjectProperty Class.
   #[sdk(child(qname = "ax:CT_OcxPr/ax:ocxPr"))]
   pub ax_ocx_pr: Vec<ActiveXObjectProperty>,
 }

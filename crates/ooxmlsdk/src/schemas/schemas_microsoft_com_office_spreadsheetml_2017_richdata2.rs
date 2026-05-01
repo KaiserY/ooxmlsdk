@@ -75,7 +75,7 @@ pub struct RichFilterColumn {
     qname = "xlrd2:CT_DynamicRichFilter/xlrd2:dynamicFilter",
     qname = "x:CT_ExtensionList/xlrd2:extLst"
   ))]
-  pub xml_children: Option<RichFilterColumnChoice>,
+  pub rich_filter_column_choice: Option<RichFilterColumnChoice>,
 }
 /// Defines the RichSortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -122,13 +122,13 @@ pub struct SupportingPropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the SupportingPropertyBagArrayData Class.
   #[sdk(child(
     office2019,
     qname = "xlrd2:CT_SupportingPropertyBagArrayData/xlrd2:spbArrays"
   ))]
   pub supporting_property_bag_array_data: Option<std::boxed::Box<SupportingPropertyBagArrayData>>,
-  /// _
+  /// Defines the SupportingPropertyBagData Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBagData/xlrd2:spbData"))]
   pub supporting_property_bag_data: std::boxed::Box<SupportingPropertyBagData>,
 }
@@ -145,10 +145,10 @@ pub struct SupportingPropertyBagStructures {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the SupportingPropertyBagStructure Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBagStructure/xlrd2:s"))]
   pub xlrd2_s: Vec<SupportingPropertyBagStructure>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub xlrd2_ext_lst: Option<ExtensionList>,
 }
@@ -162,10 +162,10 @@ pub struct ArrayData {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the Array Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_Array/xlrd2:a"))]
   pub xlrd2_a: Vec<Array>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub xlrd2_ext_lst: Option<ExtensionList>,
 }
@@ -176,19 +176,19 @@ pub struct RichStylesheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Dxfs Class.
   #[sdk(child(office2019, qname = "x:CT_Dxfs/xlrd2:dxfs"))]
   pub dxfs: Option<Dxfs>,
-  /// _
+  /// Defines the RichFormatProperties Class.
   #[sdk(child(
     office2019,
     qname = "xlrd2:CT_RichFormatProperties/xlrd2:richProperties"
   ))]
   pub rich_format_properties: Option<RichFormatProperties>,
-  /// _
+  /// Defines the RichStyles Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichStyles/xlrd2:richStyles"))]
   pub rich_styles: Option<RichStyles>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -199,13 +199,13 @@ pub struct RichValueTypesInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the RichValueGlobalType Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueGlobalType/xlrd2:global"))]
   pub rich_value_global_type: Option<std::boxed::Box<RichValueGlobalType>>,
-  /// _
+  /// Defines the RichValueTypes Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueTypes/xlrd2:types"))]
   pub rich_value_types: Option<RichValueTypes>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -213,13 +213,13 @@ pub struct RichValueTypesInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichFilters/xlrd2:filters")]
 pub struct RichFilters {
-  /// _
+  /// Defines the RichFilter Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichFilter/xlrd2:filter"))]
   pub xlrd2_filter: Vec<RichFilter>,
-  /// _
+  /// Defines the RichDateGroupItem Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichDateGroupItem/xlrd2:dateGroupItem"))]
   pub xlrd2_date_group_item: Vec<RichDateGroupItem>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub xlrd2_ext_lst: Option<ExtensionList>,
 }
@@ -288,7 +288,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the RichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -363,10 +363,10 @@ pub struct SupportingPropertyBagArrayData {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the SupportingPropertyBagArray Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBagArray/xlrd2:a"))]
   pub xlrd2_a: Vec<SupportingPropertyBagArray>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub xlrd2_ext_lst: Option<ExtensionList>,
 }
@@ -377,10 +377,10 @@ pub struct SupportingPropertyBagData {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the SupportingPropertyBag Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBag/xlrd2:spb"))]
   pub xlrd2_spb: Vec<SupportingPropertyBag>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub xlrd2_ext_lst: Option<ExtensionList>,
 }
@@ -391,7 +391,7 @@ pub struct SupportingPropertyBag {
   /// s
   #[sdk(attr(office2019, qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the SupportingPropertyBagValue Class.
   #[sdk(text_child(office2019, qname = "xlrd2:CT_SupportingPropertyBagValue/xlrd2:v"))]
   pub xlrd2_v: Vec<crate::simple_type::StringValue>,
 }
@@ -401,7 +401,7 @@ pub type SupportingPropertyBagValue = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_SupportingPropertyBagStructure/xlrd2:s")]
 pub struct SupportingPropertyBagStructure {
-  /// _
+  /// Defines the SupportingPropertyBagKey Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBagKey/xlrd2:k"))]
   pub xlrd2_k: Vec<SupportingPropertyBagKey>,
 }
@@ -423,7 +423,7 @@ pub struct SupportingPropertyBagArray {
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the SupportingPropertyBagArrayValue Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_SupportingPropertyBagArrayValue/xlrd2:v"))]
   pub xlrd2_v: Vec<SupportingPropertyBagArrayValue>,
 }
@@ -447,7 +447,7 @@ pub struct Array {
   /// c
   #[sdk(attr(office2019, qname = ":c"))]
   pub c: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the ArrayValue Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_ArrayValue/xlrd2:v"))]
   pub xlrd2_v: Vec<ArrayValue>,
 }
@@ -468,7 +468,7 @@ pub struct Dxfs {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
   pub x_dxf:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
@@ -480,7 +480,7 @@ pub struct Dxfs {
   qname = "xlrd2:CT_RichFormatProperties/xlrd2:richProperties"
 )]
 pub struct RichFormatProperties {
-  /// _
+  /// Defines the RichFormatProperty Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichFormatProperty/xlrd2:rPr"))]
   pub xlrd2_r_pr: Vec<RichFormatProperty>,
 }
@@ -488,7 +488,7 @@ pub struct RichFormatProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichStyles/xlrd2:richStyles")]
 pub struct RichStyles {
-  /// _
+  /// Defines the RichStyle Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichStyle/xlrd2:rSty"))]
   pub xlrd2_r_sty: Vec<RichStyle>,
 }
@@ -510,7 +510,7 @@ pub struct RichStyle {
   /// dxfid
   #[sdk(attr(office2019, qname = ":dxfid"))]
   pub dxfid: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the RichStylePropertyValue Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichStylePropertyValue/xlrd2:rpv"))]
   pub xlrd2_rpv: Vec<RichStylePropertyValue>,
 }
@@ -528,10 +528,10 @@ pub struct RichStylePropertyValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichValueGlobalType/xlrd2:global")]
 pub struct RichValueGlobalType {
-  /// _
+  /// Defines the RichValueTypeKeyFlags Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueTypeKeyFlags/xlrd2:keyFlags"))]
   pub rich_value_type_key_flags: Option<RichValueTypeKeyFlags>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -539,7 +539,7 @@ pub struct RichValueGlobalType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichValueTypes/xlrd2:types")]
 pub struct RichValueTypes {
-  /// _
+  /// Defines the RichValueType Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueType/xlrd2:type"))]
   pub xlrd2_type: Vec<RichValueType>,
 }
@@ -550,10 +550,10 @@ pub struct RichValueType {
   /// name
   #[sdk(attr(office2019, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the RichValueTypeKeyFlags Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueTypeKeyFlags/xlrd2:keyFlags"))]
   pub rich_value_type_key_flags: Option<RichValueTypeKeyFlags>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -561,7 +561,7 @@ pub struct RichValueType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2019, qname = "xlrd2:CT_RichValueTypeKeyFlags/xlrd2:keyFlags")]
 pub struct RichValueTypeKeyFlags {
-  /// _
+  /// Defines the RichValueTypeReservedKey Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueTypeReservedKey/xlrd2:key"))]
   pub xlrd2_key: Vec<RichValueTypeReservedKey>,
 }
@@ -572,7 +572,7 @@ pub struct RichValueTypeReservedKey {
   /// name
   #[sdk(attr(office2019, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the RichValueTypeReservedKeyFlag Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_RichValueTypeReservedKeyFlag/xlrd2:flag"))]
   pub xlrd2_flag: Vec<RichValueTypeReservedKeyFlag>,
 }
@@ -607,8 +607,10 @@ pub enum RichFilterColumnChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomRichFiltersChoice {
+  /// Defines the CustomRichFilter Class.
   #[sdk(child(office2019, qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter"))]
   Xlrd2CustomFilter(std::boxed::Box<CustomRichFilter>),
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2019, qname = "x:CT_ExtensionList/xlrd2:extLst"))]
   Xlrd2ExtLst(std::boxed::Box<ExtensionList>),
 }

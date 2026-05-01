@@ -11,7 +11,7 @@
   qname = "c16r3:CT_DataDisplayOptions16/c16r3:dataDisplayOptions16"
 )]
 pub struct DataDisplayOptions16 {
-  /// _
+  /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
   pub boolean_false: Option<BooleanFalse>,
 }

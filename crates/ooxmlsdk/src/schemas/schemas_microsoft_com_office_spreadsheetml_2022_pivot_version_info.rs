@@ -11,10 +11,10 @@
   qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo"
 )]
 pub struct CacheVersionInfo {
-  /// _
+  /// Defines the RequiredFeatureXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xxpvi:requiredFeature"))]
   pub xxpvi_required_feature: Vec<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the LastRefreshFeatureXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xxpvi:lastRefreshFeature"))]
   pub xxpvi_last_refresh_feature: Vec<crate::simple_type::StringValue>,
 }
@@ -25,10 +25,10 @@ pub struct CacheVersionInfo {
   qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"
 )]
 pub struct PivotVersionInfo {
-  /// _
+  /// Defines the RequiredFeatureXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xxpvi:requiredFeature"))]
   pub xxpvi_required_feature: Vec<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the LastUpdateFeatureXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xxpvi:lastUpdateFeature"))]
   pub xxpvi_last_update_feature: Vec<crate::simple_type::StringValue>,
 }

@@ -1578,10 +1578,10 @@ pub struct CalculationChain {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Cell.
   #[sdk(child(qname = "x:CT_CalcCell/x:c"))]
   pub x_c: Vec<CalculationCell>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -1598,7 +1598,7 @@ pub struct Comments {
   /// List of Comments
   #[sdk(child(qname = "x:CT_CommentList/x:commentList"))]
   pub comment_list: std::boxed::Box<CommentList>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1613,10 +1613,10 @@ pub struct MapInfo {
   /// Prefix Mappings for XPath Expressions
   #[sdk(attr(qname = ":SelectionNamespaces"))]
   pub selection_namespaces: crate::simple_type::StringValue,
-  /// _
+  /// XML Schema.
   #[sdk(child(qname = "x:CT_Schema/x:Schema"))]
   pub x_schema: Vec<Schema>,
-  /// _
+  /// XML Mapping Properties.
   #[sdk(child(qname = "x:CT_Map/x:Map"))]
   pub x_map: Vec<Map>,
 }
@@ -1628,7 +1628,7 @@ pub struct Connections {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Connection.
   #[sdk(child(qname = "x:CT_Connection/x:connection"))]
   pub x_connection: Vec<Connection>,
 }
@@ -1696,37 +1696,37 @@ pub struct PivotCacheDefinition {
   /// supportAdvancedDrill
   #[sdk(attr(qname = ":supportAdvancedDrill"))]
   pub support_advanced_drill: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the CacheSource Class.
   #[sdk(child(qname = "x:CT_CacheSource/x:cacheSource"))]
   pub cache_source: std::boxed::Box<CacheSource>,
-  /// _
+  /// Defines the CacheFields Class.
   #[sdk(child(qname = "x:CT_CacheFields/x:cacheFields"))]
   pub cache_fields: std::boxed::Box<CacheFields>,
-  /// _
+  /// Defines the CacheHierarchies Class.
   #[sdk(child(qname = "x:CT_CacheHierarchies/x:cacheHierarchies"))]
   pub cache_hierarchies: Option<CacheHierarchies>,
-  /// _
+  /// Defines the Kpis Class.
   #[sdk(child(qname = "x:CT_PCDKPIs/x:kpis"))]
   pub kpis: Option<Kpis>,
-  /// _
+  /// Defines the TupleCache Class.
   #[sdk(child(qname = "x:CT_TupleCache/x:tupleCache"))]
   pub tuple_cache: Option<std::boxed::Box<TupleCache>>,
-  /// _
+  /// Defines the CalculatedItems Class.
   #[sdk(child(qname = "x:CT_CalculatedItems/x:calculatedItems"))]
   pub calculated_items: Option<CalculatedItems>,
-  /// _
+  /// Defines the CalculatedMembers Class.
   #[sdk(child(qname = "x:CT_CalculatedMembers/x:calculatedMembers"))]
   pub calculated_members: Option<CalculatedMembers>,
-  /// _
+  /// Defines the Dimensions Class.
   #[sdk(child(qname = "x:CT_Dimensions/x:dimensions"))]
   pub dimensions: Option<Dimensions>,
-  /// _
+  /// Defines the MeasureGroups Class.
   #[sdk(child(qname = "x:CT_MeasureGroups/x:measureGroups"))]
   pub measure_groups: Option<MeasureGroups>,
-  /// _
+  /// Defines the Maps Class.
   #[sdk(child(qname = "x:CT_MeasureDimensionMaps/x:maps"))]
   pub maps: Option<Maps>,
-  /// _
+  /// Defines the PivotCacheDefinitionExtensionList Class.
   #[sdk(child(qname = "x:CT_PivotCacheDefinitionExtensionList/x:extLst"))]
   pub pivot_cache_definition_extension_list: Option<PivotCacheDefinitionExtensionList>,
 }
@@ -1741,10 +1741,10 @@ pub struct PivotCacheRecords {
   /// PivotCache Records Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotCache Record.
   #[sdk(child(qname = "x:CT_Record/x:r"))]
   pub x_r: Vec<PivotCacheRecord>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -1959,55 +1959,55 @@ pub struct PivotTableDefinition {
   /// customListSort
   #[sdk(attr(qname = ":customListSort"))]
   pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the Location Class.
   #[sdk(child(qname = "x:CT_Location/x:location"))]
   pub location: std::boxed::Box<Location>,
-  /// _
+  /// Defines the PivotFields Class.
   #[sdk(child(qname = "x:CT_PivotFields/x:pivotFields"))]
   pub pivot_fields: Option<PivotFields>,
-  /// _
+  /// Defines the RowFields Class.
   #[sdk(child(qname = "x:CT_RowFields/x:rowFields"))]
   pub row_fields: Option<RowFields>,
-  /// _
+  /// Defines the RowItems Class.
   #[sdk(child(qname = "x:CT_rowItems/x:rowItems"))]
   pub row_items: Option<RowItems>,
-  /// _
+  /// Defines the ColumnFields Class.
   #[sdk(child(qname = "x:CT_ColFields/x:colFields"))]
   pub column_fields: Option<ColumnFields>,
-  /// _
+  /// Defines the ColumnItems Class.
   #[sdk(child(qname = "x:CT_colItems/x:colItems"))]
   pub column_items: Option<ColumnItems>,
-  /// _
+  /// Defines the PageFields Class.
   #[sdk(child(qname = "x:CT_PageFields/x:pageFields"))]
   pub page_fields: Option<PageFields>,
-  /// _
+  /// Defines the DataFields Class.
   #[sdk(child(qname = "x:CT_DataFields/x:dataFields"))]
   pub data_fields: Option<DataFields>,
-  /// _
+  /// Defines the Formats Class.
   #[sdk(child(qname = "x:CT_Formats/x:formats"))]
   pub formats: Option<Formats>,
-  /// _
+  /// Defines the ConditionalFormats Class.
   #[sdk(child(qname = "x:CT_ConditionalFormats/x:conditionalFormats"))]
   pub conditional_formats: Option<ConditionalFormats>,
-  /// _
+  /// Defines the ChartFormats Class.
   #[sdk(child(qname = "x:CT_ChartFormats/x:chartFormats"))]
   pub chart_formats: Option<ChartFormats>,
-  /// _
+  /// Defines the PivotHierarchies Class.
   #[sdk(child(qname = "x:CT_PivotHierarchies/x:pivotHierarchies"))]
   pub pivot_hierarchies: Option<PivotHierarchies>,
-  /// _
+  /// Defines the PivotTableStyle Class.
   #[sdk(child(qname = "x:CT_PivotTableStyle/x:pivotTableStyleInfo"))]
   pub pivot_table_style: Option<PivotTableStyle>,
-  /// _
+  /// Defines the PivotFilters Class.
   #[sdk(child(qname = "x:CT_PivotFilters/x:filters"))]
   pub pivot_filters: Option<PivotFilters>,
-  /// _
+  /// Defines the RowHierarchiesUsage Class.
   #[sdk(child(qname = "x:CT_RowHierarchiesUsage/x:rowHierarchiesUsage"))]
   pub row_hierarchies_usage: Option<RowHierarchiesUsage>,
-  /// _
+  /// Defines the ColumnHierarchiesUsage Class.
   #[sdk(child(qname = "x:CT_ColHierarchiesUsage/x:colHierarchiesUsage"))]
   pub column_hierarchies_usage: Option<ColumnHierarchiesUsage>,
-  /// _
+  /// Defines the PivotTableDefinitionExtensionList Class.
   #[sdk(child(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst"))]
   pub pivot_table_definition_extension_list: Option<PivotTableDefinitionExtensionList>,
 }
@@ -2084,10 +2084,10 @@ pub struct QueryTable {
   /// Apply Width / Height Formats
   #[sdk(attr(qname = ":applyWidthHeightFormats"))]
   pub apply_width_height_formats: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the QueryTableRefresh Class.
   #[sdk(child(qname = "x:CT_QueryTableRefresh/x:queryTableRefresh"))]
   pub query_table_refresh: Option<std::boxed::Box<QueryTableRefresh>>,
-  /// _
+  /// Defines the QueryTableExtensionList Class.
   #[sdk(child(qname = "x:CT_QueryTableExtensionList/x:extLst"))]
   pub query_table_extension_list: Option<QueryTableExtensionList>,
 }
@@ -2105,10 +2105,10 @@ pub struct SharedStringTable {
   /// Unique String Count
   #[sdk(attr(qname = ":uniqueCount"))]
   pub unique_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// String Item.
   #[sdk(child(qname = "x:CT_Rst/x:si"))]
   pub x_si: Vec<SharedStringItem>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -2166,7 +2166,7 @@ pub struct Headers {
   /// Preserve History
   #[sdk(attr(qname = ":preserveHistory"))]
   pub preserve_history: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Header.
   #[sdk(child(qname = "x:CT_RevisionHeader/x:header"))]
   pub x_header: Vec<Header>,
 }
@@ -2193,7 +2193,7 @@ pub struct Revisions {
     text,
     any
   ))]
-  pub xml_children: Vec<RevisionsChoice>,
+  pub revisions_choice: Vec<RevisionsChoice>,
 }
 /// User List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2206,7 +2206,7 @@ pub struct Users {
   /// Active User Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// User Information.
   #[sdk(child(qname = "x:CT_SharedUser/x:userInfo"))]
   pub x_user_info: Vec<UserInfo>,
 }
@@ -2218,118 +2218,118 @@ pub struct Worksheet {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Sheet Properties.
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
-  /// _
+  /// Macro Sheet Dimensions.
   #[sdk(child(qname = "x:CT_SheetDimension/x:dimension"))]
   pub sheet_dimension: Option<SheetDimension>,
-  /// _
+  /// Dialog Sheet Views.
   #[sdk(child(qname = "x:CT_SheetViews/x:sheetViews"))]
   pub sheet_views: Option<std::boxed::Box<SheetViews>>,
-  /// _
+  /// Dialog Sheet Format Properties.
   #[sdk(child(qname = "x:CT_SheetFormatPr/x:sheetFormatPr"))]
   pub sheet_format_properties: Option<SheetFormatProperties>,
-  /// _
+  /// Column Information.
   #[sdk(child(qname = "x:CT_Cols/x:cols"))]
   pub x_cols: Vec<Columns>,
-  /// _
+  /// Sheet Data.
   #[sdk(child(qname = "x:CT_SheetData/x:sheetData"))]
   pub x_sheet_data: std::boxed::Box<SheetData>,
-  /// _
+  /// Defines the SheetCalculationProperties Class.
   #[sdk(child(qname = "x:CT_SheetCalcPr/x:sheetCalcPr"))]
   pub x_sheet_calc_pr: Option<SheetCalculationProperties>,
-  /// _
+  /// Sheet Protection.
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
   pub x_sheet_protection: Option<SheetProtection>,
-  /// _
+  /// Defines the ProtectedRanges Class.
   #[sdk(child(qname = "x:CT_ProtectedRanges/x:protectedRanges"))]
   pub x_protected_ranges: Option<ProtectedRanges>,
-  /// _
+  /// Defines the Scenarios Class.
   #[sdk(child(qname = "x:CT_Scenarios/x:scenarios"))]
   pub x_scenarios: Option<Scenarios>,
-  /// _
+  /// AutoFilter Settings.
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub x_auto_filter: Option<std::boxed::Box<AutoFilter>>,
-  /// _
+  /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<std::boxed::Box<SortState>>,
-  /// _
+  /// Data Consolidation.
   #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
   pub x_data_consolidate: Option<std::boxed::Box<DataConsolidate>>,
-  /// _
+  /// Custom Sheet Views.
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
   pub x_custom_sheet_views: Option<CustomSheetViews>,
-  /// _
+  /// Defines the MergeCells Class.
   #[sdk(child(qname = "x:CT_MergeCells/x:mergeCells"))]
   pub x_merge_cells: Option<MergeCells>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr: Option<PhoneticProperties>,
-  /// _
+  /// Conditional Formatting.
   #[sdk(child(qname = "x:CT_ConditionalFormatting/x:conditionalFormatting"))]
   pub x_conditional_formatting: Vec<ConditionalFormatting>,
-  /// _
+  /// Defines the DataValidations Class.
   #[sdk(child(qname = "x:CT_DataValidations/x:dataValidations"))]
   pub x_data_validations: Option<DataValidations>,
-  /// _
+  /// Defines the Hyperlinks Class.
   #[sdk(child(qname = "x:CT_Hyperlinks/x:hyperlinks"))]
   pub x_hyperlinks: Option<Hyperlinks>,
-  /// _
+  /// Print Options.
   #[sdk(child(qname = "x:CT_PrintOptions/x:printOptions"))]
   pub x_print_options: Option<PrintOptions>,
-  /// _
+  /// Page Margins.
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub x_page_margins: Option<PageMargins>,
-  /// _
+  /// Page Setup Settings.
   #[sdk(child(qname = "x:CT_PageSetup/x:pageSetup"))]
   pub x_page_setup: Option<PageSetup>,
-  /// _
+  /// Header Footer Settings.
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub x_header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  /// _
+  /// Horizontal Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:rowBreaks"))]
   pub x_row_breaks: Option<RowBreaks>,
-  /// _
+  /// Vertical Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:colBreaks"))]
   pub x_col_breaks: Option<ColumnBreaks>,
-  /// _
+  /// Custom Properties.
   #[sdk(child(qname = "x:CT_CustomProperties/x:customProperties"))]
   pub x_custom_properties: Option<CustomProperties>,
-  /// _
+  /// Defines the CellWatches Class.
   #[sdk(child(qname = "x:CT_CellWatches/x:cellWatches"))]
   pub x_cell_watches: Option<CellWatches>,
-  /// _
+  /// Defines the IgnoredErrors Class.
   #[sdk(child(qname = "x:CT_IgnoredErrors/x:ignoredErrors"))]
   pub x_ignored_errors: Option<std::boxed::Box<IgnoredErrors>>,
-  /// _
+  /// Drawing.
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
   pub x_drawing: Option<Drawing>,
-  /// _
+  /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
   pub x_legacy_drawing: Option<LegacyDrawing>,
-  /// _
+  /// Legacy Drawing Reference in  Header Footer.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub x_legacy_drawing_hf: Option<LegacyDrawingHeaderFooter>,
-  /// _
+  /// Defines the DrawingHeaderFooter Class.
   #[sdk(child(qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub x_drawing_hf: Option<DrawingHeaderFooter>,
-  /// _
+  /// Defines the Picture Class.
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
   pub x_picture: Option<Picture>,
-  /// _
+  /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub x_ole_objects: Option<OleObjects>,
-  /// _
+  /// Defines the Controls Class.
   #[sdk(child(qname = "x:CT_Controls/x:controls"))]
   pub x_controls: Option<Controls>,
-  /// _
+  /// Defines the WebPublishItems Class.
   #[sdk(child(qname = "x:CT_WebPublishItems/x:webPublishItems"))]
   pub x_web_publish_items: Option<WebPublishItems>,
-  /// _
+  /// Defines the TableParts Class.
   #[sdk(child(qname = "x:CT_TableParts/x:tableParts"))]
   pub x_table_parts: Option<TableParts>,
-  /// _
+  /// Defines the WorksheetExtensionList Class.
   #[sdk(child(qname = "x:CT_WorksheetExtensionList/x:extLst"))]
   pub x_ext_lst: Option<WorksheetExtensionList>,
 }
@@ -2353,34 +2353,34 @@ pub struct Chartsheet {
   /// Custom Chart Sheet Views
   #[sdk(child(qname = "x:CT_CustomChartsheetViews/x:customSheetViews"))]
   pub custom_chartsheet_views: Option<CustomChartsheetViews>,
-  /// _
+  /// Page Margins.
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub page_margins: Option<PageMargins>,
-  /// _
+  /// Chart Sheet Page Setup.
   #[sdk(child(qname = "x:CT_CsPageSetup/x:pageSetup"))]
   pub chart_sheet_page_setup: Option<ChartSheetPageSetup>,
-  /// _
+  /// Header Footer Settings.
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
   /// Drawing
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
   pub drawing: std::boxed::Box<Drawing>,
-  /// _
+  /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
   pub legacy_drawing: Option<LegacyDrawing>,
   /// Legacy Drawing Reference in  Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  /// _
+  /// Defines the DrawingHeaderFooter Class.
   #[sdk(child(office2010, qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
-  /// _
+  /// Defines the Picture Class.
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
   pub picture: Option<Picture>,
-  /// _
+  /// Defines the WebPublishItems Class.
   #[sdk(child(qname = "x:CT_WebPublishItems/x:webPublishItems"))]
   pub web_publish_items: Option<WebPublishItems>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2428,13 +2428,13 @@ pub struct DialogSheet {
   /// Legacy Drawing Header Footer
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub legacy_drawing_header_footer: Option<LegacyDrawingHeaderFooter>,
-  /// _
+  /// Defines the DrawingHeaderFooter Class.
   #[sdk(child(office2010, qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub drawing_header_footer: Option<DrawingHeaderFooter>,
-  /// _
+  /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub ole_objects: Option<OleObjects>,
-  /// _
+  /// Defines the Controls Class.
   #[sdk(child(office2010, qname = "x:CT_Controls/x:controls"))]
   pub controls: Option<Controls>,
   /// Future Feature Data Storage Area
@@ -2458,16 +2458,16 @@ pub struct Metadata {
   /// MDX Metadata Information
   #[sdk(child(qname = "x:CT_MdxMetadata/x:mdxMetadata"))]
   pub mdx_metadata: Option<MdxMetadata>,
-  /// _
+  /// Future Metadata.
   #[sdk(child(qname = "x:CT_FutureMetadata/x:futureMetadata"))]
   pub x_future_metadata: Vec<FutureMetadata>,
-  /// _
+  /// Cell Metadata.
   #[sdk(child(qname = "x:CT_MetadataBlocks/x:cellMetadata"))]
   pub x_cell_metadata: Option<CellMetadata>,
-  /// _
+  /// Value Metadata.
   #[sdk(child(qname = "x:CT_MetadataBlocks/x:valueMetadata"))]
   pub x_value_metadata: Option<ValueMetadata>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -2479,7 +2479,7 @@ pub struct SingleXmlCells {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Table Properties.
   #[sdk(child(qname = "x:CT_SingleXmlCell/x:singleXmlCell"))]
   pub x_single_xml_cell: Vec<SingleXmlCell>,
 }
@@ -2491,37 +2491,37 @@ pub struct Stylesheet {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Defines the NumberingFormats Class.
   #[sdk(child(qname = "x:CT_NumFmts/x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
-  /// _
+  /// Defines the Fonts Class.
   #[sdk(child(qname = "x:CT_Fonts/x:fonts"))]
   pub fonts: Option<Fonts>,
-  /// _
+  /// Defines the Fills Class.
   #[sdk(child(qname = "x:CT_Fills/x:fills"))]
   pub fills: Option<Fills>,
-  /// _
+  /// Defines the Borders Class.
   #[sdk(child(qname = "x:CT_Borders/x:borders"))]
   pub borders: Option<Borders>,
-  /// _
+  /// Defines the CellStyleFormats Class.
   #[sdk(child(qname = "x:CT_CellStyleXfs/x:cellStyleXfs"))]
   pub cell_style_formats: Option<CellStyleFormats>,
-  /// _
+  /// Defines the CellFormats Class.
   #[sdk(child(qname = "x:CT_CellXfs/x:cellXfs"))]
   pub cell_formats: Option<CellFormats>,
-  /// _
+  /// Defines the CellStyles Class.
   #[sdk(child(qname = "x:CT_CellStyles/x:cellStyles"))]
   pub cell_styles: Option<CellStyles>,
-  /// _
+  /// Defines the DifferentialFormats Class.
   #[sdk(child(qname = "x:CT_Dxfs/x:dxfs"))]
   pub differential_formats: Option<DifferentialFormats>,
-  /// _
+  /// Defines the TableStyles Class.
   #[sdk(child(qname = "x:CT_TableStyles/x:tableStyles"))]
   pub table_styles: Option<TableStyles>,
-  /// _
+  /// Defines the Colors Class.
   #[sdk(child(qname = "x:CT_Colors/x:colors"))]
   pub colors: Option<std::boxed::Box<Colors>>,
-  /// _
+  /// Defines the StylesheetExtensionList Class.
   #[sdk(child(qname = "x:CT_StylesheetExtensionList/x:extLst"))]
   pub stylesheet_extension_list: Option<StylesheetExtensionList>,
 }
@@ -2538,7 +2538,7 @@ pub struct ExternalLink {
     qname = "x:CT_OleLink/x:oleLink"
   ))]
   pub external_link_choice: Option<ExternalLinkChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -2639,10 +2639,10 @@ pub struct VolatileTypes {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Volatile Dependency Type.
   #[sdk(child(qname = "x:CT_VolType/x:volType"))]
   pub x_vol_type: Vec<VolatileType>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -2657,59 +2657,59 @@ pub struct Workbook {
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
-  /// _
+  /// Defines the FileVersion Class.
   #[sdk(child(qname = "x:CT_FileVersion/x:fileVersion"))]
   pub file_version: Option<FileVersion>,
-  /// _
+  /// Defines the FileSharing Class.
   #[sdk(child(qname = "x:CT_FileSharing/x:fileSharing"))]
   pub file_sharing: Option<FileSharing>,
-  /// _
+  /// Defines the WorkbookProperties Class.
   #[sdk(child(qname = "x:CT_WorkbookPr/x:workbookPr"))]
   pub workbook_properties: Option<WorkbookProperties>,
-  /// _
+  /// Defines the AbsolutePath Class.
   #[sdk(child(office2013, qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
   pub absolute_path:
     Option<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_ac::AbsolutePath>,
-  /// _
+  /// Defines the WorkbookProtection Class.
   #[sdk(child(qname = "x:CT_WorkbookProtection/x:workbookProtection"))]
   pub workbook_protection: Option<WorkbookProtection>,
-  /// _
+  /// Defines the BookViews Class.
   #[sdk(child(qname = "x:CT_BookViews/x:bookViews"))]
   pub book_views: Option<BookViews>,
-  /// _
+  /// Defines the Sheets Class.
   #[sdk(child(qname = "x:CT_Sheets/x:sheets"))]
   pub sheets: std::boxed::Box<Sheets>,
-  /// _
+  /// Defines the FunctionGroups Class.
   #[sdk(child(qname = "x:CT_FunctionGroups/x:functionGroups"))]
   pub function_groups: Option<FunctionGroups>,
-  /// _
+  /// Defines the ExternalReferences Class.
   #[sdk(child(qname = "x:CT_ExternalReferences/x:externalReferences"))]
   pub external_references: Option<ExternalReferences>,
-  /// _
+  /// Defines the DefinedNames Class.
   #[sdk(child(qname = "x:CT_DefinedNames/x:definedNames"))]
   pub defined_names: Option<DefinedNames>,
-  /// _
+  /// Defines the CalculationProperties Class.
   #[sdk(child(qname = "x:CT_CalcPr/x:calcPr"))]
   pub calculation_properties: Option<CalculationProperties>,
-  /// _
+  /// Defines the OleSize Class.
   #[sdk(child(qname = "x:CT_OleSize/x:oleSize"))]
   pub ole_size: Option<OleSize>,
-  /// _
+  /// Defines the CustomWorkbookViews Class.
   #[sdk(child(qname = "x:CT_CustomWorkbookViews/x:customWorkbookViews"))]
   pub custom_workbook_views: Option<CustomWorkbookViews>,
-  /// _
+  /// Defines the PivotCaches Class.
   #[sdk(child(qname = "x:CT_PivotCaches/x:pivotCaches"))]
   pub pivot_caches: Option<PivotCaches>,
-  /// _
+  /// Defines the WebPublishing Class.
   #[sdk(child(qname = "x:CT_WebPublishing/x:webPublishing"))]
   pub web_publishing: Option<WebPublishing>,
-  /// _
+  /// Defines the FileRecoveryProperties Class.
   #[sdk(child(qname = "x:CT_FileRecoveryPr/x:fileRecoveryPr"))]
   pub x_file_recovery_pr: Vec<FileRecoveryProperties>,
-  /// _
+  /// Defines the WebPublishObjects Class.
   #[sdk(child(qname = "x:CT_WebPublishObjects/x:webPublishObjects"))]
   pub x_web_publish_objects: Option<WebPublishObjects>,
-  /// _
+  /// Defines the WorkbookExtensionList Class.
   #[sdk(child(qname = "x:CT_WorkbookExtensionList/x:extLst"))]
   pub x_ext_lst: Option<WorkbookExtensionList>,
 }
@@ -2739,7 +2739,7 @@ pub struct FilterColumn {
     qname = "x:CT_IconFilter/x:iconFilter",
     qname = "x:CT_ExtensionList/x:extLst"
   ))]
-  pub xml_children: Option<FilterColumnChoice>,
+  pub filter_column_choice: Option<FilterColumnChoice>,
 }
 /// Sort State for Auto Filter.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2764,7 +2764,7 @@ pub struct SortState {
     qname = "x:CT_SortCondition/x:sortCondition"
   ))]
   pub sort_state_choice: Option<SortStateChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -2775,7 +2775,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<Extension>,
+  pub x_ext: Vec<Extension>,
 }
 /// Custom Filter Criteria.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2815,7 +2815,7 @@ pub struct CalculationCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Authors/x:authors")]
 pub struct Authors {
-  /// _
+  /// Author.
   #[sdk(child(qname = "x:CT_Xstring/x:author"))]
   pub x_author: Vec<Author>,
 }
@@ -2825,7 +2825,7 @@ pub struct Authors {
 pub struct CommentList {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Comment.
   #[sdk(child(qname = "x:CT_Comment/x:comment"))]
   pub x_comment: Vec<Comment>,
 }
@@ -2855,7 +2855,7 @@ pub struct Comment {
   /// Comment Text
   #[sdk(child(qname = "x:CT_Rst/x:text"))]
   pub comment_text: std::boxed::Box<CommentText>,
-  /// _
+  /// Defines the CommentProperties Class.
   #[sdk(child(office2010, qname = "x:CT_CommentPr/x:commentPr"))]
   pub comment_properties: Option<std::boxed::Box<CommentProperties>>,
 }
@@ -3162,22 +3162,22 @@ pub struct Connection {
   /// singleSignOnId
   #[sdk(attr(qname = ":singleSignOnId"))]
   pub single_sign_on_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the DatabaseProperties Class.
   #[sdk(child(qname = "x:CT_DbPr/x:dbPr"))]
   pub database_properties: Option<DatabaseProperties>,
-  /// _
+  /// Defines the OlapProperties Class.
   #[sdk(child(qname = "x:CT_OlapPr/x:olapPr"))]
   pub olap_properties: Option<OlapProperties>,
-  /// _
+  /// Defines the WebQueryProperties Class.
   #[sdk(child(qname = "x:CT_WebPr/x:webPr"))]
   pub web_query_properties: Option<std::boxed::Box<WebQueryProperties>>,
-  /// _
+  /// Defines the TextProperties Class.
   #[sdk(child(qname = "x:CT_TextPr/x:textPr"))]
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
-  /// _
+  /// Defines the Parameters Class.
   #[sdk(child(qname = "x:CT_Parameters/x:parameters"))]
   pub parameters: Option<Parameters>,
-  /// _
+  /// Defines the ConnectionExtensionList Class.
   #[sdk(child(qname = "x:CT_ConnectionExtensionList/x:extLst"))]
   pub connection_extension_list: Option<ConnectionExtensionList>,
 }
@@ -3193,7 +3193,7 @@ pub struct Tables {
     qname = "x:CT_XStringElement/x:s",
     qname = "x:CT_Index/x:x"
   ))]
-  pub xml_children: Vec<TablesChoice>,
+  pub tables_choice: Vec<TablesChoice>,
 }
 /// Parameter Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3302,16 +3302,16 @@ pub struct CacheField {
   /// memberPropertyField
   #[sdk(attr(qname = ":memberPropertyField"))]
   pub member_property_field: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the SharedItems Class.
   #[sdk(child(qname = "x:CT_SharedItems/x:sharedItems"))]
   pub shared_items: Option<SharedItems>,
-  /// _
+  /// Defines the FieldGroup Class.
   #[sdk(child(qname = "x:CT_FieldGroup/x:fieldGroup"))]
   pub field_group: Option<std::boxed::Box<FieldGroup>>,
-  /// _
+  /// Defines the MemberPropertiesMap Class.
   #[sdk(child(qname = "x:CT_X/x:mpMap"))]
   pub x_mp_map: Vec<MemberPropertiesMap>,
-  /// _
+  /// Defines the CacheFieldExtensionList Class.
   #[sdk(child(qname = "x:CT_CacheFieldExtensionList/x:extLst"))]
   pub x_ext_lst: Option<CacheFieldExtensionList>,
 }
@@ -3322,7 +3322,7 @@ pub struct Pages {
   /// Page Item String Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Page Items.
   #[sdk(child(qname = "x:CT_PCDSCPage/x:page"))]
   pub x_page: Vec<Page>,
 }
@@ -3333,7 +3333,7 @@ pub struct RangeSets {
   /// Reference and Page Item Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Range Set.
   #[sdk(child(qname = "x:CT_RangeSet/x:rangeSet"))]
   pub x_range_set: Vec<RangeSet>,
 }
@@ -3344,7 +3344,7 @@ pub struct Page {
   /// Page Item String Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Page Item.
   #[sdk(child(qname = "x:CT_PageItem/x:pageItem"))]
   pub x_page_item: Vec<PageItem>,
 }
@@ -3425,10 +3425,10 @@ pub struct MissingItem {
   /// Bold
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Tuples.
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub x_tpls: Vec<Tuples>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3474,10 +3474,10 @@ pub struct NumberItem {
   /// Bold
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Tuples.
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub x_tpls: Vec<Tuples>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3500,7 +3500,7 @@ pub struct BooleanItem {
   /// Member Property Count
   #[sdk(attr(qname = ":cp"))]
   pub property_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3549,7 +3549,7 @@ pub struct ErrorItem {
   /// Tuples
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub tuples: Option<Tuples>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3595,10 +3595,10 @@ pub struct StringItem {
   /// Bold
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Tuples.
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub x_tpls: Vec<Tuples>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3621,7 +3621,7 @@ pub struct DateTimeItem {
   /// Member Property Count
   #[sdk(attr(qname = ":cp"))]
   pub property_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -3632,7 +3632,7 @@ pub struct Tuples {
   /// Member Name Count
   #[sdk(attr(qname = ":c"))]
   pub member_name_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Tuple.
   #[sdk(child(qname = "x:CT_Tuple/x:tpl"))]
   pub x_tpl: Vec<Tuple>,
 }
@@ -3643,7 +3643,7 @@ pub struct SortByTuple {
   /// Member Name Count
   #[sdk(attr(qname = ":c"))]
   pub member_name_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Tuple.
   #[sdk(child(qname = "x:CT_Tuple/x:tpl"))]
   pub x_tpl: Vec<Tuple>,
 }
@@ -3676,7 +3676,7 @@ pub struct PivotCacheRecord {
     qname = "x:CT_DateTime/x:d",
     qname = "x:CT_Index/x:x"
   ))]
-  pub xml_children: Vec<PivotCacheRecordChoice>,
+  pub pivot_cache_record_choice: Vec<PivotCacheRecordChoice>,
 }
 /// OLAP KPI.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3752,7 +3752,7 @@ pub struct Groups {
   /// Level Group Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Group.
   #[sdk(child(qname = "x:CT_LevelGroup/x:group"))]
   pub x_group: Vec<Group>,
 }
@@ -3786,7 +3786,7 @@ pub struct GroupMembers {
   /// Group Member Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Group Member.
   #[sdk(child(qname = "x:CT_GroupMember/x:groupMember"))]
   pub x_group_member: Vec<GroupMember>,
 }
@@ -3814,7 +3814,7 @@ pub struct Entries {
     qname = "x:CT_Error/x:e",
     qname = "x:CT_String/x:s"
   ))]
-  pub xml_children: Vec<EntriesChoice>,
+  pub entries_choice: Vec<EntriesChoice>,
 }
 /// Sets.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3823,7 +3823,7 @@ pub struct Sets {
   /// Tuple Set Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Set.
   #[sdk(child(qname = "x:CT_Set/x:set"))]
   pub x_set: Vec<TupleSet>,
 }
@@ -3834,7 +3834,7 @@ pub struct QueryCache {
   /// Cached Query Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Query.
   #[sdk(child(qname = "x:CT_Query/x:query"))]
   pub x_query: Vec<Query>,
 }
@@ -3845,7 +3845,7 @@ pub struct ServerFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Server Format.
   #[sdk(child(qname = "x:CT_ServerFormat/x:serverFormat"))]
   pub x_server_format: Vec<ServerFormat>,
 }
@@ -3893,10 +3893,10 @@ pub struct TupleSet {
   /// Query Failed
   #[sdk(attr(qname = ":queryFailed"))]
   pub query_failed: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Tuples.
   #[sdk(child(qname = "x:CT_Tuples/x:tpls"))]
   pub x_tpls: Vec<Tuples>,
-  /// _
+  /// Sort By Tuple.
   #[sdk(child(qname = "x:CT_Tuples/x:sortByTuple"))]
   pub x_sort_by_tuple: Option<SortByTuple>,
 }
@@ -4003,7 +4003,7 @@ pub struct CalculatedMember {
   /// set
   #[sdk(attr(qname = ":set"))]
   pub set: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the CalculatedMemberExtensionList Class.
   #[sdk(child(qname = "x:CT_CalculatedMemberExtensionList/x:extLst"))]
   pub calculated_member_extension_list: Option<CalculatedMemberExtensionList>,
 }
@@ -4230,7 +4230,7 @@ pub struct DataField {
   /// numFmtId
   #[sdk(attr(qname = ":numFmtId"))]
   pub number_format_id: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the DataFieldExtensionList Class.
   #[sdk(child(qname = "x:CT_DataFieldExtensionList/x:extLst"))]
   pub data_field_extension_list: Option<DataFieldExtensionList>,
 }
@@ -4247,7 +4247,7 @@ pub struct RowItem {
   /// Data Field Index
   #[sdk(attr(qname = ":i"))]
   pub index: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Member Property Indexes.
   #[sdk(child(qname = "x:CT_X/x:x"))]
   pub x_x: Vec<MemberPropertyIndex>,
 }
@@ -4294,7 +4294,7 @@ pub struct ConditionalFormat {
   /// Pivot Areas
   #[sdk(child(qname = "x:CT_PivotAreas/x:pivotAreas"))]
   pub pivot_areas: std::boxed::Box<PivotAreas>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -4305,7 +4305,7 @@ pub struct PivotAreas {
   /// Pivot Area Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Calculated Item Location.
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub x_pivot_area: Vec<PivotArea>,
 }
@@ -4368,10 +4368,10 @@ pub struct PivotHierarchy {
   /// OLAP Member Properties
   #[sdk(child(qname = "x:CT_MemberProperties/x:mps"))]
   pub member_properties: Option<MemberProperties>,
-  /// _
+  /// Members.
   #[sdk(child(qname = "x:CT_Members/x:members"))]
   pub x_members: Vec<Members>,
-  /// _
+  /// Future Feature Data Storage Area.
   #[sdk(child(qname = "x:CT_PivotHierarchyExtensionList/x:extLst"))]
   pub x_ext_lst: Option<PivotHierarchyExtensionList>,
 }
@@ -4508,10 +4508,10 @@ pub struct PivotFilter {
   /// stringValue2
   #[sdk(attr(qname = ":stringValue2"))]
   pub string_value2: Option<crate::simple_type::StringValue>,
-  /// _
+  /// AutoFilter Settings.
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub auto_filter: std::boxed::Box<AutoFilter>,
-  /// _
+  /// Defines the PivotFilterExtensionList Class.
   #[sdk(child(qname = "x:CT_PivotFilterExtensionList/x:extLst"))]
   pub pivot_filter_extension_list: Option<PivotFilterExtensionList>,
 }
@@ -4586,13 +4586,13 @@ pub struct CacheHierarchy {
   /// hidden
   #[sdk(attr(qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the FieldsUsage Class.
   #[sdk(child(qname = "x:CT_FieldsUsage/x:fieldsUsage"))]
   pub fields_usage: Option<FieldsUsage>,
-  /// _
+  /// Defines the GroupLevels Class.
   #[sdk(child(qname = "x:CT_GroupLevels/x:groupLevels"))]
   pub group_levels: Option<GroupLevels>,
-  /// _
+  /// Defines the CacheHierarchyExtensionList Class.
   #[sdk(child(qname = "x:CT_CacheHierarchyExtensionList/x:extLst"))]
   pub cache_hierarchy_extension_list: Option<CacheHierarchyExtensionList>,
 }
@@ -4632,7 +4632,7 @@ pub struct DiscreteProperties {
   /// Mapping Index Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Index.
   #[sdk(child(qname = "x:CT_Index/x:x"))]
   pub x_x: Vec<FieldItem>,
 }
@@ -4651,7 +4651,7 @@ pub struct GroupItems {
     qname = "x:CT_String/x:s",
     qname = "x:CT_DateTime/x:d"
   ))]
-  pub xml_children: Vec<GroupItemsChoice>,
+  pub group_items_choice: Vec<GroupItemsChoice>,
 }
 /// Page Field.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4684,7 +4684,7 @@ pub struct PivotAreaReferences {
   /// Pivot Filter Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Reference.
   #[sdk(child(qname = "x:CT_PivotAreaReference/x:reference"))]
   pub x_reference: Vec<PivotAreaReference>,
 }
@@ -4745,10 +4745,10 @@ pub struct PivotAreaReference {
   /// Include VarP Filter
   #[sdk(attr(qname = ":varPSubtotal"))]
   pub apply_variance_p_in_subtotal: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Index.
   #[sdk(child(qname = "x:CT_Index/x:x"))]
   pub x_x: Vec<FieldItem>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -4759,7 +4759,7 @@ pub struct QueryTableFields {
   /// Column Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// QueryTable Field.
   #[sdk(child(qname = "x:CT_QueryTableField/x:queryTableField"))]
   pub x_query_table_field: Vec<QueryTableField>,
 }
@@ -4770,7 +4770,7 @@ pub struct QueryTableDeletedFields {
   /// Deleted Fields Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Deleted Field.
   #[sdk(child(qname = "x:CT_DeletedField/x:deletedField"))]
   pub x_deleted_field: Vec<DeletedField>,
 }
@@ -4822,13 +4822,13 @@ pub struct SharedStringItem {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
-  /// _
+  /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
   pub x_r: Vec<Run>,
-  /// _
+  /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
   pub x_r_ph: Vec<PhoneticRun>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr: Option<PhoneticProperties>,
 }
@@ -4839,13 +4839,13 @@ pub struct InlineString {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
-  /// _
+  /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
   pub x_r: Vec<Run>,
-  /// _
+  /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
   pub x_r_ph: Vec<PhoneticRun>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr: Option<PhoneticProperties>,
 }
@@ -4856,13 +4856,13 @@ pub struct CommentText {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: Option<Text>,
-  /// _
+  /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
   pub x_r: Vec<Run>,
-  /// _
+  /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
   pub x_r_ph: Vec<PhoneticRun>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr: Option<PhoneticProperties>,
 }
@@ -5066,49 +5066,49 @@ pub struct FontScheme {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RPrElt/x:rPr")]
 pub struct RunProperties {
-  /// _
+  /// Bold.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
   pub x_b: Vec<Bold>,
-  /// _
+  /// Italic.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
   pub x_i: Vec<Italic>,
-  /// _
+  /// Strike Through.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
   pub x_strike: Vec<Strike>,
-  /// _
+  /// Condense.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
   pub x_condense: Vec<Condense>,
-  /// _
+  /// Extend.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
   pub x_extend: Vec<Extend>,
-  /// _
+  /// Outline.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
   pub x_outline: Vec<Outline>,
-  /// _
+  /// Shadow.
   #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
   pub x_shadow: Vec<Shadow>,
-  /// _
+  /// Underline.
   #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
   pub x_u: Vec<Underline>,
-  /// _
+  /// Vertical Alignment.
   #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
   pub x_vert_align: Vec<VerticalTextAlignment>,
-  /// _
+  /// Font Size.
   #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
   pub x_sz: Vec<FontSize>,
-  /// _
+  /// Text Color.
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub x_color: Vec<Color>,
-  /// _
+  /// Font.
   #[sdk(child(qname = "x:CT_FontName/x:rFont"))]
   pub x_r_font: Vec<RunFont>,
-  /// _
+  /// Font Family.
   #[sdk(child(qname = "x:CT_IntProperty/x:family"))]
   pub x_family: Vec<FontFamily>,
-  /// _
+  /// Character Set.
   #[sdk(child(qname = "x:CT_IntProperty/x:charset"))]
   pub x_charset: Vec<RunPropertyCharSet>,
-  /// _
+  /// Font Scheme.
   #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
   pub x_scheme: Vec<FontScheme>,
 }
@@ -5188,7 +5188,7 @@ pub struct Header {
   /// Reviewed List
   #[sdk(child(qname = "x:CT_ReviewedRevisions/x:reviewedList"))]
   pub reviewed_list: Option<ReviewedList>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5229,7 +5229,7 @@ pub struct RevisionRowColumn {
     text,
     any
   ))]
-  pub xml_children: Vec<RevisionRowColumnChoice>,
+  pub revision_row_column_choice: Vec<RevisionRowColumnChoice>,
 }
 /// Revision Cell Move.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5265,7 +5265,7 @@ pub struct RevisionMove {
     text,
     any
   ))]
-  pub xml_children: Vec<RevisionMoveChoice>,
+  pub revision_move_choice: Vec<RevisionMoveChoice>,
 }
 /// Revision Custom View.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5306,7 +5306,7 @@ pub struct RevisionSheetName {
   /// New Sheet Name
   #[sdk(attr(qname = ":newName"))]
   pub new_name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5392,7 +5392,7 @@ pub struct RevisionCellChange {
   /// New Formatting Information
   #[sdk(child(qname = "x:CT_Dxf/x:ndxf"))]
   pub new_differential_format: Option<std::boxed::Box<NewDifferentialFormat>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5422,7 +5422,7 @@ pub struct RevisionFormat {
   /// Formatting
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
   pub differential_format: Option<std::boxed::Box<DifferentialFormat>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5541,7 +5541,7 @@ pub struct RevisionDefinedName {
   /// Old Formula
   #[sdk(child(qname = "x:CT_Xstring/x:oldFormula"))]
   pub old_formula: Option<OldFormula>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5626,7 +5626,7 @@ pub struct SheetIdMap {
   /// Sheet Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Sheet Id.
   #[sdk(child(qname = "x:CT_SheetId/x:sheetId"))]
   pub x_sheet_id: Vec<SheetId>,
 }
@@ -5637,7 +5637,7 @@ pub struct ReviewedList {
   /// Reviewed Revisions Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Reviewed.
   #[sdk(child(qname = "x:CT_Reviewed/x:reviewed"))]
   pub x_reviewed: Vec<Reviewed>,
 }
@@ -5947,7 +5947,7 @@ pub struct UserInfo {
   /// Date Time
   #[sdk(attr(qname = ":dateTime"))]
   pub date_time: crate::simple_type::DateTimeValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5996,10 +5996,10 @@ pub struct Row {
   /// dyDescent
   #[sdk(attr(office2010, qname = "x14ac:dyDescent"))]
   pub dy_descent: Option<crate::simple_type::DoubleValue>,
-  /// _
+  /// Cell.
   #[sdk(child(qname = "x:CT_Cell/x:c"))]
   pub x_c: Vec<Cell>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -6211,7 +6211,7 @@ pub struct RowBreaks {
   /// Manual Break Count
   #[sdk(attr(qname = ":manualBreakCount"))]
   pub manual_break_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Break.
   #[sdk(child(qname = "x:CT_Break/x:brk"))]
   pub x_brk: Vec<Break>,
 }
@@ -6225,7 +6225,7 @@ pub struct ColumnBreaks {
   /// Manual Break Count
   #[sdk(attr(qname = ":manualBreakCount"))]
   pub manual_break_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Break.
   #[sdk(child(qname = "x:CT_Break/x:brk"))]
   pub x_brk: Vec<Break>,
 }
@@ -6373,13 +6373,13 @@ pub struct AutoFilter {
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
-  /// _
+  /// AutoFilter Column.
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
   pub x_filter_column: Vec<FilterColumn>,
-  /// _
+  /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<std::boxed::Box<SortState>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -6428,19 +6428,19 @@ pub struct ConditionalFormattingRule {
   /// Equal Average
   #[sdk(attr(qname = ":equalAverage"))]
   pub equal_average: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Formula.
   #[sdk(child(qname = "x:CT_Xstring/x:formula"))]
   pub x_formula: Vec<Formula>,
-  /// _
+  /// Color Scale.
   #[sdk(child(qname = "x:CT_ColorScale/x:colorScale"))]
   pub x_color_scale: Option<ColorScale>,
-  /// _
+  /// Data Bar.
   #[sdk(child(qname = "x:CT_DataBar/x:dataBar"))]
   pub x_data_bar: Option<std::boxed::Box<DataBar>>,
-  /// _
+  /// Icon Set.
   #[sdk(child(qname = "x:CT_IconSet/x:iconSet"))]
   pub x_icon_set: Option<IconSet>,
-  /// _
+  /// Defines the ConditionalFormattingRuleExtensionList Class.
   #[sdk(child(qname = "x:CT_CfRuleExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ConditionalFormattingRuleExtensionList>,
 }
@@ -6479,7 +6479,7 @@ pub struct ConditionalFormatValueObject {
   /// Greater Than Or Equal
   #[sdk(attr(qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -6505,7 +6505,7 @@ pub struct Scenario {
   /// Scenario Comment
   #[sdk(attr(qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Input Cells.
   #[sdk(child(qname = "x:CT_InputCells/x:inputCells"))]
   pub x_input_cells: Vec<InputCells>,
 }
@@ -6653,7 +6653,7 @@ pub struct ChartSheetView {
   /// Zoom To Fit
   #[sdk(attr(qname = ":zoomToFit"))]
   pub zoom_to_fit: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -6678,13 +6678,13 @@ pub struct CustomChartsheetView {
   /// Zoom To Fit
   #[sdk(attr(qname = ":zoomToFit"))]
   pub zoom_to_fit: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Page Margins.
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub page_margins: Option<PageMargins>,
   /// Chart Sheet Page Setup
   #[sdk(child(qname = "x:CT_CsPageSetup/x:pageSetup"))]
   pub chart_sheet_page_setup: Option<ChartSheetPageSetup>,
-  /// _
+  /// Header Footer Settings.
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
 }
@@ -6723,7 +6723,7 @@ pub struct Control {
   /// Control Name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ControlProperties Class.
   #[sdk(child(office2010, qname = "x:CT_ControlPr/x:controlPr"))]
   pub control_properties: Option<std::boxed::Box<ControlProperties>>,
 }
@@ -6815,13 +6815,13 @@ pub struct DataValidation {
   /// sqref
   #[sdk(attr(qname = ":sqref"))]
   pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the List Class.
   #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
   pub list: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
   pub formula1: Option<Formula1>,
-  /// _
+  /// Defines the Formula2 Class.
   #[sdk(child(qname = "x:CT_Xstring/x:formula2"))]
   pub formula2: Option<Formula2>,
 }
@@ -6891,13 +6891,13 @@ pub struct SheetView {
   /// View Pane
   #[sdk(child(qname = "x:CT_Pane/x:pane"))]
   pub pane: Option<Pane>,
-  /// _
+  /// Selection.
   #[sdk(child(qname = "x:CT_Selection/x:selection"))]
   pub x_selection: Vec<Selection>,
-  /// _
+  /// PivotTable Selection.
   #[sdk(child(qname = "x:CT_PivotSelection/x:pivotSelection"))]
   pub x_pivot_selection: Vec<PivotSelection>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -6998,7 +6998,7 @@ pub struct CustomSheetView {
   /// AutoFilter Settings
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub auto_filter: Option<std::boxed::Box<AutoFilter>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -7029,7 +7029,7 @@ pub struct OleObject {
   /// Relationship Id
   #[sdk(attr(qname = "r:id"))]
   pub id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the EmbeddedObjectProperties Class.
   #[sdk(child(office2010, qname = "x:CT_ObjectPr/x:objectPr"))]
   pub embedded_object_properties: Option<std::boxed::Box<EmbeddedObjectProperties>>,
 }
@@ -7040,7 +7040,7 @@ pub struct MetadataTypes {
   /// Metadata Type Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Metadata Type Information.
   #[sdk(child(qname = "x:CT_MetadataType/x:metadataType"))]
   pub x_metadata_type: Vec<MetadataType>,
 }
@@ -7051,7 +7051,7 @@ pub struct MetadataStrings {
   /// MDX Metadata String Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Character Value.
   #[sdk(child(qname = "x:CT_XStringElement/x:s"))]
   pub x_s: Vec<CharacterValue>,
 }
@@ -7062,7 +7062,7 @@ pub struct MdxMetadata {
   /// MDX Metadata Record Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// MDX Metadata Record.
   #[sdk(child(qname = "x:CT_Mdx/x:mdx"))]
   pub x_mdx: Vec<Mdx>,
 }
@@ -7079,10 +7079,10 @@ pub struct FutureMetadata {
   /// Future Metadata Block Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Future Metadata Block.
   #[sdk(child(qname = "x:CT_FutureMetadataBlock/x:bk"))]
   pub x_bk: Vec<FutureMetadataBlock>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -7093,7 +7093,7 @@ pub struct CellMetadata {
   /// Metadata Block Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Metadata Block.
   #[sdk(child(qname = "x:CT_MetadataBlock/x:bk"))]
   pub x_bk: Vec<MetadataBlock>,
 }
@@ -7104,7 +7104,7 @@ pub struct ValueMetadata {
   /// Metadata Block Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Metadata Block.
   #[sdk(child(qname = "x:CT_MetadataBlock/x:bk"))]
   pub x_bk: Vec<MetadataBlock>,
 }
@@ -7201,7 +7201,7 @@ pub struct MetadataType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_MetadataBlock/x:bk")]
 pub struct MetadataBlock {
-  /// _
+  /// Metadata Record.
   #[sdk(child(qname = "x:CT_MetadataRecord/x:rc"))]
   pub x_rc: Vec<MetadataRecord>,
 }
@@ -7240,7 +7240,7 @@ pub struct Mdx {
     qname = "x:CT_MdxMemeberProp/x:p",
     qname = "x:CT_MdxKPI/x:k"
   ))]
-  pub xml_children: Option<MdxChoice>,
+  pub mdx_choice: Option<MdxChoice>,
 }
 /// Tuple MDX Metadata.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7278,7 +7278,7 @@ pub struct MdxTuple {
   /// Server Formatting Bold Font
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Member Unique Name Index.
   #[sdk(child(qname = "x:CT_MetadataStringIndex/x:n"))]
   pub x_n: Vec<NameIndex>,
 }
@@ -7295,7 +7295,7 @@ pub struct MdxSet {
   /// Set Sort Order
   #[sdk(attr(qname = ":o"))]
   pub sorting_order: Option<MdxSetOrderValues>,
-  /// _
+  /// Member Unique Name Index.
   #[sdk(child(qname = "x:CT_MetadataStringIndex/x:n"))]
   pub x_n: Vec<NameIndex>,
 }
@@ -7428,7 +7428,7 @@ pub struct GradientFill {
   /// Bottom Convergence
   #[sdk(attr(qname = ":bottom"))]
   pub bottom: Option<crate::simple_type::DoubleValue>,
-  /// _
+  /// Gradient Stop.
   #[sdk(child(qname = "x:CT_GradientStop/x:stop"))]
   pub x_stop: Vec<GradientStop>,
 }
@@ -7558,7 +7558,7 @@ pub struct Fill {
     qname = "x:CT_PatternFill/x:patternFill",
     qname = "x:CT_GradientFill/x:gradientFill"
   ))]
-  pub xml_children: Option<FillChoice>,
+  pub fill_choice: Option<FillChoice>,
 }
 /// Border Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7575,10 +7575,10 @@ pub struct Border {
   /// Outline
   #[sdk(attr(qname = ":outline"))]
   pub outline: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the StartBorder Class.
   #[sdk(child(office2010, qname = "x:CT_BorderPr/x:start"))]
   pub start_border: Option<std::boxed::Box<StartBorder>>,
-  /// _
+  /// Defines the EndBorder Class.
   #[sdk(child(office2010, qname = "x:CT_BorderPr/x:end"))]
   pub end_border: Option<std::boxed::Box<EndBorder>>,
   /// Left Border
@@ -7607,7 +7607,7 @@ pub struct Border {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_IndexedColors/x:indexedColors")]
 pub struct IndexedColors {
-  /// _
+  /// RGB Color.
   #[sdk(child(qname = "x:CT_RgbColor/x:rgbColor"))]
   pub x_rgb_color: Vec<RgbColor>,
 }
@@ -7615,7 +7615,7 @@ pub struct IndexedColors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_MRUColors/x:mruColors")]
 pub struct MruColors {
-  /// _
+  /// Text Color.
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub x_color: Vec<Color>,
 }
@@ -7635,7 +7635,7 @@ pub struct TableStyle {
   /// Table Style Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Table Style.
   #[sdk(child(qname = "x:CT_TableStyleElement/x:tableStyleElement"))]
   pub x_table_style_element: Vec<TableStyleElement>,
 }
@@ -7806,7 +7806,7 @@ pub struct ExternalSheetData {
   /// Last Refresh Resulted in Error
   #[sdk(attr(qname = ":refreshError"))]
   pub refresh_error: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Row.
   #[sdk(child(qname = "x:CT_ExternalRow/x:row"))]
   pub x_row: Vec<ExternalRow>,
 }
@@ -7817,7 +7817,7 @@ pub struct ExternalRow {
   /// Row
   #[sdk(attr(qname = ":r"))]
   pub row_index: crate::simple_type::UInt32Value,
-  /// _
+  /// External Cell Data.
   #[sdk(child(qname = "x:CT_ExternalCell/x:cell"))]
   pub x_cell: Vec<ExternalCell>,
 }
@@ -7842,7 +7842,7 @@ pub struct ExternalCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DdeItems/x:ddeItems")]
 pub struct DdeItems {
-  /// _
+  /// DDE Item definition.
   #[sdk(child(qname = "x:CT_DdeItem/x:ddeItem"))]
   pub x_dde_item: Vec<DdeItem>,
 }
@@ -7876,7 +7876,7 @@ pub struct Values {
   /// Columns
   #[sdk(attr(qname = ":cols"))]
   pub columns: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Value.
   #[sdk(child(qname = "x:CT_DdeValue/x:value"))]
   pub x_value: Vec<Value>,
 }
@@ -7902,7 +7902,7 @@ pub struct OleItems {
     text,
     any
   ))]
-  pub xml_children: Vec<OleItemsChoice>,
+  pub ole_items_choice: Vec<OleItemsChoice>,
 }
 /// External Workbook.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8086,7 +8086,7 @@ pub struct VolatileType {
   /// Type
   #[sdk(attr(qname = ":type"))]
   pub r#type: VolatileDependencyValues,
-  /// _
+  /// Main.
   #[sdk(child(qname = "x:CT_VolMain/x:main"))]
   pub x_main: Vec<Main>,
 }
@@ -8097,7 +8097,7 @@ pub struct Main {
   /// First String
   #[sdk(attr(qname = ":first"))]
   pub first: crate::simple_type::StringValue,
-  /// _
+  /// Topic.
   #[sdk(child(qname = "x:CT_VolTopic/x:tp"))]
   pub x_tp: Vec<Topic>,
 }
@@ -8111,10 +8111,10 @@ pub struct Topic {
   /// Topic Value
   #[sdk(text_child(qname = "x:ST_Xstring/x:v"))]
   pub xstring: crate::simple_type::StringValue,
-  /// _
+  /// Strings in Subtopic.
   #[sdk(child(qname = "x:CT_Xstring/x:stp"))]
   pub x_stp: Vec<Subtopic>,
-  /// _
+  /// References.
   #[sdk(child(qname = "x:CT_VolTopicRef/x:tr"))]
   pub x_tr: Vec<TopicReferences>,
 }
@@ -8255,7 +8255,7 @@ pub struct CustomWorkbookView {
   /// Show Objects
   #[sdk(attr(qname = ":showObjects"))]
   pub show_objects: Option<ObjectDisplayValues>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -8321,7 +8321,7 @@ pub struct WorkbookView {
   /// AutoFilter Date Grouping
   #[sdk(attr(qname = ":autoFilterDateGrouping"))]
   pub auto_filter_date_grouping: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -8398,10 +8398,10 @@ pub struct ObjectAnchor {
   /// z-order
   #[sdk(attr(qname = ":z-order"))]
   pub z_order: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the FromMarker Class.
   #[sdk(child(office2010, qname = "xdr:CT_Marker/x:from"))]
   pub from_marker: std::boxed::Box<FromMarker>,
-  /// _
+  /// Defines the ToMarker Class.
   #[sdk(child(office2010, qname = "xdr:CT_Marker/x:to"))]
   pub to_marker: std::boxed::Box<ToMarker>,
 }
@@ -8451,7 +8451,8 @@ pub struct ConditionalFormattingRuleExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x:ST_Guid/x14:id", any))]
-  pub xml_children: Option<ConditionalFormattingRuleExtensionChoice>,
+  pub conditional_formatting_rule_extension_choice:
+    Option<ConditionalFormattingRuleExtensionChoice>,
 }
 /// Defines the PivotHierarchyExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8465,7 +8466,7 @@ pub struct PivotHierarchyExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy", any))]
-  pub xml_children: Option<PivotHierarchyExtensionChoice>,
+  pub pivot_hierarchy_extension_choice: Option<PivotHierarchyExtensionChoice>,
 }
 /// Defines the PivotFieldExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8479,7 +8480,7 @@ pub struct PivotFieldExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_PivotField/x14:pivotField", any))]
-  pub xml_children: Option<PivotFieldExtensionChoice>,
+  pub pivot_field_extension_choice: Option<PivotFieldExtensionChoice>,
 }
 /// Defines the CacheSourceExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8493,7 +8494,7 @@ pub struct CacheSourceExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection", any))]
-  pub xml_children: Option<CacheSourceExtensionChoice>,
+  pub cache_source_extension_choice: Option<CacheSourceExtensionChoice>,
 }
 /// OLE Link Item.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8660,7 +8661,7 @@ pub struct ControlProperties {
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ObjectAnchor Class.
   #[sdk(child(office2010, qname = "x:CT_ObjectAnchor/x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
@@ -8704,7 +8705,7 @@ pub struct EmbeddedObjectProperties {
   /// id
   #[sdk(attr(qname = "r:id"))]
   pub r_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ObjectAnchor Class.
   #[sdk(child(office2010, qname = "x:CT_ObjectAnchor/x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
@@ -8718,7 +8719,7 @@ pub struct ChartSheetProperties {
   /// Code Name
   #[sdk(attr(qname = ":codeName"))]
   pub code_name: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Sheet Tab Color.
   #[sdk(child(qname = "x:CT_Color/x:tabColor"))]
   pub tab_color: Option<TabColor>,
 }
@@ -8726,10 +8727,10 @@ pub struct ChartSheetProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ChartsheetViews/x:sheetViews")]
 pub struct ChartSheetViews {
-  /// _
+  /// Chart Sheet View.
   #[sdk(child(qname = "x:CT_ChartsheetView/x:sheetView"))]
   pub x_sheet_view: Vec<ChartSheetView>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -8764,7 +8765,7 @@ pub struct ChartSheetProtection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomChartsheetViews/x:customSheetViews")]
 pub struct CustomChartsheetViews {
-  /// _
+  /// Custom Chart Sheet View.
   #[sdk(child(qname = "x:CT_CustomChartsheetView/x:customSheetView"))]
   pub x_custom_sheet_view: Vec<CustomChartsheetView>,
 }
@@ -8872,7 +8873,7 @@ pub struct WebPublishItems {
   /// Web Publishing Items Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Web Publishing Item.
   #[sdk(child(qname = "x:CT_WebPublishItem/x:webPublishItem"))]
   pub x_web_publish_item: Vec<WebPublishItem>,
 }
@@ -8880,10 +8881,10 @@ pub struct WebPublishItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ColorScale/x:colorScale")]
 pub struct ColorScale {
-  /// _
+  /// Conditional Format Value Object.
   #[sdk(child(qname = "x:CT_Cfvo/x:cfvo"))]
   pub x_cfvo: Vec<ConditionalFormatValueObject>,
-  /// _
+  /// Text Color.
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub x_color: Vec<Color>,
 }
@@ -8900,10 +8901,10 @@ pub struct DataBar {
   /// Show Values
   #[sdk(attr(qname = ":showValue"))]
   pub show_value: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Conditional Format Value Object.
   #[sdk(child(qname = "x:CT_Cfvo/x:cfvo"))]
   pub x_cfvo: Vec<ConditionalFormatValueObject>,
-  /// _
+  /// Text Color.
   #[sdk(child(qname = "x:CT_Color/x:color"))]
   pub x_color: std::boxed::Box<Color>,
 }
@@ -8923,7 +8924,7 @@ pub struct IconSet {
   /// Reverse Icons
   #[sdk(attr(qname = ":reverse"))]
   pub reverse: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Conditional Format Value Object.
   #[sdk(child(qname = "x:CT_Cfvo/x:cfvo"))]
   pub x_cfvo: Vec<ConditionalFormatValueObject>,
 }
@@ -8934,7 +8935,7 @@ pub struct ConditionalFormattingRuleExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Defines the ConditionalFormattingRuleExtension Class.
   #[sdk(child(qname = "x:CT_CfRuleExtension/x:ext"))]
   pub x_ext: Vec<ConditionalFormattingRuleExtension>,
 }
@@ -8945,7 +8946,7 @@ pub struct DataReferences {
   /// Data Consolidation Reference Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Data Consolidation Reference.
   #[sdk(child(qname = "x:CT_DataRef/x:dataRef"))]
   pub x_data_ref: Vec<DataReference>,
 }
@@ -8994,10 +8995,10 @@ pub struct SheetProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetViews/x:sheetViews")]
 pub struct SheetViews {
-  /// _
+  /// Worksheet View.
   #[sdk(child(qname = "x:CT_SheetView/x:sheetView"))]
   pub x_sheet_view: Vec<SheetView>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -9110,7 +9111,7 @@ pub struct SheetProtection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomSheetViews/x:customSheetViews")]
 pub struct CustomSheetViews {
-  /// _
+  /// Custom Sheet View.
   #[sdk(child(qname = "x:CT_CustomSheetView/x:customSheetView"))]
   pub x_custom_sheet_view: Vec<CustomSheetView>,
 }
@@ -9118,7 +9119,7 @@ pub struct CustomSheetViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleObjects/x:oleObjects")]
 pub struct OleObjects {
-  /// _
+  /// OLE Object.
   #[sdk(child(qname = "x:CT_OleObject/x:oleObject"))]
   pub x_ole_object: Vec<OleObject>,
 }
@@ -9126,7 +9127,7 @@ pub struct OleObjects {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Controls/x:controls")]
 pub struct Controls {
-  /// _
+  /// Embedded Control.
   #[sdk(child(qname = "x:CT_Control/x:control"))]
   pub x_control: Vec<Control>,
 }
@@ -9145,7 +9146,7 @@ pub struct Columns {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Column Width and Formatting.
   #[sdk(child(qname = "x:CT_Col/x:col"))]
   pub x_col: Vec<Column>,
 }
@@ -9155,7 +9156,7 @@ pub struct Columns {
 pub struct SheetData {
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Row.
   #[sdk(child(qname = "x:CT_Row/x:row"))]
   pub x_row: Vec<Row>,
 }
@@ -9197,10 +9198,10 @@ pub struct ConditionalFormatting {
   #[sdk(attr(qname = ":sqref"))]
   pub sequence_of_references:
     Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  /// _
+  /// Conditional Formatting Rule.
   #[sdk(child(qname = "x:CT_CfRule/x:cfRule"))]
   pub x_cf_rule: Vec<ConditionalFormattingRule>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -9208,7 +9209,7 @@ pub struct ConditionalFormatting {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomProperties/x:customProperties")]
 pub struct CustomProperties {
-  /// _
+  /// Custom Property.
   #[sdk(child(qname = "x:CT_CustomProperty/x:customPr"))]
   pub x_custom_pr: Vec<CustomProperty>,
 }
@@ -9219,7 +9220,7 @@ pub struct MemberProperties {
   /// OLAP Member Properties Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Member Property.
   #[sdk(child(qname = "x:CT_MemberProperty/x:mp"))]
   pub x_mp: Vec<MemberProperty>,
 }
@@ -9233,7 +9234,7 @@ pub struct Members {
   /// Hierarchy Level
   #[sdk(attr(qname = ":level"))]
   pub level: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Member.
   #[sdk(child(qname = "x:CT_Member/x:member"))]
   pub x_member: Vec<Member>,
 }
@@ -9242,7 +9243,7 @@ pub struct Members {
 #[sdk(qname = "x:CT_PivotHierarchyExtensionList/x:extLst")]
 pub struct PivotHierarchyExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PivotHierarchyExtension Class.
   #[sdk(child(qname = "x:CT_PivotHierarchyExtension/x:ext"))]
   pub x_ext: Vec<PivotHierarchyExtension>,
 }
@@ -9253,7 +9254,7 @@ pub struct Items {
   /// Field Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotTable Field Item.
   #[sdk(child(qname = "x:CT_Item/x:item"))]
   pub x_item: Vec<Item>,
 }
@@ -9270,7 +9271,7 @@ pub struct AutoSortScope {
 #[sdk(qname = "x:CT_PivotFieldExtensionList/x:extLst")]
 pub struct PivotFieldExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PivotFieldExtension Class.
   #[sdk(child(qname = "x:CT_PivotFieldExtension/x:ext"))]
   pub x_ext: Vec<PivotFieldExtension>,
 }
@@ -9311,7 +9312,7 @@ pub struct Consolidation {
 #[sdk(qname = "x:CT_CacheSourceExtensionList/x:extLst")]
 pub struct CacheSourceExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CacheSourceExtension Class.
   #[sdk(child(qname = "x:CT_CacheSourceExtension/x:ext"))]
   pub x_ext: Vec<CacheSourceExtension>,
 }
@@ -9364,7 +9365,7 @@ pub struct CommentProperties {
   /// colHidden
   #[sdk(attr(qname = ":colHidden"))]
   pub col_hidden: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ObjectAnchor Class.
   #[sdk(child(office2010, qname = "x:CT_ObjectAnchor/x:anchor"))]
   pub object_anchor: std::boxed::Box<ObjectAnchor>,
 }
@@ -9445,7 +9446,7 @@ pub struct Filters {
     qname = "x:CT_Filter/x:filter",
     qname = "x:CT_DateGroupItem/x:dateGroupItem"
   ))]
-  pub xml_children: Option<FiltersChoice>,
+  pub filters_choice: Option<FiltersChoice>,
 }
 /// Top 10.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9471,7 +9472,7 @@ pub struct CustomFilters {
   /// And
   #[sdk(attr(qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Custom Filter Criteria.
   #[sdk(child(qname = "x:CT_CustomFilter/x:customFilter"))]
   pub x_custom_filter: Vec<CustomFilter>,
 }
@@ -9535,7 +9536,7 @@ pub struct SlicerCacheDefinitionExtension {
     qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData",
     any
   ))]
-  pub xml_children: Option<SlicerCacheDefinitionExtensionChoice>,
+  pub slicer_cache_definition_extension_choice: Option<SlicerCacheDefinitionExtensionChoice>,
 }
 /// Defines the PivotFilterExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9553,7 +9554,7 @@ pub struct PivotFilterExtension {
     qname = "x15:CT_MovingPeriodState/x15:movingPeriodState",
     any
   ))]
-  pub xml_children: Option<PivotFilterExtensionChoice>,
+  pub pivot_filter_extension_choice: Option<PivotFilterExtensionChoice>,
 }
 /// Defines the QueryTableExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9567,7 +9568,7 @@ pub struct QueryTableExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable", any))]
-  pub xml_children: Option<QueryTableExtensionChoice>,
+  pub query_table_extension_choice: Option<QueryTableExtensionChoice>,
 }
 /// Defines the DatabaseProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9717,7 +9718,7 @@ pub struct TextProperties {
   /// delimiter
   #[sdk(attr(qname = ":delimiter"))]
   pub delimiter: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the TextFields Class.
   #[sdk(child(qname = "x:CT_TextFields/x:textFields"))]
   pub text_fields: Option<TextFields>,
 }
@@ -9728,7 +9729,7 @@ pub struct Parameters {
   /// Parameter Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Parameter Properties.
   #[sdk(child(qname = "x:CT_Parameter/x:parameter"))]
   pub x_parameter: Vec<Parameter>,
 }
@@ -9737,7 +9738,7 @@ pub struct Parameters {
 #[sdk(qname = "x:CT_ConnectionExtensionList/x:extLst")]
 pub struct ConnectionExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ConnectionExtension Class.
   #[sdk(child(qname = "x:CT_ConnectionExtension/x:ext"))]
   pub x_ext: Vec<ConnectionExtension>,
 }
@@ -9757,7 +9758,7 @@ pub struct ConnectionExtension {
     qname = "x15:CT_Connection/x15:connection",
     any
   ))]
-  pub xml_children: Option<ConnectionExtensionChoice>,
+  pub connection_extension_choice: Option<ConnectionExtensionChoice>,
 }
 /// Defines the TextFields Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9766,7 +9767,7 @@ pub struct TextFields {
   /// Count of Fields
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Text Import Field Settings.
   #[sdk(child(qname = "x:CT_TextField/x:textField"))]
   pub x_text_field: Vec<TextField>,
 }
@@ -9824,7 +9825,7 @@ pub struct SharedItems {
     qname = "x:CT_String/x:s",
     qname = "x:CT_DateTime/x:d"
   ))]
-  pub xml_children: Vec<SharedItemsChoice>,
+  pub shared_items_choice: Vec<SharedItemsChoice>,
 }
 /// Defines the FieldGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9841,7 +9842,7 @@ pub struct FieldGroup {
     qname = "x:CT_DiscretePr/x:discretePr"
   ))]
   pub field_group_choice: Option<FieldGroupChoice>,
-  /// _
+  /// OLAP Group Items.
   #[sdk(child(qname = "x:CT_GroupItems/x:groupItems"))]
   pub x_group_items: Option<GroupItems>,
 }
@@ -9850,7 +9851,7 @@ pub struct FieldGroup {
 #[sdk(qname = "x:CT_CacheFieldExtensionList/x:extLst")]
 pub struct CacheFieldExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CacheFieldExtension Class.
   #[sdk(child(qname = "x:CT_CacheFieldExtension/x:ext"))]
   pub x_ext: Vec<CacheFieldExtension>,
 }
@@ -9870,7 +9871,7 @@ pub struct CacheFieldExtension {
     qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames",
     any
   ))]
-  pub xml_children: Option<CacheFieldExtensionChoice>,
+  pub cache_field_extension_choice: Option<CacheFieldExtensionChoice>,
 }
 /// Defines the FieldsUsage Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9879,7 +9880,7 @@ pub struct FieldsUsage {
   /// Field Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotCache Field Id.
   #[sdk(child(qname = "x:CT_FieldUsage/x:fieldUsage"))]
   pub x_field_usage: Vec<FieldUsage>,
 }
@@ -9890,7 +9891,7 @@ pub struct GroupLevels {
   /// Grouping Level Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Grouping Levels.
   #[sdk(child(qname = "x:CT_GroupLevel/x:groupLevel"))]
   pub x_group_level: Vec<GroupLevel>,
 }
@@ -9899,7 +9900,7 @@ pub struct GroupLevels {
 #[sdk(qname = "x:CT_CacheHierarchyExtensionList/x:extLst")]
 pub struct CacheHierarchyExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CacheHierarchyExtension Class.
   #[sdk(child(qname = "x:CT_CacheHierarchyExtension/x:ext"))]
   pub x_ext: Vec<CacheHierarchyExtension>,
 }
@@ -9919,14 +9920,14 @@ pub struct CacheHierarchyExtension {
     qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy",
     any
   ))]
-  pub xml_children: Option<CacheHierarchyExtensionChoice>,
+  pub cache_hierarchy_extension_choice: Option<CacheHierarchyExtensionChoice>,
 }
 /// Defines the CalculatedMemberExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CalculatedMemberExtensionList/x:extLst")]
 pub struct CalculatedMemberExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CalculatedMemberExtension Class.
   #[sdk(child(qname = "x:CT_CalculatedMemberExtension/x:ext"))]
   pub x_ext: Vec<CalculatedMemberExtension>,
 }
@@ -9946,14 +9947,14 @@ pub struct CalculatedMemberExtension {
     qname = "x15:CT_CalculatedMember/x15:calculatedMember",
     any
   ))]
-  pub xml_children: Option<CalculatedMemberExtensionChoice>,
+  pub calculated_member_extension_choice: Option<CalculatedMemberExtensionChoice>,
 }
 /// Defines the DataFieldExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataFieldExtensionList/x:extLst")]
 pub struct DataFieldExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the DataFieldExtension Class.
   #[sdk(child(qname = "x:CT_DataFieldExtension/x:ext"))]
   pub x_ext: Vec<DataFieldExtension>,
 }
@@ -9973,14 +9974,14 @@ pub struct DataFieldExtension {
     qname = "x15:CT_DataField/x15:dataField",
     any
   ))]
-  pub xml_children: Option<DataFieldExtensionChoice>,
+  pub data_field_extension_choice: Option<DataFieldExtensionChoice>,
 }
 /// Defines the PivotFilterExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotFilterExtensionList/x:extLst")]
 pub struct PivotFilterExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PivotFilterExtension Class.
   #[sdk(child(qname = "x:CT_PivotFilterExtension/x:ext"))]
   pub x_ext: Vec<PivotFilterExtension>,
 }
@@ -10028,7 +10029,7 @@ pub struct QueryTableRefresh {
 #[sdk(qname = "x:CT_QueryTableExtensionList/x:extLst")]
 pub struct QueryTableExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the QueryTableExtension Class.
   #[sdk(child(qname = "x:CT_QueryTableExtension/x:ext"))]
   pub x_ext: Vec<QueryTableExtension>,
 }
@@ -10044,7 +10045,7 @@ pub struct SheetCalculationProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ProtectedRanges/x:protectedRanges")]
 pub struct ProtectedRanges {
-  /// _
+  /// Protected Range.
   #[sdk(child(qname = "x:CT_ProtectedRange/x:protectedRange"))]
   pub x_protected_range: Vec<ProtectedRange>,
 }
@@ -10062,7 +10063,7 @@ pub struct Scenarios {
   #[sdk(attr(qname = ":sqref"))]
   pub sequence_of_references:
     Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  /// _
+  /// Scenario.
   #[sdk(child(qname = "x:CT_Scenario/x:scenario"))]
   pub x_scenario: Vec<Scenario>,
 }
@@ -10073,7 +10074,7 @@ pub struct MergeCells {
   /// Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Merged Cell.
   #[sdk(child(qname = "x:CT_MergeCell/x:mergeCell"))]
   pub x_merge_cell: Vec<MergeCell>,
 }
@@ -10093,7 +10094,7 @@ pub struct DataValidations {
   /// Data Validation Item Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Data Validation.
   #[sdk(child(qname = "x:CT_DataValidation/x:dataValidation"))]
   pub x_data_validation: Vec<DataValidation>,
 }
@@ -10101,7 +10102,7 @@ pub struct DataValidations {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Hyperlinks/x:hyperlinks")]
 pub struct Hyperlinks {
-  /// _
+  /// Hyperlink.
   #[sdk(child(qname = "x:CT_Hyperlink/x:hyperlink"))]
   pub x_hyperlink: Vec<Hyperlink>,
 }
@@ -10109,7 +10110,7 @@ pub struct Hyperlinks {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CellWatches/x:cellWatches")]
 pub struct CellWatches {
-  /// _
+  /// Cell Watch Item.
   #[sdk(child(qname = "x:CT_CellWatch/x:cellWatch"))]
   pub x_cell_watch: Vec<CellWatch>,
 }
@@ -10117,10 +10118,10 @@ pub struct CellWatches {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_IgnoredErrors/x:ignoredErrors")]
 pub struct IgnoredErrors {
-  /// _
+  /// Ignored Error.
   #[sdk(child(qname = "x:CT_IgnoredError/x:ignoredError"))]
   pub x_ignored_error: Vec<IgnoredError>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst: Option<ExtensionList>,
 }
@@ -10131,7 +10132,7 @@ pub struct TableParts {
   /// Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Table Part.
   #[sdk(child(qname = "x:CT_TablePart/x:tablePart"))]
   pub x_table_part: Vec<TablePart>,
 }
@@ -10140,7 +10141,7 @@ pub struct TableParts {
 #[sdk(qname = "x:CT_WorksheetExtensionList/x:extLst")]
 pub struct WorksheetExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the WorksheetExtension Class.
   #[sdk(child(qname = "x:CT_WorksheetExtension/x:ext"))]
   pub x_ext: Vec<WorksheetExtension>,
 }
@@ -10166,7 +10167,7 @@ pub struct WorksheetExtension {
     qname = "x15:CT_TimelineRefs/x15:timelineRefs",
     any
   ))]
-  pub xml_children: Option<WorksheetExtensionChoice>,
+  pub worksheet_extension_choice: Option<WorksheetExtensionChoice>,
 }
 /// Defines the NumberingFormats Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10175,7 +10176,7 @@ pub struct NumberingFormats {
   /// Number Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Number Formats.
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub x_num_fmt: Vec<NumberingFormat>,
 }
@@ -10191,7 +10192,7 @@ pub struct Fonts {
   /// knownFonts
   #[sdk(attr(office2010, qname = "x14ac:knownFonts"))]
   pub known_fonts: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Font Properties.
   #[sdk(child(qname = "x:CT_Font/x:font"))]
   pub x_font: Vec<Font>,
 }
@@ -10202,7 +10203,7 @@ pub struct Fills {
   /// Fill Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Fill.
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
   pub x_fill: Vec<Fill>,
 }
@@ -10213,7 +10214,7 @@ pub struct Borders {
   /// Border Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Border Properties.
   #[sdk(child(qname = "x:CT_Border/x:border"))]
   pub x_border: Vec<Border>,
 }
@@ -10224,7 +10225,7 @@ pub struct CellStyleFormats {
   /// Style Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Formatting Elements.
   #[sdk(child(qname = "x:CT_Xf/x:xf"))]
   pub x_xf: Vec<CellFormat>,
 }
@@ -10235,7 +10236,7 @@ pub struct CellFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Formatting Elements.
   #[sdk(child(qname = "x:CT_Xf/x:xf"))]
   pub x_xf: Vec<CellFormat>,
 }
@@ -10246,7 +10247,7 @@ pub struct CellStyles {
   /// Style Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Cell Style.
   #[sdk(child(qname = "x:CT_CellStyle/x:cellStyle"))]
   pub x_cell_style: Vec<CellStyle>,
 }
@@ -10257,7 +10258,7 @@ pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
   pub x_dxf: Vec<DifferentialFormat>,
 }
@@ -10274,7 +10275,7 @@ pub struct TableStyles {
   /// Default Pivot Style
   #[sdk(attr(qname = ":defaultPivotStyle"))]
   pub default_pivot_style: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Table Style.
   #[sdk(child(qname = "x:CT_TableStyle/x:tableStyle"))]
   pub x_table_style: Vec<TableStyle>,
 }
@@ -10294,7 +10295,7 @@ pub struct Colors {
 #[sdk(qname = "x:CT_StylesheetExtensionList/x:extLst")]
 pub struct StylesheetExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the StylesheetExtension Class.
   #[sdk(child(qname = "x:CT_StylesheetExtension/x:ext"))]
   pub x_ext: Vec<StylesheetExtension>,
 }
@@ -10316,7 +10317,7 @@ pub struct StylesheetExtension {
     qname = "x15:CT_TimelineStyles/x15:timelineStyles",
     any
   ))]
-  pub xml_children: Option<StylesheetExtensionChoice>,
+  pub stylesheet_extension_choice: Option<StylesheetExtensionChoice>,
 }
 /// Defines the Location Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10348,7 +10349,7 @@ pub struct PivotFields {
   /// Field Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotTable Field.
   #[sdk(child(qname = "x:CT_PivotField/x:pivotField"))]
   pub x_pivot_field: Vec<PivotField>,
 }
@@ -10359,7 +10360,7 @@ pub struct RowFields {
   /// Repeated Items Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row Items.
   #[sdk(child(qname = "x:CT_Field/x:field"))]
   pub x_field: Vec<Field>,
 }
@@ -10370,7 +10371,7 @@ pub struct RowItems {
   /// Items in a Row Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row Items.
   #[sdk(child(qname = "x:CT_I/x:i"))]
   pub x_i: Vec<RowItem>,
 }
@@ -10381,7 +10382,7 @@ pub struct ColumnFields {
   /// Repeated Items Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row Items.
   #[sdk(child(qname = "x:CT_Field/x:field"))]
   pub x_field: Vec<Field>,
 }
@@ -10392,7 +10393,7 @@ pub struct ColumnItems {
   /// Column Item Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row Items.
   #[sdk(child(qname = "x:CT_I/x:i"))]
   pub x_i: Vec<RowItem>,
 }
@@ -10403,7 +10404,7 @@ pub struct PageFields {
   /// Page Item Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Page Field.
   #[sdk(child(qname = "x:CT_PageField/x:pageField"))]
   pub x_page_field: Vec<PageField>,
 }
@@ -10414,7 +10415,7 @@ pub struct DataFields {
   /// Data Items Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Data Field Item.
   #[sdk(child(qname = "x:CT_DataField/x:dataField"))]
   pub x_data_field: Vec<DataField>,
 }
@@ -10425,7 +10426,7 @@ pub struct Formats {
   /// Formats Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotTable Format.
   #[sdk(child(qname = "x:CT_Format/x:format"))]
   pub x_format: Vec<Format>,
 }
@@ -10436,7 +10437,7 @@ pub struct ConditionalFormats {
   /// Conditional Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Conditional Formatting.
   #[sdk(child(qname = "x:CT_ConditionalFormat/x:conditionalFormat"))]
   pub x_conditional_format: Vec<ConditionalFormat>,
 }
@@ -10447,7 +10448,7 @@ pub struct ChartFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotChart Format.
   #[sdk(child(qname = "x:CT_ChartFormat/x:chartFormat"))]
   pub x_chart_format: Vec<ChartFormat>,
 }
@@ -10458,7 +10459,7 @@ pub struct PivotHierarchies {
   /// OLAP Hierarchy Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Hierarchy.
   #[sdk(child(qname = "x:CT_PivotHierarchy/x:pivotHierarchy"))]
   pub x_pivot_hierarchy: Vec<PivotHierarchy>,
 }
@@ -10492,7 +10493,7 @@ pub struct PivotFilters {
   /// Pivot Filter Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotTable Advanced Filter.
   #[sdk(child(qname = "x:CT_PivotFilter/x:filter"))]
   pub x_filter: Vec<PivotFilter>,
 }
@@ -10503,7 +10504,7 @@ pub struct RowHierarchiesUsage {
   /// Item Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row OLAP Hierarchies.
   #[sdk(child(qname = "x:CT_HierarchyUsage/x:rowHierarchyUsage"))]
   pub x_row_hierarchy_usage: Vec<RowHierarchyUsage>,
 }
@@ -10514,7 +10515,7 @@ pub struct ColumnHierarchiesUsage {
   /// Items Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Column OLAP Hierarchies.
   #[sdk(child(qname = "x:CT_HierarchyUsage/x:colHierarchyUsage"))]
   pub x_col_hierarchy_usage: Vec<ColumnHierarchyUsage>,
 }
@@ -10523,7 +10524,7 @@ pub struct ColumnHierarchiesUsage {
 #[sdk(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst")]
 pub struct PivotTableDefinitionExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PivotTableDefinitionExtension Class.
   #[sdk(child(qname = "x:CT_pivotTableDefinitionExtension/x:ext"))]
   pub x_ext: Vec<PivotTableDefinitionExtension>,
 }
@@ -10545,7 +10546,7 @@ pub struct PivotTableDefinitionExtension {
     qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo",
     any
   ))]
-  pub xml_children: Option<PivotTableDefinitionExtensionChoice>,
+  pub pivot_table_definition_extension_choice: Option<PivotTableDefinitionExtensionChoice>,
 }
 /// Defines the CacheSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10563,7 +10564,7 @@ pub struct CacheSource {
     qname = "x:CT_Consolidation/x:consolidation",
     qname = "x:CT_CacheSourceExtensionList/x:extLst"
   ))]
-  pub xml_children: Option<CacheSourceChoice>,
+  pub cache_source_choice: Option<CacheSourceChoice>,
 }
 /// Defines the CacheFields Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10572,7 +10573,7 @@ pub struct CacheFields {
   /// Field Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotCache Field.
   #[sdk(child(qname = "x:CT_CacheField/x:cacheField"))]
   pub x_cache_field: Vec<CacheField>,
 }
@@ -10583,7 +10584,7 @@ pub struct CacheHierarchies {
   /// Hierarchy Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// PivotCache Hierarchy.
   #[sdk(child(qname = "x:CT_CacheHierarchy/x:cacheHierarchy"))]
   pub x_cache_hierarchy: Vec<CacheHierarchy>,
 }
@@ -10594,7 +10595,7 @@ pub struct Kpis {
   /// KPI Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP KPI.
   #[sdk(child(qname = "x:CT_PCDKPI/x:kpi"))]
   pub x_kpi: Vec<Kpi>,
 }
@@ -10625,7 +10626,7 @@ pub struct CalculatedItems {
   /// Calculated Item Formula Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Calculated Item.
   #[sdk(child(qname = "x:CT_CalculatedItem/x:calculatedItem"))]
   pub x_calculated_item: Vec<CalculatedItem>,
 }
@@ -10636,7 +10637,7 @@ pub struct CalculatedMembers {
   /// Calculated Members Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Calculated Member.
   #[sdk(child(qname = "x:CT_CalculatedMember/x:calculatedMember"))]
   pub x_calculated_member: Vec<CalculatedMember>,
 }
@@ -10647,7 +10648,7 @@ pub struct Dimensions {
   /// OLAP Dimensions Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Dimension.
   #[sdk(child(qname = "x:CT_PivotDimension/x:dimension"))]
   pub x_dimension: Vec<Dimension>,
 }
@@ -10658,7 +10659,7 @@ pub struct MeasureGroups {
   /// Measure Group Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Measure Group.
   #[sdk(child(qname = "x:CT_MeasureGroup/x:measureGroup"))]
   pub x_measure_group: Vec<MeasureGroup>,
 }
@@ -10669,7 +10670,7 @@ pub struct Maps {
   /// Measure Group Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// OLAP Measure Group.
   #[sdk(child(qname = "x:CT_MeasureDimensionMap/x:map"))]
   pub x_map: Vec<MeasureDimensionMap>,
 }
@@ -10680,7 +10681,7 @@ pub struct PivotCacheDefinitionExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Defines the PivotCacheDefinitionExtension Class.
   #[sdk(child(qname = "x:CT_PivotCacheDefinitionExtension/x:ext"))]
   pub x_ext: Vec<PivotCacheDefinitionExtension>,
 }
@@ -10707,13 +10708,13 @@ pub struct PivotCacheDefinitionExtension {
     qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray",
     any
   ))]
-  pub xml_children: Option<PivotCacheDefinitionExtensionChoice>,
+  pub pivot_cache_definition_extension_choice: Option<PivotCacheDefinitionExtensionChoice>,
 }
 /// Sheet names of supporting book.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalSheetNames/x:sheetNames")]
 pub struct SheetNames {
-  /// _
+  /// Sheet Name.
   #[sdk(child(qname = "x:CT_ExternalSheetName/x:sheetName"))]
   pub x_sheet_name: Vec<SheetName>,
 }
@@ -10721,7 +10722,7 @@ pub struct SheetNames {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalDefinedNames/x:definedNames")]
 pub struct ExternalDefinedNames {
-  /// _
+  /// Defined Name.
   #[sdk(child(qname = "x:CT_ExternalDefinedName/x:definedName"))]
   pub x_defined_name: Vec<ExternalDefinedName>,
 }
@@ -10729,7 +10730,7 @@ pub struct ExternalDefinedNames {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalSheetDataSet/x:sheetDataSet")]
 pub struct SheetDataSet {
-  /// _
+  /// External Sheet Data Set.
   #[sdk(child(qname = "x:CT_ExternalSheetData/x:sheetData"))]
   pub x_sheet_data: Vec<ExternalSheetData>,
 }
@@ -10740,7 +10741,7 @@ pub struct TableColumns {
   /// Column Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Table Column.
   #[sdk(child(qname = "x:CT_TableColumn/x:tableColumn"))]
   pub x_table_column: Vec<TableColumn>,
 }
@@ -10769,7 +10770,7 @@ pub struct TableStyleInfo {
 #[sdk(qname = "x:CT_TableExtensionList/x:extLst")]
 pub struct TableExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the TableExtension Class.
   #[sdk(child(qname = "x:CT_TableExtension/x:ext"))]
   pub x_ext: Vec<TableExtension>,
 }
@@ -10789,7 +10790,7 @@ pub struct TableExtension {
     qname = "xlmsforms:CT_MsForm/xlmsforms:msForm",
     any
   ))]
-  pub xml_children: Option<TableExtensionChoice>,
+  pub table_extension_choice: Option<TableExtensionChoice>,
 }
 /// Defines the FileVersion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -10956,7 +10957,7 @@ pub struct WorkbookProtection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_BookViews/x:bookViews")]
 pub struct BookViews {
-  /// _
+  /// Workbook View.
   #[sdk(child(qname = "x:CT_BookView/x:workbookView"))]
   pub x_workbook_view: Vec<WorkbookView>,
 }
@@ -10964,7 +10965,7 @@ pub struct BookViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Sheets/x:sheets")]
 pub struct Sheets {
-  /// _
+  /// Sheet Information.
   #[sdk(child(qname = "x:CT_Sheet/x:sheet"))]
   pub x_sheet: Vec<Sheet>,
 }
@@ -10975,7 +10976,7 @@ pub struct FunctionGroups {
   /// Built-in Function Group Count
   #[sdk(attr(qname = ":builtInGroupCount"))]
   pub built_in_group_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Function Group.
   #[sdk(child(qname = "x:CT_FunctionGroup/x:functionGroup"))]
   pub x_function_group: Vec<FunctionGroup>,
 }
@@ -10983,7 +10984,7 @@ pub struct FunctionGroups {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalReferences/x:externalReferences")]
 pub struct ExternalReferences {
-  /// _
+  /// External Reference.
   #[sdk(child(qname = "x:CT_ExternalReference/x:externalReference"))]
   pub x_external_reference: Vec<ExternalReference>,
 }
@@ -10991,7 +10992,7 @@ pub struct ExternalReferences {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DefinedNames/x:definedNames")]
 pub struct DefinedNames {
-  /// _
+  /// Defined Name.
   #[sdk(child(qname = "x:CT_DefinedName/x:definedName"))]
   pub x_defined_name: Vec<DefinedName>,
 }
@@ -11051,7 +11052,7 @@ pub struct OleSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CustomWorkbookViews/x:customWorkbookViews")]
 pub struct CustomWorkbookViews {
-  /// _
+  /// Custom Workbook View.
   #[sdk(child(qname = "x:CT_CustomWorkbookView/x:customWorkbookView"))]
   pub x_custom_workbook_view: Vec<CustomWorkbookView>,
 }
@@ -11059,7 +11060,7 @@ pub struct CustomWorkbookViews {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotCaches/x:pivotCaches")]
 pub struct PivotCaches {
-  /// _
+  /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
   pub x_pivot_cache: Vec<PivotCache>,
 }
@@ -11119,7 +11120,7 @@ pub struct WebPublishObjects {
   /// Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Web Publishing Object.
   #[sdk(child(qname = "x:CT_WebPublishObject/x:webPublishObject"))]
   pub x_web_publish_object: Vec<WebPublishObject>,
 }
@@ -11128,7 +11129,7 @@ pub struct WebPublishObjects {
 #[sdk(qname = "x:CT_WorkbookExtensionList/x:extLst")]
 pub struct WorkbookExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the WorkbookExtension Class.
   #[sdk(child(qname = "x:CT_WorkbookExtension/x:ext"))]
   pub x_ext: Vec<WorkbookExtension>,
 }
@@ -11160,7 +11161,7 @@ pub struct WorkbookExtension {
     qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput",
     any
   ))]
-  pub xml_children: Option<WorkbookExtensionChoice>,
+  pub workbook_extension_choice: Option<WorkbookExtensionChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionsChoice {
@@ -11418,6 +11419,7 @@ pub enum OleItemsChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionalFormattingRuleExtensionChoice {
+  /// Defines the Id Class.
   #[sdk(text_child(office2010, qname = "x:ST_Guid/x14:id"))]
   X14Id(crate::simple_type::StringValue),
   #[sdk(any)]
@@ -11425,6 +11427,7 @@ pub enum ConditionalFormattingRuleExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotHierarchyExtensionChoice {
+  /// Defines the PivotHierarchy Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy"))]
   X14PivotHierarchy(
     std::boxed::Box<
@@ -11436,6 +11439,7 @@ pub enum PivotHierarchyExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFieldExtensionChoice {
+  /// Defines the PivotField Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotField/x14:pivotField"))]
   X14PivotField(
     std::boxed::Box<
@@ -11447,6 +11451,7 @@ pub enum PivotFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceExtensionChoice {
+  /// Defines the SourceConnection Class.
   #[sdk(child(office2010, qname = "x14:CT_SourceConnection/x14:sourceConnection"))]
   X14SourceConnection(
     std::boxed::Box<
@@ -11472,7 +11477,8 @@ pub enum FiltersChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDefinitionExtensionChoice {
-  #[sdk(
+  /// Defines the SlicerCachePivotTables Class.
+    #[sdk(
         child(
             office2013,
             qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"
@@ -11483,12 +11489,14 @@ pub enum SlicerCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCachePivotTables,
         >,
     ),
+    /// Defines the TableSlicerCache Class.
     #[sdk(child(office2013, qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache"))]
     X15TableSlicerCache(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TableSlicerCache,
         >,
     ),
+    /// Defines the SlicerCacheHideItemsWithNoData Class.
     #[sdk(
         child(
             office2013,
@@ -11505,12 +11513,14 @@ pub enum SlicerCacheDefinitionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFilterExtensionChoice {
+  /// Defines the PivotFilter Class.
   #[sdk(child(office2013, qname = "x15:CT_PivotFilter/x15:pivotFilter"))]
   X15PivotFilter(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotFilter,
     >,
   ),
+  /// Defines the MovingPeriodState Class.
   #[sdk(child(office2013, qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"))]
   X15MovingPeriodState(
     std::boxed::Box<
@@ -11522,6 +11532,7 @@ pub enum PivotFilterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum QueryTableExtensionChoice {
+  /// Defines the QueryTable Class.
   #[sdk(child(office2013, qname = "x15:CT_QueryTable/x15:queryTable"))]
   X15QueryTable(
     std::boxed::Box<
@@ -11533,12 +11544,14 @@ pub enum QueryTableExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConnectionExtensionChoice {
+  /// Defines the Connection Class.
   #[sdk(child(office2010, qname = "x14:CT_Connection/x14:connection"))]
   X14Connection(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Connection,
     >,
   ),
+  /// Defines the Connection Class.
   #[sdk(child(office2013, qname = "x15:CT_Connection/x15:connection"))]
   X15Connection(
     std::boxed::Box<
@@ -11578,12 +11591,14 @@ pub enum FieldGroupChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheFieldExtensionChoice {
+  /// Defines the CacheField Class.
   #[sdk(child(office2010, qname = "x14:CT_CacheField/x14:cacheField"))]
   X14CacheField(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheField,
     >,
   ),
+  /// Defines the CachedUniqueNames Class.
   #[sdk(child(office2013, qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames"))]
   X15CachedUniqueNames(
     std::boxed::Box<
@@ -11595,12 +11610,14 @@ pub enum CacheFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheHierarchyExtensionChoice {
+  /// Defines the CacheHierarchy Class.
   #[sdk(child(office2010, qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy"))]
   X14CacheHierarchy(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheHierarchy,
     >,
   ),
+  /// Defines the CacheHierarchy Class.
   #[sdk(child(office2013, qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"))]
   X15CacheHierarchy(
     std::boxed::Box<
@@ -11612,12 +11629,14 @@ pub enum CacheHierarchyExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CalculatedMemberExtensionChoice {
+  /// Defines the CalculatedMember Class.
   #[sdk(child(office2010, qname = "x14:CT_CalculatedMember/x14:calculatedMember"))]
   X14CalculatedMember(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CalculatedMember,
     >,
   ),
+  /// Defines the CalculatedMember Class.
   #[sdk(child(office2013, qname = "x15:CT_CalculatedMember/x15:calculatedMember"))]
   X15CalculatedMember(
     std::boxed::Box<
@@ -11629,12 +11648,14 @@ pub enum CalculatedMemberExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataFieldExtensionChoice {
+  /// Defines the DataField Class.
   #[sdk(child(office2010, qname = "x14:CT_DataField/x14:dataField"))]
   X14DataField(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataField,
     >,
   ),
+  /// Defines the DataField Class.
   #[sdk(child(office2013, qname = "x15:CT_DataField/x15:dataField"))]
   X15DataField(
     std::boxed::Box<
@@ -11646,7 +11667,8 @@ pub enum DataFieldExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetExtensionChoice {
-  #[sdk(
+  /// Defines the ConditionalFormattings Class.
+    #[sdk(
         child(
             office2010,
             qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"
@@ -11657,42 +11679,49 @@ pub enum WorksheetExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ConditionalFormattings,
         >,
     ),
+    /// Defines the DataValidations Class.
     #[sdk(child(office2010, qname = "x14:CT_DataValidations/x14:dataValidations"))]
     X14DataValidations(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataValidations,
         >,
     ),
+    /// Defines the SparklineGroups Class.
     #[sdk(child(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups"))]
     X14SparklineGroups(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineGroups,
         >,
     ),
+    /// Defines the SlicerList Class.
     #[sdk(child(office2010, qname = "x14:CT_SlicerRefs/x14:slicerList"))]
     X14SlicerList(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerList,
         >,
     ),
+    /// Defines the ProtectedRanges Class.
     #[sdk(child(office2010, qname = "x14:CT_ProtectedRanges/x14:protectedRanges"))]
     X14ProtectedRanges(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ProtectedRanges,
         >,
     ),
+    /// Defines the IgnoredErrors Class.
     #[sdk(child(office2010, qname = "x14:CT_IgnoredErrors/x14:ignoredErrors"))]
     X14IgnoredErrors(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IgnoredErrors,
         >,
     ),
+    /// Defines the WebExtensions Class.
     #[sdk(child(office2013, qname = "x15:CT_WebExtensions/x15:webExtensions"))]
     X15WebExtensions(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WebExtensions,
         >,
     ),
+    /// Defines the TimelineReferences Class.
     #[sdk(child(office2013, qname = "x15:CT_TimelineRefs/x15:timelineRefs"))]
     X15TimelineRefs(
         std::boxed::Box<
@@ -11704,24 +11733,28 @@ pub enum WorksheetExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
+  /// Defines the DifferentialFormats Class.
   #[sdk(child(office2010, qname = "x:CT_Dxfs/x14:dxfs"))]
   X14Dxfs(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DifferentialFormats,
     >,
   ),
+  /// Defines the SlicerStyles Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyles/x14:slicerStyles"))]
   X14SlicerStyles(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerStyles,
     >,
   ),
+  /// Defines the DifferentialFormats Class.
   #[sdk(child(office2013, qname = "x:CT_Dxfs/x15:dxfs"))]
   X15Dxfs(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DifferentialFormats,
     >,
   ),
+  /// Defines the TimelineStyles Class.
   #[sdk(child(office2013, qname = "x15:CT_TimelineStyles/x15:timelineStyles"))]
   X15TimelineStyles(
     std::boxed::Box<
@@ -11733,7 +11766,8 @@ pub enum StylesheetExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotTableDefinitionExtensionChoice {
-  #[sdk(
+  /// Defines the PivotTableDefinition Class.
+    #[sdk(
         child(office2010, qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition")
     )]
     X14PivotTableDefinition(
@@ -11741,12 +11775,14 @@ pub enum PivotTableDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotTableDefinition,
         >,
     ),
+    /// Defines the PivotTableData Class.
     #[sdk(child(office2013, qname = "x15:CT_PivotTableData/x15:pivotTableData"))]
     X15PivotTableData(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableData,
         >,
     ),
+    /// Defines the PivotTableUISettings Class.
     #[sdk(
         child(office2013, qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings")
     )]
@@ -11755,6 +11791,7 @@ pub enum PivotTableDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableUiSettings,
         >,
     ),
+    /// Defines the PivotVersionInfo Class.
     #[sdk(
         child(microsoft365, qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo")
     )]
@@ -11780,7 +11817,8 @@ pub enum CacheSourceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotCacheDefinitionExtensionChoice {
-  #[sdk(
+  /// Defines the PivotCacheDefinition Class.
+    #[sdk(
         child(office2010, qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition")
     )]
     X14PivotCacheDefinition(
@@ -11788,6 +11826,7 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCacheDefinition,
         >,
     ),
+    /// Defines the PivotCacheDecoupled Class.
     #[sdk(
         child(office2013, qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled")
     )]
@@ -11796,6 +11835,7 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheDecoupled,
         >,
     ),
+    /// Defines the TimelinePivotCacheDefinition Class.
     #[sdk(
         child(
             office2013,
@@ -11807,6 +11847,7 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelinePivotCacheDefinition,
         >,
     ),
+    /// Defines the PivotCacheIdVersion Class.
     #[sdk(
         child(office2013, qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion")
     )]
@@ -11815,14 +11856,17 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheIdVersion,
         >,
     ),
+    /// Defines the Xsdboolean Class.
     #[sdk(text_child(office2021, qname = "xsd:boolean/xxpim:implicitMeasureSupport"))]
     XxpimImplicitMeasureSupport(crate::simple_type::BooleanValue),
+    /// Defines the PivotCacheRichInfo Class.
     #[sdk(child(microsoft365, qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo"))]
     XprdRichInfo(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_rich_data::PivotCacheRichInfo,
         >,
     ),
+    /// Defines the CacheVersionInfo Class.
     #[sdk(
         child(microsoft365, qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo")
     )]
@@ -11831,8 +11875,10 @@ pub enum PivotCacheDefinitionExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_version_info::CacheVersionInfo,
         >,
     ),
+    /// Defines the Xsdboolean Class.
     #[sdk(text_child(microsoft365, qname = "xsd:boolean/xlpar:autoRefresh"))]
     XlparAutoRefresh(crate::simple_type::BooleanValue),
+    /// Defines the PivotCacheDynamicArray Class.
     #[sdk(
         child(
             microsoft365,
@@ -11849,10 +11895,12 @@ pub enum PivotCacheDefinitionExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableExtensionChoice {
+  /// Defines the Table Class.
   #[sdk(child(office2010, qname = "x14:CT_Table/x14:table"))]
   X14Table(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Table>,
   ),
+  /// Defines the MsForm Class.
   #[sdk(child(microsoft365, qname = "xlmsforms:CT_MsForm/xlmsforms:msForm"))]
   XlmsformsMsForm(
     std::boxed::Box<
@@ -11864,42 +11912,49 @@ pub enum TableExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorkbookExtensionChoice {
-  #[sdk(child(office2010, qname = "x14:CT_DefinedNames/x14:definedNames"))]
+  /// Defines the DefinedNames Class.
+    #[sdk(child(office2010, qname = "x14:CT_DefinedNames/x14:definedNames"))]
     X14DefinedNames(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DefinedNames,
         >,
     ),
+    /// Defines the PivotCaches Class.
     #[sdk(child(office2010, qname = "x:CT_PivotCaches/x14:pivotCaches"))]
     X14PivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCaches,
         >,
     ),
+    /// Defines the SlicerCaches Class.
     #[sdk(child(office2010, qname = "x14:CT_SlicerCaches/x14:slicerCaches"))]
     X14SlicerCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCaches,
         >,
     ),
+    /// Defines the SlicerCaches Class.
     #[sdk(child(office2013, qname = "x14:CT_SlicerCaches/x15:slicerCaches"))]
     X15SlicerCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCaches,
         >,
     ),
+    /// Defines the WorkbookProperties Class.
     #[sdk(child(office2010, qname = "x14:CT_WorkbookPr/x14:workbookPr"))]
     X14WorkbookPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::WorkbookProperties,
         >,
     ),
+    /// Defines the PivotCaches Class.
     #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:pivotCaches"))]
     X15PivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCaches,
         >,
     ),
+    /// Defines the PivotTableReferences Class.
     #[sdk(
         child(office2013, qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences")
     )]
@@ -11908,30 +11963,35 @@ pub enum WorkbookExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableReferences,
         >,
     ),
+    /// Defines the TimelineCachePivotCaches Class.
     #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches"))]
     X15TimelineCachePivotCaches(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCachePivotCaches,
         >,
     ),
+    /// Defines the TimelineCacheReferences Class.
     #[sdk(child(office2013, qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs"))]
     X15TimelineCacheRefs(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheReferences,
         >,
     ),
+    /// Defines the WorkbookProperties Class.
     #[sdk(child(office2013, qname = "x15:CT_WorkbookPr/x15:workbookPr"))]
     X15WorkbookPr(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WorkbookProperties,
         >,
     ),
+    /// Defines the DataModel Class.
     #[sdk(child(office2013, qname = "x15:CT_DataModel/x15:dataModel"))]
     X15DataModel(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DataModel,
         >,
     ),
+    /// Defines the ExternalCodeService Class.
     #[sdk(
         child(
             microsoft365,
@@ -11943,12 +12003,14 @@ pub enum WorkbookExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2023_external_code_service::ExternalCodeService,
         >,
     ),
+    /// Defines the Version Class.
     #[sdk(child(microsoft365, qname = "xlwcv:CT_Version/xlwcv:version"))]
     XlwcvVersion(
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_spreadsheetml_2024_workbook_compatibility_version::Version,
         >,
     ),
+    /// Defines the ExternalCodeServiceImageAsInput Class.
     #[sdk(
         child(
             microsoft365,

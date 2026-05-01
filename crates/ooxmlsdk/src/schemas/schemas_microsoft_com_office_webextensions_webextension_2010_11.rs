@@ -17,25 +17,25 @@ pub struct WebExtension {
   /// frozen
   #[sdk(attr(office2013, qname = ":frozen"))]
   pub frozen: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the WebExtensionStoreReference Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub web_extension_store_reference: std::boxed::Box<WebExtensionStoreReference>,
-  /// _
+  /// Defines the WebExtensionReferenceList Class.
   #[sdk(child(
     office2013,
     qname = "we:CT_OsfWebExtensionReferenceList/we:alternateReferences"
   ))]
   pub web_extension_reference_list: Option<WebExtensionReferenceList>,
-  /// _
+  /// Defines the WebExtensionPropertyBag Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionPropertyBag/we:properties"))]
   pub web_extension_property_bag: std::boxed::Box<WebExtensionPropertyBag>,
-  /// _
+  /// Defines the WebExtensionBindingList Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBindingList/we:bindings"))]
   pub web_extension_binding_list: std::boxed::Box<WebExtensionBindingList>,
-  /// _
+  /// Defines the Snapshot Class.
   #[sdk(child(office2013, qname = "a:CT_Blip/we:snapshot"))]
   pub snapshot: Option<std::boxed::Box<Snapshot>>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -67,7 +67,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the WebExtensionBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -83,7 +83,7 @@ pub struct WebExtensionBinding {
   /// appref
   #[sdk(attr(office2013, qname = ":appref"))]
   pub app_reference: crate::simple_type::StringValue,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -104,7 +104,7 @@ pub struct WebExtensionStoreReference {
   /// storeType
   #[sdk(attr(office2013, qname = ":storeType"))]
   pub store_type: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2013, qname = "a:CT_OfficeArtExtensionList/we:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -116,7 +116,7 @@ pub struct WebExtensionStoreReference {
 )]
 pub struct WebExtensionReferenceList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the WebExtensionStoreReference Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionReference/we:reference"))]
   pub we_reference: Vec<WebExtensionStoreReference>,
 }
@@ -125,7 +125,7 @@ pub struct WebExtensionReferenceList {
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionPropertyBag/we:properties")]
 pub struct WebExtensionPropertyBag {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the WebExtensionProperty Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionProperty/we:property"))]
   pub we_property: Vec<WebExtensionProperty>,
 }
@@ -134,7 +134,7 @@ pub struct WebExtensionPropertyBag {
 #[sdk(office2013, qname = "we:CT_OsfWebExtensionBindingList/we:bindings")]
 pub struct WebExtensionBindingList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the WebExtensionBinding Class.
   #[sdk(child(office2013, qname = "we:CT_OsfWebExtensionBinding/we:binding"))]
   pub we_binding: Vec<WebExtensionBinding>,
 }
@@ -174,7 +174,7 @@ pub struct Snapshot {
     qname = "a:CT_TintEffect/a:tint"
   ))]
   pub snapshot_choice: Vec<SnapshotChoice>,
-  /// _
+  /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipExtensionList>,

@@ -61,7 +61,7 @@ pub struct Sources {
   #[sdk(attr(qname = ":URI"))]
   #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
   pub uri: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Source.
   #[sdk(child(qname = "b:CT_SourceType/b:Source"))]
   pub b_source: Vec<Source>,
 }
@@ -69,13 +69,13 @@ pub struct Sources {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_PersonType/b:Person")]
 pub struct Person {
-  /// _
+  /// Person's Last, or Family, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:Last"))]
   pub b_last: Vec<crate::simple_type::StringValue>,
-  /// _
+  /// Person's First, or Given, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:First"))]
   pub b_first: Vec<crate::simple_type::StringValue>,
-  /// _
+  /// Person's Middle, or Other, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:Middle"))]
   pub b_middle: Vec<crate::simple_type::StringValue>,
 }
@@ -191,7 +191,7 @@ pub type YearAccessed = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "b:CT_NameListType/b:NameList")]
 pub struct NameList {
-  /// _
+  /// Person.
   #[sdk(child(qname = "b:CT_PersonType/b:Person"))]
   pub b_person: Vec<Person>,
 }
@@ -315,7 +315,7 @@ pub struct Author {
     qname = "b:CT_NameListType/b:NameList",
     qname = "b:ST_String255/b:Corporate"
   ))]
-  pub xml_children: Option<AuthorChoice>,
+  pub author_choice: Option<AuthorChoice>,
 }
 /// Performer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -325,7 +325,7 @@ pub struct Performer {
     qname = "b:CT_NameListType/b:NameList",
     qname = "b:ST_String255/b:Corporate"
   ))]
-  pub xml_children: Option<PerformerChoice>,
+  pub performer_choice: Option<PerformerChoice>,
 }
 /// Contributors List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -349,7 +349,7 @@ pub struct AuthorList {
     qname = "b:CT_NameType/b:Translator",
     qname = "b:CT_NameType/b:Writer"
   ))]
-  pub xml_children: Vec<AuthorListChoice>,
+  pub author_list_choice: Vec<AuthorListChoice>,
 }
 /// Source Type.
 pub type SourceType = DataSourceValues;
@@ -411,7 +411,7 @@ pub struct Source {
     qname = "b:ST_String255/b:Year",
     qname = "b:ST_String255/b:YearAccessed"
   ))]
-  pub xml_children: Vec<SourceChoice>,
+  pub source_choice: Vec<SourceChoice>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorChoice {

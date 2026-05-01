@@ -1146,7 +1146,7 @@ pub struct RegroupTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
-  /// _
+  /// Regroup Entry.
   #[sdk(child(qname = "o:CT_Entry/o:entry"))]
   pub o_entry: Vec<Entry>,
 }
@@ -1157,7 +1157,7 @@ pub struct Rules {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
-  /// _
+  /// Rule.
   #[sdk(child(qname = "o:CT_R/o:r"))]
   pub o_r: Vec<Rule>,
 }
@@ -1189,7 +1189,7 @@ pub struct Rule {
   #[sdk(attr(qname = ":idref"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub shape_reference: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Shape Reference.
   #[sdk(child(qname = "o:CT_Proxy/o:proxy"))]
   pub o_proxy: Vec<Proxy>,
 }
@@ -1200,7 +1200,7 @@ pub struct RelationTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
   pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
-  /// _
+  /// Diagram Relationship.
   #[sdk(child(qname = "o:CT_Relation/o:rel"))]
   pub o_rel: Vec<Relation>,
 }

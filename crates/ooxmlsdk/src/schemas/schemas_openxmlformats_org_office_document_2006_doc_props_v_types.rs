@@ -129,7 +129,7 @@ pub struct Variant {
     qname = "vt:ST_Clsid/vt:clsid",
     qname = "vt:CT_Cf/vt:cf"
   ))]
-  pub xml_children: Option<VariantChoice>,
+  pub variant_choice: Option<VariantChoice>,
 }
 /// Vector.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -164,7 +164,7 @@ pub struct VtVector {
     qname = "vt:ST_Clsid/vt:clsid",
     qname = "vt:CT_Cf/vt:cf"
   ))]
-  pub xml_children: Vec<VtVectorChoice>,
+  pub vt_vector_choice: Vec<VtVectorChoice>,
 }
 /// Array.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -198,7 +198,7 @@ pub struct VtArray {
     qname = "vt:ST_Error/vt:error",
     qname = "vt:ST_Cy/vt:cy"
   ))]
-  pub xml_children: Vec<VtArrayChoice>,
+  pub vt_array_choice: Vec<VtArrayChoice>,
 }
 /// Binary Blob.
 pub type VtBlob = crate::simple_type::Base64BinaryValue;

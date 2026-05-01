@@ -196,7 +196,7 @@ pub struct Inline {
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr"))]
   pub non_visual_graphic_frame_drawing_properties:
     Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
-  /// _
+  /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
@@ -250,17 +250,17 @@ pub struct Anchor {
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
-  pub simple_position: std::boxed::Box<SimplePosition>,
+  pub simple_position: Option<SimplePosition>,
   /// Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
-  pub horizontal_position: std::boxed::Box<HorizontalPosition>,
+  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   /// Vertical Positioning
   #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
-  pub vertical_position: std::boxed::Box<VerticalPosition>,
+  pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   /// Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
-  pub extent: std::boxed::Box<Extent>,
-  /// _
+  pub extent: Option<Extent>,
+  /// Object Extents Including Effects.
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
   #[sdk(choice(
@@ -271,22 +271,23 @@ pub struct Anchor {
     qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"
   ))]
   pub anchor_choice: Option<AnchorChoice>,
-  /// _
+  /// Drawing Object Non-Visual Properties.
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
-  pub wp_doc_pr: std::boxed::Box<DocProperties>,
-  /// _
+  pub wp_doc_pr: Option<std::boxed::Box<DocProperties>>,
+  /// Defines the NonVisualGraphicFrameDrawingProperties Class.
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr"))]
   pub wp_c_nv_graphic_frame_pr: Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
-  /// _
+  /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
-  pub a_graphic:
+  pub a_graphic: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
-  /// _
+  >,
+  /// Defines the RelativeWidth Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
   pub wp14_size_rel_h: Option<
     crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_drawing::RelativeWidth,
   >,
-  /// _
+  /// Defines the RelativeHeight Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelV/wp14:sizeRelV"))]
   pub wp14_size_rel_v: Option<
     crate::schemas::schemas_microsoft_com_office_word_2010_wordprocessing_drawing::RelativeHeight,
@@ -422,7 +423,7 @@ pub struct WrapPolygon {
   /// Wrapping Polygon Start
   #[sdk(child(qname = "a:CT_Point2D/wp:start"))]
   pub start_point: std::boxed::Box<StartPoint>,
-  /// _
+  /// Wrapping Polygon Line End Position.
   #[sdk(child(qname = "a:CT_Point2D/wp:lineTo"))]
   pub wp_line_to: Vec<LineTo>,
 }
@@ -441,7 +442,7 @@ pub struct HorizontalPosition {
     qname = "wp:ST_PositionOffset/wp:posOffset",
     qname = "a:ST_Percentage/wp14:pctPosHOffset"
   ))]
-  pub xml_children: Option<HorizontalPositionChoice>,
+  pub horizontal_position_choice: Option<HorizontalPositionChoice>,
 }
 /// Vertical Positioning.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -458,7 +459,7 @@ pub struct VerticalPosition {
     qname = "wp:ST_PositionOffset/wp:posOffset",
     qname = "a:ST_Percentage/wp14:pctPosVOffset"
   ))]
-  pub xml_children: Option<VerticalPositionChoice>,
+  pub vertical_position_choice: Option<VerticalPositionChoice>,
 }
 /// Inline Drawing Object Extents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -536,7 +537,7 @@ pub struct NonVisualGraphicFrameDrawingProperties {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GraphicFrameLocks,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,

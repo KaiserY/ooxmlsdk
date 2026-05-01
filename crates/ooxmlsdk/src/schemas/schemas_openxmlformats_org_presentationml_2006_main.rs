@@ -875,7 +875,7 @@ pub struct ColorMap {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub followed_hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -888,7 +888,7 @@ pub struct ColorMapOverride {
     qname = "a:CT_EmptyElement/a:masterClrMapping",
     qname = "a:CT_ColorMapping/a:overrideClrMapping"
   ))]
-  pub xml_children: Option<ColorMapOverrideChoice>,
+  pub color_map_override_choice: Option<ColorMapOverrideChoice>,
 }
 /// Background Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -910,7 +910,7 @@ pub struct BackgroundProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub background_properties_choice2: Option<BackgroundPropertiesChoice2>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub p_ext_lst: Option<ExtensionList>,
 }
@@ -931,21 +931,21 @@ pub struct BackgroundStyleReference {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<BackgroundStyleReferenceChoice>,
+  pub background_style_reference_choice: Option<BackgroundStyleReferenceChoice>,
 }
 /// Data for the Windows platform..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p188:CT_CommentPropertiesExtension/p:ext")]
 pub struct CommentPropertiesExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the TaskDetails Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskDetails/p228:taskDetails"))]
   pub task_details: Option<
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2022_08_main::TaskDetails,
     >,
   >,
-  /// _
+  /// Defines the Reactions Class.
   #[sdk(child(microsoft365, qname = "p223:CT_Reactions/p223:reactions"))]
   pub reactions:
     Option<crate::schemas::schemas_microsoft_com_office_powerpoint_2022_03_main::Reactions>,
@@ -958,7 +958,7 @@ pub struct CommentAuthorList {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Comment Author.
   #[sdk(child(qname = "p:CT_CommentAuthor/p:cmAuthor"))]
   pub p_cm_author: Vec<CommentAuthor>,
 }
@@ -970,7 +970,7 @@ pub struct CommentList {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Comment.
   #[sdk(child(qname = "p:CT_Comment/p:cm"))]
   pub p_cm: Vec<Comment>,
 }
@@ -1007,7 +1007,7 @@ pub struct OleObject {
     qname = "p:CT_OleObjectLink/p:link"
   ))]
   pub ole_object_choice: Option<OleObjectChoice>,
-  /// _
+  /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   pub p_pic: Option<std::boxed::Box<Picture>>,
 }
@@ -1062,46 +1062,46 @@ pub struct Presentation {
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClassValues>,
-  /// _
+  /// Defines the SlideMasterIdList Class.
   #[sdk(child(qname = "p:CT_SlideMasterIdList/p:sldMasterIdLst"))]
   pub slide_master_id_list: Option<SlideMasterIdList>,
-  /// _
+  /// Defines the NotesMasterIdList Class.
   #[sdk(child(qname = "p:CT_NotesMasterIdList/p:notesMasterIdLst"))]
   pub notes_master_id_list: Option<std::boxed::Box<NotesMasterIdList>>,
-  /// _
+  /// Defines the HandoutMasterIdList Class.
   #[sdk(child(qname = "p:CT_HandoutMasterIdList/p:handoutMasterIdLst"))]
   pub handout_master_id_list: Option<std::boxed::Box<HandoutMasterIdList>>,
-  /// _
+  /// Defines the SlideIdList Class.
   #[sdk(child(qname = "p:CT_SlideIdList/p:sldIdLst"))]
   pub slide_id_list: Option<SlideIdList>,
-  /// _
+  /// Defines the SlideSize Class.
   #[sdk(child(qname = "p:CT_SlideSize/p:sldSz"))]
   pub slide_size: Option<SlideSize>,
-  /// _
+  /// Defines the NotesSize Class.
   #[sdk(child(qname = "a:CT_PositiveSize2D/p:notesSz"))]
   pub notes_size: std::boxed::Box<NotesSize>,
-  /// _
+  /// Defines the EmbeddedFontList Class.
   #[sdk(child(qname = "p:CT_EmbeddedFontList/p:embeddedFontLst"))]
   pub embedded_font_list: Option<EmbeddedFontList>,
-  /// _
+  /// Defines the CustomShowList Class.
   #[sdk(child(qname = "p:CT_CustomShowList/p:custShowLst"))]
   pub custom_show_list: Option<CustomShowList>,
-  /// _
+  /// Defines the PhotoAlbum Class.
   #[sdk(child(qname = "p:CT_PhotoAlbum/p:photoAlbum"))]
   pub photo_album: Option<std::boxed::Box<PhotoAlbum>>,
-  /// _
+  /// Customer Data List.
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
   pub customer_data_list: Option<std::boxed::Box<CustomerDataList>>,
-  /// _
+  /// Defines the Kinsoku Class.
   #[sdk(child(qname = "p:CT_Kinsoku/p:kinsoku"))]
   pub kinsoku: Option<Kinsoku>,
-  /// _
+  /// Defines the DefaultTextStyle Class.
   #[sdk(child(qname = "a:CT_TextListStyle/p:defaultTextStyle"))]
   pub default_text_style: Option<std::boxed::Box<DefaultTextStyle>>,
-  /// _
+  /// Defines the ModificationVerifier Class.
   #[sdk(child(qname = "p:CT_ModifyVerifier/p:modifyVerifier"))]
   pub modification_verifier: Option<ModificationVerifier>,
-  /// _
+  /// Defines the PresentationExtensionList Class.
   #[sdk(child(qname = "p:CT_PresentationExtensionList/p:extLst"))]
   pub presentation_extension_list: Option<PresentationExtensionList>,
 }
@@ -1118,16 +1118,16 @@ pub struct PresentationProperties {
   /// Web Properties
   #[sdk(child(qname = "p:CT_WebProperties/p:webPr"))]
   pub web_properties: Option<std::boxed::Box<WebProperties>>,
-  /// _
+  /// Defines the PrintingProperties Class.
   #[sdk(child(qname = "p:CT_PrintProperties/p:prnPr"))]
   pub printing_properties: Option<std::boxed::Box<PrintingProperties>>,
-  /// _
+  /// Defines the ShowProperties Class.
   #[sdk(child(qname = "p:CT_ShowProperties/p:showPr"))]
   pub show_properties: Option<std::boxed::Box<ShowProperties>>,
-  /// _
+  /// Defines the ColorMostRecentlyUsed Class.
   #[sdk(child(qname = "a:CT_ColorMRU/p:clrMru"))]
   pub color_most_recently_used: Option<ColorMostRecentlyUsed>,
-  /// _
+  /// Defines the PresentationPropertiesExtensionList Class.
   #[sdk(child(qname = "p:CT_PresentationPropertiesExtensionList/p:extLst"))]
   pub presentation_properties_extension_list: Option<PresentationPropertiesExtensionList>,
 }
@@ -1160,7 +1160,7 @@ pub struct Slide {
   /// Slide Timing Information for a Slide
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
-  /// _
+  /// Defines the SlideExtensionList Class.
   #[sdk(child(qname = "p:CT_SlideExtensionList/p:extLst"))]
   pub slide_extension_list: Option<SlideExtensionList>,
 }
@@ -1191,22 +1191,22 @@ pub struct SlideLayout {
   /// userDrawn
   #[sdk(attr(qname = ":userDrawn"))]
   pub user_drawn: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
   /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-  /// _
+  /// Slide Transition.
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
-  /// _
+  /// Slide Timing Information for a Slide.
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
-  /// _
+  /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  /// _
+  /// Defines the SlideLayoutExtensionList Class.
   #[sdk(child(qname = "p:CT_SlideLayoutExtensionList/p:extLst"))]
   pub slide_layout_extension_list: Option<SlideLayoutExtensionList>,
 }
@@ -1221,28 +1221,28 @@ pub struct SlideMaster {
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
   /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
-  /// _
+  /// Defines the SlideLayoutIdList Class.
   #[sdk(child(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
-  /// _
+  /// Slide Transition.
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
-  /// _
+  /// Slide Timing Information for a Slide.
   #[sdk(child(qname = "p:CT_SlideTiming/p:timing"))]
   pub timing: Option<std::boxed::Box<Timing>>,
-  /// _
+  /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  /// _
+  /// Defines the TextStyles Class.
   #[sdk(child(qname = "p:CT_SlideMasterTextStyles/p:txStyles"))]
   pub text_styles: Option<std::boxed::Box<TextStyles>>,
-  /// _
+  /// Defines the SlideMasterExtensionList Class.
   #[sdk(child(qname = "p:CT_SlideMasterExtensionList/p:extLst"))]
   pub slide_master_extension_list: Option<SlideMasterExtensionList>,
 }
@@ -1253,16 +1253,16 @@ pub struct HandoutMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
   /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
-  /// _
+  /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  /// _
+  /// Defines the HandoutMasterExtensionList Class.
   #[sdk(child(qname = "p:CT_HandoutMasterExtensionList/p:extLst"))]
   pub handout_master_extension_list: Option<HandoutMasterExtensionList>,
 }
@@ -1273,19 +1273,19 @@ pub struct NotesMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
   /// Color Scheme Map
   #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
   pub color_map: std::boxed::Box<ColorMap>,
-  /// _
+  /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
-  /// _
+  /// Defines the NotesStyle Class.
   #[sdk(child(qname = "a:CT_TextListStyle/p:notesStyle"))]
   pub notes_style: Option<std::boxed::Box<NotesStyle>>,
-  /// _
+  /// Defines the NotesMasterExtensionList Class.
   #[sdk(child(qname = "p:CT_NotesMasterExtensionList/p:extLst"))]
   pub notes_master_extension_list: Option<NotesMasterExtensionList>,
 }
@@ -1308,7 +1308,7 @@ pub struct NotesSlide {
   /// Color Scheme Map Override
   #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
   pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -1328,7 +1328,7 @@ pub struct SlideSyncProperties {
   /// Client Slide Insertion date/time
   #[sdk(attr(qname = ":clientInsertedTime"))]
   pub client_inserted_time: crate::simple_type::DateTimeValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1340,7 +1340,7 @@ pub struct TagList {
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
   pub xml_other_children: Vec<(usize, String)>,
-  /// _
+  /// Programmable Extensibility Tag.
   #[sdk(child(qname = "p:CT_StringTag/p:tag"))]
   pub p_tag: Vec<Tag>,
 }
@@ -1379,7 +1379,7 @@ pub struct ViewProperties {
   /// Grid Spacing
   #[sdk(child(qname = "a:CT_PositiveSize2D/p:gridSpacing"))]
   pub grid_spacing: Option<GridSpacing>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1395,21 +1395,21 @@ pub struct ContentPart {
     /// id
     #[sdk(attr(qname = "r:id"))]
     pub r_id: crate::simple_type::StringValue,
-    /// _
+    /// Defines the NonVisualContentPartProperties Class.
     #[sdk(child(office2010, qname = "p14:CT_ContentPartNonVisual/p14:nvContentPartPr"))]
     pub non_visual_content_part_properties: Option<
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::NonVisualContentPartProperties,
         >,
     >,
-    /// _
+    /// Defines the Transform2D Class.
     #[sdk(child(office2010, qname = "a:CT_Transform2D/p14:xfrm"))]
     pub transform2_d: Option<
         std::boxed::Box<
             crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::Transform2D,
         >,
     >,
-    /// _
+    /// Defines the ExtensionListModify Class.
     #[sdk(child(office2010, qname = "p:CT_ExtensionListModify/p14:extLst"))]
     pub extension_list_modify: Option<
         crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::ExtensionListModify,
@@ -1488,7 +1488,7 @@ pub struct TargetElement {
     qname = "p:CT_TLSubShapeId/p:inkTgt",
     qname = "p14:CT_MediaBookmarkTarget/p14:bmkTgt"
   ))]
-  pub xml_children: Option<TargetElementChoice>,
+  pub target_element_choice: Option<TargetElementChoice>,
 }
 /// Time Node.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1527,7 +1527,7 @@ pub struct Condition {
     qname = "p:CT_TLTriggerTimeNodeID/p:tn",
     qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
   ))]
-  pub xml_children: Option<ConditionChoice>,
+  pub condition_choice: Option<ConditionChoice>,
 }
 /// Defines the EndSync Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1549,7 +1549,7 @@ pub struct EndSync {
     qname = "p:CT_TLTriggerTimeNodeID/p:tn",
     qname = "p:CT_TLTriggerRuntimeNode/p:rtn"
   ))]
-  pub xml_children: Option<EndSyncChoice>,
+  pub end_sync_choice: Option<EndSyncChoice>,
 }
 /// Parallel Time Node.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1631,10 +1631,10 @@ pub struct Animate {
     max_inclusive = true
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  /// _
+  /// Defines the TimeAnimateValueList Class.
   #[sdk(child(qname = "p:CT_TLTimeAnimateValueList/p:tavLst"))]
   pub time_animate_value_list: Option<TimeAnimateValueList>,
 }
@@ -1650,7 +1650,7 @@ pub struct AnimateColor {
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub direction: Option<AnimateColorDirectionValues>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
   /// By
@@ -1677,7 +1677,7 @@ pub struct AnimateEffect {
   /// Property List
   #[sdk(attr(qname = ":prLst"))]
   pub property_list: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
   /// Progress
@@ -1717,19 +1717,19 @@ pub struct AnimateMotion {
     max_inclusive = true
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  /// _
+  /// Defines the ByPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:by"))]
   pub by_position: Option<ByPosition>,
-  /// _
+  /// Defines the FromPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:from"))]
   pub from_position: Option<FromPosition>,
-  /// _
+  /// Defines the ToPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:to"))]
   pub to_position: Option<ToPosition>,
-  /// _
+  /// Defines the RotationCenter Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:rCtr"))]
   pub rotation_center: Option<RotationCenter>,
 }
@@ -1758,7 +1758,7 @@ pub struct AnimateRotation {
     max_inclusive = true
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
 }
@@ -1781,16 +1781,16 @@ pub struct AnimateScale {
     max_inclusive = true
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
-  /// _
+  /// Defines the ByPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:by"))]
   pub by_position: Option<ByPosition>,
-  /// _
+  /// Defines the FromPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:from"))]
   pub from_position: Option<FromPosition>,
-  /// _
+  /// Defines the ToPosition Class.
   #[sdk(child(qname = "p:CT_TLPoint/p:to"))]
   pub to_position: Option<ToPosition>,
 }
@@ -1805,7 +1805,7 @@ pub struct Command {
   /// Command
   #[sdk(attr(qname = ":cmd"))]
   pub command_name: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
   pub common_behavior: std::boxed::Box<CommonBehavior>,
 }
@@ -1947,22 +1947,22 @@ pub struct CommonTimeNode {
     max_inclusive = true
   ))]
   pub preset_bounce_end: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the StartConditionList Class.
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:stCondLst"))]
   pub start_condition_list: Option<StartConditionList>,
-  /// _
+  /// Defines the EndConditionList Class.
   #[sdk(child(qname = "p:CT_TLTimeConditionList/p:endCondLst"))]
   pub end_condition_list: Option<EndConditionList>,
-  /// _
+  /// Defines the EndSync Class.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:endSync"))]
   pub end_sync: Option<std::boxed::Box<EndSync>>,
-  /// _
+  /// Defines the Iterate Class.
   #[sdk(child(qname = "p:CT_TLIterateData/p:iterate"))]
   pub iterate: Option<std::boxed::Box<Iterate>>,
-  /// _
+  /// Defines the ChildTimeNodeList Class.
   #[sdk(child(qname = "p:CT_TimeNodeList/p:childTnLst"))]
   pub child_time_node_list: Option<ChildTimeNodeList>,
-  /// _
+  /// Defines the SubTimeNodeList Class.
   #[sdk(child(qname = "p:CT_TimeNodeList/p:subTnLst"))]
   pub sub_time_node_list: Option<SubTimeNodeList>,
 }
@@ -1970,7 +1970,7 @@ pub struct CommonTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeConditionList/p:prevCondLst")]
 pub struct PreviousConditionList {
-  /// _
+  /// Condition.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub p_cond: Vec<Condition>,
 }
@@ -1978,7 +1978,7 @@ pub struct PreviousConditionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeConditionList/p:nextCondLst")]
 pub struct NextConditionList {
-  /// _
+  /// Condition.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub p_cond: Vec<Condition>,
 }
@@ -1986,7 +1986,7 @@ pub struct NextConditionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeConditionList/p:stCondLst")]
 pub struct StartConditionList {
-  /// _
+  /// Condition.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub p_cond: Vec<Condition>,
 }
@@ -1994,7 +1994,7 @@ pub struct StartConditionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeConditionList/p:endCondLst")]
 pub struct EndConditionList {
-  /// _
+  /// Condition.
   #[sdk(child(qname = "p:CT_TLTimeCondition/p:cond"))]
   pub p_cond: Vec<Condition>,
 }
@@ -2006,7 +2006,7 @@ pub type Text = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLBehaviorAttributeNameList/p:attrNameLst")]
 pub struct AttributeNameList {
-  /// _
+  /// Attribute Name.
   #[sdk(text_child(qname = "xsd:string/p:attrName"))]
   pub p_attr_name: Vec<crate::simple_type::StringValue>,
 }
@@ -2056,7 +2056,7 @@ pub struct ColorValue {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<ColorValueChoice>,
+  pub color_value_choice: Option<ColorValueChoice>,
 }
 /// Pen Color for Slide Show.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2072,7 +2072,7 @@ pub struct PenColor {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<PenColorChoice>,
+  pub pen_color_choice: Option<PenColorChoice>,
 }
 /// Time Animate Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2194,7 +2194,7 @@ pub struct CommonBehavior {
   #[sdk(attr(qname = ":override"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub r#override: Option<BehaviorOverrideValues>,
-  /// _
+  /// Parallel TimeNode.
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
   /// Target Element
@@ -2223,7 +2223,7 @@ pub struct ToVariantValue {
     qname = "p:CT_TLAnimVariantStringVal/p:strVal",
     qname = "a:CT_Color/p:clrVal"
   ))]
-  pub xml_children: Option<ToVariantValueChoice>,
+  pub to_variant_value_choice: Option<ToVariantValueChoice>,
 }
 /// Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2236,7 +2236,7 @@ pub struct VariantValue {
     qname = "p:CT_TLAnimVariantStringVal/p:strVal",
     qname = "a:CT_Color/p:clrVal"
   ))]
-  pub xml_children: Option<VariantValueChoice>,
+  pub variant_value_choice: Option<VariantValueChoice>,
 }
 /// Common Media Node Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2266,7 +2266,7 @@ pub struct CommonMediaNode {
   /// Common Time Node Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
   pub common_time_node: std::boxed::Box<CommonTimeNode>,
-  /// _
+  /// Target Element Trigger Choice.
   #[sdk(child(qname = "p:CT_TLTimeTargetElement/p:tgtEl"))]
   pub target_element: std::boxed::Box<TargetElement>,
 }
@@ -2274,7 +2274,7 @@ pub struct CommonMediaNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_RootTimeNode/p:tnLst")]
 pub struct TimeNodeList {
-  /// _
+  /// Parallel Time Node.
   #[sdk(child(qname = "p:CT_TLTimeNodeParallel/p:par"))]
   pub parallel_time_node: std::boxed::Box<ParallelTimeNode>,
 }
@@ -2293,7 +2293,7 @@ pub struct Template {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTemplateList/p:tmplLst")]
 pub struct TemplateList {
-  /// _
+  /// Template Effects.
   #[sdk(child(qname = "p:CT_TLTemplate/p:tmpl"))]
   pub p_tmpl: Vec<Template>,
 }
@@ -2305,7 +2305,7 @@ pub struct BuildSubElement {
     qname = "a:CT_AnimationDgmBuildProperties/a:bldDgm",
     qname = "a:CT_AnimationChartBuildProperties/a:bldChart"
   ))]
-  pub xml_children: Option<BuildSubElementChoice>,
+  pub build_sub_element_choice: Option<BuildSubElementChoice>,
 }
 /// Build Paragraph.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2415,7 +2415,7 @@ pub struct BuildGraphics {
     qname = "p:CT_Empty/p:bldAsOne",
     qname = "a:CT_AnimationGraphicalObjectBuildProperties/p:bldSub"
   ))]
-  pub xml_children: Option<BuildGraphicsChoice>,
+  pub build_graphics_choice: Option<BuildGraphicsChoice>,
 }
 /// Build List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2427,7 +2427,7 @@ pub struct BuildList {
     qname = "p:CT_TLOleBuildChart/p:bldOleChart",
     qname = "p:CT_TLGraphicalObjectBuild/p:bldGraphic"
   ))]
-  pub xml_children: Vec<BuildListChoice>,
+  pub build_list_choice: Vec<BuildListChoice>,
 }
 /// Defines the ExtensionListWithModification Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2439,7 +2439,7 @@ pub struct ExtensionListWithModification {
   pub modify: Option<crate::simple_type::BooleanValue>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension: Vec<Extension>,
+  pub p_ext: Vec<Extension>,
 }
 /// By.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2449,7 +2449,7 @@ pub struct ByColor {
     qname = "p:CT_TLByRgbColorTransform/p:rgb",
     qname = "p:CT_TLByHslColorTransform/p:hsl"
   ))]
-  pub xml_children: Option<ByColorChoice>,
+  pub by_color_choice: Option<ByColorChoice>,
 }
 /// From.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2465,7 +2465,7 @@ pub struct FromColor {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<FromColorChoice>,
+  pub from_color_choice: Option<FromColorChoice>,
 }
 /// To.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2481,7 +2481,7 @@ pub struct ToColor {
     qname = "a:CT_SchemeColor/a:schemeClr",
     qname = "a:CT_PresetColor/a:prstClr"
   ))]
-  pub xml_children: Option<ToColorChoice>,
+  pub to_color_choice: Option<ToColorChoice>,
 }
 /// Presentation Slide.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2526,7 +2526,7 @@ pub struct CommentAuthor {
   /// clrIdx
   #[sdk(attr(qname = ":clrIdx"))]
   pub color_index: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the CommentAuthorExtensionList Class.
   #[sdk(child(qname = "p:CT_CommentAuthorExtensionList/p:extLst"))]
   pub comment_author_extension_list: Option<CommentAuthorExtensionList>,
 }
@@ -2543,13 +2543,13 @@ pub struct Comment {
   /// idx
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the Position Class.
   #[sdk(child(qname = "a:CT_Point2D/p:pos"))]
   pub position: std::boxed::Box<Position>,
-  /// _
+  /// Defines the Text Class.
   #[sdk(text_child(qname = "xsd:string/p:text"))]
   pub text: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CommentExtensionList Class.
   #[sdk(child(qname = "p:CT_CommentExtensionList/p:extLst"))]
   pub comment_extension_list: Option<CommentExtensionList>,
 }
@@ -2560,7 +2560,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension: Vec<Extension>,
+  pub p_ext: Vec<Extension>,
 }
 /// Embedded Control.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2587,10 +2587,10 @@ pub struct Control {
   #[sdk(attr(qname = ":imgH"))]
   #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
   pub image_height: Option<crate::simple_type::Int32Value>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
-  /// _
+  /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   pub picture: Option<std::boxed::Box<Picture>>,
 }
@@ -2611,7 +2611,7 @@ pub struct SlideId {
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2631,7 +2631,7 @@ pub struct SlideMasterId {
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2642,7 +2642,7 @@ pub struct NotesMasterId {
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2653,7 +2653,7 @@ pub struct HandoutMasterId {
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2731,7 +2731,7 @@ pub struct EmbeddedFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideRelationshipList/p:sldLst")]
 pub struct SlideList {
-  /// _
+  /// Presentation Slide.
   #[sdk(child(qname = "p:CT_SlideRelationshipListEntry/p:sld"))]
   pub p_sld: Vec<SlideListEntry>,
 }
@@ -2748,7 +2748,7 @@ pub struct CustomShow {
   /// List of Presentation Slides
   #[sdk(child(qname = "p:CT_SlideRelationshipList/p:sldLst"))]
   pub slide_list: std::boxed::Box<SlideList>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2805,7 +2805,7 @@ pub struct NonVisualShapeDrawingProperties {
   pub shape_locks: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeLocks>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -2832,10 +2832,10 @@ pub struct ApplicationNonVisualDrawingProperties {
   ))]
   pub application_non_visual_drawing_properties_choice:
     Option<ApplicationNonVisualDrawingPropertiesChoice>,
-  /// _
+  /// Customer Data List.
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
   pub p_cust_data_lst: Option<std::boxed::Box<CustomerDataList>>,
-  /// _
+  /// Defines the ApplicationNonVisualDrawingPropertiesExtensionList Class.
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst"))]
   pub p_ext_lst: Option<ApplicationNonVisualDrawingPropertiesExtensionList>,
 }
@@ -2883,7 +2883,7 @@ pub struct ShapeProperties {
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
-  /// _
+  /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
@@ -2893,17 +2893,17 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
   pub a_sp3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
   >,
-  /// _
+  /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
   pub a_ext_lst: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
@@ -2913,15 +2913,15 @@ pub struct ShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ShapeStyle/p:style")]
 pub struct ShapeStyle {
-  /// _
+  /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
   pub line_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineReference>,
-  /// _
+  /// Fill Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
   pub fill_reference:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillReference>,
-  /// _
+  /// Effect Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
   pub effect_reference: std::boxed::Box<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
@@ -2946,7 +2946,7 @@ pub struct TextBody {
   pub list_style: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
   >,
-  /// _
+  /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
   pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
 }
@@ -2969,7 +2969,7 @@ pub struct NonVisualConnectorShapeDrawingProperties {
   #[sdk(child(qname = "a:CT_Connection/a:endCxn"))]
   pub end_connection:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EndConnection>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -2997,14 +2997,14 @@ pub struct NonVisualPictureDrawingProperties {
     /// preferRelativeResize
     #[sdk(attr(qname = ":preferRelativeResize"))]
     pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
-    /// _
+    /// Defines the PictureLocks Class.
     #[sdk(child(qname = "a:CT_PictureLocking/a:picLocks"))]
     pub picture_locks: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PictureLocks,
         >,
     >,
-    /// _
+    /// Defines the NonVisualPicturePropertiesExtensionList Class.
     #[sdk(child(qname = "a:CT_NonVisualPicturePropertiesExtensionList/a:extLst"))]
     pub non_visual_picture_properties_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualPicturePropertiesExtensionList,
@@ -3014,13 +3014,13 @@ pub struct NonVisualPictureDrawingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_PictureNonVisual/p:nvPicPr")]
 pub struct NonVisualPictureProperties {
-  /// _
+  /// Non-Visual Drawing Properties.
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/p:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
   /// Non-Visual Picture Drawing Properties
   #[sdk(child(qname = "a:CT_NonVisualPictureProperties/p:cNvPicPr"))]
   pub non_visual_picture_drawing_properties: std::boxed::Box<NonVisualPictureDrawingProperties>,
-  /// _
+  /// Application Non-Visual Drawing Properties.
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingProps/p:nvPr"))]
   pub application_non_visual_drawing_properties:
     std::boxed::Box<ApplicationNonVisualDrawingProperties>,
@@ -3035,7 +3035,7 @@ pub struct BlipFill {
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the Blip Class.
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
   pub blip:
     Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blip>>,
@@ -3060,7 +3060,7 @@ pub struct NonVisualGraphicFrameDrawingProperties {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GraphicFrameLocks,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3106,14 +3106,14 @@ pub struct Transform {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/p:cNvGrpSpPr")]
 pub struct NonVisualGroupShapeDrawingProperties {
-    /// _
+    /// Defines the GroupShapeLocks Class.
     #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
     pub group_shape_locks: Option<
         std::boxed::Box<
             crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupShapeLocks,
         >,
     >,
-    /// _
+    /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
     #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
     pub non_visual_group_drawing_shape_props_extension_list: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupDrawingShapePropsExtensionList,
@@ -3194,7 +3194,7 @@ pub struct TitleStyle {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3274,7 +3274,7 @@ pub struct BodyStyle {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3354,7 +3354,7 @@ pub struct OtherStyle {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3434,7 +3434,7 @@ pub struct DefaultTextStyle {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3514,7 +3514,7 @@ pub struct NotesStyle {
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Level9ParagraphProperties,
     >,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -3535,7 +3535,7 @@ pub struct SlideLayoutId {
   /// ID Tag
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3558,7 +3558,7 @@ pub struct CommonSlideData {
   /// List of controls
   #[sdk(child(qname = "p:CT_ControlList/p:controls"))]
   pub control_list: Option<ControlList>,
-  /// _
+  /// Defines the CommonSlideDataExtensionList Class.
   #[sdk(child(qname = "p:CT_CommonSlideDataExtensionList/p:extLst"))]
   pub common_slide_data_extension_list: Option<CommonSlideDataExtensionList>,
 }
@@ -3701,7 +3701,7 @@ pub struct OutlineViewSlideListEntry {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_OutlineViewSlideList/p:sldLst")]
 pub struct OutlineViewSlideList {
-  /// _
+  /// Presentation Slide.
   #[sdk(child(qname = "p:CT_OutlineViewSlideEntry/p:sld"))]
   pub p_sld: Vec<OutlineViewSlideListEntry>,
 }
@@ -3721,7 +3721,7 @@ pub struct Guide {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GuideList/p:guideLst")]
 pub struct GuideList {
-  /// _
+  /// A Guide.
   #[sdk(child(qname = "p:CT_Guide/p:guide"))]
   pub p_guide: Vec<Guide>,
 }
@@ -3772,7 +3772,7 @@ pub struct NormalViewProperties {
   /// Normal View Restored Top Properties
   #[sdk(child(qname = "p:CT_NormalViewPortion/p:restoredTop"))]
   pub restored_top: std::boxed::Box<RestoredTop>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3780,10 +3780,10 @@ pub struct NormalViewProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideViewProperties/p:slideViewPr")]
 pub struct SlideViewProperties {
-  /// _
+  /// Defines the CommonSlideViewProperties Class.
   #[sdk(child(qname = "p:CT_CommonSlideViewProperties/p:cSldViewPr"))]
   pub common_slide_view_properties: std::boxed::Box<CommonSlideViewProperties>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3797,7 +3797,7 @@ pub struct OutlineViewProperties {
   /// List of Presentation Slides
   #[sdk(child(qname = "p:CT_OutlineViewSlideList/p:sldLst"))]
   pub outline_view_slide_list: Option<OutlineViewSlideList>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3808,7 +3808,7 @@ pub struct NotesTextViewProperties {
   /// Base properties for Notes View
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3822,7 +3822,7 @@ pub struct SorterViewProperties {
   /// Base properties for Slide Sorter View
   #[sdk(child(qname = "p:CT_CommonViewProperties/p:cViewPr"))]
   pub common_view_properties: std::boxed::Box<CommonViewProperties>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3833,7 +3833,7 @@ pub struct NotesViewProperties {
   /// Common Slide View Properties
   #[sdk(child(qname = "p:CT_CommonSlideViewProperties/p:cSldViewPr"))]
   pub common_slide_view_properties: std::boxed::Box<CommonSlideViewProperties>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3904,7 +3904,7 @@ pub struct SlideExtension {
     qname = "p188:CT_CommentRelationship/p188:commentRel",
     any
   ))]
-  pub xml_children: Option<SlideExtensionChoice>,
+  pub slide_extension_choice: Option<SlideExtensionChoice>,
 }
 /// Defines the CommonSlideDataExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3918,7 +3918,7 @@ pub struct CommonSlideDataExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p14:CT_RandomId/p14:creationId", any))]
-  pub xml_children: Option<CommonSlideDataExtensionChoice>,
+  pub common_slide_data_extension_choice: Option<CommonSlideDataExtensionChoice>,
 }
 /// Defines the ShowPropertiesExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3937,7 +3937,7 @@ pub struct ShowPropertiesExtension {
     qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls",
     any
   ))]
-  pub xml_children: Option<ShowPropertiesExtensionChoice>,
+  pub show_properties_extension_choice: Option<ShowPropertiesExtensionChoice>,
 }
 /// Defines the Picture Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3949,13 +3949,13 @@ pub struct Picture {
   /// Picture Fill
   #[sdk(child(qname = "a:CT_BlipFillProperties/p:blipFill"))]
   pub blip_fill: std::boxed::Box<BlipFill>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/p:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
-  /// _
+  /// Shape Style.
   #[sdk(child(qname = "a:CT_ShapeStyle/p:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -3967,7 +3967,7 @@ pub struct OleObjectEmbed {
   #[sdk(attr(qname = ":followColorScheme"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub follow_color_scheme: Option<OleObjectFollowColorSchemeValues>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -3978,7 +3978,7 @@ pub struct OleObjectLink {
   /// Update Linked OLE Objects Automatically
   #[sdk(attr(qname = ":updateAutomatic"))]
   pub auto_update: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -4048,10 +4048,10 @@ pub struct Transition {
     qname = "p15:CT_PresetTransition/p15:prstTrans"
   ))]
   pub transition_choice: Option<TransitionChoice>,
-  /// _
+  /// Defines the SoundAction Class.
   #[sdk(child(qname = "p:CT_TransitionSoundAction/p:sndAc"))]
   pub p_snd_ac: Option<std::boxed::Box<SoundAction>>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
 }
@@ -4059,13 +4059,13 @@ pub struct Transition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideTiming/p:timing")]
 pub struct Timing {
-  /// _
+  /// Time Node List.
   #[sdk(child(qname = "p:CT_RootTimeNode/p:tnLst"))]
   pub time_node_list: Option<std::boxed::Box<TimeNodeList>>,
   /// Build List
   #[sdk(child(qname = "p:CT_BuildList/p:bldLst"))]
   pub build_list: Option<BuildList>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -4074,7 +4074,7 @@ pub struct Timing {
 #[sdk(qname = "p:CT_SlideExtensionList/p:extLst")]
 pub struct SlideExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SlideExtension Class.
   #[sdk(child(qname = "p:CT_SlideExtension/p:ext"))]
   pub p_ext: Vec<SlideExtension>,
 }
@@ -4091,7 +4091,7 @@ pub struct Background {
     qname = "p:CT_BackgroundProperties/p:bgPr",
     qname = "a:CT_StyleMatrixReference/p:bgRef"
   ))]
-  pub xml_children: Option<BackgroundChoice>,
+  pub background_choice: Option<BackgroundChoice>,
 }
 /// Shape Tree.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4100,10 +4100,10 @@ pub struct ShapeTree {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
+  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -4115,7 +4115,7 @@ pub struct ShapeTree {
     any
   ))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
 }
@@ -4126,10 +4126,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
+  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -4141,7 +4141,7 @@ pub struct GroupShape {
     any
   ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
 }
@@ -4149,10 +4149,10 @@ pub struct GroupShape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CustomerDataList/p:custDataLst")]
 pub struct CustomerDataList {
-  /// _
+  /// Customer Data.
   #[sdk(child(qname = "p:CT_CustomerData/p:custData"))]
   pub p_cust_data: Vec<CustomerData>,
-  /// _
+  /// Customer Data Tags.
   #[sdk(child(qname = "p:CT_TagsData/p:tags"))]
   pub p_tags: Option<CustomerDataTags>,
 }
@@ -4160,7 +4160,7 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ControlList/p:controls")]
 pub struct ControlList {
-  /// _
+  /// Embedded Control.
   #[sdk(child(qname = "p:CT_Control/p:control"))]
   pub p_control: Vec<Control>,
 }
@@ -4169,7 +4169,7 @@ pub struct ControlList {
 #[sdk(qname = "p:CT_CommonSlideDataExtensionList/p:extLst")]
 pub struct CommonSlideDataExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CommonSlideDataExtension Class.
   #[sdk(child(qname = "p:CT_CommonSlideDataExtension/p:ext"))]
   pub p_ext: Vec<CommonSlideDataExtension>,
 }
@@ -4217,12 +4217,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
-  /// _
+  /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
   >,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
@@ -4237,7 +4237,7 @@ pub struct Shape {
   /// Non-Visual Properties for a Shape
   #[sdk(child(qname = "p:CT_ShapeNonVisual/p:nvSpPr"))]
   pub non_visual_shape_properties: std::boxed::Box<NonVisualShapeProperties>,
-  /// _
+  /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/p:spPr"))]
   pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Shape Style
@@ -4246,7 +4246,7 @@ pub struct Shape {
   /// Shape Text Body
   #[sdk(child(qname = "a:CT_TextBody/p:txBody"))]
   pub text_body: Option<std::boxed::Box<TextBody>>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -4260,7 +4260,7 @@ pub struct GraphicFrame {
   /// 2D Transform for Graphic Frame
   #[sdk(child(qname = "a:CT_Transform2D/p:xfrm"))]
   pub transform: std::boxed::Box<Transform>,
-  /// _
+  /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
   pub graphic:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
@@ -4281,7 +4281,7 @@ pub struct ConnectionShape {
   /// Connector Shape Style
   #[sdk(child(qname = "a:CT_ShapeStyle/p:style"))]
   pub shape_style: Option<std::boxed::Box<ShapeStyle>>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -4290,7 +4290,7 @@ pub struct ConnectionShape {
 #[sdk(qname = "p:CT_ShowPropertiesExtensionList/p:extLst")]
 pub struct ShowPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ShowPropertiesExtension Class.
   #[sdk(child(qname = "p:CT_ShowPropertiesExtension/p:ext"))]
   pub p_ext: Vec<ShowPropertiesExtension>,
 }
@@ -4311,7 +4311,7 @@ pub struct ShapeTarget {
     qname = "p:CT_TLTextTargetElement/p:txEl",
     qname = "a:CT_AnimationElementChoice/p:graphicEl"
   ))]
-  pub xml_children: Option<ShapeTargetChoice>,
+  pub shape_target_choice: Option<ShapeTargetChoice>,
 }
 /// Ink Target.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4343,7 +4343,7 @@ pub struct CommentAuthorExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo", any))]
-  pub xml_children: Option<CommentAuthorExtensionChoice>,
+  pub comment_author_extension_choice: Option<CommentAuthorExtensionChoice>,
 }
 /// Defines the CommentExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4357,7 +4357,7 @@ pub struct CommentExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo", any))]
-  pub xml_children: Option<CommentExtensionChoice>,
+  pub comment_extension_choice: Option<CommentExtensionChoice>,
 }
 /// Defines the SlideLayoutExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4371,7 +4371,7 @@ pub struct SlideLayoutExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
-  pub xml_children: Option<SlideLayoutExtensionChoice>,
+  pub slide_layout_extension_choice: Option<SlideLayoutExtensionChoice>,
 }
 /// Defines the SlideMasterExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4385,7 +4385,7 @@ pub struct SlideMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
-  pub xml_children: Option<SlideMasterExtensionChoice>,
+  pub slide_master_extension_choice: Option<SlideMasterExtensionChoice>,
 }
 /// Defines the HandoutMasterExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4399,7 +4399,7 @@ pub struct HandoutMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
-  pub xml_children: Option<HandoutMasterExtensionChoice>,
+  pub handout_master_extension_choice: Option<HandoutMasterExtensionChoice>,
 }
 /// Defines the NotesMasterExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4413,7 +4413,7 @@ pub struct NotesMasterExtension {
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
-  pub xml_children: Option<NotesMasterExtensionChoice>,
+  pub notes_master_extension_choice: Option<NotesMasterExtensionChoice>,
 }
 /// Placeholder Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4437,7 +4437,7 @@ pub struct PlaceholderShape {
   /// hasCustomPrompt
   #[sdk(attr(qname = ":hasCustomPrompt"))]
   pub has_custom_prompt: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -4446,7 +4446,7 @@ pub struct PlaceholderShape {
 #[sdk(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst")]
 pub struct ApplicationNonVisualDrawingPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ApplicationNonVisualDrawingPropertiesExtension Class.
   #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtension/p:ext"))]
   pub p_ext: Vec<ApplicationNonVisualDrawingPropertiesExtension>,
 }
@@ -4466,7 +4466,8 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
     qname = "p14:CT_RandomId/p14:modId",
     any
   ))]
-  pub xml_children: Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
+  pub application_non_visual_drawing_properties_extension_choice:
+    Option<ApplicationNonVisualDrawingPropertiesExtensionChoice>,
 }
 /// Defines the Iterate Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4483,7 +4484,7 @@ pub struct Iterate {
     qname = "p:CT_TLIterateIntervalTime/p:tmAbs",
     qname = "p:CT_TLIterateIntervalPercentage/p:tmPct"
   ))]
-  pub xml_children: Option<IterateChoice>,
+  pub iterate_choice: Option<IterateChoice>,
 }
 /// Defines the ChildTimeNodeList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4507,7 +4508,7 @@ pub struct ChildTimeNodeList {
     text,
     any
   ))]
-  pub xml_children: Vec<ChildTimeNodeListChoice>,
+  pub child_time_node_list_choice: Vec<ChildTimeNodeListChoice>,
 }
 /// Defines the SubTimeNodeList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4531,13 +4532,13 @@ pub struct SubTimeNodeList {
     text,
     any
   ))]
-  pub xml_children: Vec<SubTimeNodeListChoice>,
+  pub sub_time_node_list_choice: Vec<SubTimeNodeListChoice>,
 }
 /// Defines the TimeAnimateValueList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeAnimateValueList/p:tavLst")]
 pub struct TimeAnimateValueList {
-  /// _
+  /// Time Animate Value.
   #[sdk(child(qname = "p:CT_TLTimeAnimateValue/p:tav"))]
   pub p_tav: Vec<TimeAnimateValue>,
 }
@@ -4590,7 +4591,7 @@ pub struct RotationCenter {
 #[sdk(qname = "p:CT_CommentAuthorExtensionList/p:extLst")]
 pub struct CommentAuthorExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CommentAuthorExtension Class.
   #[sdk(child(qname = "p:CT_CommentAuthorExtension/p:ext"))]
   pub p_ext: Vec<CommentAuthorExtension>,
 }
@@ -4599,7 +4600,7 @@ pub struct CommentAuthorExtensionList {
 #[sdk(qname = "p:CT_CommentExtensionList/p:extLst")]
 pub struct CommentExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the CommentExtension Class.
   #[sdk(child(qname = "p:CT_CommentExtension/p:ext"))]
   pub p_ext: Vec<CommentExtension>,
 }
@@ -4607,7 +4608,7 @@ pub struct CommentExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideMasterIdList/p:sldMasterIdLst")]
 pub struct SlideMasterIdList {
-  /// _
+  /// Slide Master ID.
   #[sdk(child(qname = "p:CT_SlideMasterIdListEntry/p:sldMasterId"))]
   pub p_sld_master_id: Vec<SlideMasterId>,
 }
@@ -4631,7 +4632,7 @@ pub struct HandoutMasterIdList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideIdList/p:sldIdLst")]
 pub struct SlideIdList {
-  /// _
+  /// Slide ID.
   #[sdk(child(qname = "p:CT_SlideIdListEntry/p:sldId"))]
   pub p_sld_id: Vec<SlideId>,
 }
@@ -4668,7 +4669,7 @@ pub struct SlideSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_EmbeddedFontList/p:embeddedFontLst")]
 pub struct EmbeddedFontList {
-  /// _
+  /// Embedded Font.
   #[sdk(child(qname = "p:CT_EmbeddedFontListEntry/p:embeddedFont"))]
   pub p_embedded_font: Vec<EmbeddedFont>,
 }
@@ -4676,7 +4677,7 @@ pub struct EmbeddedFontList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_CustomShowList/p:custShowLst")]
 pub struct CustomShowList {
-  /// _
+  /// Custom Show.
   #[sdk(child(qname = "p:CT_CustomShow/p:custShow"))]
   pub p_cust_show: Vec<CustomShow>,
 }
@@ -4698,7 +4699,7 @@ pub struct PhotoAlbum {
   #[sdk(attr(qname = ":frame"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub frame: Option<PhotoAlbumFrameShapeValues>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -4775,7 +4776,7 @@ pub struct ModificationVerifier {
 #[sdk(qname = "p:CT_PresentationExtensionList/p:extLst")]
 pub struct PresentationExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PresentationExtension Class.
   #[sdk(child(qname = "p:CT_PresentationExtension/p:ext"))]
   pub p_ext: Vec<PresentationExtension>,
 }
@@ -4797,7 +4798,7 @@ pub struct PresentationExtension {
     qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst",
     any
   ))]
-  pub xml_children: Option<PresentationExtensionChoice>,
+  pub presentation_extension_choice: Option<PresentationExtensionChoice>,
 }
 /// HTML Publishing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4819,7 +4820,7 @@ pub struct HtmlPublishProperties {
     qname = "p:CT_CustomShowId/p:custShow"
   ))]
   pub html_publish_properties_choice: Option<HtmlPublishPropertiesChoice>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub p_ext_lst: Option<ExtensionList>,
 }
@@ -4856,7 +4857,7 @@ pub struct WebProperties {
   #[sdk(attr(qname = ":clr"))]
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub color: Option<WebColorValues>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -4881,7 +4882,7 @@ pub struct PrintingProperties {
   /// Frame slides when printing
   #[sdk(attr(qname = ":frameSlides"))]
   pub frame_slides: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -4913,10 +4914,10 @@ pub struct ShowProperties {
     qname = "p:CT_CustomShowId/p:custShow"
   ))]
   pub show_properties_choice2: Option<ShowPropertiesChoice2>,
-  /// _
+  /// Pen Color for Slide Show.
   #[sdk(child(qname = "a:CT_Color/p:penClr"))]
   pub p_pen_clr: Option<std::boxed::Box<PenColor>>,
-  /// _
+  /// Defines the ShowPropertiesExtensionList Class.
   #[sdk(child(qname = "p:CT_ShowPropertiesExtensionList/p:extLst"))]
   pub p_ext_lst: Option<ShowPropertiesExtensionList>,
 }
@@ -4942,7 +4943,7 @@ pub struct ColorMostRecentlyUsed {
 #[sdk(qname = "p:CT_PresentationPropertiesExtensionList/p:extLst")]
 pub struct PresentationPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the PresentationPropertiesExtension Class.
   #[sdk(child(qname = "p:CT_PresentationPropertiesExtension/p:ext"))]
   pub p_ext: Vec<PresentationPropertiesExtension>,
 }
@@ -4964,7 +4965,7 @@ pub struct PresentationPropertiesExtension {
     qname = "p15:CT_ChartTrackingRefBased/p15:chartTrackingRefBased",
     any
   ))]
-  pub xml_children: Option<PresentationPropertiesExtensionChoice>,
+  pub presentation_properties_extension_choice: Option<PresentationPropertiesExtensionChoice>,
 }
 /// Defines the HeaderFooter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4982,7 +4983,7 @@ pub struct HeaderFooter {
   /// Date/Time Placeholder
   #[sdk(attr(qname = ":dt"))]
   pub date_time: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
 }
@@ -4991,7 +4992,7 @@ pub struct HeaderFooter {
 #[sdk(qname = "p:CT_SlideLayoutExtensionList/p:extLst")]
 pub struct SlideLayoutExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SlideLayoutExtension Class.
   #[sdk(child(qname = "p:CT_SlideLayoutExtension/p:ext"))]
   pub p_ext: Vec<SlideLayoutExtension>,
 }
@@ -4999,7 +5000,7 @@ pub struct SlideLayoutExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst")]
 pub struct SlideLayoutIdList {
-  /// _
+  /// Slide Layout Id.
   #[sdk(child(qname = "p:CT_SlideLayoutIdListEntry/p:sldLayoutId"))]
   pub p_sld_layout_id: Vec<SlideLayoutId>,
 }
@@ -5016,7 +5017,7 @@ pub struct TextStyles {
   /// Slide Master Other Text Style
   #[sdk(child(qname = "a:CT_TextListStyle/p:otherStyle"))]
   pub other_style: Option<std::boxed::Box<OtherStyle>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -5025,7 +5026,7 @@ pub struct TextStyles {
 #[sdk(qname = "p:CT_SlideMasterExtensionList/p:extLst")]
 pub struct SlideMasterExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the SlideMasterExtension Class.
   #[sdk(child(qname = "p:CT_SlideMasterExtension/p:ext"))]
   pub p_ext: Vec<SlideMasterExtension>,
 }
@@ -5034,7 +5035,7 @@ pub struct SlideMasterExtensionList {
 #[sdk(qname = "p:CT_HandoutMasterExtensionList/p:extLst")]
 pub struct HandoutMasterExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the HandoutMasterExtension Class.
   #[sdk(child(qname = "p:CT_HandoutMasterExtension/p:ext"))]
   pub p_ext: Vec<HandoutMasterExtension>,
 }
@@ -5043,7 +5044,7 @@ pub struct HandoutMasterExtensionList {
 #[sdk(qname = "p:CT_NotesMasterExtensionList/p:extLst")]
 pub struct NotesMasterExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the NotesMasterExtension Class.
   #[sdk(child(qname = "p:CT_NotesMasterExtension/p:ext"))]
   pub p_ext: Vec<NotesMasterExtension>,
 }
@@ -5064,7 +5065,7 @@ pub struct OleChartElement {
 #[sdk(qname = "p:CT_TLTextTargetElement/p:txEl")]
 pub struct TextElement {
   #[sdk(choice(qname = "p:CT_IndexRange/p:charRg", qname = "p:CT_IndexRange/p:pRg"))]
-  pub xml_children: Option<TextElementChoice>,
+  pub text_element_choice: Option<TextElementChoice>,
 }
 /// Graphic Element.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5074,7 +5075,7 @@ pub struct GraphicElement {
     qname = "a:CT_AnimationDgmElement/a:dgm",
     qname = "a:CT_AnimationChartElement/a:chart"
   ))]
-  pub xml_children: Option<GraphicElementChoice>,
+  pub graphic_element_choice: Option<GraphicElementChoice>,
 }
 /// Defines the BlindsTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5213,14 +5214,14 @@ pub struct SoundAction {
     qname = "p:CT_TransitionStartSoundAction/p:stSnd",
     qname = "p:CT_Empty/p:endSnd"
   ))]
-  pub xml_children: Option<SoundActionChoice>,
+  pub sound_action_choice: Option<SoundActionChoice>,
 }
 /// Defines the PlaceholderExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(microsoft365, qname = "p:CT_PlaceholderExtension/p:ext")]
 pub struct PlaceholderExtension {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// _
+    /// Defines the PlaceholderTypeExtension Class.
     #[sdk(
         child(microsoft365, qname = "p232:CT_PlaceholderTypeExtension/p232:phTypeExt")
     )]
@@ -5245,20 +5246,25 @@ pub enum ColorMapOverrideChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundPropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -5266,10 +5272,12 @@ pub enum BackgroundPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundPropertiesChoice2 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -5622,10 +5630,12 @@ pub enum ApplicationNonVisualDrawingPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
+  /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
   ACustGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
   ),
+  /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
   APrstGeom(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
@@ -5633,20 +5643,25 @@ pub enum ShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -5657,10 +5672,12 @@ pub enum ShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -5677,18 +5694,21 @@ pub enum BlipFillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideExtensionChoice {
+  /// Defines the LaserTraceList Class.
   #[sdk(child(office2010, qname = "p14:CT_LaserTraceList/p14:laserTraceLst"))]
   P14LaserTraceLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::LaserTraceList,
     >,
   ),
+  /// Defines the ShowEventRecordList Class.
   #[sdk(child(office2010, qname = "p14:CT_ShowEventRecordList/p14:showEvtLst"))]
   P14ShowEvtLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::ShowEventRecordList,
     >,
   ),
+  /// Defines the CommentRelationship Class.
   #[sdk(child(office2021, qname = "p188:CT_CommentRelationship/p188:commentRel"))]
   P188CommentRel(
     std::boxed::Box<
@@ -5700,6 +5720,7 @@ pub enum SlideExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommonSlideDataExtensionChoice {
+  /// Defines the CreationId Class.
   #[sdk(child(office2010, qname = "p14:CT_RandomId/p14:creationId"))]
   P14CreationId(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::CreationId>,
@@ -5709,14 +5730,17 @@ pub enum CommonSlideDataExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowPropertiesExtensionChoice {
+  /// Defines the BrowseMode Class.
   #[sdk(child(office2010, qname = "p14:CT_BrowseMode/p14:browseMode"))]
   P14BrowseMode(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::BrowseMode>,
   ),
+  /// Defines the LaserColor Class.
   #[sdk(child(office2010, qname = "a:CT_Color/p14:laserClr"))]
   P14LaserClr(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::LaserColor>,
   ),
+  /// Defines the ShowMediaControls Class.
   #[sdk(child(office2010, qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls"))]
   P14ShowMediaCtrls(
     std::boxed::Box<
@@ -5945,20 +5969,25 @@ pub enum GroupShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
   ),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
   ),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
   ),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
@@ -5969,10 +5998,12 @@ pub enum GroupShapePropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
   ),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
@@ -5998,6 +6029,7 @@ pub enum ShapeTargetChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentAuthorExtensionChoice {
+  /// Defines the PresenceInfo Class.
   #[sdk(child(office2013, qname = "p15:CT_PresenceInfo/p15:presenceInfo"))]
   P15PresenceInfo(
     std::boxed::Box<
@@ -6009,6 +6041,7 @@ pub enum CommentAuthorExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentExtensionChoice {
+  /// Defines the ThreadingInfo Class.
   #[sdk(child(office2013, qname = "p15:CT_CommentThreading/p15:threadingInfo"))]
   P15ThreadingInfo(
     std::boxed::Box<
@@ -6020,6 +6053,7 @@ pub enum CommentExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideLayoutExtensionChoice {
+  /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -6031,6 +6065,7 @@ pub enum SlideLayoutExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideMasterExtensionChoice {
+  /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -6042,6 +6077,7 @@ pub enum SlideMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HandoutMasterExtensionChoice {
+  /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -6053,6 +6089,7 @@ pub enum HandoutMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NotesMasterExtensionChoice {
+  /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
@@ -6064,10 +6101,12 @@ pub enum NotesMasterExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesExtensionChoice {
+  /// Defines the Media Class.
   #[sdk(child(office2010, qname = "p14:CT_Media/p14:media"))]
   P14Media(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::Media>,
   ),
+  /// Defines the ModificationId Class.
   #[sdk(child(office2010, qname = "p14:CT_RandomId/p14:modId"))]
   P14ModId(
     std::boxed::Box<
@@ -6184,22 +6223,26 @@ pub enum SubTimeNodeListChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationExtensionChoice {
+  /// Defines the SectionProperties Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionProperties/p14:sectionPr"))]
   P14SectionPr(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::SectionProperties,
     >,
   ),
+  /// Defines the SectionList Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionList/p14:sectionLst"))]
   P14SectionLst(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::SectionList>,
   ),
+  /// Defines the SlideGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst"))]
   P15SldGuideLst(
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_powerpoint_2012_main::SlideGuideList,
     >,
   ),
+  /// Defines the NotesGuideList Class.
   #[sdk(child(office2013, qname = "p15:CT_ExtendedGuideList/p15:notesGuideLst"))]
   P15NotesGuideLst(
     std::boxed::Box<
@@ -6224,8 +6267,10 @@ pub enum ShowPropertiesChoice {
   /// Presenter Slide Show Mode.
   #[sdk(empty_child(qname = "p:CT_Empty/p:present"))]
   PPresent,
+  /// Browse Slide Show Mode.
   #[sdk(child(qname = "p:CT_ShowInfoBrowse/p:browse"))]
   PBrowse(std::boxed::Box<BrowseSlideMode>),
+  /// Kiosk Slide Show Mode.
   #[sdk(child(qname = "p:CT_ShowInfoKiosk/p:kiosk"))]
   PKiosk(std::boxed::Box<KioskSlideMode>),
 }
@@ -6234,37 +6279,45 @@ pub enum ShowPropertiesChoice2 {
   /// All Slides.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
   PSldAll,
+  /// Slide Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
   PSldRg(std::boxed::Box<SlideRange>),
+  /// Custom Show.
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
   PCustShow(std::boxed::Box<CustomShowReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorMostRecentlyUsedChoice {
+  /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
   AScrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
     >,
   ),
+  /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
   ASrgbClr(
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
     >,
   ),
+  /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
   AHslClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
   ),
+  /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
   ASysClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
   ),
+  /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
   ASchemeClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
   ),
+  /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
@@ -6278,7 +6331,8 @@ pub enum ColorMostRecentlyUsedChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PresentationPropertiesExtensionChoice {
-  #[sdk(
+  /// Defines the DiscardImageEditData Class.
+    #[sdk(
         child(office2010, qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData")
     )]
     P14DiscardImageEditData(
@@ -6286,6 +6340,7 @@ pub enum PresentationPropertiesExtensionChoice {
             crate::schemas::schemas_microsoft_com_office_powerpoint_2010_main::DiscardImageEditData,
         >,
     ),
+    /// Defines the DefaultImageDpi Class.
     #[sdk(child(office2010, qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi"))]
     P14DefaultImageDpi(
         std::boxed::Box<
@@ -6295,6 +6350,7 @@ pub enum PresentationPropertiesExtensionChoice {
     /// Defines the TextMath Class.
     #[sdk(empty_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
     A14M,
+    /// Defines the ChartTrackingReferenceBased Class.
     #[sdk(
         child(
             office2013,

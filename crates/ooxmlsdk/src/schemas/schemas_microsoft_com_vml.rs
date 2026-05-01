@@ -225,7 +225,7 @@ pub struct Path {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Formulas/v:formulas")]
 pub struct Formulas {
-  /// _
+  /// Single Formula.
   #[sdk(child(qname = "v:CT_F/v:f"))]
   pub v_f: Vec<Formula>,
 }
@@ -233,7 +233,7 @@ pub struct Formulas {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "v:CT_Handles/v:handles")]
 pub struct ShapeHandles {
-  /// _
+  /// Shape Handle.
   #[sdk(child(qname = "v:CT_H/v:h"))]
   pub v_h: Vec<ShapeHandle>,
 }
@@ -319,7 +319,7 @@ pub struct Fill {
   /// Relationship to Part
   #[sdk(attr(qname = "r:id"))]
   pub relationship_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Shape Fill Extended Properties.
   #[sdk(child(qname = "o:CT_Fill/o:fill"))]
   pub fill_extended_properties:
     Option<crate::schemas::schemas_microsoft_com_office_office::FillExtendedProperties>,
@@ -412,19 +412,19 @@ pub struct Stroke {
   /// Inset Border From Path
   #[sdk(attr(qname = ":insetpen"))]
   pub insetpen: Option<crate::simple_type::TrueFalseValue>,
-  /// _
+  /// Text Box Left Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:left"))]
   pub left_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::LeftStroke>,
-  /// _
+  /// Text Box Top Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:top"))]
   pub top_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::TopStroke>,
-  /// _
+  /// Text Box Right Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:right"))]
   pub right_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::RightStroke>,
-  /// _
+  /// Text Box Bottom Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:bottom"))]
   pub bottom_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::BottomStroke>,
-  /// _
+  /// Text Box Interior Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:column"))]
   pub column_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::ColumnStroke>,
 }
@@ -483,7 +483,7 @@ pub struct TextBox {
   #[sdk(attr(qname = "o:singleclick"))]
   pub single_click: Option<crate::simple_type::TrueFalseValue>,
   #[sdk(choice(qname = "w:CT_TxbxContent/w:txbxContent", any))]
-  pub xml_children: Option<TextBoxChoice>,
+  pub text_box_choice: Option<TextBoxChoice>,
 }
 /// Defines the TextPath Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -786,7 +786,7 @@ pub struct Shape {
     qname = "o:CT_Ink/o:ink",
     qname = "pvml:CT_Empty/pvml:iscomment"
   ))]
-  pub xml_children: Vec<ShapeChoice>,
+  pub shape_choice: Vec<ShapeChoice>,
 }
 /// Shape Template.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -991,7 +991,7 @@ pub struct Shapetype {
     qname = "pvml:CT_Rel/pvml:textdata"
   ))]
   pub shapetype_choice: Vec<ShapetypeChoice>,
-  /// _
+  /// Complex.
   #[sdk(child(qname = "o:CT_Complex/o:complex"))]
   pub o_complex: Option<crate::schemas::schemas_microsoft_com_office_office::Complex>,
 }
@@ -1121,7 +1121,7 @@ pub struct Group {
     qname = "w10:CT_AnchorLock/w10:anchorlock",
     qname = "xvml:CT_ClientData/xvml:ClientData"
   ))]
-  pub xml_children: Vec<GroupChoice>,
+  pub group_choice: Vec<GroupChoice>,
 }
 /// Document Background.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1154,7 +1154,7 @@ pub struct Background {
   #[sdk(attr(qname = "o:targetscreensize"))]
   pub target_screen_size:
     Option<crate::schemas::schemas_microsoft_com_office_office::ScreenSizeValues>,
-  /// _
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
 }
@@ -2196,7 +2196,7 @@ pub struct Oval {
     qname = "xvml:CT_ClientData/xvml:ClientData",
     qname = "pvml:CT_Rel/pvml:textdata"
   ))]
-  pub xml_children: Vec<OvalChoice>,
+  pub oval_choice: Vec<OvalChoice>,
 }
 /// Multiple Path Line.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2398,7 +2398,7 @@ pub struct PolyLine {
     qname = "pvml:CT_Rel/pvml:textdata",
     qname = "o:CT_Ink/o:ink"
   ))]
-  pub xml_children: Vec<PolyLineChoice>,
+  pub poly_line_choice: Vec<PolyLineChoice>,
 }
 /// Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2596,7 +2596,7 @@ pub struct Rectangle {
     qname = "xvml:CT_ClientData/xvml:ClientData",
     qname = "pvml:CT_Rel/pvml:textdata"
   ))]
-  pub xml_children: Vec<RectangleChoice>,
+  pub rectangle_choice: Vec<RectangleChoice>,
 }
 /// Rounded Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2794,7 +2794,7 @@ pub struct RoundRectangle {
     qname = "xvml:CT_ClientData/xvml:ClientData",
     qname = "pvml:CT_Rel/pvml:textdata"
   ))]
-  pub xml_children: Vec<RoundRectangleChoice>,
+  pub round_rectangle_choice: Vec<RoundRectangleChoice>,
 }
 /// Shape Handle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2838,6 +2838,7 @@ pub struct Formula {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBoxChoice {
+  /// Rich Text Box Content Container.
   #[sdk(child(qname = "w:CT_TxbxContent/w:txbxContent"))]
   WTxbxContent(
     std::boxed::Box<
@@ -3012,209 +3013,297 @@ pub enum GroupChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArcChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
+  /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
   OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
   OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
   OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
   OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
   OSignatureline(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
   ),
+  /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
+  /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
   W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
   W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
   W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CurveChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
+  /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
   OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
   OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
   OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
   OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
   OSignatureline(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
   ),
+  /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
+  /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
   W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
   W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
   W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ImageFileChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
+  /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
   OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
   OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
   OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
   OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
   OSignatureline(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
   ),
+  /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
+  /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
   W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
   W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
   W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
+  /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
   OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
   OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
   OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
   OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
   OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
   OSignatureline(
     std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
   ),
+  /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
   W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
+  /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
   W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
   W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
   W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
   W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
   XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
   PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
 }

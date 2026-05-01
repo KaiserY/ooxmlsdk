@@ -11,7 +11,7 @@
   qname = "xlrvr:CT_RichValueRefreshIntervals/xlrvr:refreshIntervals"
 )]
 pub struct RichValueRefreshIntervals {
-  /// _
+  /// Defines the RichValueRefreshInterval Class.
   #[sdk(child(
     office2021,
     qname = "xlrvr:CT_RichValueRefreshInterval/xlrvr:refreshInterval"

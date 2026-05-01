@@ -17,10 +17,10 @@ pub struct ExternalBookAlternateUrls {
   /// itemId
   #[sdk(attr(microsoft365, qname = ":itemId"))]
   pub item_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the AbsoluteUrlAlternateUrl Class.
   #[sdk(child(microsoft365, qname = "xxl21:CT_AlternateUrl/xxl21:absoluteUrl"))]
   pub absolute_url_alternate_url: Option<AbsoluteUrlAlternateUrl>,
-  /// _
+  /// Defines the RelativeUrlAlternateUrl Class.
   #[sdk(child(microsoft365, qname = "xxl21:CT_AlternateUrl/xxl21:relativeUrl"))]
   pub relative_url_alternate_url: Option<RelativeUrlAlternateUrl>,
 }

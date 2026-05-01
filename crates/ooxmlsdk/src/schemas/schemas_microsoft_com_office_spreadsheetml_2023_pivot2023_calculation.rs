@@ -50,7 +50,7 @@ pub struct FeatureSupport {
   qname = "xlpcalc:CT_PivotFieldSubtotals/xlpcalc:pivotFieldSubtotals"
 )]
 pub struct PivotFieldSubtotals {
-  /// _
+  /// Defines the SubtotalPivotItemSubtotal Class.
   #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotal"))]
   pub xlpcalc_subtotal: Vec<SubtotalPivotItemSubtotal>,
 }
@@ -61,7 +61,7 @@ pub struct PivotFieldSubtotals {
   qname = "xlpcalc:CT_PivotAreaReferenceSubtotals/xlpcalc:pivotAreaReferenceSubtotals"
 )]
 pub struct PivotAreaReferenceSubtotals {
-  /// _
+  /// Defines the PivotSubtotalType Class.
   #[sdk(child(microsoft365, qname = "xlpcalc:CT_PivotSubtotalType/xlpcalc:subtotal"))]
   pub xlpcalc_subtotal: Vec<PivotSubtotalType>,
 }
@@ -72,7 +72,7 @@ pub struct PivotAreaReferenceSubtotals {
   qname = "xlpcalc:CT_PivotTableSubtotalLineItems/xlpcalc:pivotFieldSubtotalLineItems"
 )]
 pub struct PivotTableSubtotalLineItems {
-  /// _
+  /// Defines the SubtotalLineItemPivotItemSubtotal Class.
   #[sdk(child(
     microsoft365,
     qname = "xlpcalc:CT_PivotItemSubtotal/xlpcalc:subtotalLineItem"

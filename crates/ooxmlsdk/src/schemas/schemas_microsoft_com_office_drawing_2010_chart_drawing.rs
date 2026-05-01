@@ -16,22 +16,22 @@ pub struct ContentPart {
   #[sdk(string_format(source = 0u32, kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
-  /// _
+  /// Defines the NonVisualContentPartProperties Class.
   #[sdk(child(
     office2010,
     qname = "cdr14:CT_ContentPartNonVisual/cdr14:nvContentPartPr"
   ))]
   pub non_visual_content_part_properties: Option<std::boxed::Box<NonVisualContentPartProperties>>,
-  /// _
+  /// Defines the ApplicationNonVisualDrawingProperties Class.
   #[sdk(child(
     office2010,
     qname = "cdr14:CT_ApplicationNonVisualDrawingProps/cdr14:nvPr"
   ))]
   pub application_non_visual_drawing_properties: Option<ApplicationNonVisualDrawingProperties>,
-  /// _
+  /// Defines the Transform2D Class.
   #[sdk(child(office2010, qname = "a:CT_Transform2D/cdr14:xfrm"))]
   pub transform2_d: Option<std::boxed::Box<Transform2D>>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/cdr14:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -85,14 +85,14 @@ pub struct NonVisualInkContentPartProperties {
   /// isComment
   #[sdk(attr(office2010, qname = ":isComment"))]
   pub is_comment: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ContentPartLocks Class.
   #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
   pub content_part_locks: Option<
     std::boxed::Box<
       crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ContentPartLocks,
     >,
   >,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
   pub office_art_extension_list:
     Option<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::OfficeArtExtensionList>,
@@ -104,10 +104,10 @@ pub struct NonVisualInkContentPartProperties {
   qname = "cdr14:CT_ContentPartNonVisual/cdr14:nvContentPartPr"
 )]
 pub struct NonVisualContentPartProperties {
-  /// _
+  /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/cdr14:cNvPr"))]
   pub non_visual_drawing_properties: std::boxed::Box<NonVisualDrawingProperties>,
-  /// _
+  /// Defines the NonVisualInkContentPartProperties Class.
   #[sdk(child(
     office2010,
     qname = "a14:CT_NonVisualInkContentPartProperties/cdr14:cNvContentPartPr"
@@ -157,5 +157,5 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }

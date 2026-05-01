@@ -315,7 +315,7 @@ pub enum ObjectTypeValues {
   qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"
 )]
 pub struct ConditionalFormattings {
-  /// _
+  /// Defines the ConditionalFormatting Class.
   #[sdk(child(
     office2010,
     qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
@@ -338,7 +338,7 @@ pub struct DataValidations {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the DataValidation Class.
   #[sdk(child(office2010, qname = "x14:CT_DataValidation/x14:dataValidation"))]
   pub x14_data_validation: Vec<DataValidation>,
 }
@@ -346,7 +346,7 @@ pub struct DataValidations {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups")]
 pub struct SparklineGroups {
-  /// _
+  /// Defines the SparklineGroup Class.
   #[sdk(child(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
   pub x14_sparkline_group: Vec<SparklineGroup>,
 }
@@ -354,7 +354,7 @@ pub struct SparklineGroups {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SlicerRefs/x14:slicerList")]
 pub struct SlicerList {
-  /// _
+  /// Defines the SlicerRef Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerRef/x14:slicer"))]
   pub x14_slicer: Vec<SlicerRef>,
 }
@@ -362,7 +362,7 @@ pub struct SlicerList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_ProtectedRanges/x14:protectedRanges")]
 pub struct ProtectedRanges {
-  /// _
+  /// Defines the ProtectedRange Class.
   #[sdk(child(office2010, qname = "x14:CT_ProtectedRange/x14:protectedRange"))]
   pub x14_protected_range: Vec<ProtectedRange>,
 }
@@ -370,10 +370,10 @@ pub struct ProtectedRanges {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_IgnoredErrors/x14:ignoredErrors")]
 pub struct IgnoredErrors {
-  /// _
+  /// Defines the IgnoredError Class.
   #[sdk(child(office2010, qname = "x14:CT_IgnoredError/x14:ignoredError"))]
   pub x14_ignored_error: Vec<IgnoredError>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
@@ -381,7 +381,7 @@ pub struct IgnoredErrors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DefinedNames/x14:definedNames")]
 pub struct DefinedNames {
-  /// _
+  /// Defines the DefinedName Class.
   #[sdk(child(office2010, qname = "x14:CT_DefinedName/x14:definedName"))]
   pub x14_defined_name: Vec<DefinedName>,
 }
@@ -389,7 +389,7 @@ pub struct DefinedNames {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x:CT_PivotCaches/x14:pivotCaches")]
 pub struct PivotCaches {
-  /// _
+  /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
   pub x_pivot_cache:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
@@ -398,7 +398,7 @@ pub struct PivotCaches {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SlicerCaches/x14:slicerCaches")]
 pub struct SlicerCaches {
-  /// _
+  /// Defines the SlicerCache Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache"))]
   pub x14_slicer_cache: Vec<SlicerCache>,
 }
@@ -435,7 +435,7 @@ pub struct CalculatedMember {
   /// mdxLong
   #[sdk(attr(office2010, qname = ":mdxLong"))]
   pub mdx_long: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the TupleSet Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSet/x14:tupleSet"))]
   pub tuple_set: Option<std::boxed::Box<TupleSet>>,
 }
@@ -455,7 +455,7 @@ pub struct CacheHierarchy {
   /// ignore
   #[sdk(attr(office2010, qname = ":ignore"))]
   pub ignore: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the SetLevels Class.
   #[sdk(child(office2010, qname = "x14:CT_SetLevels/x14:setLevels"))]
   pub set_levels: Option<SetLevels>,
 }
@@ -521,13 +521,13 @@ pub struct PivotTableDefinition {
   /// hideValuesRow
   #[sdk(attr(office2010, qname = ":hideValuesRow"))]
   pub hide_values_row: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the PivotEdits Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEdits/x14:pivotEdits"))]
   pub pivot_edits: Option<PivotEdits>,
-  /// _
+  /// Defines the PivotChanges Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotChanges/x14:pivotChanges"))]
   pub pivot_changes: Option<PivotChanges>,
-  /// _
+  /// Defines the ConditionalFormats Class.
   #[sdk(child(office2010, qname = "x14:CT_ConditionalFormats/x14:conditionalFormats"))]
   pub conditional_formats: Option<ConditionalFormats>,
 }
@@ -564,7 +564,7 @@ pub struct Connection {
   /// embeddedDataId
   #[sdk(attr(office2010, qname = ":embeddedDataId"))]
   pub embedded_data_id: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the CalculatedMembers Class.
   #[sdk(child(office2010, qname = "x:CT_CalculatedMembers/x14:calculatedMembers"))]
   pub calculated_members: Option<CalculatedMembers>,
 }
@@ -586,7 +586,7 @@ pub struct SlicerStyles {
   /// defaultSlicerStyle
   #[sdk(attr(office2010, qname = ":defaultSlicerStyle"))]
   pub default_slicer_style: crate::simple_type::StringValue,
-  /// _
+  /// Defines the SlicerStyle Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyle/x14:slicerStyle"))]
   pub x14_slicer_style: Vec<SlicerStyle>,
 }
@@ -597,7 +597,7 @@ pub struct DifferentialFormats {
   /// Format Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
   pub x_dxf:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
@@ -618,7 +618,7 @@ pub struct OleItem {
   /// preferPic
   #[sdk(attr(office2010, qname = ":preferPic"))]
   pub prefer_picture: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the DdeValues Class.
   #[sdk(child(office2010, qname = "x:CT_DdeValues/x14:values"))]
   pub dde_values: Option<DdeValues>,
 }
@@ -666,7 +666,7 @@ pub struct CustomFilters {
   /// and
   #[sdk(attr(office2010, qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the CustomFilter Class.
   #[sdk(child(office2010, qname = "x14:CT_CustomFilter/x14:customFilter"))]
   pub x14_custom_filter: Vec<CustomFilter>,
 }
@@ -715,7 +715,7 @@ pub struct DatastoreItem {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -824,10 +824,10 @@ pub struct FormControlProperties {
   /// passwordEdit
   #[sdk(attr(office2010, qname = ":passwordEdit"))]
   pub password_edit: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ListItems Class.
   #[sdk(child(office2010, qname = "x14:CT_ListItems/x14:itemLst"))]
   pub list_items: Option<std::boxed::Box<ListItems>>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -838,7 +838,7 @@ pub struct Slicers {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the Slicer Class.
   #[sdk(child(office2010, qname = "x14:CT_Slicer/x14:slicer"))]
   pub x14_slicer: Vec<Slicer>,
 }
@@ -858,13 +858,13 @@ pub struct SlicerCacheDefinition {
   /// sourceName
   #[sdk(attr(office2010, qname = ":sourceName"))]
   pub source_name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the SlicerCachePivotTables Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables"))]
   pub slicer_cache_pivot_tables: Option<SlicerCachePivotTables>,
-  /// _
+  /// Defines the SlicerCacheData Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCacheData/x14:data"))]
   pub slicer_cache_data: Option<std::boxed::Box<SlicerCacheData>>,
-  /// _
+  /// Defines the SlicerCacheDefinitionExtensionList Class.
   #[sdk(child(
     office2010,
     qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"
@@ -881,13 +881,13 @@ pub struct ConditionalFormatting {
   /// pivot
   #[sdk(attr(office2010, qname = ":pivot"))]
   pub pivot: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ConditionalFormattingRule Class.
   #[sdk(child(office2010, qname = "x14:CT_CfRule/x14:cfRule"))]
   pub x14_cf_rule: Vec<ConditionalFormattingRule>,
-  /// _
+  /// Defines the ReferenceSequence Class.
   #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub xne_sqref: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
@@ -950,22 +950,22 @@ pub struct ConditionalFormattingRule {
     )]
     #[sdk(string_format(source = 0u32, kind = "token"))]
     pub id: Option<crate::simple_type::StringValue>,
-    /// _
+    /// Defines the Formula Class.
     #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
     pub xne_f: Vec<crate::simple_type::StringValue>,
-    /// _
+    /// Defines the ColorScale Class.
     #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
     pub x14_color_scale: Option<ColorScale>,
-    /// _
+    /// Defines the DataBar Class.
     #[sdk(child(office2010, qname = "x14:CT_DataBar/x14:dataBar"))]
     pub x14_data_bar: Option<std::boxed::Box<DataBar>>,
-    /// _
+    /// Defines the IconSet Class.
     #[sdk(child(office2010, qname = "x14:CT_IconSet/x14:iconSet"))]
     pub x14_icon_set: Option<IconSet>,
-    /// _
+    /// Defines the DifferentialType Class.
     #[sdk(child(office2010, qname = "x:CT_Dxf/x14:dxf"))]
     pub x14_dxf: Option<std::boxed::Box<DifferentialType>>,
-    /// _
+    /// Defines the ExtensionList Class.
     #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
     pub x14_ext_lst: Option<ExtensionList>,
 }
@@ -976,7 +976,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }
 /// Defines the DataValidation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1026,13 +1026,13 @@ pub struct DataValidation {
     /// prompt
     #[sdk(attr(office2010, qname = ":prompt"))]
     pub prompt: Option<crate::simple_type::StringValue>,
-    /// _
+    /// Defines the DataValidationForumla1 Class.
     #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1"))]
     pub data_validation_forumla1: Option<DataValidationForumla1>,
-    /// _
+    /// Defines the DataValidationForumla2 Class.
     #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
     pub data_validation_forumla2: Option<DataValidationForumla2>,
-    /// _
+    /// Defines the ReferenceSequence Class.
     #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
     pub reference_sequence: crate::simple_type::StringValue,
 }
@@ -1040,7 +1040,7 @@ pub struct DataValidation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1")]
 pub struct DataValidationForumla1 {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::simple_type::StringValue,
 }
@@ -1048,7 +1048,7 @@ pub struct DataValidationForumla1 {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2")]
 pub struct DataValidationForumla2 {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::simple_type::StringValue,
 }
@@ -1107,34 +1107,34 @@ pub struct SparklineGroup {
   /// rightToLeft
   #[sdk(attr(office2010, qname = ":rightToLeft"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the SeriesColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
   pub series_color: Option<SeriesColor>,
-  /// _
+  /// Defines the NegativeColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
   pub negative_color: Option<NegativeColor>,
-  /// _
+  /// Defines the AxisColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
   pub axis_color: Option<AxisColor>,
-  /// _
+  /// Defines the MarkersColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
   pub markers_color: Option<MarkersColor>,
-  /// _
+  /// Defines the FirstMarkerColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
   pub first_marker_color: Option<FirstMarkerColor>,
-  /// _
+  /// Defines the LastMarkerColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
   pub last_marker_color: Option<LastMarkerColor>,
-  /// _
+  /// Defines the HighMarkerColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
   pub high_marker_color: Option<HighMarkerColor>,
-  /// _
+  /// Defines the LowMarkerColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
   pub low_marker_color: Option<LowMarkerColor>,
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
   pub sparklines: std::boxed::Box<Sparklines>,
 }
@@ -1436,7 +1436,7 @@ pub struct BarAxisColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_Sparklines/x14:sparklines")]
 pub struct Sparklines {
-  /// _
+  /// Defines the Sparkline Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparkline/x14:sparkline"))]
   pub x14_sparkline: Vec<Sparkline>,
 }
@@ -1444,10 +1444,10 @@ pub struct Sparklines {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_Sparkline/x14:sparkline")]
 pub struct Sparkline {
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ReferenceSequence Class.
   #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
@@ -1474,7 +1474,7 @@ pub struct DefinedName {
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ArgumentDescriptions Class.
   #[sdk(child(
     office2010,
     qname = "x14:CT_DefinedNameArgumentDescriptions/x14:argumentDescriptions"
@@ -1491,7 +1491,7 @@ pub struct ArgumentDescriptions {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the ArgumentDescription Class.
   #[sdk(child(
     office2010,
     qname = "x14:CT_DefinedNameArgumentDescription/x14:argumentDescription"
@@ -1521,10 +1521,10 @@ pub struct TupleSet {
   /// columnCount
   #[sdk(attr(office2010, qname = ":columnCount"))]
   pub column_count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the TupleSetHeaders Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetHeaders/x14:headers"))]
   pub tuple_set_headers: std::boxed::Box<TupleSetHeaders>,
-  /// _
+  /// Defines the TupleSetRows Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetRows/x14:rows"))]
   pub tuple_set_rows: std::boxed::Box<TupleSetRows>,
 }
@@ -1532,7 +1532,7 @@ pub struct TupleSet {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_TupleSetHeaders/x14:headers")]
 pub struct TupleSetHeaders {
-  /// _
+  /// Defines the TupleSetHeader Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetHeader/x14:header"))]
   pub x14_header: Vec<TupleSetHeader>,
 }
@@ -1540,7 +1540,7 @@ pub struct TupleSetHeaders {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_TupleSetRows/x14:rows")]
 pub struct TupleSetRows {
-  /// _
+  /// Defines the TupleSetRow Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetRow/x14:row"))]
   pub x14_row: Vec<TupleSetRow>,
 }
@@ -1559,7 +1559,7 @@ pub struct TupleSetHeader {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_TupleSetRow/x14:row")]
 pub struct TupleSetRow {
-  /// _
+  /// Defines the TupleSetRowItem Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleSetRowItem/x14:rowItem"))]
   pub x14_row_item: Vec<TupleSetRowItem>,
 }
@@ -1589,7 +1589,7 @@ pub struct SetLevels {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the SetLevel Class.
   #[sdk(child(office2010, qname = "x14:CT_SetLevel/x14:setLevel"))]
   pub x14_set_level: Vec<SetLevel>,
 }
@@ -1597,10 +1597,10 @@ pub struct SetLevels {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_ColorScale/x14:colorScale")]
 pub struct ColorScale {
-  /// _
+  /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
-  /// _
+  /// Defines the Color Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:color"))]
   pub x14_color: Vec<Color>,
 }
@@ -1635,22 +1635,22 @@ pub struct DataBar {
   /// axisPosition
   #[sdk(attr(office2010, qname = ":axisPosition"))]
   pub axis_position: Option<DataBarAxisPositionValues>,
-  /// _
+  /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
-  /// _
+  /// Defines the FillColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:fillColor"))]
   pub x14_fill_color: Option<FillColor>,
-  /// _
+  /// Defines the BorderColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:borderColor"))]
   pub x14_border_color: Option<BorderColor>,
-  /// _
+  /// Defines the NegativeFillColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeFillColor"))]
   pub x14_negative_fill_color: Option<NegativeFillColor>,
-  /// _
+  /// Defines the NegativeBorderColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:negativeBorderColor"))]
   pub x14_negative_border_color: Option<NegativeBorderColor>,
-  /// _
+  /// Defines the BarAxisColor Class.
   #[sdk(child(office2010, qname = "x:CT_Color/x14:axisColor"))]
   pub x14_axis_color: Option<BarAxisColor>,
 }
@@ -1673,10 +1673,10 @@ pub struct IconSet {
   /// custom
   #[sdk(attr(office2010, qname = ":custom"))]
   pub custom: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ConditionalFormattingValueObject Class.
   #[sdk(child(office2010, qname = "x14:CT_Cfvo/x14:cfvo"))]
   pub x14_cfvo: Vec<ConditionalFormattingValueObject>,
-  /// _
+  /// Defines the ConditionalFormattingIcon Class.
   #[sdk(child(office2010, qname = "x14:CT_CfIcon/x14:cfIcon"))]
   pub x14_cf_icon: Vec<ConditionalFormattingIcon>,
 }
@@ -1726,10 +1726,10 @@ pub struct ConditionalFormattingValueObject {
   /// gte
   #[sdk(attr(office2010, qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1748,7 +1748,7 @@ pub struct ConditionalFormattingIcon {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_PivotEdits/x14:pivotEdits")]
 pub struct PivotEdits {
-  /// _
+  /// Defines the PivotEdit Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEdit/x14:pivotEdit"))]
   pub x14_pivot_edit: Vec<PivotEdit>,
 }
@@ -1756,7 +1756,7 @@ pub struct PivotEdits {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_PivotChanges/x14:pivotChanges")]
 pub struct PivotChanges {
-  /// _
+  /// Defines the PivotChange Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotChange/x14:pivotChange"))]
   pub x14_pivot_change: Vec<PivotChange>,
 }
@@ -1767,7 +1767,7 @@ pub struct ConditionalFormats {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the ConditionalFormat Class.
   #[sdk(child(office2010, qname = "x14:CT_ConditionalFormat/x14:conditionalFormat"))]
   pub x14_conditional_format: Vec<ConditionalFormat>,
 }
@@ -1778,7 +1778,7 @@ pub struct CalculatedMembers {
   /// Calculated Members Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Calculated Member.
   #[sdk(child(qname = "x:CT_CalculatedMember/x:calculatedMember"))]
   pub x_calculated_member:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculatedMember>,
@@ -1787,16 +1787,16 @@ pub struct CalculatedMembers {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_PivotEdit/x14:pivotEdit")]
 pub struct PivotEdit {
-  /// _
+  /// Defines the PivotUserEdit Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotUserEdit/x14:userEdit"))]
   pub pivot_user_edit: std::boxed::Box<PivotUserEdit>,
-  /// _
+  /// Defines the TupleItems Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleItems/x14:tupleItems"))]
   pub tuple_items: std::boxed::Box<TupleItems>,
-  /// _
+  /// Defines the PivotArea Class.
   #[sdk(child(office2010, qname = "x:CT_PivotArea/x14:pivotArea"))]
   pub pivot_area: std::boxed::Box<PivotArea>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1808,13 +1808,13 @@ pub struct PivotUserEdit {
     qname = "x:ST_Formula/xne:f",
     qname = "x14:CT_PivotEditValue/x14:editValue"
   ))]
-  pub xml_children: Option<PivotUserEditChoice>,
+  pub pivot_user_edit_choice: Option<PivotUserEditChoice>,
 }
 /// Defines the TupleItems Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_TupleItems/x14:tupleItems")]
 pub struct TupleItems {
-  /// _
+  /// Defines the Xstring Class.
   #[sdk(text_child(office2010, qname = "x:ST_Xstring/x14:tupleItem"))]
   pub x14_tuple_item: Vec<crate::simple_type::StringValue>,
 }
@@ -1880,13 +1880,13 @@ pub struct PivotChange {
   /// weightExpression
   #[sdk(attr(office2010, qname = ":weightExpression"))]
   pub weight_expression: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the PivotEditValue Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
   pub pivot_edit_value: std::boxed::Box<PivotEditValue>,
-  /// _
+  /// Defines the TupleItems Class.
   #[sdk(child(office2010, qname = "x14:CT_TupleItems/x14:tupleItems"))]
   pub tuple_items: std::boxed::Box<TupleItems>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1909,7 +1909,7 @@ pub type Xstring = crate::simple_type::StringValue;
   qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements"
 )]
 pub struct SlicerStyleElements {
-  /// _
+  /// Defines the SlicerStyleElement Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyleElement/x14:slicerStyleElement"))]
   pub x14_slicer_style_element: Vec<SlicerStyleElement>,
 }
@@ -1923,7 +1923,7 @@ pub struct DdeValues {
   /// Columns
   #[sdk(attr(qname = ":cols"))]
   pub columns: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Value.
   #[sdk(child(qname = "x:CT_DdeValue/x:value"))]
   pub x_value: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Value>,
 }
@@ -1950,10 +1950,10 @@ pub struct ConditionalFormat {
   ))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the PivotAreas Class.
   #[sdk(child(office2010, qname = "x:CT_PivotAreas/x14:pivotAreas"))]
   pub pivot_areas: Option<PivotAreas>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -1964,7 +1964,7 @@ pub struct PivotAreas {
   /// Pivot Area Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Calculated Item Location.
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
   pub x_pivot_area:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotArea>,
@@ -1976,7 +1976,7 @@ pub struct SlicerStyle {
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the SlicerStyleElements Class.
   #[sdk(child(
     office2010,
     qname = "x14:CT_SlicerStyleElements/x14:slicerStyleElements"
@@ -2025,7 +2025,7 @@ pub struct IgnoredError {
   /// calculatedColumn
   #[sdk(attr(office2010, qname = ":calculatedColumn"))]
   pub calculated_column: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the ReferenceSequence Class.
   #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
@@ -2055,7 +2055,7 @@ pub struct ProtectedRange {
   /// securityDescriptor
   #[sdk(attr(office2010, qname = ":securityDescriptor"))]
   pub security_descriptor: Option<crate::simple_type::StringValue>,
-  /// _
+  /// Defines the ReferenceSequence Class.
   #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: crate::simple_type::StringValue,
 }
@@ -2084,10 +2084,10 @@ pub struct ListItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_ListItems/x14:itemLst")]
 pub struct ListItems {
-  /// _
+  /// Defines the ListItem Class.
   #[sdk(child(office2010, qname = "x14:CT_ListItem/x14:item"))]
   pub x14_item: Vec<ListItem>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
 }
@@ -2125,7 +2125,7 @@ pub struct Slicer {
   /// rowHeight
   #[sdk(attr(office2010, qname = ":rowHeight"))]
   pub row_height: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2136,13 +2136,13 @@ pub struct OlapSlicerCache {
   /// pivotCacheId
   #[sdk(attr(office2010, qname = ":pivotCacheId"))]
   pub pivot_cache_id: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the OlapSlicerCacheLevelsData Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheLevelsData/x14:levels"))]
   pub olap_slicer_cache_levels_data: std::boxed::Box<OlapSlicerCacheLevelsData>,
-  /// _
+  /// Defines the OlapSlicerCacheSelections Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheSelections/x14:selections"))]
   pub olap_slicer_cache_selections: std::boxed::Box<OlapSlicerCacheSelections>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2165,10 +2165,10 @@ pub struct TabularSlicerCache {
   /// crossFilter
   #[sdk(attr(office2010, qname = ":crossFilter"))]
   pub cross_filter: Option<SlicerCacheCrossFilterValues>,
-  /// _
+  /// Defines the TabularSlicerCacheItems Class.
   #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCacheItems/x14:items"))]
   pub tabular_slicer_cache_items: std::boxed::Box<TabularSlicerCacheItems>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -2204,7 +2204,7 @@ pub struct OlapSlicerCacheItem {
   /// nd
   #[sdk(attr(office2010, qname = ":nd"))]
   pub non_display: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the OlapSlicerCacheItemParent Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
   pub x14_p: Vec<OlapSlicerCacheItemParent>,
 }
@@ -2215,7 +2215,7 @@ pub struct OlapSlicerCacheRange {
   /// startItem
   #[sdk(attr(office2010, qname = ":startItem"))]
   pub start_item: crate::simple_type::UInt32Value,
-  /// _
+  /// Defines the OlapSlicerCacheItem Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItem/x14:i"))]
   pub x14_i: Vec<OlapSlicerCacheItem>,
 }
@@ -2223,7 +2223,7 @@ pub struct OlapSlicerCacheRange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges")]
 pub struct OlapSlicerCacheRanges {
-  /// _
+  /// Defines the OlapSlicerCacheRange Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheRange/x14:range"))]
   pub x14_range: Vec<OlapSlicerCacheRange>,
 }
@@ -2246,7 +2246,7 @@ pub struct OlapSlicerCacheLevelData {
   /// crossFilter
   #[sdk(attr(office2010, qname = ":crossFilter"))]
   pub cross_filter: Option<SlicerCacheCrossFilterValues>,
-  /// _
+  /// Defines the OlapSlicerCacheRanges Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheRanges/x14:ranges"))]
   pub olap_slicer_cache_ranges: Option<OlapSlicerCacheRanges>,
 }
@@ -2257,7 +2257,7 @@ pub struct OlapSlicerCacheLevelsData {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the OlapSlicerCacheLevelData Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheLevelData/x14:level"))]
   pub x14_level: Vec<OlapSlicerCacheLevelData>,
 }
@@ -2268,7 +2268,7 @@ pub struct OlapSlicerCacheSelections {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the OlapSlicerCacheSelection Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheSelection/x14:selection"))]
   pub x14_selection: Vec<OlapSlicerCacheSelection>,
 }
@@ -2279,7 +2279,7 @@ pub struct OlapSlicerCacheSelection {
   /// n
   #[sdk(attr(office2010, qname = ":n"))]
   pub name: crate::simple_type::StringValue,
-  /// _
+  /// Defines the OlapSlicerCacheItemParent Class.
   #[sdk(child(office2010, qname = "x14:CT_OlapSlicerCacheItemParent/x14:p"))]
   pub x14_p: Vec<OlapSlicerCacheItemParent>,
 }
@@ -2290,7 +2290,7 @@ pub struct TabularSlicerCacheItems {
   /// count
   #[sdk(attr(office2010, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Defines the TabularSlicerCacheItem Class.
   #[sdk(child(office2010, qname = "x14:CT_TabularSlicerCacheItem/x14:i"))]
   pub x14_i: Vec<TabularSlicerCacheItem>,
 }
@@ -2312,7 +2312,7 @@ pub struct TabularSlicerCacheItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SlicerCachePivotTables/x14:pivotTables")]
 pub struct SlicerCachePivotTables {
-  /// _
+  /// Defines the SlicerCachePivotTable Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
   pub x14_pivot_table: Vec<SlicerCachePivotTable>,
 }
@@ -2324,7 +2324,7 @@ pub struct SlicerCacheData {
     qname = "x14:CT_OlapSlicerCache/x14:olap",
     qname = "x14:CT_TabularSlicerCache/x14:tabular"
   ))]
-  pub xml_children: Option<SlicerCacheDataChoice>,
+  pub slicer_cache_data_choice: Option<SlicerCacheDataChoice>,
 }
 /// Defines the SlicerCacheDefinitionExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2334,7 +2334,7 @@ pub struct SlicerCacheData {
 )]
 pub struct SlicerCacheDefinitionExtensionList {
     pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// _
+    /// Defines the SlicerCacheDefinitionExtension Class.
     #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext"))]
     pub x_ext: Vec<
         crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SlicerCacheDefinitionExtension,

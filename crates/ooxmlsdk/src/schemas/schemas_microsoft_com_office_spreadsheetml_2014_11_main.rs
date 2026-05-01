@@ -30,7 +30,7 @@ pub enum ModelTimeGroupingContentType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "x16:CT_ModelTimeGroupings/x16:modelTimeGroupings")]
 pub struct ModelTimeGroupings {
-  /// _
+  /// Defines the ModelTimeGrouping Class.
   #[sdk(child(office2016, qname = "x16:CT_ModelTimeGrouping/x16:modelTimeGrouping"))]
   pub x16_model_time_grouping: Vec<ModelTimeGrouping>,
 }
@@ -47,7 +47,7 @@ pub struct ModelTimeGrouping {
   /// columnId
   #[sdk(attr(office2016, qname = ":columnId"))]
   pub column_id: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CalculatedTimeColumn Class.
   #[sdk(child(
     office2016,
     qname = "x16:CT_CalculatedTimeColumn/x16:calculatedTimeColumn"

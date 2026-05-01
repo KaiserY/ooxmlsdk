@@ -33,103 +33,103 @@ pub struct Macrosheet {
   pub sheet_format_properties: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetFormatProperties,
   >,
-  /// _
+  /// Column Information.
   #[sdk(child(qname = "x:CT_Cols/x:cols"))]
   pub x_cols: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Columns>,
-  /// _
+  /// Sheet Data.
   #[sdk(child(qname = "x:CT_SheetData/x:sheetData"))]
   pub x_sheet_data:
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetData>,
-  /// _
+  /// Sheet Protection.
   #[sdk(child(qname = "x:CT_SheetProtection/x:sheetProtection"))]
   pub x_sheet_protection:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SheetProtection>,
-  /// _
+  /// AutoFilter Settings.
   #[sdk(child(qname = "x:CT_AutoFilter/x:autoFilter"))]
   pub x_auto_filter: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::AutoFilter>,
   >,
-  /// _
+  /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
   pub x_sort_state: Option<
     std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortState>,
   >,
-  /// _
+  /// Data Consolidation.
   #[sdk(child(qname = "x:CT_DataConsolidate/x:dataConsolidate"))]
   pub x_data_consolidate: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataConsolidate,
     >,
   >,
-  /// _
+  /// Custom Sheet Views.
   #[sdk(child(qname = "x:CT_CustomSheetViews/x:customSheetViews"))]
   pub x_custom_sheet_views:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CustomSheetViews>,
-  /// _
+  /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
   pub x_phonetic_pr:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticProperties>,
-  /// _
+  /// Conditional Formatting.
   #[sdk(child(qname = "x:CT_ConditionalFormatting/x:conditionalFormatting"))]
   pub x_conditional_formatting:
     Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormatting>,
-  /// _
+  /// Print Options.
   #[sdk(child(qname = "x:CT_PrintOptions/x:printOptions"))]
   pub x_print_options:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PrintOptions>,
-  /// _
+  /// Page Margins.
   #[sdk(child(qname = "x:CT_PageMargins/x:pageMargins"))]
   pub x_page_margins:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageMargins>,
-  /// _
+  /// Page Setup Settings.
   #[sdk(child(qname = "x:CT_PageSetup/x:pageSetup"))]
   pub x_page_setup:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageSetup>,
-  /// _
+  /// Header Footer Settings.
   #[sdk(child(qname = "x:CT_HeaderFooter/x:headerFooter"))]
   pub x_header_footer: Option<
     std::boxed::Box<
       crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::HeaderFooter,
     >,
   >,
-  /// _
+  /// Horizontal Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:rowBreaks"))]
   pub x_row_breaks:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowBreaks>,
-  /// _
+  /// Vertical Page Breaks.
   #[sdk(child(qname = "x:CT_PageBreak/x:colBreaks"))]
   pub x_col_breaks:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnBreaks>,
-  /// _
+  /// Custom Properties.
   #[sdk(child(qname = "x:CT_CustomProperties/x:customProperties"))]
   pub x_custom_properties:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CustomProperties>,
-  /// _
+  /// Drawing.
   #[sdk(child(qname = "x:CT_Drawing/x:drawing"))]
   pub x_drawing:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Drawing>,
-  /// _
+  /// Defines the LegacyDrawing Class.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawing"))]
   pub x_legacy_drawing:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::LegacyDrawing>,
-  /// _
+  /// Legacy Drawing Reference in  Header Footer.
   #[sdk(child(qname = "x:CT_LegacyDrawing/x:legacyDrawingHF"))]
   pub x_legacy_drawing_hf: Option<
     crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::LegacyDrawingHeaderFooter,
   >,
-  /// _
+  /// Defines the Picture Class.
   #[sdk(child(qname = "x:CT_SheetBackgroundPicture/x:picture"))]
   pub x_picture:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Picture>,
-  /// _
+  /// Defines the OleObjects Class.
   #[sdk(child(qname = "x:CT_OleObjects/x:oleObjects"))]
   pub x_ole_objects:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::OleObjects>,
-  /// _
+  /// Defines the DrawingHeaderFooter Class.
   #[sdk(child(office2010, qname = "x:CT_DrawingHF/x:drawingHF"))]
   pub x_drawing_hf:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DrawingHeaderFooter>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
   pub x_ext_lst:
     Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
@@ -168,7 +168,7 @@ pub struct RowSortMap {
     max_inclusive = true
   ))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Row.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:row"))]
   pub xne_row: Vec<RowSortMapItem>,
 }
@@ -188,7 +188,7 @@ pub struct ColumnSortMap {
     max_inclusive = true
   ))]
   pub count: Option<crate::simple_type::UInt32Value>,
-  /// _
+  /// Column.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:col"))]
   pub xne_col: Vec<ColumnSortMapItem>,
 }

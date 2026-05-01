@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "p202:CT_DesignerTagList/p202:designTagLst")]
 pub struct DesignerTagList {
-  /// _
+  /// Defines the DesignerTag Class.
   #[sdk(child(office2021, qname = "p202:CT_DesignerTag/p202:designTag"))]
   pub p202_design_tag: Vec<DesignerTag>,
 }
@@ -19,10 +19,10 @@ pub struct DesignerDrawingProps {
   /// edtDesignElem
   #[sdk(attr(office2021, qname = ":edtDesignElem"))]
   pub edt_design_elem: Option<crate::simple_type::BooleanValue>,
-  /// _
+  /// Defines the DesignerTagList Class.
   #[sdk(child(office2021, qname = "p202:CT_DesignerTagList/p202:designTagLst"))]
   pub designer_tag_list: Option<DesignerTagList>,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "p:CT_ExtensionList/p202:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -44,6 +44,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub extension:
-    Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
 }

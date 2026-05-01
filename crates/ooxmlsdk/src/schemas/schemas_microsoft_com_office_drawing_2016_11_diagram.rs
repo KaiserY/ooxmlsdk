@@ -19,7 +19,7 @@ pub enum STorageType {
   qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst"
 )]
 pub struct NumberDiagramInfoList {
-  /// _
+  /// Defines the NumberDiagramInfo Class.
   #[sdk(child(
     office2019,
     qname = "dgm1611:CT_NumberDiagramInfo/dgm1611:autoBuNodeInfo"
@@ -42,7 +42,7 @@ pub struct DiagramAutoBullet {
     qname = "a:CT_TextCharBullet/a:buChar",
     qname = "a:CT_TextBlipBullet/a:buBlip"
   ))]
-  pub xml_children: Option<DiagramAutoBulletChoice>,
+  pub diagram_auto_bullet_choice: Option<DiagramAutoBulletChoice>,
 }
 /// Defines the NumberDiagramInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -58,7 +58,7 @@ pub struct NumberDiagramInfo {
   #[sdk(attr(office2019, qname = ":ptType"))]
   #[sdk(string_format(source = 1u32, kind = "token"))]
   pub pt_type: STorageType,
-  /// _
+  /// Defines the DiagramAutoBullet Class.
   #[sdk(child(office2019, qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr"))]
   pub diagram_auto_bullet: std::boxed::Box<DiagramAutoBullet>,
 }

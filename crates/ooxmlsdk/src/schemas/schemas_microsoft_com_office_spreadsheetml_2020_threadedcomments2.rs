@@ -19,7 +19,7 @@ pub struct CommentHyperlink {
   /// url
   #[sdk(attr(office2021, qname = ":url"))]
   pub url: crate::simple_type::StringValue,
-  /// _
+  /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "x:CT_ExtensionList/xltc2:extLst"))]
   pub extension_list: Option<ExtensionList>,
 }
@@ -30,5 +30,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
 }

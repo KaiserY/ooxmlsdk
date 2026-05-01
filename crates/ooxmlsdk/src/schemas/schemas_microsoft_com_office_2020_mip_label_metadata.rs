@@ -11,10 +11,10 @@ pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(String, String)>,
-  /// _
+  /// Defines the ClassificationLabel Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationLabel/clbl:label"))]
   pub clbl_label: Vec<ClassificationLabel>,
-  /// _
+  /// Defines the ClassificationExtensionList Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationExtensionList/clbl:extLst"))]
   pub clbl_ext_lst: Option<ClassificationExtensionList>,
 }
@@ -72,7 +72,7 @@ pub struct ClassificationLabel {
 #[sdk(office2021, qname = "clbl:CT_ClassificationExtensionList/clbl:extLst")]
 pub struct ClassificationExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  /// _
+  /// Defines the ClassificationExtension Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationExtension/clbl:ext"))]
   pub clbl_ext: Vec<ClassificationExtension>,
 }

@@ -8,7 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "alf:CT_BackgroundNormalProperties/alf:Normal")]
 pub struct BackgroundNormalProperties {
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -16,7 +16,7 @@ pub struct BackgroundNormalProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "alf:CT_BackgroundRemovedProperties/alf:Removed")]
 pub struct BackgroundRemovedProperties {
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -24,7 +24,7 @@ pub struct BackgroundRemovedProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "alf:CT_BackgroundBlurProperties/alf:Blur")]
 pub struct BackgroundBlurProperties {
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -32,7 +32,7 @@ pub struct BackgroundBlurProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "alf:CT_BackgroundCustomProperties/alf:Custom")]
 pub struct BackgroundCustomProperties {
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -40,13 +40,13 @@ pub struct BackgroundCustomProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2021, qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps")]
 pub struct LiveFeedProperties {
-  /// _
+  /// Defines the LiveFeedBackgroundProperties Class.
   #[sdk(child(
     office2021,
     qname = "alf:CT_LiveFeedBackgroundProperties/alf:backgroundProps"
   ))]
   pub live_feed_background_properties: Option<std::boxed::Box<LiveFeedBackgroundProperties>>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub office_art_extension_list: Option<OfficeArtExtensionList>,
 }
@@ -57,7 +57,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub extension: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
 }
 /// Defines the LiveFeedBackgroundProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -74,7 +74,7 @@ pub struct LiveFeedBackgroundProperties {
     qname = "alf:CT_BackgroundCustomProperties/alf:Custom"
   ))]
   pub live_feed_background_properties_choice: Option<LiveFeedBackgroundPropertiesChoice>,
-  /// _
+  /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/alf:extLst"))]
   pub alf_ext_lst: Option<OfficeArtExtensionList>,
 }

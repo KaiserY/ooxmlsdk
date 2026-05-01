@@ -231,13 +231,13 @@ pub struct ContextNode {
   #[sdk(attr(qname = ":shapeGeometry"))]
   #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
   pub shape_geometry: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
-  /// _
+  /// Defines the ContextNodeProperty Class.
   #[sdk(child(qname = "msink:CT_Property/msink:property"))]
   pub msink_property: Vec<ContextNodeProperty>,
-  /// _
+  /// Defines the SourceLink Class.
   #[sdk(child(qname = "msink:CT_CtxLink/msink:sourceLink"))]
   pub msink_source_link: Vec<SourceLink>,
-  /// _
+  /// Defines the DestinationLink Class.
   #[sdk(child(qname = "msink:CT_CtxLink/msink:destinationLink"))]
   pub msink_destination_link: Vec<DestinationLink>,
 }

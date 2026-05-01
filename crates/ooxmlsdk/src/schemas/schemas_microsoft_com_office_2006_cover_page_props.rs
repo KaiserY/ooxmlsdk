@@ -8,22 +8,22 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cppr:CT_CoverPageProperties/cppr:CoverPageProperties")]
 pub struct CoverPageProperties {
-  /// _
+  /// Defines the PublishDate Class.
   #[sdk(text_child(qname = "cppr:ST_PublishDate/cppr:PublishDate"))]
   pub publish_date: crate::simple_type::StringValue,
-  /// _
+  /// Defines the DocumentAbstract Class.
   #[sdk(text_child(qname = "xsd:string/cppr:Abstract"))]
   pub document_abstract: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CompanyAddress Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyAddress"))]
   pub company_address: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CompanyPhoneNumber Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyPhone"))]
   pub company_phone_number: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CompanyFaxNumber Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyFax"))]
   pub company_fax_number: crate::simple_type::StringValue,
-  /// _
+  /// Defines the CompanyEmailAddress Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyEmail"))]
   pub company_email_address: crate::simple_type::StringValue,
 }

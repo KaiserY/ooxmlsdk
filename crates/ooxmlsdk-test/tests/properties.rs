@@ -143,7 +143,7 @@ fn extended_properties_titles_of_parts_round_trip_from_bug225919_test() {
     titles.vt_vector.base_type,
     VectorBaseValues::Lpstr
   ));
-  assert_eq!(titles.vt_vector.xml_children.len(), 1);
+  assert_eq!(titles.vt_vector.vt_vector_choice.len(), 1);
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<ap:Properties"));
   assert!(serialized.contains("<ap:TitlesOfParts"));
@@ -167,7 +167,9 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
     property.format_id.as_str(),
     "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}"
   );
-  let Some(CustomDocumentPropertyChoice::VtBool(value)) = property.xml_children.as_ref() else {
+  let Some(CustomDocumentPropertyChoice::VtBool(value)) =
+    property.custom_document_property_choice.as_ref()
+  else {
     panic!("expected vt:bool");
   };
   assert!(value);
@@ -184,7 +186,7 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
 #[test]
 fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
   let value = Variant {
-    xml_children: Some(VariantChoice::VtR8(f64::INFINITY)),
+    variant_choice: Some(VariantChoice::VtR8(f64::INFINITY)),
   };
 
   let xml = value.to_xml().unwrap();
@@ -192,7 +194,7 @@ fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
   assert!(serialized.contains("<vt:r8>INF</vt:r8>"));
 
   let reparsed = serialized.parse::<Variant>().unwrap();
-  let Some(VariantChoice::VtR8(parsed)) = reparsed.xml_children else {
+  let Some(VariantChoice::VtR8(parsed)) = reparsed.variant_choice else {
     panic!("expected vt:r8");
   };
   assert!(parsed.is_infinite());
@@ -202,7 +204,7 @@ fn variant_double_text_child_uses_xml_schema_float_lexical_form() {
 #[test]
 fn variant_sbyte_text_child_round_trips_as_numeric_value() {
   let value = Variant {
-    xml_children: Some(VariantChoice::VtI1(-12)),
+    variant_choice: Some(VariantChoice::VtI1(-12)),
   };
 
   let xml = value.to_xml().unwrap();
@@ -210,7 +212,7 @@ fn variant_sbyte_text_child_round_trips_as_numeric_value() {
   assert!(serialized.contains("<vt:i1>-12</vt:i1>"));
 
   let reparsed = serialized.parse::<Variant>().unwrap();
-  let Some(VariantChoice::VtI1(parsed)) = reparsed.xml_children else {
+  let Some(VariantChoice::VtI1(parsed)) = reparsed.variant_choice else {
     panic!("expected vt:i1");
   };
   assert_eq!(parsed, -12);

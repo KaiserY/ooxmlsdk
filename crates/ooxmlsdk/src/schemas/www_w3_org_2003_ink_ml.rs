@@ -912,7 +912,7 @@ pub struct AnnotationXml {
   pub href: Option<crate::simple_type::StringValue>,
   /// Defines the Emma Class.
   #[sdk(child(qname = "emma:CT_Emma/emma:emma"))]
-  pub emma: Option<crate::schemas::www_w3_org_2003_04_emma::Emma>,
+  pub emma: Option<crate::schemas::emma::Emma>,
 }
 /// Defines the BrushProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -382,13 +382,10 @@ pub struct ChartShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -404,9 +401,7 @@ pub struct ChartShapeProperties {
   pub chart_shape_properties_choice2: Option<ChartShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -414,18 +409,13 @@ pub struct ChartShapeProperties {
   pub chart_shape_properties_choice3: Option<ChartShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the TextProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -434,16 +424,13 @@ pub struct TextProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  pub body_properties:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
+  pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
+  pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
+  pub a_p: Vec<crate::schemas::a::Paragraph>,
 }
 /// Rich Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -452,16 +439,13 @@ pub struct RichText {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  pub body_properties:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
+  pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
+  pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
+  pub a_p: Vec<crate::schemas::a::Paragraph>,
 }
 /// Data Label Position.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2207,13 +2191,10 @@ pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -2230,9 +2211,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -2240,19 +2219,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
-  >,
+  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Data Label.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4337,8 +4310,7 @@ pub struct SurfaceSerExtension {
 pub struct DataDisplayOptions16 {
   /// Defines the BooleanFalse Class.
   #[sdk(child(office2019, qname = "c16r3:CT_BooleanFalse/c16r3:dispNaAsBlank"))]
-  pub boolean_false:
-    Option<crate::schemas::schemas_microsoft_com_office_drawing_2017_03_chart::BooleanFalse>,
+  pub boolean_false: Option<crate::schemas::c16r3::BooleanFalse>,
 }
 /// pivot chart format persistence data.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4537,65 +4509,54 @@ pub struct ColorMapOverride {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
   #[sdk(string_format(kind = "token"))]
-  pub background1:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub background1: crate::schemas::a::ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
   #[sdk(string_format(kind = "token"))]
-  pub text1: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub text1: crate::schemas::a::ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
   #[sdk(string_format(kind = "token"))]
-  pub background2:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub background2: crate::schemas::a::ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
   #[sdk(string_format(kind = "token"))]
-  pub text2: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub text2: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent1:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent1: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent2:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent2: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent3:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent3: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent4:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent4: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent5:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent5: crate::schemas::a::ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
   #[sdk(string_format(kind = "token"))]
-  pub accent6:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub accent6: crate::schemas::a::ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
   #[sdk(string_format(kind = "token"))]
-  pub hyperlink:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub hyperlink: crate::schemas::a::ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
   #[sdk(string_format(kind = "token"))]
-  pub followed_hyperlink:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
+  pub followed_hyperlink: crate::schemas::a::ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the PivotSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4735,53 +4696,37 @@ pub struct ChartSpaceExtension {
 pub enum ChartShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartTextChoice {
@@ -4857,9 +4802,7 @@ pub enum DataLabelsChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartSpaceChoice {
   #[sdk(child(office2010, qname = "c14:CT_Style/c14:style"))]
-  C14Style(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::Style>,
-  ),
+  C14Style(std::boxed::Box<crate::schemas::c14::Style>),
   #[sdk(child(qname = "c:CT_Style/c:style"))]
   CStyle(std::boxed::Box<Style>),
 }
@@ -4867,18 +4810,10 @@ pub enum ChartSpaceChoice {
 pub enum UserShapesChoice {
   /// Relative Anchor Shape Size.
   #[sdk(child(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor"))]
-  CdrRelSizeAnchor(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart_drawing::RelativeAnchorSize,
-    >,
-  ),
+  CdrRelSizeAnchor(std::boxed::Box<crate::schemas::cdr::RelativeAnchorSize>),
   /// Absolute Anchor Shape Size.
   #[sdk(child(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"))]
-  CdrAbsSizeAnchor(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart_drawing::AbsoluteAnchorSize,
-    >,
-  ),
+  CdrAbsSizeAnchor(std::boxed::Box<crate::schemas::cdr::AbsoluteAnchorSize>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlusChoice {
@@ -4936,40 +4871,28 @@ pub enum LegendEntryChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -4978,14 +4901,10 @@ pub enum ShapePropertiesChoice2 {
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct DataLabelChoiceSequence {
@@ -5069,11 +4988,7 @@ pub enum SeriesAxisChoice {
 pub enum StockChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
-  C15FilteredLineSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
-    >,
-  ),
+  C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5081,11 +4996,7 @@ pub enum StockChartExtensionChoice {
 pub enum PieChartExtensionChoice {
   /// Defines the FilteredPieSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
-  C15FilteredPieSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredPieSeries,
-    >,
-  ),
+  C15FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5093,11 +5004,7 @@ pub enum PieChartExtensionChoice {
 pub enum Pie3DChartExtensionChoice {
   /// Defines the FilteredPieSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
-  C15FilteredPieSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredPieSeries,
-    >,
-  ),
+  C15FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5105,23 +5012,13 @@ pub enum Pie3DChartExtensionChoice {
 pub enum NumRefExtensionChoice {
   /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
-  C15FullRef(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
-  ),
+  C15FullRef(std::boxed::Box<crate::schemas::c15::FullReference>),
   /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
-  C15LevelRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
-    >,
-  ),
+  C15LevelRef(std::boxed::Box<crate::schemas::c15::LevelReference>),
   /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
-  C15FormulaRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
-    >,
-  ),
+  C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5129,11 +5026,7 @@ pub enum NumRefExtensionChoice {
 pub enum StrDataExtensionChoice {
   /// Defines the AutoGeneneratedCategories Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:autoCat"))]
-  C15AutoCat(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::AutoGeneneratedCategories,
-    >,
-  ),
+  C15AutoCat(std::boxed::Box<crate::schemas::c15::AutoGeneneratedCategories>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5141,23 +5034,13 @@ pub enum StrDataExtensionChoice {
 pub enum StrRefExtensionChoice {
   /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
-  C15FullRef(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
-  ),
+  C15FullRef(std::boxed::Box<crate::schemas::c15::FullReference>),
   /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
-  C15LevelRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
-    >,
-  ),
+  C15LevelRef(std::boxed::Box<crate::schemas::c15::LevelReference>),
   /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
-  C15FormulaRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
-    >,
-  ),
+  C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5165,23 +5048,13 @@ pub enum StrRefExtensionChoice {
 pub enum MultiLvlStrRefExtensionChoice {
   /// Defines the FullReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FullRef/c15:fullRef"))]
-  C15FullRef(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FullReference>,
-  ),
+  C15FullRef(std::boxed::Box<crate::schemas::c15::FullReference>),
   /// Defines the LevelReference Class.
   #[sdk(child(office2013, qname = "c15:CT_LevelRef/c15:levelRef"))]
-  C15LevelRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LevelReference,
-    >,
-  ),
+  C15LevelRef(std::boxed::Box<crate::schemas::c15::LevelReference>),
   /// Defines the FormulaReference Class.
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
-  C15FormulaRef(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FormulaReference,
-    >,
-  ),
+  C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5189,47 +5062,25 @@ pub enum MultiLvlStrRefExtensionChoice {
 pub enum DLblsExtensionChoice {
   /// Defines the ChartText Class.
   #[sdk(child(office2013, qname = "c:CT_Tx/c15:tx"))]
-  C15Tx(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ChartText>,
-  ),
+  C15Tx(std::boxed::Box<crate::schemas::c15::ChartText>),
   /// Defines the DataLabelFieldTable Class.
   #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
-  C15DlblFieldTable(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
-    >,
-  ),
+  C15DlblFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
   /// Defines the ShowDataLabelsRange Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
-  C15ShowDataLabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
-    >,
-  ),
+  C15ShowDataLabelsRange(std::boxed::Box<crate::schemas::c15::ShowDataLabelsRange>),
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
-  C15SpPr(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
-    >,
-  ),
+  C15SpPr(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   /// Defines the Layout Class.
   #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
-  C15Layout(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
-  ),
+  C15Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   /// Defines the ShowLeaderLines Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showLeaderLines"))]
-  C15ShowLeaderLines(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowLeaderLines,
-    >,
-  ),
+  C15ShowLeaderLines(std::boxed::Box<crate::schemas::c15::ShowLeaderLines>),
   /// Defines the LeaderLines Class.
   #[sdk(child(office2013, qname = "c:CT_ChartLines/c15:leaderLines"))]
-  C15LeaderLines(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::LeaderLines>,
-  ),
+  C15LeaderLines(std::boxed::Box<crate::schemas::c15::LeaderLines>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5237,11 +5088,7 @@ pub enum DLblsExtensionChoice {
 pub enum LineChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
-  C15FilteredLineSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
-    >,
-  ),
+  C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5249,11 +5096,7 @@ pub enum LineChartExtensionChoice {
 pub enum Line3DChartExtensionChoice {
   /// Defines the FilteredLineSeriesExtension Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
-  C15FilteredLineSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredLineSeriesExtension,
-    >,
-  ),
+  C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5264,11 +5107,7 @@ pub enum ScatterChartExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries"
   ))]
-  C15FilteredScatterSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredScatterSeries,
-    >,
-  ),
+  C15FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5276,11 +5115,7 @@ pub enum ScatterChartExtensionChoice {
 pub enum RadarChartExtensionChoice {
   /// Defines the FilteredRadarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
-  C15FilteredRadarSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredRadarSeries,
-    >,
-  ),
+  C15FilteredRadarSeries(std::boxed::Box<crate::schemas::c15::FilteredRadarSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5288,11 +5123,7 @@ pub enum RadarChartExtensionChoice {
 pub enum BarChartExtensionChoice {
   /// Defines the FilteredBarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
-  C15FilteredBarSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBarSeries,
-    >,
-  ),
+  C15FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5300,11 +5131,7 @@ pub enum BarChartExtensionChoice {
 pub enum Bar3DChartExtensionChoice {
   /// Defines the FilteredBarSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
-  C15FilteredBarSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBarSeries,
-    >,
-  ),
+  C15FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5312,11 +5139,7 @@ pub enum Bar3DChartExtensionChoice {
 pub enum AreaChartExtensionChoice {
   /// Defines the FilteredAreaSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
-  C15FilteredAreaSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredAreaSeries,
-    >,
-  ),
+  C15FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5324,11 +5147,7 @@ pub enum AreaChartExtensionChoice {
 pub enum Area3DChartExtensionChoice {
   /// Defines the FilteredAreaSeries Class.
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
-  C15FilteredAreaSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredAreaSeries,
-    >,
-  ),
+  C15FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5339,11 +5158,7 @@ pub enum BubbleChartExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries"
   ))]
-  C15FilteredBubbleSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredBubbleSeries,
-    >,
-  ),
+  C15FilteredBubbleSeries(std::boxed::Box<crate::schemas::c15::FilteredBubbleSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5354,11 +5169,7 @@ pub enum SurfaceChartExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
   ))]
-  C15FilteredSurfaceSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSurfaceSeries,
-    >,
-  ),
+  C15FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5369,11 +5180,7 @@ pub enum Surface3DChartExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries"
   ))]
-  C15FilteredSurfaceSeries(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSurfaceSeries,
-    >,
-  ),
+  C15FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5381,11 +5188,7 @@ pub enum Surface3DChartExtensionChoice {
 pub enum CatAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
-  C15NumFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
-    >,
-  ),
+  C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5393,11 +5196,7 @@ pub enum CatAxExtensionChoice {
 pub enum DateAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
-  C15NumFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
-    >,
-  ),
+  C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5405,11 +5204,7 @@ pub enum DateAxExtensionChoice {
 pub enum SerAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
-  C15NumFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
-    >,
-  ),
+  C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5417,11 +5212,7 @@ pub enum SerAxExtensionChoice {
 pub enum ValAxExtensionChoice {
   /// Defines the NumberingFormat Class.
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
-  C15NumFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::NumberingFormat,
-    >,
-  ),
+  C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5436,44 +5227,22 @@ pub enum DisplayUnitsChoice {
 pub enum DLblExtensionChoice {
   /// Defines the DataLabelFieldTable Class.
   #[sdk(child(office2013, qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable"))]
-  C15DlblFieldTable(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelFieldTable,
-    >,
-  ),
+  C15DlblFieldTable(std::boxed::Box<crate::schemas::c15::DataLabelFieldTable>),
   /// Defines the ExceptionForSave Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:xForSave"))]
-  C15XForSave(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ExceptionForSave,
-    >,
-  ),
+  C15XForSave(std::boxed::Box<crate::schemas::c15::ExceptionForSave>),
   /// Defines the ShowDataLabelsRange Class.
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:showDataLabelsRange"))]
-  C15ShowDataLabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShowDataLabelsRange,
-    >,
-  ),
+  C15ShowDataLabelsRange(std::boxed::Box<crate::schemas::c15::ShowDataLabelsRange>),
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
-  C15SpPr(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::ShapeProperties,
-    >,
-  ),
+  C15SpPr(std::boxed::Box<crate::schemas::c15::ShapeProperties>),
   /// Defines the Layout Class.
   #[sdk(child(office2013, qname = "c:CT_Layout/c15:layout"))]
-  C15Layout(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::Layout>,
-  ),
+  C15Layout(std::boxed::Box<crate::schemas::c15::Layout>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5520,65 +5289,37 @@ pub enum LineSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5589,65 +5330,37 @@ pub enum ScatterSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5658,65 +5371,37 @@ pub enum RadarSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5724,75 +5409,43 @@ pub enum RadarSerExtensionChoice {
 pub enum BarSerExtensionChoice {
   /// Defines the InvertSolidFillFormat Class.
   #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
-  C14InvertSolidFillFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
-    >,
-  ),
+  C14InvertSolidFillFmt(std::boxed::Box<crate::schemas::c14::InvertSolidFillFormat>),
   /// Defines the FilteredSeriesTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5803,65 +5456,37 @@ pub enum AreaSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5872,65 +5497,37 @@ pub enum PieSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -5938,65 +5535,37 @@ pub enum PieSerExtensionChoice {
 pub enum BubbleSerExtensionChoice {
   /// Defines the InvertSolidFillFormat Class.
   #[sdk(child(office2010, qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt"))]
-  C14InvertSolidFillFmt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::InvertSolidFillFormat,
-    >,
-  ),
+  C14InvertSolidFillFmt(std::boxed::Box<crate::schemas::c14::InvertSolidFillFormat>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the DataLabelsRange Class.
   #[sdk(child(office2013, qname = "c15:CT_SeriesDataLabelsRange/c15:datalabelsRange"))]
-  C15DatalabelsRange(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::DataLabelsRange,
-    >,
-  ),
+  C15DatalabelsRange(std::boxed::Box<crate::schemas::c15::DataLabelsRange>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -6007,58 +5576,34 @@ pub enum SurfaceSerExtensionChoice {
     office2013,
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle"
   ))]
-  C15FilteredSeriesTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredSeriesTitle,
-    >,
-  ),
+  C15FilteredSeriesTitle(std::boxed::Box<crate::schemas::c15::FilteredSeriesTitle>),
   /// Defines the FilteredCategoryTitle Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_FilteredCategoryTitle/c15:filteredCategoryTitle"
   ))]
-  C15FilteredCategoryTitle(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::FilteredCategoryTitle,
-    >,
-  ),
+  C15FilteredCategoryTitle(std::boxed::Box<crate::schemas::c15::FilteredCategoryTitle>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2013,
     qname = "c15:CT_CategoryFilterExceptions/c15:categoryFilterExceptions"
   ))]
-  C15CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C15CategoryFilterExceptions(std::boxed::Box<crate::schemas::c15::CategoryFilterExceptions>),
   /// Defines the CategoryFilterExceptions Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_CategoryFilterExceptions/c16:categoryFilterExceptions"
   ))]
-  C16CategoryFilterExceptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::CategoryFilterExceptions,
-    >,
-  ),
+  C16CategoryFilterExceptions(std::boxed::Box<crate::schemas::c16::CategoryFilterExceptions>),
   /// Defines the ChartDataPointUniqueIDMap Class.
   #[sdk(child(
     office2016,
     qname = "c16:CT_ChartDataPointUniqueIDMap/c16:datapointuniqueidmap"
   ))]
-  C16Datapointuniqueidmap(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::ChartDataPointUniqueIdMap,
-    >,
-  ),
+  C16Datapointuniqueidmap(std::boxed::Box<crate::schemas::c16::ChartDataPointUniqueIdMap>),
   /// Defines the UniqueIdChartUniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
-  C16UniqueId(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2014_chart::UniqueIdChartUniqueId,
-    >,
-  ),
+  C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -6132,23 +5677,13 @@ pub enum PlotAreaChoice2 {
 pub enum ChartSpaceExtensionChoice {
   /// Defines the PivotOptions Class.
   #[sdk(child(office2010, qname = "c14:CT_PivotOptions/c14:pivotOptions"))]
-  C14PivotOptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::PivotOptions,
-    >,
-  ),
+  C14PivotOptions(std::boxed::Box<crate::schemas::c14::PivotOptions>),
   /// Defines the SketchOptions Class.
   #[sdk(child(office2010, qname = "c14:CT_SketchOptions/c14:sketchOptions"))]
-  C14SketchOptions(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2007_8_2_chart::SketchOptions,
-    >,
-  ),
+  C14SketchOptions(std::boxed::Box<crate::schemas::c14::SketchOptions>),
   /// Defines the PivotSource Class.
   #[sdk(child(office2013, qname = "c:CT_PivotSource/c15:pivotSource"))]
-  C15PivotSource(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_chart::PivotSource>,
-  ),
+  C15PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
   #[sdk(any)]
   XmlOther(String),
 }

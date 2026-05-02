@@ -37,18 +37,15 @@ pub struct BackgroundProperties {
   /// bwMode
   #[sdk(attr(office2013, qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// bwPure
   #[sdk(attr(office2013, qname = ":bwPure"))]
   #[sdk(string_format(kind = "token"))]
-  pub pure:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub pure: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// bwNormal
   #[sdk(attr(office2013, qname = ":bwNormal"))]
   #[sdk(string_format(kind = "token"))]
-  pub normal:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub normal: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// targetScreenSize
   #[sdk(attr(office2013, qname = ":targetScreenSize"))]
   #[sdk(string_format(kind = "token"))]

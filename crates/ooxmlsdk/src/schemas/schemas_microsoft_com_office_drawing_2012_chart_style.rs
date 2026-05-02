@@ -329,7 +329,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the StyleColor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -451,8 +451,7 @@ pub struct FontReference {
   /// idx
   #[sdk(attr(office2013, qname = ":idx"))]
   #[sdk(string_format(kind = "token"))]
-  pub index:
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontCollectionIndexValues,
+  pub index: crate::schemas::a::FontCollectionIndexValues,
   /// mods
   #[sdk(attr(office2013, qname = ":mods"))]
   pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
@@ -477,13 +476,10 @@ pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -500,9 +496,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -510,19 +504,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
-  >,
+  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the TextCharacterPropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -551,13 +539,11 @@ pub struct TextCharacterPropertiesType {
   /// u
   #[sdk(attr(qname = ":u"))]
   #[sdk(string_format(kind = "token"))]
-  pub underline:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextUnderlineValues>,
+  pub underline: Option<crate::schemas::a::TextUnderlineValues>,
   /// strike
   #[sdk(attr(qname = ":strike"))]
   #[sdk(string_format(kind = "token"))]
-  pub strike:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextStrikeValues>,
+  pub strike: Option<crate::schemas::a::TextStrikeValues>,
   /// kern
   #[sdk(attr(qname = ":kern"))]
   #[sdk(number_range(range = 0..= 400000))]
@@ -565,8 +551,7 @@ pub struct TextCharacterPropertiesType {
   /// cap
   #[sdk(attr(qname = ":cap"))]
   #[sdk(string_format(kind = "token"))]
-  pub capital:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextCapsValues>,
+  pub capital: Option<crate::schemas::a::TextCapsValues>,
   /// spc
   #[sdk(attr(qname = ":spc"))]
   #[sdk(number_range(range = -400000..= 400000))]
@@ -597,9 +582,7 @@ pub struct TextCharacterPropertiesType {
   pub bookmark: Option<crate::simple_type::StringValue>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub outline: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub outline: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -616,9 +599,7 @@ pub struct TextCharacterPropertiesType {
   pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
-  pub a_highlight: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Highlight>,
-  >,
+  pub a_highlight: Option<std::boxed::Box<crate::schemas::a::Highlight>>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
@@ -631,38 +612,28 @@ pub struct TextCharacterPropertiesType {
   pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
-  pub a_latin: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LatinFont>,
+  pub a_latin: Option<crate::schemas::a::LatinFont>,
   /// East Asian Font.
   #[sdk(child(qname = "a:CT_TextFont/a:ea"))]
-  pub a_ea: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EastAsianFont>,
+  pub a_ea: Option<crate::schemas::a::EastAsianFont>,
   /// Complex Script Font.
   #[sdk(child(qname = "a:CT_TextFont/a:cs"))]
-  pub a_cs:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ComplexScriptFont>,
+  pub a_cs: Option<crate::schemas::a::ComplexScriptFont>,
   /// Defines the SymbolFont Class.
   #[sdk(child(qname = "a:CT_TextFont/a:sym"))]
-  pub a_sym: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SymbolFont>,
+  pub a_sym: Option<crate::schemas::a::SymbolFont>,
   /// Defines the HyperlinkOnClick Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-  pub a_hlink_click: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
-    >,
-  >,
+  pub a_hlink_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
   /// Defines the HyperlinkOnMouseOver Class.
   #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkMouseOver"))]
-  pub a_hlink_mouse_over: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnMouseOver,
-    >,
-  >,
+  pub a_hlink_mouse_over: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnMouseOver>>,
   /// Defines the RightToLeft Class.
   #[sdk(child(qname = "a:CT_Bool/a:rtl"))]
-  pub a_rtl: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RightToLeft>,
+  pub a_rtl: Option<crate::schemas::a::RightToLeft>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the TextBodyProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -678,25 +649,19 @@ pub struct TextBodyProperties {
   /// Text Vertical Overflow
   #[sdk(attr(qname = ":vertOverflow"))]
   #[sdk(string_format(kind = "token"))]
-  pub vertical_overflow: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalOverflowValues,
-  >,
+  pub vertical_overflow: Option<crate::schemas::a::TextVerticalOverflowValues>,
   /// Text Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
   #[sdk(string_format(kind = "token"))]
-  pub horizontal_overflow: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextHorizontalOverflowValues,
-  >,
+  pub horizontal_overflow: Option<crate::schemas::a::TextHorizontalOverflowValues>,
   /// Vertical Text
   #[sdk(attr(qname = ":vert"))]
   #[sdk(string_format(kind = "token"))]
-  pub vertical:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalValues>,
+  pub vertical: Option<crate::schemas::a::TextVerticalValues>,
   /// Text Wrapping Type
   #[sdk(attr(qname = ":wrap"))]
   #[sdk(string_format(kind = "token"))]
-  pub wrap:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextWrappingValues>,
+  pub wrap: Option<crate::schemas::a::TextWrappingValues>,
   /// Left Inset
   #[sdk(attr(qname = ":lIns"))]
   pub left_inset: Option<crate::simple_type::Int32Value>,
@@ -726,8 +691,7 @@ pub struct TextBodyProperties {
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
   #[sdk(string_format(kind = "token"))]
-  pub anchor:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues>,
+  pub anchor: Option<crate::schemas::a::TextAnchoringTypeValues>,
   /// Anchor Center
   #[sdk(attr(qname = ":anchorCtr"))]
   pub anchor_center: Option<crate::simple_type::BooleanValue>,
@@ -742,9 +706,7 @@ pub struct TextBodyProperties {
   pub compatible_line_spacing: Option<crate::simple_type::BooleanValue>,
   /// Preset Text Shape
   #[sdk(child(qname = "a:CT_PresetTextShape/a:prstTxWarp"))]
-  pub preset_text_warp: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetTextWarp>,
-  >,
+  pub preset_text_warp: Option<std::boxed::Box<crate::schemas::a::PresetTextWarp>>,
   #[sdk(choice(
     qname = "a:CT_TextNoAutofit/a:noAutofit",
     qname = "a:CT_TextNormalAutofit/a:normAutofit",
@@ -753,15 +715,12 @@ pub struct TextBodyProperties {
   pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
   pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
 }
 /// Defines the CategoryAxisProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2087,42 +2046,26 @@ pub struct MarkerLayoutProperties {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorStyleChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorStyleVariationChoice {
   /// Tint.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
-  ATint(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tint>),
+  ATint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
-  AShade(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shade>),
+  AShade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
   #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
   AComp,
@@ -2134,107 +2077,67 @@ pub enum ColorStyleVariationChoice {
   AGray,
   /// Alpha.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
-  AAlpha(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Alpha>),
+  AAlpha(std::boxed::Box<crate::schemas::a::Alpha>),
   /// Alpha Offset.
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
-  AAlphaOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaOffset>,
-  ),
+  AAlphaOff(std::boxed::Box<crate::schemas::a::AlphaOffset>),
   /// Alpha Modulation.
   #[sdk(child(qname = "a:CT_PositivePercentage/a:alphaMod"))]
-  AAlphaMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulation,
-    >,
-  ),
+  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulation>),
   /// Hue.
   #[sdk(child(qname = "a:CT_PositiveFixedAngle/a:hue"))]
-  AHue(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hue>),
+  AHue(std::boxed::Box<crate::schemas::a::Hue>),
   /// Hue Offset.
   #[sdk(child(qname = "a:CT_Angle/a:hueOff"))]
-  AHueOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HueOffset>,
-  ),
+  AHueOff(std::boxed::Box<crate::schemas::a::HueOffset>),
   /// Hue Modulate.
   #[sdk(child(qname = "a:CT_PositivePercentage/a:hueMod"))]
-  AHueMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HueModulation>,
-  ),
+  AHueMod(std::boxed::Box<crate::schemas::a::HueModulation>),
   /// Saturation.
   #[sdk(child(qname = "a:CT_Percentage/a:sat"))]
-  ASat(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Saturation>),
+  ASat(std::boxed::Box<crate::schemas::a::Saturation>),
   /// Saturation Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:satOff"))]
-  ASatOff(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SaturationOffset,
-    >,
-  ),
+  ASatOff(std::boxed::Box<crate::schemas::a::SaturationOffset>),
   /// Saturation Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:satMod"))]
-  ASatMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SaturationModulation,
-    >,
-  ),
+  ASatMod(std::boxed::Box<crate::schemas::a::SaturationModulation>),
   /// Luminance.
   #[sdk(child(qname = "a:CT_Percentage/a:lum"))]
-  ALum(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Luminance>),
+  ALum(std::boxed::Box<crate::schemas::a::Luminance>),
   /// Luminance Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:lumOff"))]
-  ALumOff(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceOffset,
-    >,
-  ),
+  ALumOff(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
   /// Luminance Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:lumMod"))]
-  ALumMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceModulation,
-    >,
-  ),
+  ALumMod(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
   /// Red.
   #[sdk(child(qname = "a:CT_Percentage/a:red"))]
-  ARed(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Red>),
+  ARed(std::boxed::Box<crate::schemas::a::Red>),
   /// Red Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:redOff"))]
-  ARedOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RedOffset>,
-  ),
+  ARedOff(std::boxed::Box<crate::schemas::a::RedOffset>),
   /// Red Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:redMod"))]
-  ARedMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RedModulation>,
-  ),
+  ARedMod(std::boxed::Box<crate::schemas::a::RedModulation>),
   /// Green.
   #[sdk(child(qname = "a:CT_Percentage/a:green"))]
-  AGreen(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Green>),
+  AGreen(std::boxed::Box<crate::schemas::a::Green>),
   /// Green Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:greenOff"))]
-  AGreenOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GreenOffset>,
-  ),
+  AGreenOff(std::boxed::Box<crate::schemas::a::GreenOffset>),
   /// Green Modification.
   #[sdk(child(qname = "a:CT_Percentage/a:greenMod"))]
-  AGreenMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GreenModulation,
-    >,
-  ),
+  AGreenMod(std::boxed::Box<crate::schemas::a::GreenModulation>),
   /// Blue.
   #[sdk(child(qname = "a:CT_Percentage/a:blue"))]
-  ABlue(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blue>),
+  ABlue(std::boxed::Box<crate::schemas::a::Blue>),
   /// Blue Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:blueOff"))]
-  ABlueOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueOffset>,
-  ),
+  ABlueOff(std::boxed::Box<crate::schemas::a::BlueOffset>),
   /// Blue Modification.
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
-  ABlueMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueModulation>,
-  ),
+  ABlueMod(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
   #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
   AGamma,
@@ -2246,10 +2149,10 @@ pub enum ColorStyleVariationChoice {
 pub enum StyleColorChoice {
   /// Tint.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:tint"))]
-  ATint(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tint>),
+  ATint(std::boxed::Box<crate::schemas::a::Tint>),
   /// Shade.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:shade"))]
-  AShade(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shade>),
+  AShade(std::boxed::Box<crate::schemas::a::Shade>),
   /// Complement.
   #[sdk(empty_child(qname = "a:CT_ComplementTransform/a:comp"))]
   AComp,
@@ -2261,107 +2164,67 @@ pub enum StyleColorChoice {
   AGray,
   /// Alpha.
   #[sdk(child(qname = "a:CT_PositiveFixedPercentage/a:alpha"))]
-  AAlpha(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Alpha>),
+  AAlpha(std::boxed::Box<crate::schemas::a::Alpha>),
   /// Alpha Offset.
   #[sdk(child(qname = "a:CT_FixedPercentage/a:alphaOff"))]
-  AAlphaOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaOffset>,
-  ),
+  AAlphaOff(std::boxed::Box<crate::schemas::a::AlphaOffset>),
   /// Alpha Modulation.
   #[sdk(child(qname = "a:CT_PositivePercentage/a:alphaMod"))]
-  AAlphaMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulation,
-    >,
-  ),
+  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulation>),
   /// Hue.
   #[sdk(child(qname = "a:CT_PositiveFixedAngle/a:hue"))]
-  AHue(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hue>),
+  AHue(std::boxed::Box<crate::schemas::a::Hue>),
   /// Hue Offset.
   #[sdk(child(qname = "a:CT_Angle/a:hueOff"))]
-  AHueOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HueOffset>,
-  ),
+  AHueOff(std::boxed::Box<crate::schemas::a::HueOffset>),
   /// Hue Modulate.
   #[sdk(child(qname = "a:CT_PositivePercentage/a:hueMod"))]
-  AHueMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HueModulation>,
-  ),
+  AHueMod(std::boxed::Box<crate::schemas::a::HueModulation>),
   /// Saturation.
   #[sdk(child(qname = "a:CT_Percentage/a:sat"))]
-  ASat(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Saturation>),
+  ASat(std::boxed::Box<crate::schemas::a::Saturation>),
   /// Saturation Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:satOff"))]
-  ASatOff(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SaturationOffset,
-    >,
-  ),
+  ASatOff(std::boxed::Box<crate::schemas::a::SaturationOffset>),
   /// Saturation Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:satMod"))]
-  ASatMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SaturationModulation,
-    >,
-  ),
+  ASatMod(std::boxed::Box<crate::schemas::a::SaturationModulation>),
   /// Luminance.
   #[sdk(child(qname = "a:CT_Percentage/a:lum"))]
-  ALum(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Luminance>),
+  ALum(std::boxed::Box<crate::schemas::a::Luminance>),
   /// Luminance Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:lumOff"))]
-  ALumOff(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceOffset,
-    >,
-  ),
+  ALumOff(std::boxed::Box<crate::schemas::a::LuminanceOffset>),
   /// Luminance Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:lumMod"))]
-  ALumMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceModulation,
-    >,
-  ),
+  ALumMod(std::boxed::Box<crate::schemas::a::LuminanceModulation>),
   /// Red.
   #[sdk(child(qname = "a:CT_Percentage/a:red"))]
-  ARed(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Red>),
+  ARed(std::boxed::Box<crate::schemas::a::Red>),
   /// Red Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:redOff"))]
-  ARedOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RedOffset>,
-  ),
+  ARedOff(std::boxed::Box<crate::schemas::a::RedOffset>),
   /// Red Modulation.
   #[sdk(child(qname = "a:CT_Percentage/a:redMod"))]
-  ARedMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RedModulation>,
-  ),
+  ARedMod(std::boxed::Box<crate::schemas::a::RedModulation>),
   /// Green.
   #[sdk(child(qname = "a:CT_Percentage/a:green"))]
-  AGreen(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Green>),
+  AGreen(std::boxed::Box<crate::schemas::a::Green>),
   /// Green Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:greenOff"))]
-  AGreenOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GreenOffset>,
-  ),
+  AGreenOff(std::boxed::Box<crate::schemas::a::GreenOffset>),
   /// Green Modification.
   #[sdk(child(qname = "a:CT_Percentage/a:greenMod"))]
-  AGreenMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GreenModulation,
-    >,
-  ),
+  AGreenMod(std::boxed::Box<crate::schemas::a::GreenModulation>),
   /// Blue.
   #[sdk(child(qname = "a:CT_Percentage/a:blue"))]
-  ABlue(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blue>),
+  ABlue(std::boxed::Box<crate::schemas::a::Blue>),
   /// Blue Offset.
   #[sdk(child(qname = "a:CT_Percentage/a:blueOff"))]
-  ABlueOff(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueOffset>,
-  ),
+  ABlueOff(std::boxed::Box<crate::schemas::a::BlueOffset>),
   /// Blue Modification.
   #[sdk(child(qname = "a:CT_Percentage/a:blueMod"))]
-  ABlueMod(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlueModulation>,
-  ),
+  ABlueMod(std::boxed::Box<crate::schemas::a::BlueModulation>),
   /// Gamma.
   #[sdk(empty_child(qname = "a:CT_GammaTransform/a:gamma"))]
   AGamma,
@@ -2372,165 +2235,89 @@ pub enum StyleColorChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FontReferenceChoice {
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -2539,40 +2326,28 @@ pub enum ShapePropertiesChoice2 {
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -2581,14 +2356,10 @@ pub enum TextCharacterPropertiesTypeChoice {
 pub enum TextCharacterPropertiesTypeChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice3 {
@@ -2597,7 +2368,7 @@ pub enum TextCharacterPropertiesTypeChoice3 {
   AULnTx,
   /// Underline Stroke.
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
-  AULn(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Underline>),
+  AULn(std::boxed::Box<crate::schemas::a::Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice4 {
@@ -2606,9 +2377,7 @@ pub enum TextCharacterPropertiesTypeChoice4 {
   AUFillTx,
   /// Underline Fill.
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
-  AUFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::UnderlineFill>,
-  ),
+  AUFill(std::boxed::Box<crate::schemas::a::UnderlineFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
@@ -2617,25 +2386,17 @@ pub enum TextBodyPropertiesChoice {
   ANoAutofit,
   /// Normal AutoFit.
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
-  ANormAutofit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NormalAutoFit>,
-  ),
+  ANormAutofit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
   #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
-  ASpAutoFit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeAutoFit>,
-  ),
+  ASpAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  ASp3d(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  ),
+  ASp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
-  AFlatTx(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FlatText>,
-  ),
+  AFlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
 }

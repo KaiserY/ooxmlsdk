@@ -13,12 +13,10 @@ pub struct PivotSource {
   pub pivot_table_name: crate::simple_type::StringValue,
   /// Format ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:fmtId"))]
-  pub format_id:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::FormatId>,
+  pub format_id: std::boxed::Box<crate::schemas::c::FormatId>,
   /// Chart Extensibility
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }
 /// Defines the NumberingFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -39,13 +37,10 @@ pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -62,9 +57,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -72,19 +65,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
-  >,
+  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the Layout Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -92,13 +79,10 @@ pub struct ShapeProperties {
 pub struct Layout {
   /// Manual Layout
   #[sdk(child(qname = "c:CT_ManualLayout/c:manualLayout"))]
-  pub manual_layout: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ManualLayout>,
-  >,
+  pub manual_layout: Option<std::boxed::Box<crate::schemas::c::ManualLayout>>,
   /// Chart Extensibility
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }
 /// Defines the FullReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -318,11 +302,7 @@ pub struct ChartText {
 pub struct LeaderLines {
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
 }
 /// Defines the SequenceOfReferences Class.
 pub type SequenceOfReferences = crate::simple_type::StringValue;
@@ -349,70 +329,46 @@ pub struct AxisDataSourceType {
 pub struct BarChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Invert if Negative.
   #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
-  pub invert_if_negative:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::InvertIfNegative>,
+  pub invert_if_negative: Option<crate::schemas::c::InvertIfNegative>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  pub c_trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
-  >,
+  pub c_err_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the Shape Class.
   #[sdk(child(qname = "c:CT_Shape/c:shape"))]
-  pub c_shape: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Shape>,
+  pub c_shape: Option<crate::schemas::c::Shape>,
   /// Defines the BarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BarSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BarSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::BarSerExtensionList>,
 }
 /// Defines the LineChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -420,71 +376,46 @@ pub struct BarChartSeries {
 pub struct LineChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
-  pub marker: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
-  >,
+  pub marker: Option<std::boxed::Box<crate::schemas::c::Marker>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  pub c_trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
-  >,
+  pub c_err_bars: Option<std::boxed::Box<crate::schemas::c::ErrorBars>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
-  pub c_smooth: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Smooth>,
+  pub c_smooth: Option<crate::schemas::c::Smooth>,
   /// Defines the LineSerExtensionList Class.
   #[sdk(child(qname = "c:CT_LineSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::LineSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::LineSerExtensionList>,
 }
 /// Defines the ScatterChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -492,61 +423,43 @@ pub struct LineChartSeries {
 pub struct ScatterChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
-  pub marker: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
-  >,
+  pub marker: Option<std::boxed::Box<crate::schemas::c::Marker>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  pub c_trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
-  pub c_x_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::XValues>,
-  >,
+  pub c_x_val: Option<std::boxed::Box<crate::schemas::c::XValues>>,
   /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
-  pub c_y_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::YValues>,
-  >,
+  pub c_y_val: Option<std::boxed::Box<crate::schemas::c::YValues>>,
   /// Defines the Smooth Class.
   #[sdk(child(qname = "c:CT_Boolean/c:smooth"))]
-  pub c_smooth: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Smooth>,
+  pub c_smooth: Option<crate::schemas::c::Smooth>,
   /// Defines the ScatterSerExtensionList Class.
   #[sdk(child(qname = "c:CT_ScatterSerExtensionList/c:extLst"))]
-  pub c_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ScatterSerExtensionList,
-  >,
+  pub c_ext_lst: Option<crate::schemas::c::ScatterSerExtensionList>,
 }
 /// Defines the AreaChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -554,61 +467,40 @@ pub struct ScatterChartSeries {
 pub struct AreaChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  pub c_trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the AreaSerExtensionList Class.
   #[sdk(child(qname = "c:CT_AreaSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::AreaSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::AreaSerExtensionList>,
 }
 /// Defines the PieChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -616,58 +508,37 @@ pub struct AreaChartSeries {
 pub struct PieChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Explosion.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:explosion"))]
-  pub explosion: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Explosion>,
+  pub explosion: Option<crate::schemas::c::Explosion>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the PieSerExtensionList Class.
   #[sdk(child(qname = "c:CT_PieSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PieSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::PieSerExtensionList>,
 }
 /// Defines the BubbleChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -675,72 +546,49 @@ pub struct PieChartSeries {
 pub struct BubbleChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Invert if Negative.
   #[sdk(child(qname = "c:CT_Boolean/c:invertIfNegative"))]
-  pub invert_if_negative:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::InvertIfNegative>,
+  pub invert_if_negative: Option<crate::schemas::c::InvertIfNegative>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the Trendline Class.
   #[sdk(child(qname = "c:CT_Trendline/c:trendline"))]
-  pub c_trendline: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Trendline>,
+  pub c_trendline: Vec<crate::schemas::c::Trendline>,
   /// Defines the ErrorBars Class.
   #[sdk(child(qname = "c:CT_ErrBars/c:errBars"))]
-  pub c_err_bars: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ErrorBars>,
+  pub c_err_bars: Vec<crate::schemas::c::ErrorBars>,
   /// Defines the XValues Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:xVal"))]
-  pub c_x_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::XValues>,
-  >,
+  pub c_x_val: Option<std::boxed::Box<crate::schemas::c::XValues>>,
   /// Defines the YValues Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:yVal"))]
-  pub c_y_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::YValues>,
-  >,
+  pub c_y_val: Option<std::boxed::Box<crate::schemas::c::YValues>>,
   /// Defines the BubbleSize Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:bubbleSize"))]
-  pub c_bubble_size: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BubbleSize>,
-  >,
+  pub c_bubble_size: Option<std::boxed::Box<crate::schemas::c::BubbleSize>>,
   /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
-  pub c_bubble3_d:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Bubble3D>,
+  pub c_bubble3_d: Option<crate::schemas::c::Bubble3D>,
   /// Defines the BubbleSerExtensionList Class.
   #[sdk(child(qname = "c:CT_BubbleSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::BubbleSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::BubbleSerExtensionList>,
 }
 /// Defines the RadarChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -748,60 +596,37 @@ pub struct BubbleChartSeries {
 pub struct RadarChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Marker.
   #[sdk(child(qname = "c:CT_Marker/c:marker"))]
-  pub marker: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Marker>,
-  >,
+  pub marker: Option<std::boxed::Box<crate::schemas::c::Marker>>,
   /// Defines the DataPoint Class.
   #[sdk(child(qname = "c:CT_DPt/c:dPt"))]
-  pub c_d_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataPoint>,
+  pub c_d_pt: Vec<crate::schemas::c::DataPoint>,
   /// Data Labels.
   #[sdk(child(qname = "c:CT_DLbls/c:dLbls"))]
-  pub c_d_lbls: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabels>,
-  >,
+  pub c_d_lbls: Option<std::boxed::Box<crate::schemas::c::DataLabels>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub c_cat: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub c_cat: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub c_val: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub c_val: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// Defines the RadarSerExtensionList Class.
   #[sdk(child(qname = "c:CT_RadarSerExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::RadarSerExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::RadarSerExtensionList>,
 }
 /// Defines the SurfaceChartSeries Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -809,51 +634,31 @@ pub struct RadarChartSeries {
 pub struct SurfaceChartSeries {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   /// Order
   #[sdk(child(qname = "c:CT_UnsignedInt/c:order"))]
-  pub order:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Order>,
+  pub order: std::boxed::Box<crate::schemas::c::Order>,
   /// Series Text
   #[sdk(child(qname = "c:CT_SerTx/c:tx"))]
-  pub series_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SeriesText>,
-  >,
+  pub series_text: Option<std::boxed::Box<crate::schemas::c::SeriesText>>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the PictureOptions Class.
   #[sdk(child(qname = "c:CT_PictureOptions/c:pictureOptions"))]
-  pub picture_options: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PictureOptions,
-    >,
-  >,
+  pub picture_options: Option<std::boxed::Box<crate::schemas::c::PictureOptions>>,
   /// Defines the CategoryAxisData Class.
   #[sdk(child(qname = "c:CT_AxDataSource/c:cat"))]
-  pub category_axis_data: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::CategoryAxisData,
-    >,
-  >,
+  pub category_axis_data: Option<std::boxed::Box<crate::schemas::c::CategoryAxisData>>,
   /// Defines the Values Class.
   #[sdk(child(qname = "c:CT_NumDataSource/c:val"))]
-  pub values: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Values>,
-  >,
+  pub values: Option<std::boxed::Box<crate::schemas::c::Values>>,
   /// 3D Bubble.
   #[sdk(child(qname = "c:CT_Boolean/c:bubble3D"))]
-  pub bubble3_d: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Bubble3D>,
+  pub bubble3_d: Option<crate::schemas::c::Bubble3D>,
   /// Defines the SurfaceSerExtensionList Class.
   #[sdk(child(qname = "c:CT_SurfaceSerExtensionList/c:extLst"))]
-  pub surface_ser_extension_list: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::SurfaceSerExtensionList,
-  >,
+  pub surface_ser_extension_list: Option<crate::schemas::c::SurfaceSerExtensionList>,
 }
 /// Defines the DataLabelsRangeChache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -861,15 +666,13 @@ pub struct SurfaceChartSeries {
 pub struct DataLabelsRangeChache {
   /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  pub point_count:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  pub point_count: Option<crate::schemas::c::PointCount>,
   /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
+  pub c_pt: Vec<crate::schemas::c::StringPoint>,
   /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::StrDataExtensionList>,
 }
 /// Defines the DataLabelFieldTableCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -877,15 +680,13 @@ pub struct DataLabelsRangeChache {
 pub struct DataLabelFieldTableCache {
   /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  pub point_count:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  pub point_count: Option<crate::schemas::c::PointCount>,
   /// String Point.
   #[sdk(child(qname = "c:CT_StrVal/c:pt"))]
-  pub c_pt: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringPoint>,
+  pub c_pt: Vec<crate::schemas::c::StringPoint>,
   /// Defines the StrDataExtensionList Class.
   #[sdk(child(qname = "c:CT_StrDataExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StrDataExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::StrDataExtensionList>,
 }
 /// Defines the Explosion Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -902,21 +703,16 @@ pub struct Marker {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Symbol
   #[sdk(child(qname = "c:CT_MarkerStyle/c:symbol"))]
-  pub symbol: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Symbol>,
+  pub symbol: Option<crate::schemas::c::Symbol>,
   /// Size
   #[sdk(child(qname = "c:CT_MarkerSize/c:size"))]
-  pub size: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Size>,
+  pub size: Option<crate::schemas::c::Size>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Chart Extensibility
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+  pub extension_list: Option<crate::schemas::c::ExtensionList>,
 }
 /// Defines the DataLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -924,7 +720,7 @@ pub struct Marker {
 pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Index>,
+  pub index: Option<crate::schemas::c::Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",
@@ -944,8 +740,7 @@ pub struct DataLabel {
   pub data_label_choice: Option<DataLabelChoice>,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DLblExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::DLblExtensionList>,
 }
 /// Defines the CategoryFilterException Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -994,40 +789,28 @@ pub struct DataLabelFieldTableEntry {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -1036,125 +819,79 @@ pub enum ShapePropertiesChoice2 {
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ChartTextChoice {
   /// Defines the StringReference Class.
   #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
-  CStrRef(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringReference,
-    >,
-  ),
+  CStrRef(std::boxed::Box<crate::schemas::c::StringReference>),
   /// Rich Text.
   #[sdk(child(qname = "a:CT_TextBody/c:rich"))]
-  CRich(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::RichText>),
+  CRich(std::boxed::Box<crate::schemas::c::RichText>),
   /// String Literal.
   #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
-  CStrLit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringLiteral>,
-  ),
+  CStrLit(std::boxed::Box<crate::schemas::c::StringLiteral>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AxisDataSourceTypeChoice {
   /// Multi Level String Reference.
   #[sdk(child(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef"))]
-  CMultiLvlStrRef(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::MultiLevelStringReference,
-    >,
-  ),
+  CMultiLvlStrRef(std::boxed::Box<crate::schemas::c::MultiLevelStringReference>),
   /// Number Reference.
   #[sdk(child(qname = "c:CT_NumRef/c:numRef"))]
-  CNumRef(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberReference,
-    >,
-  ),
+  CNumRef(std::boxed::Box<crate::schemas::c::NumberReference>),
   /// Number Literal.
   #[sdk(child(qname = "c:CT_NumData/c:numLit"))]
-  CNumLit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberLiteral>,
-  ),
+  CNumLit(std::boxed::Box<crate::schemas::c::NumberLiteral>),
   /// Defines the StringReference Class.
   #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
-  CStrRef(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringReference,
-    >,
-  ),
+  CStrRef(std::boxed::Box<crate::schemas::c::StringReference>),
   /// String Literal.
   #[sdk(child(qname = "c:CT_StrData/c:strLit"))]
-  CStrLit(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::StringLiteral>,
-  ),
+  CStrLit(std::boxed::Box<crate::schemas::c::StringLiteral>),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 pub struct DataLabelChoiceSequence {
   /// Layout.
   #[sdk(child(qname = "c:CT_Layout/c:layout"))]
-  pub layout: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Layout>,
-  >,
+  pub layout: Option<std::boxed::Box<crate::schemas::c::Layout>>,
   /// Defines the ChartText Class.
   #[sdk(child(qname = "c:CT_Tx/c:tx"))]
-  pub chart_text: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartText>,
-  >,
+  pub chart_text: Option<std::boxed::Box<crate::schemas::c::ChartText>>,
   /// Number Format.
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
-  pub numbering_format:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::c::NumberingFormat>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ChartShapeProperties,
-    >,
-  >,
+  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
-  pub text_properties: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::TextProperties,
-    >,
-  >,
+  pub text_properties: Option<std::boxed::Box<crate::schemas::c::TextProperties>>,
   /// Data Label Position.
   #[sdk(child(qname = "c:CT_DLblPos/c:dLblPos"))]
-  pub data_label_position:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::DataLabelPosition>,
+  pub data_label_position: Option<crate::schemas::c::DataLabelPosition>,
   /// Show Legend Key.
   #[sdk(child(qname = "c:CT_Boolean/c:showLegendKey"))]
-  pub show_legend_key:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowLegendKey>,
+  pub show_legend_key: Option<crate::schemas::c::ShowLegendKey>,
   /// Show Value.
   #[sdk(child(qname = "c:CT_Boolean/c:showVal"))]
-  pub show_value:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowValue>,
+  pub show_value: Option<crate::schemas::c::ShowValue>,
   /// Show Category Name.
   #[sdk(child(qname = "c:CT_Boolean/c:showCatName"))]
-  pub show_category_name:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowCategoryName>,
+  pub show_category_name: Option<crate::schemas::c::ShowCategoryName>,
   /// Show Series Name.
   #[sdk(child(qname = "c:CT_Boolean/c:showSerName"))]
-  pub show_series_name:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowSeriesName>,
+  pub show_series_name: Option<crate::schemas::c::ShowSeriesName>,
   /// Show Percent.
   #[sdk(child(qname = "c:CT_Boolean/c:showPercent"))]
-  pub show_percent:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowPercent>,
+  pub show_percent: Option<crate::schemas::c::ShowPercent>,
   /// Show Bubble Size.
   #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
-  pub show_bubble_size:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ShowBubbleSize>,
+  pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
   #[sdk(text_child(qname = "xsd:string/c:separator"))]
   pub separator: Option<crate::simple_type::StringValue>,
@@ -1162,7 +899,7 @@ pub struct DataLabelChoiceSequence {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelChoice {
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
-  CDelete(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Delete>),
+  CDelete(std::boxed::Box<crate::schemas::c::Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
   #[sdk(sequence)]
   Sequence(std::boxed::Box<DataLabelChoiceSequence>),

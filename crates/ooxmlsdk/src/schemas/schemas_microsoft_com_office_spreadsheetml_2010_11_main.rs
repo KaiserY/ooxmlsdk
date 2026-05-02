@@ -124,8 +124,7 @@ pub enum SurveyPosition {
 pub struct PivotCaches {
   /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
-  pub x_pivot_cache:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
+  pub x_pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the TimelineCachePivotCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -133,8 +132,7 @@ pub struct PivotCaches {
 pub struct TimelineCachePivotCaches {
   /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
-  pub x_pivot_cache:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
+  pub x_pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the PivotTableReferences Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -217,8 +215,7 @@ pub struct DifferentialFormats {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
-  pub x_dxf:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
+  pub x_dxf: Vec<crate::schemas::x::DifferentialFormat>,
 }
 /// Defines the Connection Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -420,35 +417,30 @@ pub struct MovingPeriodState {
 pub struct SlicerCaches {
   /// Defines the SlicerCache Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCache/x14:slicerCache"))]
-  pub x14_slicer_cache:
-    Vec<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCache>,
+  pub x14_slicer_cache: Vec<crate::schemas::x14::SlicerCache>,
 }
 /// Defines the TableSlicerCache Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2013, qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache")]
 pub struct TableSlicerCache {
-    /// tableId
-    #[sdk(attr(office2013, qname = ":tableId"))]
-    pub table_id: crate::simple_type::UInt32Value,
-    /// column
-    #[sdk(attr(office2013, qname = ":column"))]
-    pub column: crate::simple_type::UInt32Value,
-    /// sortOrder
-    #[sdk(attr(office2010, qname = ":sortOrder"))]
-    pub sort_order: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::TabularSlicerCacheSortOrderValues,
-    >,
-    /// customListSort
-    #[sdk(attr(office2013, qname = ":customListSort"))]
-    pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
-    /// crossFilter
-    #[sdk(attr(office2010, qname = ":crossFilter"))]
-    pub cross_filter: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCacheCrossFilterValues,
-    >,
-    /// Defines the ExtensionList Class.
-    #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
-    pub extension_list: Option<ExtensionList>,
+  /// tableId
+  #[sdk(attr(office2013, qname = ":tableId"))]
+  pub table_id: crate::simple_type::UInt32Value,
+  /// column
+  #[sdk(attr(office2013, qname = ":column"))]
+  pub column: crate::simple_type::UInt32Value,
+  /// sortOrder
+  #[sdk(attr(office2010, qname = ":sortOrder"))]
+  pub sort_order: Option<crate::schemas::x14::TabularSlicerCacheSortOrderValues>,
+  /// customListSort
+  #[sdk(attr(office2013, qname = ":customListSort"))]
+  pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
+  /// crossFilter
+  #[sdk(attr(office2010, qname = ":crossFilter"))]
+  pub cross_filter: Option<crate::schemas::x14::SlicerCacheCrossFilterValues>,
+  /// Defines the ExtensionList Class.
+  #[sdk(child(office2013, qname = "x:CT_ExtensionList/x15:extLst"))]
+  pub extension_list: Option<ExtensionList>,
 }
 /// Defines the SlicerCacheHideItemsWithNoData Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -476,9 +468,7 @@ pub struct SlicerCacheHideItemsWithNoData {
 pub struct SlicerCachePivotTables {
   /// Defines the SlicerCachePivotTable Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerCachePivotTable/x14:pivotTable"))]
-  pub x14_pivot_table: Vec<
-    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCachePivotTable,
-  >,
+  pub x14_pivot_table: Vec<crate::schemas::x14::SlicerCachePivotTable>,
 }
 /// Defines the Survey Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -665,8 +655,7 @@ pub struct TextProperties {
   pub prompt: Option<crate::simple_type::BooleanValue>,
   /// fileType
   #[sdk(attr(qname = ":fileType"))]
-  pub file_type:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FileTypeValues>,
+  pub file_type: Option<crate::schemas::x::FileTypeValues>,
   /// codePage
   #[sdk(attr(qname = ":codePage"))]
   pub code_page: Option<crate::simple_type::UInt32Value>,
@@ -705,15 +694,13 @@ pub struct TextProperties {
   pub consecutive: Option<crate::simple_type::BooleanValue>,
   /// qualifier
   #[sdk(attr(qname = ":qualifier"))]
-  pub qualifier:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::QualifierValues>,
+  pub qualifier: Option<crate::schemas::x::QualifierValues>,
   /// delimiter
   #[sdk(attr(qname = ":delimiter"))]
   pub delimiter: Option<crate::simple_type::StringValue>,
   /// Defines the TextFields Class.
   #[sdk(child(qname = "x:CT_TextFields/x:textFields"))]
-  pub text_fields:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::TextFields>,
+  pub text_fields: Option<crate::schemas::x::TextFields>,
 }
 /// Defines the ModelTextProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -776,7 +763,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the CachedUniqueName Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1214,17 +1201,13 @@ pub struct AutoFilter {
   pub reference: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
-  pub x_filter_column:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterColumn>,
+  pub x_filter_column: Vec<crate::schemas::x::FilterColumn>,
   /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
-  pub x_sort_state: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortState>,
-  >,
+  pub x_sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub x_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub x_ext_lst: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the TimelineCachePivotTables Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1252,8 +1235,7 @@ pub struct TimelineState {
   pub pivot_cache_id: crate::simple_type::UInt32Value,
   /// filterType
   #[sdk(attr(office2013, qname = ":filterType"))]
-  pub filter_type:
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotFilterValues,
+  pub filter_type: crate::schemas::x::PivotFilterValues,
   /// filterId
   #[sdk(attr(office2013, qname = ":filterId"))]
   pub filter_id: Option<crate::simple_type::UInt32Value>,

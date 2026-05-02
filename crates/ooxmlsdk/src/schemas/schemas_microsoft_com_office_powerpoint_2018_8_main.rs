@@ -21,16 +21,13 @@ pub struct TextBodyType {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  pub body_properties:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
+  pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
+  pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
+  pub a_p: Vec<crate::schemas::a::Paragraph>,
 }
 /// Defines the CommentPropertiesExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -42,9 +39,7 @@ pub struct CommentPropertiesExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Data for the Windows platform..
   #[sdk(child(office2021, qname = "p188:CT_CommentPropertiesExtension/p:ext"))]
-  pub p_ext: Vec<
-    crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CommentPropertiesExtension,
-  >,
+  pub p_ext: Vec<crate::schemas::p::CommentPropertiesExtension>,
 }
 /// Defines the AuthorList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -83,7 +78,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the Author Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -242,55 +237,24 @@ pub struct Comment {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {
   #[sdk(child(office2016, qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
-    PcSldMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideMonikerList,
-        >,
-    ),
-    #[sdk(
-        any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst")
-    )]
-    PcSldLayoutMkLst(
-        crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideLayoutMonikerList,
-    ),
-    #[sdk(
-        any_child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst")
-    )]
-    PcSldMasterMkLst(
-        crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::MainMasterMonikerList,
-    ),
-    #[sdk(any_child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
-    OacDeMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::DeMkLstDrawingElementMonikerList,
-    ),
-    #[sdk(any_child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
-    OacTxBodyMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextBodyMonikerList,
-    ),
-    #[sdk(any_child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
-    OacTxMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextCharRangeMonikerList,
-    ),
-    #[sdk(any_child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
-    OacTcMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableCellMonikerList,
-    ),
-    #[sdk(any_child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
-    OacTrMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableRowMonikerList,
-    ),
-    #[sdk(
-        any_child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")
-    )]
-    OacGridColMkLst(
-        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableColumnMonikerList,
-    ),
-    /// Defines the CommentUnknownAnchor Class.
-    #[sdk(
-        empty_child(
-            office2021,
-            qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"
-        )
-    )]
-    P188UnknownAnchor,
+  PcSldMkLst(std::boxed::Box<crate::schemas::pc::SlideMonikerList>),
+  #[sdk(any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst"))]
+  PcSldLayoutMkLst(crate::schemas::pc::SlideLayoutMonikerList),
+  #[sdk(any_child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst"))]
+  PcSldMasterMkLst(crate::schemas::pc::MainMasterMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
+  OacDeMkLst(crate::schemas::oac::DeMkLstDrawingElementMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
+  OacTxBodyMkLst(crate::schemas::oac::TextBodyMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
+  OacTxMkLst(crate::schemas::oac::TextCharRangeMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
+  OacTcMkLst(crate::schemas::oac::TableCellMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
+  OacTrMkLst(crate::schemas::oac::TableRowMonikerList),
+  #[sdk(any_child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst"))]
+  OacGridColMkLst(crate::schemas::oac::TableColumnMonikerList),
+  /// Defines the CommentUnknownAnchor Class.
+  #[sdk(empty_child(office2021, qname = "p188:CT_CommentUnknownAnchor/p188:unknownAnchor"))]
+  P188UnknownAnchor,
 }

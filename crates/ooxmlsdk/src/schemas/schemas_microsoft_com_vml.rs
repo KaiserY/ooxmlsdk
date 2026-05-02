@@ -209,8 +209,7 @@ pub struct Path {
   pub allow_inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Connection Point Type
   #[sdk(attr(qname = "o:connecttype"))]
-  pub connection_point_type:
-    Option<crate::schemas::schemas_microsoft_com_office_office::ConnectValues>,
+  pub connection_point_type: Option<crate::schemas::o::ConnectValues>,
   /// Connection Points
   #[sdk(attr(qname = "o:connectlocs"))]
   pub connection_points: Option<crate::simple_type::StringValue>,
@@ -321,8 +320,7 @@ pub struct Fill {
   pub relationship_id: Option<crate::simple_type::StringValue>,
   /// Shape Fill Extended Properties.
   #[sdk(child(qname = "o:CT_Fill/o:fill"))]
-  pub fill_extended_properties:
-    Option<crate::schemas::schemas_microsoft_com_office_office::FillExtendedProperties>,
+  pub fill_extended_properties: Option<crate::schemas::o::FillExtendedProperties>,
 }
 /// Defines the Stroke Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -414,19 +412,19 @@ pub struct Stroke {
   pub insetpen: Option<crate::simple_type::TrueFalseValue>,
   /// Text Box Left Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:left"))]
-  pub left_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::LeftStroke>,
+  pub left_stroke: Option<crate::schemas::o::LeftStroke>,
   /// Text Box Top Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:top"))]
-  pub top_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::TopStroke>,
+  pub top_stroke: Option<crate::schemas::o::TopStroke>,
   /// Text Box Right Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:right"))]
-  pub right_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::RightStroke>,
+  pub right_stroke: Option<crate::schemas::o::RightStroke>,
   /// Text Box Bottom Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:bottom"))]
-  pub bottom_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::BottomStroke>,
+  pub bottom_stroke: Option<crate::schemas::o::BottomStroke>,
   /// Text Box Interior Stroke.
   #[sdk(child(qname = "o:CT_StrokeChild/o:column"))]
-  pub column_stroke: Option<crate::schemas::schemas_microsoft_com_office_office::ColumnStroke>,
+  pub column_stroke: Option<crate::schemas::o::ColumnStroke>,
 }
 /// Defines the Shadow Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -648,8 +646,7 @@ pub struct Shape {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -682,7 +679,7 @@ pub struct Shape {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -707,19 +704,16 @@ pub struct Shape {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -854,8 +848,7 @@ pub struct Shapetype {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -888,7 +881,7 @@ pub struct Shapetype {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -913,19 +906,16 @@ pub struct Shapetype {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -981,7 +971,7 @@ pub struct Shapetype {
   pub shapetype_choice: Vec<ShapetypeChoice>,
   /// Complex.
   #[sdk(child(qname = "o:CT_Complex/o:complex"))]
-  pub o_complex: Option<crate::schemas::schemas_microsoft_com_office_office::Complex>,
+  pub o_complex: Option<crate::schemas::o::Complex>,
 }
 /// Shape Group.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1055,8 +1045,7 @@ pub struct Group {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// hralign
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// allowincell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -1077,7 +1066,7 @@ pub struct Group {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// insetmode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Encoded Package
   #[sdk(attr(qname = "o:gfxdata"))]
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
@@ -1128,20 +1117,16 @@ pub struct Background {
   pub fillcolor: Option<crate::simple_type::StringValue>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Target Screen Size
   #[sdk(attr(qname = "o:targetscreensize"))]
-  pub target_screen_size:
-    Option<crate::schemas::schemas_microsoft_com_office_office::ScreenSizeValues>,
+  pub target_screen_size: Option<crate::schemas::o::ScreenSizeValues>,
   /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   pub fill: Option<std::boxed::Box<Fill>>,
@@ -1185,8 +1170,7 @@ pub struct Arc {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -1219,7 +1203,7 @@ pub struct Arc {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -1244,19 +1228,16 @@ pub struct Arc {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -1415,8 +1396,7 @@ pub struct Curve {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -1449,7 +1429,7 @@ pub struct Curve {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -1474,19 +1454,16 @@ pub struct Curve {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -1616,8 +1593,7 @@ pub struct ImageFile {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -1650,7 +1626,7 @@ pub struct ImageFile {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -1675,19 +1651,16 @@ pub struct ImageFile {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -1838,8 +1811,7 @@ pub struct Line {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -1872,7 +1844,7 @@ pub struct Line {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -1897,19 +1869,16 @@ pub struct Line {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -2036,8 +2005,7 @@ pub struct Oval {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -2070,7 +2038,7 @@ pub struct Oval {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -2095,19 +2063,16 @@ pub struct Oval {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -2228,8 +2193,7 @@ pub struct PolyLine {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -2262,7 +2226,7 @@ pub struct PolyLine {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -2287,19 +2251,16 @@ pub struct PolyLine {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -2424,8 +2385,7 @@ pub struct Rectangle {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -2458,7 +2418,7 @@ pub struct Rectangle {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -2483,19 +2443,16 @@ pub struct Rectangle {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -2613,8 +2570,7 @@ pub struct RoundRectangle {
   pub horizontal_percentage: Option<crate::simple_type::SingleValue>,
   /// Horizontal Rule Alignment
   #[sdk(attr(qname = "o:hralign"))]
-  pub horizontal_alignment:
-    Option<crate::schemas::schemas_microsoft_com_office_office::HorizontalRuleAlignmentValues>,
+  pub horizontal_alignment: Option<crate::schemas::o::HorizontalRuleAlignmentValues>,
   /// Allow in Table Cell
   #[sdk(attr(qname = "o:allowincell"))]
   pub allow_in_cell: Option<crate::simple_type::TrueFalseValue>,
@@ -2647,7 +2603,7 @@ pub struct RoundRectangle {
   pub diagram_layout_most_recent_used: Option<crate::simple_type::IntegerValue>,
   /// Text Inset Mode
   #[sdk(attr(qname = "o:insetmode"))]
-  pub inset_mode: Option<crate::schemas::schemas_microsoft_com_office_office::InsetMarginValues>,
+  pub inset_mode: Option<crate::schemas::o::InsetMarginValues>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":filled"))]
   pub filled: Option<crate::simple_type::TrueFalseValue>,
@@ -2672,19 +2628,16 @@ pub struct RoundRectangle {
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
-  pub connector_type: Option<crate::schemas::schemas_microsoft_com_office_office::ConnectorValues>,
+  pub connector_type: Option<crate::schemas::o::ConnectorValues>,
   /// Black-and-White Mode
   #[sdk(attr(qname = "o:bwmode"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Pure Black-and-White Mode
   #[sdk(attr(qname = "o:bwpure"))]
-  pub pure_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub pure_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Normal Black-and-White Mode
   #[sdk(attr(qname = "o:bwnormal"))]
-  pub normal_black_white_mode:
-    Option<crate::schemas::schemas_microsoft_com_office_office::BlackAndWhiteModeValues>,
+  pub normal_black_white_mode: Option<crate::schemas::o::BlackAndWhiteModeValues>,
   /// Force Dashed Outline
   #[sdk(attr(qname = "o:forcedash"))]
   pub force_dash: Option<crate::simple_type::TrueFalseValue>,
@@ -2780,11 +2733,7 @@ pub struct Formula {
 pub enum TextBoxChoice {
   /// Rich Text Box Content Container.
   #[sdk(child(qname = "w:CT_TxbxContent/w:txbxContent"))]
-  WTxbxContent(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::TextBoxContent,
-    >,
-  ),
+  WTxbxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -2809,38 +2758,36 @@ pub enum ShapeChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
   #[sdk(child(qname = "o:CT_Ink/o:ink"))]
-  OInk(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Ink>),
+  OInk(std::boxed::Box<crate::schemas::o::Ink>),
   /// Ink Annotation Flag.
   #[sdk(empty_child(qname = "pvml:CT_Empty/pvml:iscomment"))]
   PvmlIscomment,
@@ -2866,36 +2813,34 @@ pub enum ShapetypeChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupChoice {
@@ -2934,22 +2879,22 @@ pub enum GroupChoice {
   VRoundrect(std::boxed::Box<RoundRectangle>),
   /// VML Diagram.
   #[sdk(child(qname = "o:CT_Diagram/o:diagram"))]
-  ODiagram(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Diagram>),
+  ODiagram(std::boxed::Box<crate::schemas::o::Diagram>),
   /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ArcChoice {
@@ -2982,48 +2927,46 @@ pub enum ArcChoice {
   VImagedata(std::boxed::Box<ImageData>),
   /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CurveChoice {
@@ -3056,48 +2999,46 @@ pub enum CurveChoice {
   VImagedata(std::boxed::Box<ImageData>),
   /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ImageFileChoice {
@@ -3130,48 +3071,46 @@ pub enum ImageFileChoice {
   VImagedata(std::boxed::Box<ImageData>),
   /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChoice {
@@ -3204,48 +3143,46 @@ pub enum LineChoice {
   VImagedata(std::boxed::Box<ImageData>),
   /// Skew Transform.
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   /// 3D Extrusion.
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   /// Defines the Callout Class.
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   /// Defines the Lock Class.
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   /// Shape Clipping Path.
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   /// Digital Signature Line.
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   /// Text Wrapping.
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   /// Top Border.
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   /// Bottom Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   /// Left Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   /// Right Border.
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   /// Attached Object Data.
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   /// VML Diagram Text.
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OvalChoice {
@@ -3268,36 +3205,34 @@ pub enum OvalChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PolyLineChoice {
@@ -3320,38 +3255,36 @@ pub enum PolyLineChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
   #[sdk(child(qname = "o:CT_Ink/o:ink"))]
-  OInk(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Ink>),
+  OInk(std::boxed::Box<crate::schemas::o::Ink>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RectangleChoice {
@@ -3374,36 +3307,34 @@ pub enum RectangleChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RoundRectangleChoice {
@@ -3426,34 +3357,32 @@ pub enum RoundRectangleChoice {
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
-  OSkew(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Skew>),
+  OSkew(std::boxed::Box<crate::schemas::o::Skew>),
   #[sdk(child(qname = "o:CT_Extrusion/o:extrusion"))]
-  OExtrusion(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Extrusion>),
+  OExtrusion(std::boxed::Box<crate::schemas::o::Extrusion>),
   #[sdk(child(qname = "o:CT_Callout/o:callout"))]
-  OCallout(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Callout>),
+  OCallout(std::boxed::Box<crate::schemas::o::Callout>),
   #[sdk(child(qname = "o:CT_Lock/o:lock"))]
-  OLock(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::Lock>),
+  OLock(std::boxed::Box<crate::schemas::o::Lock>),
   #[sdk(child(qname = "o:CT_ClipPath/o:clippath"))]
-  OClippath(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::ClipPath>),
+  OClippath(std::boxed::Box<crate::schemas::o::ClipPath>),
   #[sdk(child(qname = "o:CT_SignatureLine/o:signatureline"))]
-  OSignatureline(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_office::SignatureLine>,
-  ),
+  OSignatureline(std::boxed::Box<crate::schemas::o::SignatureLine>),
   #[sdk(child(qname = "w10:CT_Wrap/w10:wrap"))]
-  W10Wrap(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TextWrap>),
+  W10Wrap(std::boxed::Box<crate::schemas::w10::TextWrap>),
   /// Anchor Location Is Locked.
   #[sdk(empty_child(qname = "w10:CT_AnchorLock/w10:anchorlock"))]
   W10Anchorlock,
   #[sdk(child(qname = "w10:CT_Border/w10:bordertop"))]
-  W10Bordertop(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::TopBorder>),
+  W10Bordertop(std::boxed::Box<crate::schemas::w10::TopBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderbottom"))]
-  W10Borderbottom(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::BottomBorder>),
+  W10Borderbottom(std::boxed::Box<crate::schemas::w10::BottomBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderleft"))]
-  W10Borderleft(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::LeftBorder>),
+  W10Borderleft(std::boxed::Box<crate::schemas::w10::LeftBorder>),
   #[sdk(child(qname = "w10:CT_Border/w10:borderright"))]
-  W10Borderright(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_word::RightBorder>),
+  W10Borderright(std::boxed::Box<crate::schemas::w10::RightBorder>),
   #[sdk(child(qname = "xvml:CT_ClientData/xvml:ClientData"))]
-  XvmlClientData(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_excel::ClientData>),
+  XvmlClientData(std::boxed::Box<crate::schemas::xvml::ClientData>),
   #[sdk(child(qname = "pvml:CT_Rel/pvml:textdata"))]
-  PvmlTextdata(std::boxed::Box<crate::schemas::schemas_microsoft_com_office_powerpoint::TextData>),
+  PvmlTextdata(std::boxed::Box<crate::schemas::pvml::TextData>),
 }

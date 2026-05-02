@@ -10,9 +10,7 @@
 pub struct CommentV2MonikerList {
   /// Defines the SlideMonikerList Class.
   #[sdk(child(office2016, qname = "pc:CT_SlideMonikerList/pc:sldMkLst"))]
-  pub slide_moniker_list: std::boxed::Box<
-    crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideMonikerList,
-  >,
+  pub slide_moniker_list: std::boxed::Box<crate::schemas::pc::SlideMonikerList>,
   /// Defines the CommentV2Moniker Class.
   #[sdk(child(microsoft365, qname = "pc2:CT_CommentV2Moniker/pc2:cmMK"))]
   pub comment_v2_moniker: std::boxed::Box<CommentV2Moniker>,

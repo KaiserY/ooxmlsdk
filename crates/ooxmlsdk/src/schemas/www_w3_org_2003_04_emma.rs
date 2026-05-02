@@ -691,7 +691,7 @@ pub enum InterpretationChoice {
   EmmaLiteral(crate::simple_type::StringValue),
   /// Defines the ContextNode Class.
   #[sdk(child(qname = "msink:CT_CtxNode/msink:context"))]
-  MsinkContext(std::boxed::Box<crate::schemas::schemas_microsoft_com_ink_2010_main::ContextNode>),
+  MsinkContext(std::boxed::Box<crate::schemas::msink::ContextNode>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneOfChoice {

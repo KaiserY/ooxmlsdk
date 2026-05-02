@@ -213,7 +213,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the ArrayFeatureProperty Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -298,35 +298,25 @@ pub struct RelFeatureProperty {
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
-  >,
+  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
-  pub numbering_format:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
   /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
-  pub fill: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
-  >,
+  pub fill: Option<std::boxed::Box<crate::schemas::x::Fill>>,
   /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
-  pub alignment:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
+  pub alignment: Option<crate::schemas::x::Alignment>,
   /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
-  pub border: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
-  >,
+  pub border: Option<std::boxed::Box<crate::schemas::x::Border>>,
   /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
-  pub protection:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
+  pub protection: Option<crate::schemas::x::Protection>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the XsdunsignedInt Class.
 pub type XsdunsignedInt = crate::simple_type::UInt32Value;

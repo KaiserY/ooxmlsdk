@@ -164,8 +164,7 @@ pub struct GraphicFrame {
   pub transform: std::boxed::Box<Transform>,
   /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
-  pub graphic:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Graphic>,
+  pub graphic: std::boxed::Box<crate::schemas::a::Graphic>,
 }
 /// Connection Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -214,43 +213,33 @@ pub struct Picture {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart")]
 pub struct ContentPart {
-    /// id
-    #[sdk(attr(office2010, qname = "r:id"))]
-    pub relationship_id: crate::simple_type::StringValue,
-    /// bwMode
-    #[sdk(attr(office2010, qname = ":bwMode"))]
-    #[sdk(string_format(kind = "token"))]
-    pub black_white_mode: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues,
-    >,
-    /// Defines the ExcelNonVisualContentPartShapeProperties Class.
-    #[sdk(
-        child(office2010, qname = "xdr14:CT_ContentPartNonVisual/xdr14:nvContentPartPr")
-    )]
-    pub excel_non_visual_content_part_shape_properties: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::ExcelNonVisualContentPartShapeProperties,
-        >,
-    >,
-    /// Defines the ApplicationNonVisualDrawingProperties Class.
-    #[sdk(
-        child(office2010, qname = "xdr14:CT_ApplicationNonVisualDrawingProps/xdr14:nvPr")
-    )]
-    pub application_non_visual_drawing_properties: Option<
-        crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::ApplicationNonVisualDrawingProperties,
-    >,
-    /// Defines the Transform2D Class.
-    #[sdk(child(office2010, qname = "a:CT_Transform2D/xdr14:xfrm"))]
-    pub transform2_d: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::Transform2D,
-        >,
-    >,
-    /// Defines the OfficeArtExtensionList Class.
-    #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/xdr14:extLst"))]
-    pub office_art_extension_list: Option<
-        crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::OfficeArtExtensionList,
-    >,
+  /// id
+  #[sdk(attr(office2010, qname = "r:id"))]
+  pub relationship_id: crate::simple_type::StringValue,
+  /// bwMode
+  #[sdk(attr(office2010, qname = ":bwMode"))]
+  #[sdk(string_format(kind = "token"))]
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
+  /// Defines the ExcelNonVisualContentPartShapeProperties Class.
+  #[sdk(child(
+    office2010,
+    qname = "xdr14:CT_ContentPartNonVisual/xdr14:nvContentPartPr"
+  ))]
+  pub excel_non_visual_content_part_shape_properties:
+    Option<std::boxed::Box<crate::schemas::xdr14::ExcelNonVisualContentPartShapeProperties>>,
+  /// Defines the ApplicationNonVisualDrawingProperties Class.
+  #[sdk(child(
+    office2010,
+    qname = "xdr14:CT_ApplicationNonVisualDrawingProps/xdr14:nvPr"
+  ))]
+  pub application_non_visual_drawing_properties:
+    Option<crate::schemas::xdr14::ApplicationNonVisualDrawingProperties>,
+  /// Defines the Transform2D Class.
+  #[sdk(child(office2010, qname = "a:CT_Transform2D/xdr14:xfrm"))]
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::xdr14::Transform2D>>,
+  /// Defines the OfficeArtExtensionList Class.
+  #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/xdr14:extLst"))]
+  pub office_art_extension_list: Option<crate::schemas::xdr14::OfficeArtExtensionList>,
 }
 /// Worksheet Drawing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -286,13 +275,10 @@ pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -309,9 +295,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -319,19 +303,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
-  >,
+  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the ShapeStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -339,21 +317,16 @@ pub struct ShapeProperties {
 pub struct ShapeStyle {
   /// Defines the LineReference Class.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:lnRef"))]
-  pub line_reference:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineReference>,
+  pub line_reference: std::boxed::Box<crate::schemas::a::LineReference>,
   /// Fill Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
-  pub fill_reference:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillReference>,
+  pub fill_reference: std::boxed::Box<crate::schemas::a::FillReference>,
   /// Effect Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:effectRef"))]
-  pub effect_reference: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectReference,
-  >,
+  pub effect_reference: std::boxed::Box<crate::schemas::a::EffectReference>,
   /// Font Reference
   #[sdk(child(qname = "a:CT_FontReference/a:fontRef"))]
-  pub font_reference:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontReference>,
+  pub font_reference: std::boxed::Box<crate::schemas::a::FontReference>,
 }
 /// Shape Text Body.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -363,16 +336,13 @@ pub struct TextBody {
   pub xml_other_children: Vec<(usize, String)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
-  pub body_properties:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BodyProperties>,
+  pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
   /// Text List Styles
   #[sdk(child(qname = "a:CT_TextListStyle/a:lstStyle"))]
-  pub list_style: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ListStyle>,
-  >,
+  pub list_style: Option<std::boxed::Box<crate::schemas::a::ListStyle>>,
   /// Text Paragraphs.
   #[sdk(child(qname = "a:CT_TextParagraph/a:p"))]
-  pub a_p: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Paragraph>,
+  pub a_p: Vec<crate::schemas::a::Paragraph>,
 }
 /// Non-Visual Properties for a Connection Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -406,12 +376,10 @@ pub struct BlipFill {
   pub rotate_with_shape: Option<crate::simple_type::BooleanValue>,
   /// Defines the Blip Class.
   #[sdk(child(qname = "a:CT_Blip/a:blip"))]
-  pub blip:
-    Option<std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blip>>,
+  pub blip: Option<std::boxed::Box<crate::schemas::a::Blip>>,
   /// Source Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:srcRect"))]
-  pub source_rectangle:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SourceRectangle>,
+  pub source_rectangle: Option<crate::schemas::a::SourceRectangle>,
   #[sdk(choice(
     qname = "a:CT_TileInfoProperties/a:tile",
     qname = "a:CT_StretchInfoProperties/a:stretch"
@@ -446,10 +414,10 @@ pub struct Transform {
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
-  pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
+  pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
-  pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
+  pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Column).
 pub type ColumnId = crate::simple_type::Int32Value;
@@ -536,41 +504,32 @@ pub struct Position {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SpreadSheetNonVisualDrawingProps/xdr:cNvPr")]
 pub struct NonVisualDrawingProperties {
-    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// id
-    #[sdk(attr(qname = ":id"))]
-    pub id: crate::simple_type::UInt32Value,
-    /// name
-    #[sdk(attr(qname = ":name"))]
-    pub name: crate::simple_type::StringValue,
-    /// descr
-    #[sdk(attr(qname = ":descr"))]
-    pub description: Option<crate::simple_type::StringValue>,
-    /// hidden
-    #[sdk(attr(qname = ":hidden"))]
-    pub hidden: Option<crate::simple_type::BooleanValue>,
-    /// title
-    #[sdk(attr(qname = ":title"))]
-    pub title: Option<crate::simple_type::StringValue>,
-    /// Defines the HyperlinkOnClick Class.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-    pub hyperlink_on_click: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
-        >,
-    >,
-    /// Defines the HyperlinkOnHover Class.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
-    pub hyperlink_on_hover: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
-        >,
-    >,
-    /// Defines the NonVisualDrawingPropertiesExtensionList Class.
-    #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
-    pub non_visual_drawing_properties_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
-    >,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  /// id
+  #[sdk(attr(qname = ":id"))]
+  pub id: crate::simple_type::UInt32Value,
+  /// name
+  #[sdk(attr(qname = ":name"))]
+  pub name: crate::simple_type::StringValue,
+  /// descr
+  #[sdk(attr(qname = ":descr"))]
+  pub description: Option<crate::simple_type::StringValue>,
+  /// hidden
+  #[sdk(attr(qname = ":hidden"))]
+  pub hidden: Option<crate::simple_type::BooleanValue>,
+  /// title
+  #[sdk(attr(qname = ":title"))]
+  pub title: Option<crate::simple_type::StringValue>,
+  /// Defines the HyperlinkOnClick Class.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
+  /// Defines the HyperlinkOnHover Class.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
+  /// Defines the NonVisualDrawingPropertiesExtensionList Class.
+  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  pub non_visual_drawing_properties_extension_list:
+    Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Connection Non-Visual Shape Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -582,13 +541,10 @@ pub struct NonVisualShapeDrawingProperties {
   pub text_box: Option<crate::simple_type::BooleanValue>,
   /// Shape Locks
   #[sdk(child(qname = "a:CT_ShapeLocking/a:spLocks"))]
-  pub shape_locks: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapeLocks>,
-  >,
+  pub shape_locks: Option<std::boxed::Box<crate::schemas::a::ShapeLocks>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Connector Shape Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -596,43 +552,31 @@ pub struct NonVisualShapeDrawingProperties {
 pub struct NonVisualConnectorShapeDrawingProperties {
   /// Connection Shape Locks
   #[sdk(child(qname = "a:CT_ConnectorLocking/a:cxnSpLocks"))]
-  pub connection_shape_locks: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ConnectionShapeLocks,
-    >,
-  >,
+  pub connection_shape_locks: Option<std::boxed::Box<crate::schemas::a::ConnectionShapeLocks>>,
   /// Connection Start
   #[sdk(child(qname = "a:CT_Connection/a:stCxn"))]
-  pub start_connection:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::StartConnection>,
+  pub start_connection: Option<crate::schemas::a::StartConnection>,
   /// Connection End
   #[sdk(child(qname = "a:CT_Connection/a:endCxn"))]
-  pub end_connection:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EndConnection>,
+  pub end_connection: Option<crate::schemas::a::EndConnection>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Picture Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualPictureProperties/xdr:cNvPicPr")]
 pub struct NonVisualPictureDrawingProperties {
-    /// preferRelativeResize
-    #[sdk(attr(qname = ":preferRelativeResize"))]
-    pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
-    /// Defines the PictureLocks Class.
-    #[sdk(child(qname = "a:CT_PictureLocking/a:picLocks"))]
-    pub picture_locks: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PictureLocks,
-        >,
-    >,
-    /// Defines the NonVisualPicturePropertiesExtensionList Class.
-    #[sdk(child(qname = "a:CT_NonVisualPicturePropertiesExtensionList/a:extLst"))]
-    pub non_visual_picture_properties_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualPicturePropertiesExtensionList,
-    >,
+  /// preferRelativeResize
+  #[sdk(attr(qname = ":preferRelativeResize"))]
+  pub prefer_relative_resize: Option<crate::simple_type::BooleanValue>,
+  /// Defines the PictureLocks Class.
+  #[sdk(child(qname = "a:CT_PictureLocking/a:picLocks"))]
+  pub picture_locks: Option<std::boxed::Box<crate::schemas::a::PictureLocks>>,
+  /// Defines the NonVisualPicturePropertiesExtensionList Class.
+  #[sdk(child(qname = "a:CT_NonVisualPicturePropertiesExtensionList/a:extLst"))]
+  pub non_visual_picture_properties_extension_list:
+    Option<crate::schemas::a::NonVisualPicturePropertiesExtensionList>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -640,32 +584,22 @@ pub struct NonVisualPictureDrawingProperties {
 pub struct NonVisualGraphicFrameDrawingProperties {
   /// Graphic Frame Locks
   #[sdk(child(qname = "a:CT_GraphicalObjectFrameLocking/a:graphicFrameLocks"))]
-  pub graphic_frame_locks: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GraphicFrameLocks,
-    >,
-  >,
+  pub graphic_frame_locks: Option<std::boxed::Box<crate::schemas::a::GraphicFrameLocks>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::a::ExtensionList>,
 }
 /// Non-Visual Group Shape Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_NonVisualGroupDrawingShapeProps/xdr:cNvGrpSpPr")]
 pub struct NonVisualGroupShapeDrawingProperties {
-    /// Defines the GroupShapeLocks Class.
-    #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
-    pub group_shape_locks: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GroupShapeLocks,
-        >,
-    >,
-    /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
-    #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
-    pub non_visual_group_drawing_shape_props_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualGroupDrawingShapePropsExtensionList,
-    >,
+  /// Defines the GroupShapeLocks Class.
+  #[sdk(child(qname = "a:CT_GroupLocking/a:grpSpLocks"))]
+  pub group_shape_locks: Option<std::boxed::Box<crate::schemas::a::GroupShapeLocks>>,
+  /// Defines the NonVisualGroupDrawingShapePropsExtensionList Class.
+  #[sdk(child(qname = "a:CT_NonVisualGroupDrawingShapePropsExtensionList/a:extLst"))]
+  pub non_visual_group_drawing_shape_props_extension_list:
+    Option<crate::schemas::a::NonVisualGroupDrawingShapePropsExtensionList>,
 }
 /// Non-Visual Properties for a Group Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -686,13 +620,10 @@ pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
-  pub transform_group: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TransformGroup>,
-  >,
+  pub transform_group: Option<std::boxed::Box<crate::schemas::a::TransformGroup>>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -709,13 +640,10 @@ pub struct GroupShapeProperties {
   pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TwoCellAnchorChoice {
@@ -775,11 +703,7 @@ pub enum GroupShapeChoice {
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr14:contentPart"))]
-  Xdr14ContentPart(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_excel_2010_spreadsheet_drawing::ContentPart,
-    >,
-  ),
+  Xdr14ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -803,40 +727,28 @@ pub enum WorksheetDrawingChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -845,49 +757,35 @@ pub enum ShapePropertiesChoice2 {
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
-  ATile(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Tile>),
+  ATile(std::boxed::Box<crate::schemas::a::Tile>),
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
-  AStretch(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Stretch>,
-  ),
+  AStretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -896,12 +794,8 @@ pub enum GroupShapePropertiesChoice {
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }

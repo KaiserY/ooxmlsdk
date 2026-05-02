@@ -14,8 +14,7 @@ pub struct ContentPart {
   /// bwMode
   #[sdk(attr(office2010, qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// Defines the ExcelNonVisualContentPartShapeProperties Class.
   #[sdk(child(
     office2010,
@@ -40,41 +39,32 @@ pub struct ContentPart {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/xdr14:cNvPr")]
 pub struct NonVisualDrawingProperties {
-    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// Application defined unique identifier.
-    #[sdk(attr(qname = ":id"))]
-    pub id: crate::simple_type::UInt32Value,
-    /// Name compatible with Object Model (non-unique).
-    #[sdk(attr(qname = ":name"))]
-    pub name: crate::simple_type::StringValue,
-    /// Description of the drawing element.
-    #[sdk(attr(qname = ":descr"))]
-    pub description: Option<crate::simple_type::StringValue>,
-    /// Flag determining to show or hide this element.
-    #[sdk(attr(qname = ":hidden"))]
-    pub hidden: Option<crate::simple_type::BooleanValue>,
-    /// Title
-    #[sdk(attr(qname = ":title"))]
-    pub title: Option<crate::simple_type::StringValue>,
-    /// Hyperlink associated with clicking or selecting the element.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-    pub hyperlink_on_click: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
-        >,
-    >,
-    /// Hyperlink associated with hovering over the element.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
-    pub hyperlink_on_hover: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
-        >,
-    >,
-    /// Future extension
-    #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
-    pub non_visual_drawing_properties_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
-    >,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  /// Application defined unique identifier.
+  #[sdk(attr(qname = ":id"))]
+  pub id: crate::simple_type::UInt32Value,
+  /// Name compatible with Object Model (non-unique).
+  #[sdk(attr(qname = ":name"))]
+  pub name: crate::simple_type::StringValue,
+  /// Description of the drawing element.
+  #[sdk(attr(qname = ":descr"))]
+  pub description: Option<crate::simple_type::StringValue>,
+  /// Flag determining to show or hide this element.
+  #[sdk(attr(qname = ":hidden"))]
+  pub hidden: Option<crate::simple_type::BooleanValue>,
+  /// Title
+  #[sdk(attr(qname = ":title"))]
+  pub title: Option<crate::simple_type::StringValue>,
+  /// Hyperlink associated with clicking or selecting the element.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
+  /// Hyperlink associated with hovering over the element.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
+  /// Future extension
+  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  pub non_visual_drawing_properties_extension_list:
+    Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -88,15 +78,10 @@ pub struct NonVisualInkContentPartProperties {
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
   #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
-  pub content_part_locks: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ContentPartLocks,
-    >,
-  >,
+  pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
-  pub office_art_extension_list:
-    Option<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the ExcelNonVisualContentPartShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -146,10 +131,10 @@ pub struct Transform2D {
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
-  pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
+  pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
-  pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
+  pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -158,5 +143,5 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::a::Extension>,
 }

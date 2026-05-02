@@ -145,9 +145,7 @@ pub type HyperlinksChanged = crate::simple_type::BooleanValue;
 pub struct HeadingPairs {
   /// Vector
   #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
-  pub vt_vector: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VtVector,
-  >,
+  pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Hyperlink List.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -155,9 +153,7 @@ pub struct HeadingPairs {
 pub struct HyperlinkList {
   /// Vector
   #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
-  pub vt_vector: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VtVector,
-  >,
+  pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Part Titles.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -165,9 +161,7 @@ pub struct HyperlinkList {
 pub struct TitlesOfParts {
   /// Vector
   #[sdk(child(qname = "vt:CT_Vector/vt:vector"))]
-  pub vt_vector: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_office_document_2006_doc_props_v_types::VtVector,
-  >,
+  pub vt_vector: std::boxed::Box<crate::schemas::vt::VtVector>,
 }
 /// Digital Signature.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

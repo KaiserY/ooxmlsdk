@@ -214,7 +214,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the PosPoint3D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -287,8 +287,7 @@ pub struct Blip {
   /// Compression state for blips.
   #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(kind = "token"))]
-  pub compression_state:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
+  pub compression_state: Option<crate::schemas::a::BlipCompressionValues>,
   #[sdk(choice(
     qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
     qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
@@ -311,8 +310,7 @@ pub struct Blip {
   pub blip_choice: Vec<BlipChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::BlipExtensionList>,
 }
 /// Defines the ColorType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -352,13 +350,10 @@ pub struct ShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
   #[sdk(string_format(kind = "token"))]
-  pub black_white_mode:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
+  pub black_white_mode: Option<crate::schemas::a::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
-  pub transform2_d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Transform2D>,
-  >,
+  pub transform2_d: Option<std::boxed::Box<crate::schemas::a::Transform2D>>,
   #[sdk(choice(
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
@@ -375,9 +370,7 @@ pub struct ShapeProperties {
   pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
-  pub a_ln: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Outline>,
-  >,
+  pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
@@ -385,19 +378,13 @@ pub struct ShapeProperties {
   pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
-  pub a_scene3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Scene3DType>,
-  >,
+  pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  pub a_sp3d: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Shape3DType>,
-  >,
+  pub a_sp3d: Option<std::boxed::Box<crate::schemas::a::Shape3DType>>,
   /// Defines the ShapePropertiesExtensionList Class.
   #[sdk(child(qname = "a:CT_ShapePropertiesExtensionList/a:extLst"))]
-  pub a_ext_lst: Option<
-    crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ShapePropertiesExtensionList,
-  >,
+  pub a_ext_lst: Option<crate::schemas::a::ShapePropertiesExtensionList>,
 }
 /// Defines the Model3DCamera Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -624,9 +611,7 @@ pub enum Model3DChoice2 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
-  AAlphaBiLevel(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaBiLevel>,
-  ),
+  AAlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
   AAlphaCeiling,
@@ -634,159 +619,93 @@ pub enum BlipChoice {
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
   AAlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
-  AAlphaInv(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaInverse>,
-  ),
+  AAlphaInv(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
-  AAlphaMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulationEffect,
-    >,
-  ),
+  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
-  AAlphaModFix(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulationFixed,
-    >,
-  ),
+  AAlphaModFix(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
-  AAlphaRepl(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaReplace>,
-  ),
+  AAlphaRepl(std::boxed::Box<crate::schemas::a::AlphaReplace>),
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
-  ABiLevel(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BiLevel>,
-  ),
+  ABiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
-  ABlur(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blur>),
+  ABlur(std::boxed::Box<crate::schemas::a::Blur>),
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
-  AClrChange(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorChange>,
-  ),
+  AClrChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
-  AClrRepl(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorReplacement,
-    >,
-  ),
+  AClrRepl(std::boxed::Box<crate::schemas::a::ColorReplacement>),
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
-  ADuotone(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Duotone>,
-  ),
+  ADuotone(std::boxed::Box<crate::schemas::a::Duotone>),
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
-  AFillOverlay(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillOverlay>,
-  ),
+  AFillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
   AGrayscl,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
-  AHsl(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hsl>),
+  AHsl(std::boxed::Box<crate::schemas::a::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
-  ALum(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceEffect,
-    >,
-  ),
+  ALum(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
-  ATint(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TintEffect>,
-  ),
+  ATint(std::boxed::Box<crate::schemas::a::TintEffect>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ColorTypeChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DExtensionChoice {
   /// Defines the EmbeddedAnimation Class.
-    #[sdk(child(office2019, qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim"))]
-    A3danimEmbedAnim(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2018_animation_model3d::EmbeddedAnimation,
-        >,
-    ),
-    /// Defines the PosterFrame Class.
-    #[sdk(child(office2019, qname = "a3danim:CT_PosterFrame/a3danim:posterFrame"))]
-    A3danimPosterFrame(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2018_animation_model3d::PosterFrame,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(office2019, qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim"))]
+  A3danimEmbedAnim(std::boxed::Box<crate::schemas::a3danim::EmbeddedAnimation>),
+  /// Defines the PosterFrame Class.
+  #[sdk(child(office2019, qname = "a3danim:CT_PosterFrame/a3danim:posterFrame"))]
+  A3danimPosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CustomGeometry>,
-  ),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetGeometry>,
-  ),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SolidFill>,
-  ),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::GradientFill>,
-  ),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipFill>,
-  ),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PatternFill>,
-  ),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
   AGrpFill,
@@ -795,14 +714,10 @@ pub enum ShapePropertiesChoice2 {
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectList>,
-  ),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::EffectDag>,
-  ),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DCameraChoice {

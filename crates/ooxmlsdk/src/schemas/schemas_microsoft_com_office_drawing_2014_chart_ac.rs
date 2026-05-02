@@ -10,13 +10,11 @@
 pub struct MultiLvlStrData {
   /// Point Count.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
-  pub point_count:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::PointCount>,
+  pub point_count: Option<crate::schemas::c::PointCount>,
   /// Level.
   #[sdk(child(qname = "c:CT_Lvl/c:lvl"))]
-  pub c_lvl: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::Level>,
+  pub c_lvl: Vec<crate::schemas::c::Level>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "c:CT_ExtensionList/c:extLst"))]
-  pub c_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_chart::ExtensionList>,
+  pub c_ext_lst: Option<crate::schemas::c::ExtensionList>,
 }

@@ -2662,8 +2662,7 @@ pub struct Workbook {
   pub workbook_properties: Option<WorkbookProperties>,
   /// Defines the AbsolutePath Class.
   #[sdk(child(office2013, qname = "x15ac:CT_AbsolutePath/x15ac:absPath"))]
-  pub absolute_path:
-    Option<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_ac::AbsolutePath>,
+  pub absolute_path: Option<crate::schemas::x15ac::AbsolutePath>,
   /// Defines the WorkbookProtection Class.
   #[sdk(child(qname = "x:CT_WorkbookProtection/x:workbookProtection"))]
   pub workbook_protection: Option<WorkbookProtection>,
@@ -2857,7 +2856,7 @@ pub struct Author {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2868,7 +2867,7 @@ pub struct Text {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2879,7 +2878,7 @@ pub struct CellValue {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2890,7 +2889,7 @@ pub struct Formula {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2901,7 +2900,7 @@ pub struct OldFormula {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2912,7 +2911,7 @@ pub struct OddHeader {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2923,7 +2922,7 @@ pub struct OddFooter {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2934,7 +2933,7 @@ pub struct EvenHeader {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2945,7 +2944,7 @@ pub struct EvenFooter {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2956,7 +2955,7 @@ pub struct FirstHeader {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2967,7 +2966,7 @@ pub struct FirstFooter {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2978,7 +2977,7 @@ pub struct DdeLinkValue {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -2989,7 +2988,7 @@ pub struct Subtopic {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -3000,7 +2999,7 @@ pub struct Formula1 {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -3011,7 +3010,7 @@ pub struct Formula2 {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -5903,7 +5902,7 @@ pub struct CellFormula {
   pub bx: Option<crate::simple_type::BooleanValue>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -7869,32 +7868,27 @@ pub struct OleItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalBook/x:externalBook")]
 pub struct ExternalBook {
-    pub xml_other_attrs: Vec<(String, String)>,
-    pub xml_other_children: Vec<(usize, String)>,
-    /// Relationship to supporting book file path
-    #[sdk(attr(qname = "r:id"))]
-    pub id: crate::simple_type::StringValue,
-    /// Alternate URLs and identifiers of the external book
-    #[sdk(
-        child(
-            microsoft365,
-            qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"
-        )
-    )]
-    pub external_book_alternate_urls: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2021_extlinks2021::ExternalBookAlternateUrls,
-        >,
-    >,
-    /// Sheet names of supporting book
-    #[sdk(child(qname = "x:CT_ExternalSheetNames/x:sheetNames"))]
-    pub sheet_names: Option<SheetNames>,
-    /// Defined names associated with supporting book.
-    #[sdk(child(qname = "x:CT_ExternalDefinedNames/x:definedNames"))]
-    pub external_defined_names: Option<ExternalDefinedNames>,
-    /// Cached worksheet data associated with supporting book
-    #[sdk(child(qname = "x:CT_ExternalSheetDataSet/x:sheetDataSet"))]
-    pub sheet_data_set: Option<SheetDataSet>,
+  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_children: Vec<(usize, String)>,
+  /// Relationship to supporting book file path
+  #[sdk(attr(qname = "r:id"))]
+  pub id: crate::simple_type::StringValue,
+  /// Alternate URLs and identifiers of the external book
+  #[sdk(child(
+    microsoft365,
+    qname = "xxl21:CT_ExternalBookAlternateUrls/xxl21:alternateUrls"
+  ))]
+  pub external_book_alternate_urls:
+    Option<std::boxed::Box<crate::schemas::xxl21::ExternalBookAlternateUrls>>,
+  /// Sheet names of supporting book
+  #[sdk(child(qname = "x:CT_ExternalSheetNames/x:sheetNames"))]
+  pub sheet_names: Option<SheetNames>,
+  /// Defined names associated with supporting book.
+  #[sdk(child(qname = "x:CT_ExternalDefinedNames/x:definedNames"))]
+  pub external_defined_names: Option<ExternalDefinedNames>,
+  /// Cached worksheet data associated with supporting book
+  #[sdk(child(qname = "x:CT_ExternalSheetDataSet/x:sheetDataSet"))]
+  pub sheet_data_set: Option<SheetDataSet>,
 }
 /// DDE Connection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7998,7 +7992,7 @@ pub struct CalculatedColumnFormula {
   pub array: Option<crate::simple_type::BooleanValue>,
   /// space
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -8012,7 +8006,7 @@ pub struct TotalsRowFormula {
   pub array: Option<crate::simple_type::BooleanValue>,
   /// space
   #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::www_w3_org_xml_1998_namespace::SpaceProcessingModeValues>,
+  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::StringValue>,
 }
@@ -11182,11 +11176,7 @@ pub enum FilterColumnChoice {
   XTop10(std::boxed::Box<Top10>),
   /// Defines the CustomFilters Class.
   #[sdk(child(office2010, qname = "x14:CT_CustomFilters/x14:customFilters"))]
-  X14CustomFilters(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CustomFilters,
-    >,
-  ),
+  X14CustomFilters(std::boxed::Box<crate::schemas::x14::CustomFilters>),
   /// Custom Filters.
   #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
   XCustomFilters(std::boxed::Box<CustomFilters>),
@@ -11198,11 +11188,7 @@ pub enum FilterColumnChoice {
   XColorFilter(std::boxed::Box<ColorFilter>),
   /// Defines the IconFilter Class.
   #[sdk(child(office2010, qname = "x14:CT_IconFilter/x14:iconFilter"))]
-  X14IconFilter(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconFilter,
-    >,
-  ),
+  X14IconFilter(std::boxed::Box<crate::schemas::x14::IconFilter>),
   /// Icon Filter.
   #[sdk(child(qname = "x:CT_IconFilter/x:iconFilter"))]
   XIconFilter(std::boxed::Box<IconFilter>),
@@ -11213,11 +11199,7 @@ pub enum FilterColumnChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortStateChoice {
   #[sdk(child(office2010, qname = "x14:CT_SortCondition/x14:sortCondition"))]
-  X14SortCondition(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SortCondition,
-    >,
-  ),
+  X14SortCondition(std::boxed::Box<crate::schemas::x14::SortCondition>),
   #[sdk(child(qname = "x:CT_SortCondition/x:sortCondition"))]
   XSortCondition(std::boxed::Box<SortCondition>),
 }
@@ -11360,11 +11342,7 @@ pub enum OleItemsChoice {
   XOleItem(std::boxed::Box<OleItem>),
   /// Defines the OleItem Class.
   #[sdk(child(office2010, qname = "x14:CT_OleItem/x14:oleItem"))]
-  X14OleItem(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::OleItem,
-    >,
-  ),
+  X14OleItem(std::boxed::Box<crate::schemas::x14::OleItem>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlOther(String),
@@ -11384,11 +11362,7 @@ pub enum ConditionalFormattingRuleExtensionChoice {
 pub enum PivotHierarchyExtensionChoice {
   /// Defines the PivotHierarchy Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy"))]
-  X14PivotHierarchy(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotHierarchy,
-    >,
-  ),
+  X14PivotHierarchy(std::boxed::Box<crate::schemas::x14::PivotHierarchy>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11396,11 +11370,7 @@ pub enum PivotHierarchyExtensionChoice {
 pub enum PivotFieldExtensionChoice {
   /// Defines the PivotField Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotField/x14:pivotField"))]
-  X14PivotField(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotField,
-    >,
-  ),
+  X14PivotField(std::boxed::Box<crate::schemas::x14::PivotField>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11408,11 +11378,7 @@ pub enum PivotFieldExtensionChoice {
 pub enum CacheSourceExtensionChoice {
   /// Defines the SourceConnection Class.
   #[sdk(child(office2010, qname = "x14:CT_SourceConnection/x14:sourceConnection"))]
-  X14SourceConnection(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SourceConnection,
-    >,
-  ),
+  X14SourceConnection(std::boxed::Box<crate::schemas::x14::SourceConnection>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11420,9 +11386,7 @@ pub enum CacheSourceExtensionChoice {
 pub enum FiltersChoice {
   /// Defines the Filter Class.
   #[sdk(child(office2010, qname = "x14:CT_Filter/x14:filter"))]
-  X14Filter(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Filter>,
-  ),
+  X14Filter(std::boxed::Box<crate::schemas::x14::Filter>),
   /// Filter.
   #[sdk(child(qname = "x:CT_Filter/x:filter"))]
   XFilter(std::boxed::Box<Filter>),
@@ -11433,55 +11397,33 @@ pub enum FiltersChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlicerCacheDefinitionExtensionChoice {
   /// Defines the SlicerCachePivotTables Class.
-    #[sdk(
-        child(
-            office2013,
-            qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"
-        )
-    )]
-    X15SlicerCachePivotTables(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCachePivotTables,
-        >,
-    ),
-    /// Defines the TableSlicerCache Class.
-    #[sdk(child(office2013, qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache"))]
-    X15TableSlicerCache(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TableSlicerCache,
-        >,
-    ),
-    /// Defines the SlicerCacheHideItemsWithNoData Class.
-    #[sdk(
-        child(
-            office2013,
-            qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData"
-        )
-    )]
-    X15SlicerCacheHideItemsWithNoData(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCacheHideItemsWithNoData,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(
+    office2013,
+    qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables"
+  ))]
+  X15SlicerCachePivotTables(std::boxed::Box<crate::schemas::x15::SlicerCachePivotTables>),
+  /// Defines the TableSlicerCache Class.
+  #[sdk(child(office2013, qname = "x15:CT_TableSlicerCache/x15:tableSlicerCache"))]
+  X15TableSlicerCache(std::boxed::Box<crate::schemas::x15::TableSlicerCache>),
+  /// Defines the SlicerCacheHideItemsWithNoData Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_SlicerCacheHideNoData/x15:slicerCacheHideItemsWithNoData"
+  ))]
+  X15SlicerCacheHideItemsWithNoData(
+    std::boxed::Box<crate::schemas::x15::SlicerCacheHideItemsWithNoData>,
+  ),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotFilterExtensionChoice {
   /// Defines the PivotFilter Class.
   #[sdk(child(office2013, qname = "x15:CT_PivotFilter/x15:pivotFilter"))]
-  X15PivotFilter(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotFilter,
-    >,
-  ),
+  X15PivotFilter(std::boxed::Box<crate::schemas::x15::PivotFilter>),
   /// Defines the MovingPeriodState Class.
   #[sdk(child(office2013, qname = "x15:CT_MovingPeriodState/x15:movingPeriodState"))]
-  X15MovingPeriodState(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::MovingPeriodState,
-    >,
-  ),
+  X15MovingPeriodState(std::boxed::Box<crate::schemas::x15::MovingPeriodState>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11489,11 +11431,7 @@ pub enum PivotFilterExtensionChoice {
 pub enum QueryTableExtensionChoice {
   /// Defines the QueryTable Class.
   #[sdk(child(office2013, qname = "x15:CT_QueryTable/x15:queryTable"))]
-  X15QueryTable(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::QueryTable,
-    >,
-  ),
+  X15QueryTable(std::boxed::Box<crate::schemas::x15::QueryTable>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11501,18 +11439,10 @@ pub enum QueryTableExtensionChoice {
 pub enum ConnectionExtensionChoice {
   /// Defines the Connection Class.
   #[sdk(child(office2010, qname = "x14:CT_Connection/x14:connection"))]
-  X14Connection(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Connection,
-    >,
-  ),
+  X14Connection(std::boxed::Box<crate::schemas::x14::Connection>),
   /// Defines the Connection Class.
   #[sdk(child(office2013, qname = "x15:CT_Connection/x15:connection"))]
-  X15Connection(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::Connection,
-    >,
-  ),
+  X15Connection(std::boxed::Box<crate::schemas::x15::Connection>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11548,18 +11478,10 @@ pub enum FieldGroupChoice {
 pub enum CacheFieldExtensionChoice {
   /// Defines the CacheField Class.
   #[sdk(child(office2010, qname = "x14:CT_CacheField/x14:cacheField"))]
-  X14CacheField(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheField,
-    >,
-  ),
+  X14CacheField(std::boxed::Box<crate::schemas::x14::CacheField>),
   /// Defines the CachedUniqueNames Class.
   #[sdk(child(office2013, qname = "x15:CT_CachedUniqueNames/x15:cachedUniqueNames"))]
-  X15CachedUniqueNames(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::CachedUniqueNames,
-    >,
-  ),
+  X15CachedUniqueNames(std::boxed::Box<crate::schemas::x15::CachedUniqueNames>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11567,18 +11489,10 @@ pub enum CacheFieldExtensionChoice {
 pub enum CacheHierarchyExtensionChoice {
   /// Defines the CacheHierarchy Class.
   #[sdk(child(office2010, qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy"))]
-  X14CacheHierarchy(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CacheHierarchy,
-    >,
-  ),
+  X14CacheHierarchy(std::boxed::Box<crate::schemas::x14::CacheHierarchy>),
   /// Defines the CacheHierarchy Class.
   #[sdk(child(office2013, qname = "x15:CT_CacheHierarchy/x15:cacheHierarchy"))]
-  X15CacheHierarchy(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::CacheHierarchy,
-    >,
-  ),
+  X15CacheHierarchy(std::boxed::Box<crate::schemas::x15::CacheHierarchy>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11586,18 +11500,10 @@ pub enum CacheHierarchyExtensionChoice {
 pub enum CalculatedMemberExtensionChoice {
   /// Defines the CalculatedMember Class.
   #[sdk(child(office2010, qname = "x14:CT_CalculatedMember/x14:calculatedMember"))]
-  X14CalculatedMember(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::CalculatedMember,
-    >,
-  ),
+  X14CalculatedMember(std::boxed::Box<crate::schemas::x14::CalculatedMember>),
   /// Defines the CalculatedMember Class.
   #[sdk(child(office2013, qname = "x15:CT_CalculatedMember/x15:calculatedMember"))]
-  X15CalculatedMember(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::CalculatedMember,
-    >,
-  ),
+  X15CalculatedMember(std::boxed::Box<crate::schemas::x15::CalculatedMember>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11605,158 +11511,87 @@ pub enum CalculatedMemberExtensionChoice {
 pub enum DataFieldExtensionChoice {
   /// Defines the DataField Class.
   #[sdk(child(office2010, qname = "x14:CT_DataField/x14:dataField"))]
-  X14DataField(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataField,
-    >,
-  ),
+  X14DataField(std::boxed::Box<crate::schemas::x14::DataField>),
   /// Defines the DataField Class.
   #[sdk(child(office2013, qname = "x15:CT_DataField/x15:dataField"))]
-  X15DataField(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DataField,
-    >,
-  ),
+  X15DataField(std::boxed::Box<crate::schemas::x15::DataField>),
   #[sdk(any)]
   XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorksheetExtensionChoice {
   /// Defines the ConditionalFormattings Class.
-    #[sdk(
-        child(
-            office2010,
-            qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"
-        )
-    )]
-    X14ConditionalFormattings(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ConditionalFormattings,
-        >,
-    ),
-    /// Defines the DataValidations Class.
-    #[sdk(child(office2010, qname = "x14:CT_DataValidations/x14:dataValidations"))]
-    X14DataValidations(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DataValidations,
-        >,
-    ),
-    /// Defines the SparklineGroups Class.
-    #[sdk(child(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups"))]
-    X14SparklineGroups(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineGroups,
-        >,
-    ),
-    /// Defines the SlicerList Class.
-    #[sdk(child(office2010, qname = "x14:CT_SlicerRefs/x14:slicerList"))]
-    X14SlicerList(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerList,
-        >,
-    ),
-    /// Defines the ProtectedRanges Class.
-    #[sdk(child(office2010, qname = "x14:CT_ProtectedRanges/x14:protectedRanges"))]
-    X14ProtectedRanges(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::ProtectedRanges,
-        >,
-    ),
-    /// Defines the IgnoredErrors Class.
-    #[sdk(child(office2010, qname = "x14:CT_IgnoredErrors/x14:ignoredErrors"))]
-    X14IgnoredErrors(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IgnoredErrors,
-        >,
-    ),
-    /// Defines the WebExtensions Class.
-    #[sdk(child(office2013, qname = "x15:CT_WebExtensions/x15:webExtensions"))]
-    X15WebExtensions(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WebExtensions,
-        >,
-    ),
-    /// Defines the TimelineReferences Class.
-    #[sdk(child(office2013, qname = "x15:CT_TimelineRefs/x15:timelineRefs"))]
-    X15TimelineRefs(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineReferences,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings"
+  ))]
+  X14ConditionalFormattings(std::boxed::Box<crate::schemas::x14::ConditionalFormattings>),
+  /// Defines the DataValidations Class.
+  #[sdk(child(office2010, qname = "x14:CT_DataValidations/x14:dataValidations"))]
+  X14DataValidations(std::boxed::Box<crate::schemas::x14::DataValidations>),
+  /// Defines the SparklineGroups Class.
+  #[sdk(child(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups"))]
+  X14SparklineGroups(std::boxed::Box<crate::schemas::x14::SparklineGroups>),
+  /// Defines the SlicerList Class.
+  #[sdk(child(office2010, qname = "x14:CT_SlicerRefs/x14:slicerList"))]
+  X14SlicerList(std::boxed::Box<crate::schemas::x14::SlicerList>),
+  /// Defines the ProtectedRanges Class.
+  #[sdk(child(office2010, qname = "x14:CT_ProtectedRanges/x14:protectedRanges"))]
+  X14ProtectedRanges(std::boxed::Box<crate::schemas::x14::ProtectedRanges>),
+  /// Defines the IgnoredErrors Class.
+  #[sdk(child(office2010, qname = "x14:CT_IgnoredErrors/x14:ignoredErrors"))]
+  X14IgnoredErrors(std::boxed::Box<crate::schemas::x14::IgnoredErrors>),
+  /// Defines the WebExtensions Class.
+  #[sdk(child(office2013, qname = "x15:CT_WebExtensions/x15:webExtensions"))]
+  X15WebExtensions(std::boxed::Box<crate::schemas::x15::WebExtensions>),
+  /// Defines the TimelineReferences Class.
+  #[sdk(child(office2013, qname = "x15:CT_TimelineRefs/x15:timelineRefs"))]
+  X15TimelineRefs(std::boxed::Box<crate::schemas::x15::TimelineReferences>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StylesheetExtensionChoice {
   /// Defines the DifferentialFormats Class.
   #[sdk(child(office2010, qname = "x:CT_Dxfs/x14:dxfs"))]
-  X14Dxfs(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DifferentialFormats,
-    >,
-  ),
+  X14Dxfs(std::boxed::Box<crate::schemas::x14::DifferentialFormats>),
   /// Defines the SlicerStyles Class.
   #[sdk(child(office2010, qname = "x14:CT_SlicerStyles/x14:slicerStyles"))]
-  X14SlicerStyles(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerStyles,
-    >,
-  ),
+  X14SlicerStyles(std::boxed::Box<crate::schemas::x14::SlicerStyles>),
   /// Defines the DifferentialFormats Class.
   #[sdk(child(office2013, qname = "x:CT_Dxfs/x15:dxfs"))]
-  X15Dxfs(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DifferentialFormats,
-    >,
-  ),
+  X15Dxfs(std::boxed::Box<crate::schemas::x15::DifferentialFormats>),
   /// Defines the TimelineStyles Class.
   #[sdk(child(office2013, qname = "x15:CT_TimelineStyles/x15:timelineStyles"))]
-  X15TimelineStyles(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineStyles,
-    >,
-  ),
+  X15TimelineStyles(std::boxed::Box<crate::schemas::x15::TimelineStyles>),
   #[sdk(any)]
   XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotTableDefinitionExtensionChoice {
   /// Defines the PivotTableDefinition Class.
-    #[sdk(
-        child(office2010, qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition")
-    )]
-    X14PivotTableDefinition(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotTableDefinition,
-        >,
-    ),
-    /// Defines the PivotTableData Class.
-    #[sdk(child(office2013, qname = "x15:CT_PivotTableData/x15:pivotTableData"))]
-    X15PivotTableData(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableData,
-        >,
-    ),
-    /// Defines the PivotTableUISettings Class.
-    #[sdk(
-        child(office2013, qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings")
-    )]
-    X15PivotTableUiSettings(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableUiSettings,
-        >,
-    ),
-    /// Defines the PivotVersionInfo Class.
-    #[sdk(
-        child(microsoft365, qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo")
-    )]
-    XxpviPivotVersionInfo(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_version_info::PivotVersionInfo,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition"
+  ))]
+  X14PivotTableDefinition(std::boxed::Box<crate::schemas::x14::PivotTableDefinition>),
+  /// Defines the PivotTableData Class.
+  #[sdk(child(office2013, qname = "x15:CT_PivotTableData/x15:pivotTableData"))]
+  X15PivotTableData(std::boxed::Box<crate::schemas::x15::PivotTableData>),
+  /// Defines the PivotTableUISettings Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_PivotTableUISettings/x15:pivotTableUISettings"
+  ))]
+  X15PivotTableUiSettings(std::boxed::Box<crate::schemas::x15::PivotTableUiSettings>),
+  /// Defines the PivotVersionInfo Class.
+  #[sdk(child(
+    microsoft365,
+    qname = "xxpvi:CT_PivotVersionInfo/xxpvi:pivotVersionInfo"
+  ))]
+  XxpviPivotVersionInfo(std::boxed::Box<crate::schemas::xxpvi::PivotVersionInfo>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CacheSourceChoice {
@@ -11773,210 +11608,121 @@ pub enum CacheSourceChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotCacheDefinitionExtensionChoice {
   /// Defines the PivotCacheDefinition Class.
-    #[sdk(
-        child(office2010, qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition")
-    )]
-    X14PivotCacheDefinition(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCacheDefinition,
-        >,
-    ),
-    /// Defines the PivotCacheDecoupled Class.
-    #[sdk(
-        child(office2013, qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled")
-    )]
-    X15PivotCacheDecoupled(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheDecoupled,
-        >,
-    ),
-    /// Defines the TimelinePivotCacheDefinition Class.
-    #[sdk(
-        child(
-            office2013,
-            qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition"
-        )
-    )]
-    X15TimelinePivotCacheDefinition(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelinePivotCacheDefinition,
-        >,
-    ),
-    /// Defines the PivotCacheIdVersion Class.
-    #[sdk(
-        child(office2013, qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion")
-    )]
-    X15PivotCacheIdVersion(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCacheIdVersion,
-        >,
-    ),
-    /// Defines the Xsdboolean Class.
-    #[sdk(text_child(office2021, qname = "xsd:boolean/xxpim:implicitMeasureSupport"))]
-    XxpimImplicitMeasureSupport(crate::simple_type::BooleanValue),
-    /// Defines the PivotCacheRichInfo Class.
-    #[sdk(child(microsoft365, qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo"))]
-    XprdRichInfo(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_rich_data::PivotCacheRichInfo,
-        >,
-    ),
-    /// Defines the CacheVersionInfo Class.
-    #[sdk(
-        child(microsoft365, qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo")
-    )]
-    XxpviCacheVersionInfo(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_pivot_version_info::CacheVersionInfo,
-        >,
-    ),
-    /// Defines the Xsdboolean Class.
-    #[sdk(text_child(microsoft365, qname = "xsd:boolean/xlpar:autoRefresh"))]
-    XlparAutoRefresh(crate::simple_type::BooleanValue),
-    /// Defines the PivotCacheDynamicArray Class.
-    #[sdk(
-        child(
-            microsoft365,
-            qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray"
-        )
-    )]
-    XlpdaPivotCacheDynamicArray(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2024_pivot_dynamic_arrays::PivotCacheDynamicArray,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(
+    office2010,
+    qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition"
+  ))]
+  X14PivotCacheDefinition(std::boxed::Box<crate::schemas::x14::PivotCacheDefinition>),
+  /// Defines the PivotCacheDecoupled Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_PivotCacheDecoupled/x15:pivotCacheDecoupled"
+  ))]
+  X15PivotCacheDecoupled(std::boxed::Box<crate::schemas::x15::PivotCacheDecoupled>),
+  /// Defines the TimelinePivotCacheDefinition Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_TimelinePivotCacheDefinition/x15:timelinePivotCacheDefinition"
+  ))]
+  X15TimelinePivotCacheDefinition(
+    std::boxed::Box<crate::schemas::x15::TimelinePivotCacheDefinition>,
+  ),
+  /// Defines the PivotCacheIdVersion Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_PivotCacheIdVersion/x15:pivotCacheIdVersion"
+  ))]
+  X15PivotCacheIdVersion(std::boxed::Box<crate::schemas::x15::PivotCacheIdVersion>),
+  /// Defines the Xsdboolean Class.
+  #[sdk(text_child(office2021, qname = "xsd:boolean/xxpim:implicitMeasureSupport"))]
+  XxpimImplicitMeasureSupport(crate::simple_type::BooleanValue),
+  /// Defines the PivotCacheRichInfo Class.
+  #[sdk(child(microsoft365, qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo"))]
+  XprdRichInfo(std::boxed::Box<crate::schemas::xprd::PivotCacheRichInfo>),
+  /// Defines the CacheVersionInfo Class.
+  #[sdk(child(
+    microsoft365,
+    qname = "xxpvi:CT_CacheVersionInfo/xxpvi:cacheVersionInfo"
+  ))]
+  XxpviCacheVersionInfo(std::boxed::Box<crate::schemas::xxpvi::CacheVersionInfo>),
+  /// Defines the Xsdboolean Class.
+  #[sdk(text_child(microsoft365, qname = "xsd:boolean/xlpar:autoRefresh"))]
+  XlparAutoRefresh(crate::simple_type::BooleanValue),
+  /// Defines the PivotCacheDynamicArray Class.
+  #[sdk(child(
+    microsoft365,
+    qname = "xlpda:CT_PivotCacheDynamicArray/xlpda:pivotCacheDynamicArray"
+  ))]
+  XlpdaPivotCacheDynamicArray(std::boxed::Box<crate::schemas::xlpda::PivotCacheDynamicArray>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableExtensionChoice {
   /// Defines the Table Class.
   #[sdk(child(office2010, qname = "x14:CT_Table/x14:table"))]
-  X14Table(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Table>,
-  ),
+  X14Table(std::boxed::Box<crate::schemas::x14::Table>),
   /// Defines the MsForm Class.
   #[sdk(child(microsoft365, qname = "xlmsforms:CT_MsForm/xlmsforms:msForm"))]
-  XlmsformsMsForm(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_spreadsheetml_2023_ms_forms::MsForm,
-    >,
-  ),
+  XlmsformsMsForm(std::boxed::Box<crate::schemas::xlmsforms::MsForm>),
   #[sdk(any)]
   XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WorkbookExtensionChoice {
   /// Defines the DefinedNames Class.
-    #[sdk(child(office2010, qname = "x14:CT_DefinedNames/x14:definedNames"))]
-    X14DefinedNames(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DefinedNames,
-        >,
-    ),
-    /// Defines the PivotCaches Class.
-    #[sdk(child(office2010, qname = "x:CT_PivotCaches/x14:pivotCaches"))]
-    X14PivotCaches(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::PivotCaches,
-        >,
-    ),
-    /// Defines the SlicerCaches Class.
-    #[sdk(child(office2010, qname = "x14:CT_SlicerCaches/x14:slicerCaches"))]
-    X14SlicerCaches(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SlicerCaches,
-        >,
-    ),
-    /// Defines the SlicerCaches Class.
-    #[sdk(child(office2013, qname = "x14:CT_SlicerCaches/x15:slicerCaches"))]
-    X15SlicerCaches(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::SlicerCaches,
-        >,
-    ),
-    /// Defines the WorkbookProperties Class.
-    #[sdk(child(office2010, qname = "x14:CT_WorkbookPr/x14:workbookPr"))]
-    X14WorkbookPr(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::WorkbookProperties,
-        >,
-    ),
-    /// Defines the PivotCaches Class.
-    #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:pivotCaches"))]
-    X15PivotCaches(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotCaches,
-        >,
-    ),
-    /// Defines the PivotTableReferences Class.
-    #[sdk(
-        child(office2013, qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences")
-    )]
-    X15PivotTableReferences(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::PivotTableReferences,
-        >,
-    ),
-    /// Defines the TimelineCachePivotCaches Class.
-    #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches"))]
-    X15TimelineCachePivotCaches(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCachePivotCaches,
-        >,
-    ),
-    /// Defines the TimelineCacheReferences Class.
-    #[sdk(child(office2013, qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs"))]
-    X15TimelineCacheRefs(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheReferences,
-        >,
-    ),
-    /// Defines the WorkbookProperties Class.
-    #[sdk(child(office2013, qname = "x15:CT_WorkbookPr/x15:workbookPr"))]
-    X15WorkbookPr(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::WorkbookProperties,
-        >,
-    ),
-    /// Defines the DataModel Class.
-    #[sdk(child(office2013, qname = "x15:CT_DataModel/x15:dataModel"))]
-    X15DataModel(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::DataModel,
-        >,
-    ),
-    /// Defines the ExternalCodeService Class.
-    #[sdk(
-        child(
-            microsoft365,
-            qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService"
-        )
-    )]
-    XlecsExternalCodeService(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2023_external_code_service::ExternalCodeService,
-        >,
-    ),
-    /// Defines the Version Class.
-    #[sdk(child(microsoft365, qname = "xlwcv:CT_Version/xlwcv:version"))]
-    XlwcvVersion(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2024_workbook_compatibility_version::Version,
-        >,
-    ),
-    /// Defines the ExternalCodeServiceImageAsInput Class.
-    #[sdk(
-        child(
-            microsoft365,
-            qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput"
-        )
-    )]
-    Xlecs2ExternalCodeServiceImageAsInput(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_spreadsheetml_2025_external_code_service2::ExternalCodeServiceImageAsInput,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(office2010, qname = "x14:CT_DefinedNames/x14:definedNames"))]
+  X14DefinedNames(std::boxed::Box<crate::schemas::x14::DefinedNames>),
+  /// Defines the PivotCaches Class.
+  #[sdk(child(office2010, qname = "x:CT_PivotCaches/x14:pivotCaches"))]
+  X14PivotCaches(std::boxed::Box<crate::schemas::x14::PivotCaches>),
+  /// Defines the SlicerCaches Class.
+  #[sdk(child(office2010, qname = "x14:CT_SlicerCaches/x14:slicerCaches"))]
+  X14SlicerCaches(std::boxed::Box<crate::schemas::x14::SlicerCaches>),
+  /// Defines the SlicerCaches Class.
+  #[sdk(child(office2013, qname = "x14:CT_SlicerCaches/x15:slicerCaches"))]
+  X15SlicerCaches(std::boxed::Box<crate::schemas::x15::SlicerCaches>),
+  /// Defines the WorkbookProperties Class.
+  #[sdk(child(office2010, qname = "x14:CT_WorkbookPr/x14:workbookPr"))]
+  X14WorkbookPr(std::boxed::Box<crate::schemas::x14::WorkbookProperties>),
+  /// Defines the PivotCaches Class.
+  #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:pivotCaches"))]
+  X15PivotCaches(std::boxed::Box<crate::schemas::x15::PivotCaches>),
+  /// Defines the PivotTableReferences Class.
+  #[sdk(child(
+    office2013,
+    qname = "x15:CT_PivotTableReferences/x15:pivotTableReferences"
+  ))]
+  X15PivotTableReferences(std::boxed::Box<crate::schemas::x15::PivotTableReferences>),
+  /// Defines the TimelineCachePivotCaches Class.
+  #[sdk(child(office2013, qname = "x:CT_PivotCaches/x15:timelineCachePivotCaches"))]
+  X15TimelineCachePivotCaches(std::boxed::Box<crate::schemas::x15::TimelineCachePivotCaches>),
+  /// Defines the TimelineCacheReferences Class.
+  #[sdk(child(office2013, qname = "x15:CT_TimelineCacheRefs/x15:timelineCacheRefs"))]
+  X15TimelineCacheRefs(std::boxed::Box<crate::schemas::x15::TimelineCacheReferences>),
+  /// Defines the WorkbookProperties Class.
+  #[sdk(child(office2013, qname = "x15:CT_WorkbookPr/x15:workbookPr"))]
+  X15WorkbookPr(std::boxed::Box<crate::schemas::x15::WorkbookProperties>),
+  /// Defines the DataModel Class.
+  #[sdk(child(office2013, qname = "x15:CT_DataModel/x15:dataModel"))]
+  X15DataModel(std::boxed::Box<crate::schemas::x15::DataModel>),
+  /// Defines the ExternalCodeService Class.
+  #[sdk(child(
+    microsoft365,
+    qname = "xlecs:CT_ExternalCodeService/xlecs:externalCodeService"
+  ))]
+  XlecsExternalCodeService(std::boxed::Box<crate::schemas::xlecs::ExternalCodeService>),
+  /// Defines the Version Class.
+  #[sdk(child(microsoft365, qname = "xlwcv:CT_Version/xlwcv:version"))]
+  XlwcvVersion(std::boxed::Box<crate::schemas::xlwcv::Version>),
+  /// Defines the ExternalCodeServiceImageAsInput Class.
+  #[sdk(child(
+    microsoft365,
+    qname = "xlecs2:CT_ExternalCodeServiceImageAsInput/xlecs2:externalCodeServiceImageAsInput"
+  ))]
+  Xlecs2ExternalCodeServiceImageAsInput(
+    std::boxed::Box<crate::schemas::xlecs2::ExternalCodeServiceImageAsInput>,
+  ),
+  #[sdk(any)]
+  XmlOther(String),
 }

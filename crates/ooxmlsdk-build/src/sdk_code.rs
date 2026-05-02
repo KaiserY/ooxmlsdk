@@ -1,6 +1,8 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde_json::Value;
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
@@ -17,6 +19,7 @@ use crate::sdk_code::schemas::{
   CodegenContext, TypeContainmentGraph, gen_schema_from_ir_with_type_graph,
 };
 use crate::sdk_data::sdk_data_model::Schema as SdkDataSchema;
+use crate::utils::escape_snake_case;
 
 pub mod codegen_ir;
 pub mod codegen_ir_builder;
@@ -157,30 +160,52 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
   );
 
   let mut schemas_mod_list: Vec<ItemMod> = vec![];
+  let mut schema_alias_mod_list: Vec<ItemMod> = vec![];
+  let module_names = loaded_schemas
+    .iter()
+    .map(|loaded| loaded.ir.module_name.as_str())
+    .collect::<HashSet<_>>();
+  let mut alias_names = HashSet::new();
 
   for loaded_schema in loaded_schemas {
     let schema_path = out_schemas_dir_path.join(format!("{}.rs", loaded_schema.ir.module_name));
-    write_generated_module(
-      &schema_path,
-      gen_schema_from_ir_with_type_graph(&loaded_schema.ir, false, &schema_graph).map_err(
-        |err| {
-          format!(
-            "failed to generate schema {}: {err:?}",
-            loaded_schema.ir.module_name
-          )
-        },
-      )?,
-    )?;
+    let schema_tokens = gen_schema_from_ir_with_type_graph(&loaded_schema.ir, false, &schema_graph)
+      .map_err(|err| {
+        format!(
+          "failed to generate schema {}: {err:?}",
+          loaded_schema.ir.module_name
+        )
+      })?;
+    let schema_has_public_items = generated_schema_has_public_items(schema_tokens.clone())?;
+    write_generated_module(&schema_path, schema_tokens)?;
 
     push_module_decl(
       &mut schemas_mod_list,
       &loaded_schema.ir.module_name,
       schema_module_cfg_attrs_ir(&loaded_schema.ir),
     )?;
+
+    if let Some(alias_name) = schema_prefix_alias_name(&loaded_schema.ir) {
+      if module_names.contains(alias_name.as_str()) || !alias_names.insert(alias_name.clone()) {
+        return Err(format!(
+          "schema prefix alias {alias_name} for module {} collides with an existing schema module or alias",
+          loaded_schema.ir.module_name
+        )
+        .into());
+      }
+      push_schema_alias_decl(
+        &mut schema_alias_mod_list,
+        &alias_name,
+        &loaded_schema.ir.module_name,
+        schema_has_public_items,
+        schema_module_cfg_attrs_ir(&loaded_schema.ir),
+      )?;
+    }
   }
 
   let token_stream: TokenStream = quote! {
     #( #schemas_mod_list )*
+    #( #schema_alias_mod_list )*
   };
   let schemas_mod_path = out_dir_path.join("schemas.rs");
   write_generated_module(&schemas_mod_path, token_stream)?;
@@ -346,6 +371,58 @@ fn push_module_decl(
     pub mod #module_ident;
   })?);
   Ok(())
+}
+
+fn push_schema_alias_decl(
+  mod_list: &mut Vec<ItemMod>,
+  alias_name: &str,
+  module_name: &str,
+  has_public_items: bool,
+  cfg_attrs: Vec<Attribute>,
+) -> Result<()> {
+  let alias_ident: Ident = parse_str(alias_name)?;
+  let module_ident: Ident = parse_str(module_name)?;
+  let reexport = if has_public_items {
+    quote! {
+      pub use super::#module_ident::*;
+    }
+  } else {
+    quote! {}
+  };
+  mod_list.push(parse2(quote! {
+    #( #cfg_attrs )*
+    pub mod #alias_ident {
+      #reexport
+    }
+  })?);
+  Ok(())
+}
+
+fn generated_schema_has_public_items(token_stream: TokenStream) -> Result<bool> {
+  let syntax_tree: syn::File = parse2(token_stream)?;
+  Ok(syntax_tree.items.iter().any(|item| match item {
+    syn::Item::Const(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Enum(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Fn(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Mod(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Static(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Struct(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Trait(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::TraitAlias(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Type(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Union(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    syn::Item::Use(item) => matches!(item.vis, syn::Visibility::Public(_)),
+    _ => false,
+  }))
+}
+
+fn schema_prefix_alias_name(schema: &SchemaModuleDecl) -> Option<String> {
+  let prefix = schema.prefix.trim();
+  if prefix.is_empty() {
+    return None;
+  }
+
+  Some(escape_snake_case(prefix.to_snake_case()))
 }
 
 fn schema_module_cfg_attrs_ir(schema: &SchemaModuleDecl) -> Vec<Attribute> {

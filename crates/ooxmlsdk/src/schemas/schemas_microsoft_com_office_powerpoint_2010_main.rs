@@ -69,10 +69,10 @@ pub struct Transform2D {
   pub vertical_flip: Option<crate::simple_type::BooleanValue>,
   /// Offset
   #[sdk(child(qname = "a:CT_Point2D/a:off"))]
-  pub offset: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Offset>,
+  pub offset: Option<crate::schemas::a::Offset>,
   /// Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/a:ext"))]
-  pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
+  pub extents: Option<crate::schemas::a::Extents>,
 }
 /// Defines the ExtensionListModify Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -84,7 +84,7 @@ pub struct ExtensionListModify {
   pub modify: Option<crate::simple_type::BooleanValue>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the Media Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -114,23 +114,19 @@ pub struct Media {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p:CT_SideDirectionTransition/p14:vortex")]
 pub struct VortexTransition {
-    /// Direction
-    #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
-    >,
+  /// Direction
+  #[sdk(attr(qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionSlideDirectionValues>,
 }
 /// Defines the PanTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p:CT_SideDirectionTransition/p14:pan")]
 pub struct PanTransition {
-    /// Direction
-    #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
-    >,
+  /// Direction
+  #[sdk(attr(qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionSlideDirectionValues>,
 }
 /// Defines the SwitchTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -191,18 +187,16 @@ pub struct RippleTransition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_PrismTransition/p14:prism")]
 pub struct PrismTransition {
-    /// dir
-    #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
-    >,
-    /// isContent
-    #[sdk(attr(office2010, qname = ":isContent"))]
-    pub is_content: Option<crate::simple_type::BooleanValue>,
-    /// isInverted
-    #[sdk(attr(office2010, qname = ":isInverted"))]
-    pub is_inverted: Option<crate::simple_type::BooleanValue>,
+  /// dir
+  #[sdk(attr(office2010, qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionSlideDirectionValues>,
+  /// isContent
+  #[sdk(attr(office2010, qname = ":isContent"))]
+  pub is_content: Option<crate::simple_type::BooleanValue>,
+  /// isInverted
+  #[sdk(attr(office2010, qname = ":isInverted"))]
+  pub is_inverted: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the DoorsTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -211,8 +205,7 @@ pub struct DoorsTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(kind = "token"))]
-  pub direction:
-    Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
+  pub direction: Option<crate::schemas::p::DirectionValues>,
 }
 /// Defines the WindowTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -221,63 +214,54 @@ pub struct WindowTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(string_format(kind = "token"))]
-  pub direction:
-    Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
+  pub direction: Option<crate::schemas::p::DirectionValues>,
 }
 /// Defines the GlitterTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_GlitterTransition/p14:glitter")]
 pub struct GlitterTransition {
-    /// dir
-    #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
-    >,
-    /// pattern
-    #[sdk(attr(office2010, qname = ":pattern"))]
-    #[sdk(string_format(kind = "token"))]
-    pub pattern: Option<TransitionPatternValues>,
+  /// dir
+  #[sdk(attr(office2010, qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionSlideDirectionValues>,
+  /// pattern
+  #[sdk(attr(office2010, qname = ":pattern"))]
+  #[sdk(string_format(kind = "token"))]
+  pub pattern: Option<TransitionPatternValues>,
 }
 /// Defines the WarpTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p:CT_InOutTransition/p14:warp")]
 pub struct WarpTransition {
-    /// Direction
-    #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
-    >,
+  /// Direction
+  #[sdk(attr(qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionInOutDirectionValues>,
 }
 /// Defines the FlythroughTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_FlyThroughTransition/p14:flythrough")]
 pub struct FlythroughTransition {
-    /// dir
-    #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
-    >,
-    /// hasBounce
-    #[sdk(attr(office2010, qname = ":hasBounce"))]
-    pub has_bounce: Option<crate::simple_type::BooleanValue>,
+  /// dir
+  #[sdk(attr(office2010, qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionInOutDirectionValues>,
+  /// hasBounce
+  #[sdk(attr(office2010, qname = ":hasBounce"))]
+  pub has_bounce: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShredTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_ShredTransition/p14:shred")]
 pub struct ShredTransition {
-    /// pattern
-    #[sdk(attr(office2010, qname = ":pattern"))]
-    #[sdk(string_format(kind = "token"))]
-    pub pattern: Option<TransitionShredPatternValues>,
-    /// dir
-    #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(kind = "token"))]
-    pub direction: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
-    >,
+  /// pattern
+  #[sdk(attr(office2010, qname = ":pattern"))]
+  #[sdk(string_format(kind = "token"))]
+  pub pattern: Option<TransitionShredPatternValues>,
+  /// dir
+  #[sdk(attr(office2010, qname = ":dir"))]
+  #[sdk(string_format(kind = "token"))]
+  pub direction: Option<crate::schemas::p::TransitionInOutDirectionValues>,
 }
 /// Defines the RevealTransition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -422,41 +406,32 @@ pub struct ShowEventRecordList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_NonVisualDrawingProps/p14:cNvPr")]
 pub struct NonVisualDrawingProperties {
-    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// Application defined unique identifier.
-    #[sdk(attr(qname = ":id"))]
-    pub id: crate::simple_type::UInt32Value,
-    /// Name compatible with Object Model (non-unique).
-    #[sdk(attr(qname = ":name"))]
-    pub name: crate::simple_type::StringValue,
-    /// Description of the drawing element.
-    #[sdk(attr(qname = ":descr"))]
-    pub description: Option<crate::simple_type::StringValue>,
-    /// Flag determining to show or hide this element.
-    #[sdk(attr(qname = ":hidden"))]
-    pub hidden: Option<crate::simple_type::BooleanValue>,
-    /// Title
-    #[sdk(attr(qname = ":title"))]
-    pub title: Option<crate::simple_type::StringValue>,
-    /// Hyperlink associated with clicking or selecting the element.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
-    pub hyperlink_on_click: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnClick,
-        >,
-    >,
-    /// Hyperlink associated with hovering over the element.
-    #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
-    pub hyperlink_on_hover: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HyperlinkOnHover,
-        >,
-    >,
-    /// Future extension
-    #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
-    pub non_visual_drawing_properties_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::NonVisualDrawingPropertiesExtensionList,
-    >,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  /// Application defined unique identifier.
+  #[sdk(attr(qname = ":id"))]
+  pub id: crate::simple_type::UInt32Value,
+  /// Name compatible with Object Model (non-unique).
+  #[sdk(attr(qname = ":name"))]
+  pub name: crate::simple_type::StringValue,
+  /// Description of the drawing element.
+  #[sdk(attr(qname = ":descr"))]
+  pub description: Option<crate::simple_type::StringValue>,
+  /// Flag determining to show or hide this element.
+  #[sdk(attr(qname = ":hidden"))]
+  pub hidden: Option<crate::simple_type::BooleanValue>,
+  /// Title
+  #[sdk(attr(qname = ":title"))]
+  pub title: Option<crate::simple_type::StringValue>,
+  /// Hyperlink associated with clicking or selecting the element.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkClick"))]
+  pub hyperlink_on_click: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnClick>>,
+  /// Hyperlink associated with hovering over the element.
+  #[sdk(child(qname = "a:CT_Hyperlink/a:hlinkHover"))]
+  pub hyperlink_on_hover: Option<std::boxed::Box<crate::schemas::a::HyperlinkOnHover>>,
+  /// Future extension
+  #[sdk(child(qname = "a:CT_NonVisualDrawingPropsExtensionList/a:extLst"))]
+  pub non_visual_drawing_properties_extension_list:
+    Option<crate::schemas::a::NonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the NonVisualInkContentPartProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -470,57 +445,39 @@ pub struct NonVisualInkContentPartProperties {
   pub is_comment: Option<crate::simple_type::BooleanValue>,
   /// Defines the ContentPartLocks Class.
   #[sdk(child(office2010, qname = "a14:CT_ContentPartLocking/a14:cpLocks"))]
-  pub content_part_locks: Option<
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ContentPartLocks,
-    >,
-  >,
+  pub content_part_locks: Option<std::boxed::Box<crate::schemas::a14::ContentPartLocks>>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst"))]
-  pub office_art_extension_list:
-    Option<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::OfficeArtExtensionList>,
+  pub office_art_extension_list: Option<crate::schemas::a14::OfficeArtExtensionList>,
 }
 /// Defines the ApplicationNonVisualDrawingProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p:CT_ApplicationNonVisualDrawingProps/p14:nvPr")]
 pub struct ApplicationNonVisualDrawingProperties {
-    /// Is a Photo Album
-    #[sdk(attr(qname = ":isPhoto"))]
-    pub is_photo: Option<crate::simple_type::BooleanValue>,
-    /// Is User Drawn
-    #[sdk(attr(qname = ":userDrawn"))]
-    pub user_drawn: Option<crate::simple_type::BooleanValue>,
-    /// Placeholder Shape
-    #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
-    pub placeholder_shape: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::PlaceholderShape,
-        >,
-    >,
-    #[sdk(
-        choice(
-            qname = "a:CT_AudioCD/a:audioCd",
-            qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
-            qname = "a:CT_AudioFile/a:audioFile",
-            qname = "a:CT_VideoFile/a:videoFile",
-            qname = "a:CT_QuickTimeFile/a:quickTimeFile"
-        )
-    )]
-    pub application_non_visual_drawing_properties_choice: Option<
-        ApplicationNonVisualDrawingPropertiesChoice,
-    >,
-    /// Customer Data List.
-    #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
-    pub p_cust_data_lst: Option<
-        std::boxed::Box<
-            crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::CustomerDataList,
-        >,
-    >,
-    /// Defines the ApplicationNonVisualDrawingPropertiesExtensionList Class.
-    #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst"))]
-    pub p_ext_lst: Option<
-        crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::ApplicationNonVisualDrawingPropertiesExtensionList,
-    >,
+  /// Is a Photo Album
+  #[sdk(attr(qname = ":isPhoto"))]
+  pub is_photo: Option<crate::simple_type::BooleanValue>,
+  /// Is User Drawn
+  #[sdk(attr(qname = ":userDrawn"))]
+  pub user_drawn: Option<crate::simple_type::BooleanValue>,
+  /// Placeholder Shape
+  #[sdk(child(qname = "p:CT_Placeholder/p:ph"))]
+  pub placeholder_shape: Option<std::boxed::Box<crate::schemas::p::PlaceholderShape>>,
+  #[sdk(choice(
+    qname = "a:CT_AudioCD/a:audioCd",
+    qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile",
+    qname = "a:CT_AudioFile/a:audioFile",
+    qname = "a:CT_VideoFile/a:videoFile",
+    qname = "a:CT_QuickTimeFile/a:quickTimeFile"
+  ))]
+  pub application_non_visual_drawing_properties_choice:
+    Option<ApplicationNonVisualDrawingPropertiesChoice>,
+  /// Customer Data List.
+  #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
+  pub p_cust_data_lst: Option<std::boxed::Box<crate::schemas::p::CustomerDataList>>,
+  /// Defines the ApplicationNonVisualDrawingPropertiesExtensionList Class.
+  #[sdk(child(qname = "p:CT_ApplicationNonVisualDrawingPropsExtensionList/p:extLst"))]
+  pub p_ext_lst: Option<crate::schemas::p::ApplicationNonVisualDrawingPropertiesExtensionList>,
 }
 /// Defines the MediaBookmark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -570,7 +527,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "p:CT_Extension/p:ext"))]
-  pub p_ext: Vec<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::Extension>,
+  pub p_ext: Vec<crate::schemas::p::Extension>,
 }
 /// Defines the SectionOld Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -659,8 +616,7 @@ pub struct TriggerEventRecord {
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
   #[sdk(string_format(kind = "token"))]
-  pub r#type:
-    crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TriggerEventValues,
+  pub r#type: crate::schemas::p::TriggerEventValues,
   /// time
   #[sdk(attr(office2010, qname = ":time"))]
   pub time: crate::simple_type::StringValue,
@@ -741,38 +697,22 @@ pub struct NullEventRecord {
 pub enum LaserColorChoice {
   /// RGB Color Model - Percentage Variant.
   #[sdk(child(qname = "a:CT_ScRgbColor/a:scrgbClr"))]
-  AScrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelPercentage,
-    >,
-  ),
+  AScrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelPercentage>),
   /// RGB Color Model - Hex Variant.
   #[sdk(child(qname = "a:CT_SRgbColor/a:srgbClr"))]
-  ASrgbClr(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::RgbColorModelHex,
-    >,
-  ),
+  ASrgbClr(std::boxed::Box<crate::schemas::a::RgbColorModelHex>),
   /// Hue, Saturation, Luminance Color Model.
   #[sdk(child(qname = "a:CT_HslColor/a:hslClr"))]
-  AHslClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::HslColor>,
-  ),
+  AHslClr(std::boxed::Box<crate::schemas::a::HslColor>),
   /// System Color.
   #[sdk(child(qname = "a:CT_SystemColor/a:sysClr"))]
-  ASysClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SystemColor>,
-  ),
+  ASysClr(std::boxed::Box<crate::schemas::a::SystemColor>),
   /// Scheme Color.
   #[sdk(child(qname = "a:CT_SchemeColor/a:schemeClr"))]
-  ASchemeClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::SchemeColor>,
-  ),
+  ASchemeClr(std::boxed::Box<crate::schemas::a::SchemeColor>),
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
-  APrstClr(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetColor>,
-  ),
+  APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShowEventRecordListChoice {
@@ -801,25 +741,13 @@ pub enum ShowEventRecordListChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
-  AAudioCd(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AudioFromCd>,
-  ),
+  AAudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
-  AWavAudioFile(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::WaveAudioFile>,
-  ),
+  AWavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
   #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
-  AAudioFile(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AudioFromFile>,
-  ),
+  AAudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
-  AVideoFile(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::VideoFromFile>,
-  ),
+  AVideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
-  AQuickTimeFile(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::QuickTimeFromFile,
-    >,
-  ),
+  AQuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }

@@ -44,7 +44,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "oel:CT_Extension/oel:ext"))]
-  pub oel_ext: Vec<crate::schemas::schemas_microsoft_com_office_2019_extlst::Extension>,
+  pub oel_ext: Vec<crate::schemas::oel::Extension>,
 }
 /// Defines the TaskAnchor Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

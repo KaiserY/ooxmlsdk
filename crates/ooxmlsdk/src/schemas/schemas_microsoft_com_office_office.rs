@@ -240,7 +240,7 @@ pub enum BlackAndWhiteModeValues {
 pub struct ShapeDefaults {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Shape ID Optional Storage
   #[sdk(attr(qname = ":spidmax"))]
   pub max_shape_id: Option<crate::simple_type::IntegerValue>,
@@ -270,19 +270,19 @@ pub struct ShapeDefaults {
   pub inset_mode: Option<InsetMarginValues>,
   /// _
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
-  pub fill: Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_vml::Fill>>,
+  pub fill: Option<std::boxed::Box<crate::schemas::v::Fill>>,
   /// _
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
-  pub image_data: Option<crate::schemas::schemas_microsoft_com_vml::ImageData>,
+  pub image_data: Option<crate::schemas::v::ImageData>,
   /// _
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
-  pub stroke: Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_vml::Stroke>>,
+  pub stroke: Option<std::boxed::Box<crate::schemas::v::Stroke>>,
   /// _
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
-  pub text_box: Option<std::boxed::Box<crate::schemas::schemas_microsoft_com_vml::TextBox>>,
+  pub text_box: Option<std::boxed::Box<crate::schemas::v::TextBox>>,
   /// _
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
-  pub shadow: Option<crate::schemas::schemas_microsoft_com_vml::Shadow>,
+  pub shadow: Option<crate::schemas::v::Shadow>,
   /// _
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
   pub skew: Option<Skew>,
@@ -308,7 +308,7 @@ pub struct ShapeDefaults {
 pub struct ShapeLayout {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Shape ID Map
   #[sdk(child(qname = "o:CT_IdMap/o:idmap"))]
   pub shape_id_map: Option<ShapeIdMap>,
@@ -325,7 +325,7 @@ pub struct ShapeLayout {
 pub struct SignatureLine {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Signature Line Flag
   #[sdk(attr(qname = ":issignatureline"))]
   pub is_signature_line: Option<crate::simple_type::TrueFalseValue>,
@@ -384,7 +384,7 @@ pub struct Ink {
 pub struct Diagram {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Diagram Style Options
   #[sdk(attr(qname = ":dgmstyle"))]
   pub style: Option<crate::simple_type::IntegerValue>,
@@ -422,7 +422,7 @@ pub struct Diagram {
 pub struct Skew {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Skew ID
   #[sdk(attr(qname = ":id"))]
   pub id: Option<crate::simple_type::StringValue>,
@@ -445,7 +445,7 @@ pub struct Skew {
 pub struct Extrusion {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Extrusion Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -543,7 +543,7 @@ pub struct Extrusion {
 pub struct Callout {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Callout toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -590,7 +590,7 @@ pub struct Callout {
 pub struct Lock {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Position Lock
   #[sdk(attr(qname = ":position"))]
   pub position: Option<crate::simple_type::TrueFalseValue>,
@@ -666,7 +666,7 @@ pub struct OleObject {
 pub struct Complex {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
 }
 /// Text Box Left Stroke.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -674,7 +674,7 @@ pub struct Complex {
 pub struct LeftStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Stroke Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -692,16 +692,16 @@ pub struct LeftStroke {
   pub opacity: Option<crate::simple_type::StringValue>,
   /// Stroke Line Style
   #[sdk(attr(qname = ":linestyle"))]
-  pub line_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeLineStyleValues>,
+  pub line_style: Option<crate::schemas::v::StrokeLineStyleValues>,
   /// Miter Joint Limit
   #[sdk(attr(qname = ":miterlimit"))]
   pub miter_limit: Option<crate::simple_type::DecimalValue>,
   /// Line End Join Style)
   #[sdk(attr(qname = ":joinstyle"))]
-  pub join_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeJoinStyleValues>,
+  pub join_style: Option<crate::schemas::v::StrokeJoinStyleValues>,
   /// Line End Cap
   #[sdk(attr(qname = ":endcap"))]
-  pub end_cap: Option<crate::schemas::schemas_microsoft_com_vml::StrokeEndCapValues>,
+  pub end_cap: Option<crate::schemas::v::StrokeEndCapValues>,
   /// Stroke Dash Pattern
   #[sdk(attr(qname = ":dashstyle"))]
   pub dash_style: Option<crate::simple_type::StringValue>,
@@ -710,13 +710,13 @@ pub struct LeftStroke {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Stroke Image Style
   #[sdk(attr(qname = ":filltype"))]
-  pub fill_type: Option<crate::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub fill_type: Option<crate::schemas::v::FillTypeValues>,
   /// Stroke Image Location
   #[sdk(attr(qname = ":src"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Stroke Image Aspect Ratio
   #[sdk(attr(qname = ":imageaspect"))]
-  pub image_aspect: Option<crate::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub image_aspect: Option<crate::schemas::v::ImageAspectValues>,
   /// Stroke Image Size
   #[sdk(attr(qname = ":imagesize"))]
   pub image_size: Option<crate::simple_type::StringValue>,
@@ -725,23 +725,22 @@ pub struct LeftStroke {
   pub image_align_shape: Option<crate::simple_type::TrueFalseValue>,
   /// Line Start Arrowhead
   #[sdk(attr(qname = ":startarrow"))]
-  pub start_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub start_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line Start Arrowhead Width
   #[sdk(attr(qname = ":startarrowwidth"))]
-  pub start_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub start_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line Start Arrowhead Length
   #[sdk(attr(qname = ":startarrowlength"))]
-  pub start_arrow_length:
-    Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub start_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Line End Arrowhead
   #[sdk(attr(qname = ":endarrow"))]
-  pub end_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub end_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line End Arrowhead Width
   #[sdk(attr(qname = ":endarrowwidth"))]
-  pub end_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub end_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line End Arrowhead Length
   #[sdk(attr(qname = ":endarrowlength"))]
-  pub end_arrow_length: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub end_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Original Image Reference
   #[sdk(attr(qname = "o:href"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -761,7 +760,7 @@ pub struct LeftStroke {
 pub struct TopStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Stroke Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -779,16 +778,16 @@ pub struct TopStroke {
   pub opacity: Option<crate::simple_type::StringValue>,
   /// Stroke Line Style
   #[sdk(attr(qname = ":linestyle"))]
-  pub line_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeLineStyleValues>,
+  pub line_style: Option<crate::schemas::v::StrokeLineStyleValues>,
   /// Miter Joint Limit
   #[sdk(attr(qname = ":miterlimit"))]
   pub miter_limit: Option<crate::simple_type::DecimalValue>,
   /// Line End Join Style)
   #[sdk(attr(qname = ":joinstyle"))]
-  pub join_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeJoinStyleValues>,
+  pub join_style: Option<crate::schemas::v::StrokeJoinStyleValues>,
   /// Line End Cap
   #[sdk(attr(qname = ":endcap"))]
-  pub end_cap: Option<crate::schemas::schemas_microsoft_com_vml::StrokeEndCapValues>,
+  pub end_cap: Option<crate::schemas::v::StrokeEndCapValues>,
   /// Stroke Dash Pattern
   #[sdk(attr(qname = ":dashstyle"))]
   pub dash_style: Option<crate::simple_type::StringValue>,
@@ -797,13 +796,13 @@ pub struct TopStroke {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Stroke Image Style
   #[sdk(attr(qname = ":filltype"))]
-  pub fill_type: Option<crate::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub fill_type: Option<crate::schemas::v::FillTypeValues>,
   /// Stroke Image Location
   #[sdk(attr(qname = ":src"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Stroke Image Aspect Ratio
   #[sdk(attr(qname = ":imageaspect"))]
-  pub image_aspect: Option<crate::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub image_aspect: Option<crate::schemas::v::ImageAspectValues>,
   /// Stroke Image Size
   #[sdk(attr(qname = ":imagesize"))]
   pub image_size: Option<crate::simple_type::StringValue>,
@@ -812,23 +811,22 @@ pub struct TopStroke {
   pub image_align_shape: Option<crate::simple_type::TrueFalseValue>,
   /// Line Start Arrowhead
   #[sdk(attr(qname = ":startarrow"))]
-  pub start_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub start_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line Start Arrowhead Width
   #[sdk(attr(qname = ":startarrowwidth"))]
-  pub start_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub start_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line Start Arrowhead Length
   #[sdk(attr(qname = ":startarrowlength"))]
-  pub start_arrow_length:
-    Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub start_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Line End Arrowhead
   #[sdk(attr(qname = ":endarrow"))]
-  pub end_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub end_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line End Arrowhead Width
   #[sdk(attr(qname = ":endarrowwidth"))]
-  pub end_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub end_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line End Arrowhead Length
   #[sdk(attr(qname = ":endarrowlength"))]
-  pub end_arrow_length: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub end_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Original Image Reference
   #[sdk(attr(qname = "o:href"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -848,7 +846,7 @@ pub struct TopStroke {
 pub struct RightStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Stroke Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -866,16 +864,16 @@ pub struct RightStroke {
   pub opacity: Option<crate::simple_type::StringValue>,
   /// Stroke Line Style
   #[sdk(attr(qname = ":linestyle"))]
-  pub line_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeLineStyleValues>,
+  pub line_style: Option<crate::schemas::v::StrokeLineStyleValues>,
   /// Miter Joint Limit
   #[sdk(attr(qname = ":miterlimit"))]
   pub miter_limit: Option<crate::simple_type::DecimalValue>,
   /// Line End Join Style)
   #[sdk(attr(qname = ":joinstyle"))]
-  pub join_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeJoinStyleValues>,
+  pub join_style: Option<crate::schemas::v::StrokeJoinStyleValues>,
   /// Line End Cap
   #[sdk(attr(qname = ":endcap"))]
-  pub end_cap: Option<crate::schemas::schemas_microsoft_com_vml::StrokeEndCapValues>,
+  pub end_cap: Option<crate::schemas::v::StrokeEndCapValues>,
   /// Stroke Dash Pattern
   #[sdk(attr(qname = ":dashstyle"))]
   pub dash_style: Option<crate::simple_type::StringValue>,
@@ -884,13 +882,13 @@ pub struct RightStroke {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Stroke Image Style
   #[sdk(attr(qname = ":filltype"))]
-  pub fill_type: Option<crate::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub fill_type: Option<crate::schemas::v::FillTypeValues>,
   /// Stroke Image Location
   #[sdk(attr(qname = ":src"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Stroke Image Aspect Ratio
   #[sdk(attr(qname = ":imageaspect"))]
-  pub image_aspect: Option<crate::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub image_aspect: Option<crate::schemas::v::ImageAspectValues>,
   /// Stroke Image Size
   #[sdk(attr(qname = ":imagesize"))]
   pub image_size: Option<crate::simple_type::StringValue>,
@@ -899,23 +897,22 @@ pub struct RightStroke {
   pub image_align_shape: Option<crate::simple_type::TrueFalseValue>,
   /// Line Start Arrowhead
   #[sdk(attr(qname = ":startarrow"))]
-  pub start_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub start_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line Start Arrowhead Width
   #[sdk(attr(qname = ":startarrowwidth"))]
-  pub start_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub start_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line Start Arrowhead Length
   #[sdk(attr(qname = ":startarrowlength"))]
-  pub start_arrow_length:
-    Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub start_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Line End Arrowhead
   #[sdk(attr(qname = ":endarrow"))]
-  pub end_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub end_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line End Arrowhead Width
   #[sdk(attr(qname = ":endarrowwidth"))]
-  pub end_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub end_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line End Arrowhead Length
   #[sdk(attr(qname = ":endarrowlength"))]
-  pub end_arrow_length: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub end_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Original Image Reference
   #[sdk(attr(qname = "o:href"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -935,7 +932,7 @@ pub struct RightStroke {
 pub struct BottomStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Stroke Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -953,16 +950,16 @@ pub struct BottomStroke {
   pub opacity: Option<crate::simple_type::StringValue>,
   /// Stroke Line Style
   #[sdk(attr(qname = ":linestyle"))]
-  pub line_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeLineStyleValues>,
+  pub line_style: Option<crate::schemas::v::StrokeLineStyleValues>,
   /// Miter Joint Limit
   #[sdk(attr(qname = ":miterlimit"))]
   pub miter_limit: Option<crate::simple_type::DecimalValue>,
   /// Line End Join Style)
   #[sdk(attr(qname = ":joinstyle"))]
-  pub join_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeJoinStyleValues>,
+  pub join_style: Option<crate::schemas::v::StrokeJoinStyleValues>,
   /// Line End Cap
   #[sdk(attr(qname = ":endcap"))]
-  pub end_cap: Option<crate::schemas::schemas_microsoft_com_vml::StrokeEndCapValues>,
+  pub end_cap: Option<crate::schemas::v::StrokeEndCapValues>,
   /// Stroke Dash Pattern
   #[sdk(attr(qname = ":dashstyle"))]
   pub dash_style: Option<crate::simple_type::StringValue>,
@@ -971,13 +968,13 @@ pub struct BottomStroke {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Stroke Image Style
   #[sdk(attr(qname = ":filltype"))]
-  pub fill_type: Option<crate::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub fill_type: Option<crate::schemas::v::FillTypeValues>,
   /// Stroke Image Location
   #[sdk(attr(qname = ":src"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Stroke Image Aspect Ratio
   #[sdk(attr(qname = ":imageaspect"))]
-  pub image_aspect: Option<crate::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub image_aspect: Option<crate::schemas::v::ImageAspectValues>,
   /// Stroke Image Size
   #[sdk(attr(qname = ":imagesize"))]
   pub image_size: Option<crate::simple_type::StringValue>,
@@ -986,23 +983,22 @@ pub struct BottomStroke {
   pub image_align_shape: Option<crate::simple_type::TrueFalseValue>,
   /// Line Start Arrowhead
   #[sdk(attr(qname = ":startarrow"))]
-  pub start_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub start_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line Start Arrowhead Width
   #[sdk(attr(qname = ":startarrowwidth"))]
-  pub start_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub start_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line Start Arrowhead Length
   #[sdk(attr(qname = ":startarrowlength"))]
-  pub start_arrow_length:
-    Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub start_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Line End Arrowhead
   #[sdk(attr(qname = ":endarrow"))]
-  pub end_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub end_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line End Arrowhead Width
   #[sdk(attr(qname = ":endarrowwidth"))]
-  pub end_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub end_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line End Arrowhead Length
   #[sdk(attr(qname = ":endarrowlength"))]
-  pub end_arrow_length: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub end_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Original Image Reference
   #[sdk(attr(qname = "o:href"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -1022,7 +1018,7 @@ pub struct BottomStroke {
 pub struct ColumnStroke {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Stroke Toggle
   #[sdk(attr(qname = ":on"))]
   pub on: Option<crate::simple_type::TrueFalseValue>,
@@ -1040,16 +1036,16 @@ pub struct ColumnStroke {
   pub opacity: Option<crate::simple_type::StringValue>,
   /// Stroke Line Style
   #[sdk(attr(qname = ":linestyle"))]
-  pub line_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeLineStyleValues>,
+  pub line_style: Option<crate::schemas::v::StrokeLineStyleValues>,
   /// Miter Joint Limit
   #[sdk(attr(qname = ":miterlimit"))]
   pub miter_limit: Option<crate::simple_type::DecimalValue>,
   /// Line End Join Style)
   #[sdk(attr(qname = ":joinstyle"))]
-  pub join_style: Option<crate::schemas::schemas_microsoft_com_vml::StrokeJoinStyleValues>,
+  pub join_style: Option<crate::schemas::v::StrokeJoinStyleValues>,
   /// Line End Cap
   #[sdk(attr(qname = ":endcap"))]
-  pub end_cap: Option<crate::schemas::schemas_microsoft_com_vml::StrokeEndCapValues>,
+  pub end_cap: Option<crate::schemas::v::StrokeEndCapValues>,
   /// Stroke Dash Pattern
   #[sdk(attr(qname = ":dashstyle"))]
   pub dash_style: Option<crate::simple_type::StringValue>,
@@ -1058,13 +1054,13 @@ pub struct ColumnStroke {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Stroke Image Style
   #[sdk(attr(qname = ":filltype"))]
-  pub fill_type: Option<crate::schemas::schemas_microsoft_com_vml::FillTypeValues>,
+  pub fill_type: Option<crate::schemas::v::FillTypeValues>,
   /// Stroke Image Location
   #[sdk(attr(qname = ":src"))]
   pub source: Option<crate::simple_type::StringValue>,
   /// Stroke Image Aspect Ratio
   #[sdk(attr(qname = ":imageaspect"))]
-  pub image_aspect: Option<crate::schemas::schemas_microsoft_com_vml::ImageAspectValues>,
+  pub image_aspect: Option<crate::schemas::v::ImageAspectValues>,
   /// Stroke Image Size
   #[sdk(attr(qname = ":imagesize"))]
   pub image_size: Option<crate::simple_type::StringValue>,
@@ -1073,23 +1069,22 @@ pub struct ColumnStroke {
   pub image_align_shape: Option<crate::simple_type::TrueFalseValue>,
   /// Line Start Arrowhead
   #[sdk(attr(qname = ":startarrow"))]
-  pub start_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub start_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line Start Arrowhead Width
   #[sdk(attr(qname = ":startarrowwidth"))]
-  pub start_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub start_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line Start Arrowhead Length
   #[sdk(attr(qname = ":startarrowlength"))]
-  pub start_arrow_length:
-    Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub start_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Line End Arrowhead
   #[sdk(attr(qname = ":endarrow"))]
-  pub end_arrow: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowValues>,
+  pub end_arrow: Option<crate::schemas::v::StrokeArrowValues>,
   /// Line End Arrowhead Width
   #[sdk(attr(qname = ":endarrowwidth"))]
-  pub end_arrow_width: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowWidthValues>,
+  pub end_arrow_width: Option<crate::schemas::v::StrokeArrowWidthValues>,
   /// Line End Arrowhead Length
   #[sdk(attr(qname = ":endarrowlength"))]
-  pub end_arrow_length: Option<crate::schemas::schemas_microsoft_com_vml::StrokeArrowLengthValues>,
+  pub end_arrow_length: Option<crate::schemas::v::StrokeArrowLengthValues>,
   /// Original Image Reference
   #[sdk(attr(qname = "o:href"))]
   pub href: Option<crate::simple_type::StringValue>,
@@ -1117,7 +1112,7 @@ pub struct ClipPath {
 pub struct FillExtendedProperties {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Fill Type
   #[sdk(attr(qname = ":type"))]
   pub r#type: Option<FillValues>,
@@ -1128,7 +1123,7 @@ pub struct FillExtendedProperties {
 pub struct ShapeIdMap {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Shape IDs
   #[sdk(attr(qname = ":data"))]
   pub data: Option<crate::simple_type::StringValue>,
@@ -1139,7 +1134,7 @@ pub struct ShapeIdMap {
 pub struct RegroupTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Regroup Entry.
   #[sdk(child(qname = "o:CT_Entry/o:entry"))]
   pub o_entry: Vec<Entry>,
@@ -1150,7 +1145,7 @@ pub struct RegroupTable {
 pub struct Rules {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Rule.
   #[sdk(child(qname = "o:CT_R/o:r"))]
   pub o_r: Vec<Rule>,
@@ -1193,7 +1188,7 @@ pub struct Rule {
 pub struct RelationTable {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Diagram Relationship.
   #[sdk(child(qname = "o:CT_Relation/o:rel"))]
   pub o_rel: Vec<Relation>,
@@ -1204,7 +1199,7 @@ pub struct RelationTable {
 pub struct Relation {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Diagram Relationship Source Shape
   #[sdk(attr(qname = ":idsrc"))]
   #[sdk(string_format(kind = "token"))]
@@ -1248,7 +1243,7 @@ pub struct Proxy {
 pub struct ColorMostRecentlyUsed {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Recent colors
   #[sdk(attr(qname = ":colors"))]
   pub colors: Option<crate::simple_type::StringValue>,
@@ -1259,7 +1254,7 @@ pub struct ColorMostRecentlyUsed {
 pub struct ColorMenu {
   /// VML Extension Handling Behavior
   #[sdk(attr(qname = "v:ext"))]
-  pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
+  pub extension: Option<crate::schemas::v::ExtensionHandlingBehaviorValues>,
   /// Default stroke color
   #[sdk(attr(qname = ":strokecolor"))]
   pub stroke_color: Option<crate::simple_type::StringValue>,

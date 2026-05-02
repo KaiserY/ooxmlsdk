@@ -204,35 +204,25 @@ pub struct RevExStream {
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
-  >,
+  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
-  pub numbering_format:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
   /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
-  pub fill: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
-  >,
+  pub fill: Option<std::boxed::Box<crate::schemas::x::Fill>>,
   /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
-  pub alignment:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
+  pub alignment: Option<crate::schemas::x::Alignment>,
   /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
-  pub border: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
-  >,
+  pub border: Option<std::boxed::Box<crate::schemas::x::Border>>,
   /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
-  pub protection:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
+  pub protection: Option<crate::schemas::x::Protection>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the RevisionPtr Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -855,7 +845,7 @@ pub struct RevGroup {
 pub struct RevCell {
   /// t
   #[sdk(attr(office2016, qname = ":t"))]
-  pub t: Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CellValues>,
+  pub t: Option<crate::schemas::x::CellValues>,
   /// nop
   #[sdk(attr(office2016, qname = ":nop"))]
   pub nop: Option<crate::simple_type::BooleanValue>,
@@ -902,7 +892,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the FormulaFormula Class.
 pub type FormulaFormula = crate::simple_type::StringValue;
@@ -1046,17 +1036,16 @@ pub type Xstring = crate::simple_type::StringValue;
 pub struct RstType {
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
-  pub text: Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Text>,
+  pub text: Option<crate::schemas::x::Text>,
   /// Rich Text Run.
   #[sdk(child(qname = "x:CT_RElt/x:r"))]
-  pub x_r: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Run>,
+  pub x_r: Vec<crate::schemas::x::Run>,
   /// Phonetic Run.
   #[sdk(child(qname = "x:CT_PhoneticRun/x:rPh"))]
-  pub x_r_ph: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticRun>,
+  pub x_r_ph: Vec<crate::schemas::x::PhoneticRun>,
   /// Phonetic Properties.
   #[sdk(child(qname = "x:CT_PhoneticPr/x:phoneticPr"))]
-  pub x_phonetic_pr:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PhoneticProperties>,
+  pub x_phonetic_pr: Option<crate::schemas::x::PhoneticProperties>,
 }
 /// Defines the RefCell Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1186,68 +1175,54 @@ pub struct RefTest {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "x:CT_DataValidation/xr:dataValidation")]
 pub struct DataValidation {
-    /// type
-    #[sdk(attr(qname = ":type"))]
-    pub r#type: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationValues,
-    >,
-    /// errorStyle
-    #[sdk(attr(qname = ":errorStyle"))]
-    pub error_style: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationErrorStyleValues,
-    >,
-    /// imeMode
-    #[sdk(attr(qname = ":imeMode"))]
-    pub ime_mode: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationImeModeValues,
-    >,
-    /// operator
-    #[sdk(attr(qname = ":operator"))]
-    pub operator: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationOperatorValues,
-    >,
-    /// allowBlank
-    #[sdk(attr(qname = ":allowBlank"))]
-    pub allow_blank: Option<crate::simple_type::BooleanValue>,
-    /// showDropDown
-    #[sdk(attr(qname = ":showDropDown"))]
-    pub show_drop_down: Option<crate::simple_type::BooleanValue>,
-    /// showInputMessage
-    #[sdk(attr(qname = ":showInputMessage"))]
-    pub show_input_message: Option<crate::simple_type::BooleanValue>,
-    /// showErrorMessage
-    #[sdk(attr(qname = ":showErrorMessage"))]
-    pub show_error_message: Option<crate::simple_type::BooleanValue>,
-    /// errorTitle
-    #[sdk(attr(qname = ":errorTitle"))]
-    pub error_title: Option<crate::simple_type::StringValue>,
-    /// error
-    #[sdk(attr(qname = ":error"))]
-    pub error: Option<crate::simple_type::StringValue>,
-    /// promptTitle
-    #[sdk(attr(qname = ":promptTitle"))]
-    pub prompt_title: Option<crate::simple_type::StringValue>,
-    /// prompt
-    #[sdk(attr(qname = ":prompt"))]
-    pub prompt: Option<crate::simple_type::StringValue>,
-    /// sqref
-    #[sdk(attr(qname = ":sqref"))]
-    pub sequence_of_references: crate::simple_type::ListValue<
-        crate::simple_type::StringValue,
-    >,
-    /// Defines the List Class.
-    #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
-    pub list: Option<crate::simple_type::StringValue>,
-    /// Defines the Formula1 Class.
-    #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
-    pub formula1: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formula1,
-    >,
-    /// Defines the Formula2 Class.
-    #[sdk(child(qname = "x:CT_Xstring/x:formula2"))]
-    pub formula2: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formula2,
-    >,
+  /// type
+  #[sdk(attr(qname = ":type"))]
+  pub r#type: Option<crate::schemas::x::DataValidationValues>,
+  /// errorStyle
+  #[sdk(attr(qname = ":errorStyle"))]
+  pub error_style: Option<crate::schemas::x::DataValidationErrorStyleValues>,
+  /// imeMode
+  #[sdk(attr(qname = ":imeMode"))]
+  pub ime_mode: Option<crate::schemas::x::DataValidationImeModeValues>,
+  /// operator
+  #[sdk(attr(qname = ":operator"))]
+  pub operator: Option<crate::schemas::x::DataValidationOperatorValues>,
+  /// allowBlank
+  #[sdk(attr(qname = ":allowBlank"))]
+  pub allow_blank: Option<crate::simple_type::BooleanValue>,
+  /// showDropDown
+  #[sdk(attr(qname = ":showDropDown"))]
+  pub show_drop_down: Option<crate::simple_type::BooleanValue>,
+  /// showInputMessage
+  #[sdk(attr(qname = ":showInputMessage"))]
+  pub show_input_message: Option<crate::simple_type::BooleanValue>,
+  /// showErrorMessage
+  #[sdk(attr(qname = ":showErrorMessage"))]
+  pub show_error_message: Option<crate::simple_type::BooleanValue>,
+  /// errorTitle
+  #[sdk(attr(qname = ":errorTitle"))]
+  pub error_title: Option<crate::simple_type::StringValue>,
+  /// error
+  #[sdk(attr(qname = ":error"))]
+  pub error: Option<crate::simple_type::StringValue>,
+  /// promptTitle
+  #[sdk(attr(qname = ":promptTitle"))]
+  pub prompt_title: Option<crate::simple_type::StringValue>,
+  /// prompt
+  #[sdk(attr(qname = ":prompt"))]
+  pub prompt: Option<crate::simple_type::StringValue>,
+  /// sqref
+  #[sdk(attr(qname = ":sqref"))]
+  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  /// Defines the List Class.
+  #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
+  pub list: Option<crate::simple_type::StringValue>,
+  /// Defines the Formula1 Class.
+  #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
+  pub formula1: Option<crate::schemas::x::Formula1>,
+  /// Defines the Formula2 Class.
+  #[sdk(child(qname = "x:CT_Xstring/x:formula2"))]
+  pub formula2: Option<crate::schemas::x::Formula2>,
 }
 /// Represents a hyperlink within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1273,113 +1248,87 @@ pub struct Hyperlink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "x14:CT_SparklineGroup/xr:sparklineGroup")]
 pub struct SparklineGroup {
-    /// manualMax
-    #[sdk(attr(office2010, qname = ":manualMax"))]
-    pub manual_max: Option<crate::simple_type::DoubleValue>,
-    /// manualMin
-    #[sdk(attr(office2010, qname = ":manualMin"))]
-    pub manual_min: Option<crate::simple_type::DoubleValue>,
-    /// lineWeight
-    #[sdk(attr(office2010, qname = ":lineWeight"))]
-    pub line_weight: Option<crate::simple_type::DoubleValue>,
-    /// type
-    #[sdk(attr(office2010, qname = ":type"))]
-    pub r#type: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineTypeValues,
-    >,
-    /// dateAxis
-    #[sdk(attr(office2010, qname = ":dateAxis"))]
-    pub date_axis: Option<crate::simple_type::BooleanValue>,
-    /// displayEmptyCellsAs
-    #[sdk(attr(office2010, qname = ":displayEmptyCellsAs"))]
-    pub display_empty_cells_as: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::DisplayBlanksAsValues,
-    >,
-    /// markers
-    #[sdk(attr(office2010, qname = ":markers"))]
-    pub markers: Option<crate::simple_type::BooleanValue>,
-    /// high
-    #[sdk(attr(office2010, qname = ":high"))]
-    pub high: Option<crate::simple_type::BooleanValue>,
-    /// low
-    #[sdk(attr(office2010, qname = ":low"))]
-    pub low: Option<crate::simple_type::BooleanValue>,
-    /// first
-    #[sdk(attr(office2010, qname = ":first"))]
-    pub first: Option<crate::simple_type::BooleanValue>,
-    /// last
-    #[sdk(attr(office2010, qname = ":last"))]
-    pub last: Option<crate::simple_type::BooleanValue>,
-    /// negative
-    #[sdk(attr(office2010, qname = ":negative"))]
-    pub negative: Option<crate::simple_type::BooleanValue>,
-    /// displayXAxis
-    #[sdk(attr(office2010, qname = ":displayXAxis"))]
-    pub display_x_axis: Option<crate::simple_type::BooleanValue>,
-    /// displayHidden
-    #[sdk(attr(office2010, qname = ":displayHidden"))]
-    pub display_hidden: Option<crate::simple_type::BooleanValue>,
-    /// minAxisType
-    #[sdk(attr(office2010, qname = ":minAxisType"))]
-    pub min_axis_type: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineAxisMinMaxValues,
-    >,
-    /// maxAxisType
-    #[sdk(attr(office2010, qname = ":maxAxisType"))]
-    pub max_axis_type: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SparklineAxisMinMaxValues,
-    >,
-    /// rightToLeft
-    #[sdk(attr(office2010, qname = ":rightToLeft"))]
-    pub right_to_left: Option<crate::simple_type::BooleanValue>,
-    /// Defines the SeriesColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
-    pub series_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::SeriesColor,
-    >,
-    /// Defines the NegativeColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
-    pub negative_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::NegativeColor,
-    >,
-    /// Defines the AxisColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
-    pub axis_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::AxisColor,
-    >,
-    /// Defines the MarkersColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
-    pub markers_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::MarkersColor,
-    >,
-    /// Defines the FirstMarkerColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
-    pub first_marker_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::FirstMarkerColor,
-    >,
-    /// Defines the LastMarkerColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
-    pub last_marker_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LastMarkerColor,
-    >,
-    /// Defines the HighMarkerColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
-    pub high_marker_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::HighMarkerColor,
-    >,
-    /// Defines the LowMarkerColor Class.
-    #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
-    pub low_marker_color: Option<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::LowMarkerColor,
-    >,
-    /// Defines the Formula Class.
-    #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-    pub formula: Option<crate::simple_type::StringValue>,
-    /// Defines the Sparklines Class.
-    #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
-    pub sparklines: std::boxed::Box<
-        crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::Sparklines,
-    >,
+  /// manualMax
+  #[sdk(attr(office2010, qname = ":manualMax"))]
+  pub manual_max: Option<crate::simple_type::DoubleValue>,
+  /// manualMin
+  #[sdk(attr(office2010, qname = ":manualMin"))]
+  pub manual_min: Option<crate::simple_type::DoubleValue>,
+  /// lineWeight
+  #[sdk(attr(office2010, qname = ":lineWeight"))]
+  pub line_weight: Option<crate::simple_type::DoubleValue>,
+  /// type
+  #[sdk(attr(office2010, qname = ":type"))]
+  pub r#type: Option<crate::schemas::x14::SparklineTypeValues>,
+  /// dateAxis
+  #[sdk(attr(office2010, qname = ":dateAxis"))]
+  pub date_axis: Option<crate::simple_type::BooleanValue>,
+  /// displayEmptyCellsAs
+  #[sdk(attr(office2010, qname = ":displayEmptyCellsAs"))]
+  pub display_empty_cells_as: Option<crate::schemas::x14::DisplayBlanksAsValues>,
+  /// markers
+  #[sdk(attr(office2010, qname = ":markers"))]
+  pub markers: Option<crate::simple_type::BooleanValue>,
+  /// high
+  #[sdk(attr(office2010, qname = ":high"))]
+  pub high: Option<crate::simple_type::BooleanValue>,
+  /// low
+  #[sdk(attr(office2010, qname = ":low"))]
+  pub low: Option<crate::simple_type::BooleanValue>,
+  /// first
+  #[sdk(attr(office2010, qname = ":first"))]
+  pub first: Option<crate::simple_type::BooleanValue>,
+  /// last
+  #[sdk(attr(office2010, qname = ":last"))]
+  pub last: Option<crate::simple_type::BooleanValue>,
+  /// negative
+  #[sdk(attr(office2010, qname = ":negative"))]
+  pub negative: Option<crate::simple_type::BooleanValue>,
+  /// displayXAxis
+  #[sdk(attr(office2010, qname = ":displayXAxis"))]
+  pub display_x_axis: Option<crate::simple_type::BooleanValue>,
+  /// displayHidden
+  #[sdk(attr(office2010, qname = ":displayHidden"))]
+  pub display_hidden: Option<crate::simple_type::BooleanValue>,
+  /// minAxisType
+  #[sdk(attr(office2010, qname = ":minAxisType"))]
+  pub min_axis_type: Option<crate::schemas::x14::SparklineAxisMinMaxValues>,
+  /// maxAxisType
+  #[sdk(attr(office2010, qname = ":maxAxisType"))]
+  pub max_axis_type: Option<crate::schemas::x14::SparklineAxisMinMaxValues>,
+  /// rightToLeft
+  #[sdk(attr(office2010, qname = ":rightToLeft"))]
+  pub right_to_left: Option<crate::simple_type::BooleanValue>,
+  /// Defines the SeriesColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorSeries"))]
+  pub series_color: Option<crate::schemas::x14::SeriesColor>,
+  /// Defines the NegativeColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorNegative"))]
+  pub negative_color: Option<crate::schemas::x14::NegativeColor>,
+  /// Defines the AxisColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorAxis"))]
+  pub axis_color: Option<crate::schemas::x14::AxisColor>,
+  /// Defines the MarkersColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorMarkers"))]
+  pub markers_color: Option<crate::schemas::x14::MarkersColor>,
+  /// Defines the FirstMarkerColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorFirst"))]
+  pub first_marker_color: Option<crate::schemas::x14::FirstMarkerColor>,
+  /// Defines the LastMarkerColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLast"))]
+  pub last_marker_color: Option<crate::schemas::x14::LastMarkerColor>,
+  /// Defines the HighMarkerColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorHigh"))]
+  pub high_marker_color: Option<crate::schemas::x14::HighMarkerColor>,
+  /// Defines the LowMarkerColor Class.
+  #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
+  pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
+  /// Defines the Formula Class.
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
+  pub formula: Option<crate::simple_type::StringValue>,
+  /// Defines the Sparklines Class.
+  #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
+  pub sparklines: std::boxed::Box<crate::schemas::x14::Sparklines>,
 }
 /// Represents one comment within a cell..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1387,17 +1336,13 @@ pub struct SparklineGroup {
 pub struct Comments {
   /// Authors
   #[sdk(child(qname = "x:CT_Authors/x:authors"))]
-  pub authors:
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Authors>,
+  pub authors: std::boxed::Box<crate::schemas::x::Authors>,
   /// List of Comments
   #[sdk(child(qname = "x:CT_CommentList/x:commentList"))]
-  pub comment_list: std::boxed::Box<
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CommentList,
-  >,
+  pub comment_list: std::boxed::Box<crate::schemas::x::CommentList>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Represents an autofilter..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1408,17 +1353,13 @@ pub struct AutoFilter {
   pub reference: Option<crate::simple_type::StringValue>,
   /// AutoFilter Column.
   #[sdk(child(qname = "x:CT_FilterColumn/x:filterColumn"))]
-  pub x_filter_column:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterColumn>,
+  pub x_filter_column: Vec<crate::schemas::x::FilterColumn>,
   /// Sort State for Auto Filter.
   #[sdk(child(qname = "x:CT_SortState/x:sortState"))]
-  pub x_sort_state: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortState>,
-  >,
+  pub x_sort_state: Option<std::boxed::Box<crate::schemas::x::SortState>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub x_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub x_ext_lst: Option<crate::schemas::x::ExtensionList>,
 }
 /// Represents a PivotTable View..
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1427,295 +1368,262 @@ pub struct AutoFilter {
   qname = "x:CT_pivotTableDefinition/xr:pivotTableDefinition"
 )]
 pub struct PivotTableDefinition {
-    /// name
-    #[sdk(attr(qname = ":name"))]
-    pub name: crate::simple_type::StringValue,
-    /// cacheId
-    #[sdk(attr(qname = ":cacheId"))]
-    pub cache_id: crate::simple_type::UInt32Value,
-    /// dataOnRows
-    #[sdk(attr(qname = ":dataOnRows"))]
-    pub data_on_rows: Option<crate::simple_type::BooleanValue>,
-    /// dataPosition
-    #[sdk(attr(qname = ":dataPosition"))]
-    pub data_position: Option<crate::simple_type::UInt32Value>,
-    /// Auto Format Id
-    #[sdk(attr(qname = ":autoFormatId"))]
-    pub auto_format_id: Option<crate::simple_type::UInt32Value>,
-    /// Apply Number Formats
-    #[sdk(attr(qname = ":applyNumberFormats"))]
-    pub apply_number_formats: Option<crate::simple_type::BooleanValue>,
-    /// Apply Border Formats
-    #[sdk(attr(qname = ":applyBorderFormats"))]
-    pub apply_border_formats: Option<crate::simple_type::BooleanValue>,
-    /// Apply Font Formats
-    #[sdk(attr(qname = ":applyFontFormats"))]
-    pub apply_font_formats: Option<crate::simple_type::BooleanValue>,
-    /// Apply Pattern Formats
-    #[sdk(attr(qname = ":applyPatternFormats"))]
-    pub apply_pattern_formats: Option<crate::simple_type::BooleanValue>,
-    /// Apply Alignment Formats
-    #[sdk(attr(qname = ":applyAlignmentFormats"))]
-    pub apply_alignment_formats: Option<crate::simple_type::BooleanValue>,
-    /// Apply Width / Height Formats
-    #[sdk(attr(qname = ":applyWidthHeightFormats"))]
-    pub apply_width_height_formats: Option<crate::simple_type::BooleanValue>,
-    /// dataCaption
-    #[sdk(attr(qname = ":dataCaption"))]
-    pub data_caption: crate::simple_type::StringValue,
-    /// grandTotalCaption
-    #[sdk(attr(qname = ":grandTotalCaption"))]
-    pub grand_total_caption: Option<crate::simple_type::StringValue>,
-    /// errorCaption
-    #[sdk(attr(qname = ":errorCaption"))]
-    pub error_caption: Option<crate::simple_type::StringValue>,
-    /// showError
-    #[sdk(attr(qname = ":showError"))]
-    pub show_error: Option<crate::simple_type::BooleanValue>,
-    /// missingCaption
-    #[sdk(attr(qname = ":missingCaption"))]
-    pub missing_caption: Option<crate::simple_type::StringValue>,
-    /// showMissing
-    #[sdk(attr(qname = ":showMissing"))]
-    pub show_missing: Option<crate::simple_type::BooleanValue>,
-    /// pageStyle
-    #[sdk(attr(qname = ":pageStyle"))]
-    pub page_style: Option<crate::simple_type::StringValue>,
-    /// pivotTableStyle
-    #[sdk(attr(qname = ":pivotTableStyle"))]
-    pub pivot_table_style_name: Option<crate::simple_type::StringValue>,
-    /// vacatedStyle
-    #[sdk(attr(qname = ":vacatedStyle"))]
-    pub vacated_style: Option<crate::simple_type::StringValue>,
-    /// tag
-    #[sdk(attr(qname = ":tag"))]
-    pub tag: Option<crate::simple_type::StringValue>,
-    /// updatedVersion
-    #[sdk(attr(qname = ":updatedVersion"))]
-    pub updated_version: Option<crate::simple_type::ByteValue>,
-    /// minRefreshableVersion
-    #[sdk(attr(qname = ":minRefreshableVersion"))]
-    pub min_refreshable_version: Option<crate::simple_type::ByteValue>,
-    /// asteriskTotals
-    #[sdk(attr(qname = ":asteriskTotals"))]
-    pub asterisk_totals: Option<crate::simple_type::BooleanValue>,
-    /// showItems
-    #[sdk(attr(qname = ":showItems"))]
-    pub show_items: Option<crate::simple_type::BooleanValue>,
-    /// editData
-    #[sdk(attr(qname = ":editData"))]
-    pub edit_data: Option<crate::simple_type::BooleanValue>,
-    /// disableFieldList
-    #[sdk(attr(qname = ":disableFieldList"))]
-    pub disable_field_list: Option<crate::simple_type::BooleanValue>,
-    /// showCalcMbrs
-    #[sdk(attr(qname = ":showCalcMbrs"))]
-    pub show_calculated_members: Option<crate::simple_type::BooleanValue>,
-    /// visualTotals
-    #[sdk(attr(qname = ":visualTotals"))]
-    pub visual_totals: Option<crate::simple_type::BooleanValue>,
-    /// showMultipleLabel
-    #[sdk(attr(qname = ":showMultipleLabel"))]
-    pub show_multiple_label: Option<crate::simple_type::BooleanValue>,
-    /// showDataDropDown
-    #[sdk(attr(qname = ":showDataDropDown"))]
-    pub show_data_drop_down: Option<crate::simple_type::BooleanValue>,
-    /// showDrill
-    #[sdk(attr(qname = ":showDrill"))]
-    pub show_drill: Option<crate::simple_type::BooleanValue>,
-    /// printDrill
-    #[sdk(attr(qname = ":printDrill"))]
-    pub print_drill: Option<crate::simple_type::BooleanValue>,
-    /// showMemberPropertyTips
-    #[sdk(attr(qname = ":showMemberPropertyTips"))]
-    pub show_member_property_tips: Option<crate::simple_type::BooleanValue>,
-    /// showDataTips
-    #[sdk(attr(qname = ":showDataTips"))]
-    pub show_data_tips: Option<crate::simple_type::BooleanValue>,
-    /// enableWizard
-    #[sdk(attr(qname = ":enableWizard"))]
-    pub enable_wizard: Option<crate::simple_type::BooleanValue>,
-    /// enableDrill
-    #[sdk(attr(qname = ":enableDrill"))]
-    pub enable_drill: Option<crate::simple_type::BooleanValue>,
-    /// enableFieldProperties
-    #[sdk(attr(qname = ":enableFieldProperties"))]
-    pub enable_field_properties: Option<crate::simple_type::BooleanValue>,
-    /// preserveFormatting
-    #[sdk(attr(qname = ":preserveFormatting"))]
-    pub preserve_formatting: Option<crate::simple_type::BooleanValue>,
-    /// useAutoFormatting
-    #[sdk(attr(qname = ":useAutoFormatting"))]
-    pub use_auto_formatting: Option<crate::simple_type::BooleanValue>,
-    /// pageWrap
-    #[sdk(attr(qname = ":pageWrap"))]
-    pub page_wrap: Option<crate::simple_type::UInt32Value>,
-    /// pageOverThenDown
-    #[sdk(attr(qname = ":pageOverThenDown"))]
-    pub page_over_then_down: Option<crate::simple_type::BooleanValue>,
-    /// subtotalHiddenItems
-    #[sdk(attr(qname = ":subtotalHiddenItems"))]
-    pub subtotal_hidden_items: Option<crate::simple_type::BooleanValue>,
-    /// rowGrandTotals
-    #[sdk(attr(qname = ":rowGrandTotals"))]
-    pub row_grand_totals: Option<crate::simple_type::BooleanValue>,
-    /// colGrandTotals
-    #[sdk(attr(qname = ":colGrandTotals"))]
-    pub column_grand_totals: Option<crate::simple_type::BooleanValue>,
-    /// fieldPrintTitles
-    #[sdk(attr(qname = ":fieldPrintTitles"))]
-    pub field_print_titles: Option<crate::simple_type::BooleanValue>,
-    /// itemPrintTitles
-    #[sdk(attr(qname = ":itemPrintTitles"))]
-    pub item_print_titles: Option<crate::simple_type::BooleanValue>,
-    /// mergeItem
-    #[sdk(attr(qname = ":mergeItem"))]
-    pub merge_item: Option<crate::simple_type::BooleanValue>,
-    /// showDropZones
-    #[sdk(attr(qname = ":showDropZones"))]
-    pub show_drop_zones: Option<crate::simple_type::BooleanValue>,
-    /// createdVersion
-    #[sdk(attr(qname = ":createdVersion"))]
-    pub created_version: Option<crate::simple_type::ByteValue>,
-    /// indent
-    #[sdk(attr(qname = ":indent"))]
-    pub indent: Option<crate::simple_type::UInt32Value>,
-    /// showEmptyRow
-    #[sdk(attr(qname = ":showEmptyRow"))]
-    pub show_empty_row: Option<crate::simple_type::BooleanValue>,
-    /// showEmptyCol
-    #[sdk(attr(qname = ":showEmptyCol"))]
-    pub show_empty_column: Option<crate::simple_type::BooleanValue>,
-    /// showHeaders
-    #[sdk(attr(qname = ":showHeaders"))]
-    pub show_headers: Option<crate::simple_type::BooleanValue>,
-    /// compact
-    #[sdk(attr(qname = ":compact"))]
-    pub compact: Option<crate::simple_type::BooleanValue>,
-    /// outline
-    #[sdk(attr(qname = ":outline"))]
-    pub outline: Option<crate::simple_type::BooleanValue>,
-    /// outlineData
-    #[sdk(attr(qname = ":outlineData"))]
-    pub outline_data: Option<crate::simple_type::BooleanValue>,
-    /// compactData
-    #[sdk(attr(qname = ":compactData"))]
-    pub compact_data: Option<crate::simple_type::BooleanValue>,
-    /// published
-    #[sdk(attr(qname = ":published"))]
-    pub published: Option<crate::simple_type::BooleanValue>,
-    /// gridDropZones
-    #[sdk(attr(qname = ":gridDropZones"))]
-    pub grid_drop_zones: Option<crate::simple_type::BooleanValue>,
-    /// immersive
-    #[sdk(attr(qname = ":immersive"))]
-    pub stop_immersive_ui: Option<crate::simple_type::BooleanValue>,
-    /// multipleFieldFilters
-    #[sdk(attr(qname = ":multipleFieldFilters"))]
-    pub multiple_field_filters: Option<crate::simple_type::BooleanValue>,
-    /// chartFormat
-    #[sdk(attr(qname = ":chartFormat"))]
-    pub chart_format: Option<crate::simple_type::UInt32Value>,
-    /// rowHeaderCaption
-    #[sdk(attr(qname = ":rowHeaderCaption"))]
-    pub row_header_caption: Option<crate::simple_type::StringValue>,
-    /// colHeaderCaption
-    #[sdk(attr(qname = ":colHeaderCaption"))]
-    pub column_header_caption: Option<crate::simple_type::StringValue>,
-    /// fieldListSortAscending
-    #[sdk(attr(qname = ":fieldListSortAscending"))]
-    pub field_list_sort_ascending: Option<crate::simple_type::BooleanValue>,
-    /// mdxSubqueries
-    #[sdk(attr(qname = ":mdxSubqueries"))]
-    pub mdx_subqueries: Option<crate::simple_type::BooleanValue>,
-    /// customListSort
-    #[sdk(attr(qname = ":customListSort"))]
-    pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
-    /// Defines the Location Class.
-    #[sdk(child(qname = "x:CT_Location/x:location"))]
-    pub location: std::boxed::Box<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Location,
-    >,
-    /// Defines the PivotFields Class.
-    #[sdk(child(qname = "x:CT_PivotFields/x:pivotFields"))]
-    pub pivot_fields: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotFields,
-    >,
-    /// Defines the RowFields Class.
-    #[sdk(child(qname = "x:CT_RowFields/x:rowFields"))]
-    pub row_fields: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowFields,
-    >,
-    /// Defines the RowItems Class.
-    #[sdk(child(qname = "x:CT_rowItems/x:rowItems"))]
-    pub row_items: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowItems,
-    >,
-    /// Defines the ColumnFields Class.
-    #[sdk(child(qname = "x:CT_ColFields/x:colFields"))]
-    pub column_fields: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnFields,
-    >,
-    /// Defines the ColumnItems Class.
-    #[sdk(child(qname = "x:CT_colItems/x:colItems"))]
-    pub column_items: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnItems,
-    >,
-    /// Defines the PageFields Class.
-    #[sdk(child(qname = "x:CT_PageFields/x:pageFields"))]
-    pub page_fields: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PageFields,
-    >,
-    /// Defines the DataFields Class.
-    #[sdk(child(qname = "x:CT_DataFields/x:dataFields"))]
-    pub data_fields: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataFields,
-    >,
-    /// Defines the Formats Class.
-    #[sdk(child(qname = "x:CT_Formats/x:formats"))]
-    pub formats: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Formats,
-    >,
-    /// Defines the ConditionalFormats Class.
-    #[sdk(child(qname = "x:CT_ConditionalFormats/x:conditionalFormats"))]
-    pub conditional_formats: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormats,
-    >,
-    /// Defines the ChartFormats Class.
-    #[sdk(child(qname = "x:CT_ChartFormats/x:chartFormats"))]
-    pub chart_formats: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ChartFormats,
-    >,
-    /// Defines the PivotHierarchies Class.
-    #[sdk(child(qname = "x:CT_PivotHierarchies/x:pivotHierarchies"))]
-    pub pivot_hierarchies: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotHierarchies,
-    >,
-    /// Defines the PivotTableStyle Class.
-    #[sdk(child(qname = "x:CT_PivotTableStyle/x:pivotTableStyleInfo"))]
-    pub pivot_table_style: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableStyle,
-    >,
-    /// Defines the PivotFilters Class.
-    #[sdk(child(qname = "x:CT_PivotFilters/x:filters"))]
-    pub pivot_filters: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotFilters,
-    >,
-    /// Defines the RowHierarchiesUsage Class.
-    #[sdk(child(qname = "x:CT_RowHierarchiesUsage/x:rowHierarchiesUsage"))]
-    pub row_hierarchies_usage: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RowHierarchiesUsage,
-    >,
-    /// Defines the ColumnHierarchiesUsage Class.
-    #[sdk(child(qname = "x:CT_ColHierarchiesUsage/x:colHierarchiesUsage"))]
-    pub column_hierarchies_usage: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ColumnHierarchiesUsage,
-    >,
-    /// Defines the PivotTableDefinitionExtensionList Class.
-    #[sdk(child(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst"))]
-    pub pivot_table_definition_extension_list: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableDefinitionExtensionList,
-    >,
+  /// name
+  #[sdk(attr(qname = ":name"))]
+  pub name: crate::simple_type::StringValue,
+  /// cacheId
+  #[sdk(attr(qname = ":cacheId"))]
+  pub cache_id: crate::simple_type::UInt32Value,
+  /// dataOnRows
+  #[sdk(attr(qname = ":dataOnRows"))]
+  pub data_on_rows: Option<crate::simple_type::BooleanValue>,
+  /// dataPosition
+  #[sdk(attr(qname = ":dataPosition"))]
+  pub data_position: Option<crate::simple_type::UInt32Value>,
+  /// Auto Format Id
+  #[sdk(attr(qname = ":autoFormatId"))]
+  pub auto_format_id: Option<crate::simple_type::UInt32Value>,
+  /// Apply Number Formats
+  #[sdk(attr(qname = ":applyNumberFormats"))]
+  pub apply_number_formats: Option<crate::simple_type::BooleanValue>,
+  /// Apply Border Formats
+  #[sdk(attr(qname = ":applyBorderFormats"))]
+  pub apply_border_formats: Option<crate::simple_type::BooleanValue>,
+  /// Apply Font Formats
+  #[sdk(attr(qname = ":applyFontFormats"))]
+  pub apply_font_formats: Option<crate::simple_type::BooleanValue>,
+  /// Apply Pattern Formats
+  #[sdk(attr(qname = ":applyPatternFormats"))]
+  pub apply_pattern_formats: Option<crate::simple_type::BooleanValue>,
+  /// Apply Alignment Formats
+  #[sdk(attr(qname = ":applyAlignmentFormats"))]
+  pub apply_alignment_formats: Option<crate::simple_type::BooleanValue>,
+  /// Apply Width / Height Formats
+  #[sdk(attr(qname = ":applyWidthHeightFormats"))]
+  pub apply_width_height_formats: Option<crate::simple_type::BooleanValue>,
+  /// dataCaption
+  #[sdk(attr(qname = ":dataCaption"))]
+  pub data_caption: crate::simple_type::StringValue,
+  /// grandTotalCaption
+  #[sdk(attr(qname = ":grandTotalCaption"))]
+  pub grand_total_caption: Option<crate::simple_type::StringValue>,
+  /// errorCaption
+  #[sdk(attr(qname = ":errorCaption"))]
+  pub error_caption: Option<crate::simple_type::StringValue>,
+  /// showError
+  #[sdk(attr(qname = ":showError"))]
+  pub show_error: Option<crate::simple_type::BooleanValue>,
+  /// missingCaption
+  #[sdk(attr(qname = ":missingCaption"))]
+  pub missing_caption: Option<crate::simple_type::StringValue>,
+  /// showMissing
+  #[sdk(attr(qname = ":showMissing"))]
+  pub show_missing: Option<crate::simple_type::BooleanValue>,
+  /// pageStyle
+  #[sdk(attr(qname = ":pageStyle"))]
+  pub page_style: Option<crate::simple_type::StringValue>,
+  /// pivotTableStyle
+  #[sdk(attr(qname = ":pivotTableStyle"))]
+  pub pivot_table_style_name: Option<crate::simple_type::StringValue>,
+  /// vacatedStyle
+  #[sdk(attr(qname = ":vacatedStyle"))]
+  pub vacated_style: Option<crate::simple_type::StringValue>,
+  /// tag
+  #[sdk(attr(qname = ":tag"))]
+  pub tag: Option<crate::simple_type::StringValue>,
+  /// updatedVersion
+  #[sdk(attr(qname = ":updatedVersion"))]
+  pub updated_version: Option<crate::simple_type::ByteValue>,
+  /// minRefreshableVersion
+  #[sdk(attr(qname = ":minRefreshableVersion"))]
+  pub min_refreshable_version: Option<crate::simple_type::ByteValue>,
+  /// asteriskTotals
+  #[sdk(attr(qname = ":asteriskTotals"))]
+  pub asterisk_totals: Option<crate::simple_type::BooleanValue>,
+  /// showItems
+  #[sdk(attr(qname = ":showItems"))]
+  pub show_items: Option<crate::simple_type::BooleanValue>,
+  /// editData
+  #[sdk(attr(qname = ":editData"))]
+  pub edit_data: Option<crate::simple_type::BooleanValue>,
+  /// disableFieldList
+  #[sdk(attr(qname = ":disableFieldList"))]
+  pub disable_field_list: Option<crate::simple_type::BooleanValue>,
+  /// showCalcMbrs
+  #[sdk(attr(qname = ":showCalcMbrs"))]
+  pub show_calculated_members: Option<crate::simple_type::BooleanValue>,
+  /// visualTotals
+  #[sdk(attr(qname = ":visualTotals"))]
+  pub visual_totals: Option<crate::simple_type::BooleanValue>,
+  /// showMultipleLabel
+  #[sdk(attr(qname = ":showMultipleLabel"))]
+  pub show_multiple_label: Option<crate::simple_type::BooleanValue>,
+  /// showDataDropDown
+  #[sdk(attr(qname = ":showDataDropDown"))]
+  pub show_data_drop_down: Option<crate::simple_type::BooleanValue>,
+  /// showDrill
+  #[sdk(attr(qname = ":showDrill"))]
+  pub show_drill: Option<crate::simple_type::BooleanValue>,
+  /// printDrill
+  #[sdk(attr(qname = ":printDrill"))]
+  pub print_drill: Option<crate::simple_type::BooleanValue>,
+  /// showMemberPropertyTips
+  #[sdk(attr(qname = ":showMemberPropertyTips"))]
+  pub show_member_property_tips: Option<crate::simple_type::BooleanValue>,
+  /// showDataTips
+  #[sdk(attr(qname = ":showDataTips"))]
+  pub show_data_tips: Option<crate::simple_type::BooleanValue>,
+  /// enableWizard
+  #[sdk(attr(qname = ":enableWizard"))]
+  pub enable_wizard: Option<crate::simple_type::BooleanValue>,
+  /// enableDrill
+  #[sdk(attr(qname = ":enableDrill"))]
+  pub enable_drill: Option<crate::simple_type::BooleanValue>,
+  /// enableFieldProperties
+  #[sdk(attr(qname = ":enableFieldProperties"))]
+  pub enable_field_properties: Option<crate::simple_type::BooleanValue>,
+  /// preserveFormatting
+  #[sdk(attr(qname = ":preserveFormatting"))]
+  pub preserve_formatting: Option<crate::simple_type::BooleanValue>,
+  /// useAutoFormatting
+  #[sdk(attr(qname = ":useAutoFormatting"))]
+  pub use_auto_formatting: Option<crate::simple_type::BooleanValue>,
+  /// pageWrap
+  #[sdk(attr(qname = ":pageWrap"))]
+  pub page_wrap: Option<crate::simple_type::UInt32Value>,
+  /// pageOverThenDown
+  #[sdk(attr(qname = ":pageOverThenDown"))]
+  pub page_over_then_down: Option<crate::simple_type::BooleanValue>,
+  /// subtotalHiddenItems
+  #[sdk(attr(qname = ":subtotalHiddenItems"))]
+  pub subtotal_hidden_items: Option<crate::simple_type::BooleanValue>,
+  /// rowGrandTotals
+  #[sdk(attr(qname = ":rowGrandTotals"))]
+  pub row_grand_totals: Option<crate::simple_type::BooleanValue>,
+  /// colGrandTotals
+  #[sdk(attr(qname = ":colGrandTotals"))]
+  pub column_grand_totals: Option<crate::simple_type::BooleanValue>,
+  /// fieldPrintTitles
+  #[sdk(attr(qname = ":fieldPrintTitles"))]
+  pub field_print_titles: Option<crate::simple_type::BooleanValue>,
+  /// itemPrintTitles
+  #[sdk(attr(qname = ":itemPrintTitles"))]
+  pub item_print_titles: Option<crate::simple_type::BooleanValue>,
+  /// mergeItem
+  #[sdk(attr(qname = ":mergeItem"))]
+  pub merge_item: Option<crate::simple_type::BooleanValue>,
+  /// showDropZones
+  #[sdk(attr(qname = ":showDropZones"))]
+  pub show_drop_zones: Option<crate::simple_type::BooleanValue>,
+  /// createdVersion
+  #[sdk(attr(qname = ":createdVersion"))]
+  pub created_version: Option<crate::simple_type::ByteValue>,
+  /// indent
+  #[sdk(attr(qname = ":indent"))]
+  pub indent: Option<crate::simple_type::UInt32Value>,
+  /// showEmptyRow
+  #[sdk(attr(qname = ":showEmptyRow"))]
+  pub show_empty_row: Option<crate::simple_type::BooleanValue>,
+  /// showEmptyCol
+  #[sdk(attr(qname = ":showEmptyCol"))]
+  pub show_empty_column: Option<crate::simple_type::BooleanValue>,
+  /// showHeaders
+  #[sdk(attr(qname = ":showHeaders"))]
+  pub show_headers: Option<crate::simple_type::BooleanValue>,
+  /// compact
+  #[sdk(attr(qname = ":compact"))]
+  pub compact: Option<crate::simple_type::BooleanValue>,
+  /// outline
+  #[sdk(attr(qname = ":outline"))]
+  pub outline: Option<crate::simple_type::BooleanValue>,
+  /// outlineData
+  #[sdk(attr(qname = ":outlineData"))]
+  pub outline_data: Option<crate::simple_type::BooleanValue>,
+  /// compactData
+  #[sdk(attr(qname = ":compactData"))]
+  pub compact_data: Option<crate::simple_type::BooleanValue>,
+  /// published
+  #[sdk(attr(qname = ":published"))]
+  pub published: Option<crate::simple_type::BooleanValue>,
+  /// gridDropZones
+  #[sdk(attr(qname = ":gridDropZones"))]
+  pub grid_drop_zones: Option<crate::simple_type::BooleanValue>,
+  /// immersive
+  #[sdk(attr(qname = ":immersive"))]
+  pub stop_immersive_ui: Option<crate::simple_type::BooleanValue>,
+  /// multipleFieldFilters
+  #[sdk(attr(qname = ":multipleFieldFilters"))]
+  pub multiple_field_filters: Option<crate::simple_type::BooleanValue>,
+  /// chartFormat
+  #[sdk(attr(qname = ":chartFormat"))]
+  pub chart_format: Option<crate::simple_type::UInt32Value>,
+  /// rowHeaderCaption
+  #[sdk(attr(qname = ":rowHeaderCaption"))]
+  pub row_header_caption: Option<crate::simple_type::StringValue>,
+  /// colHeaderCaption
+  #[sdk(attr(qname = ":colHeaderCaption"))]
+  pub column_header_caption: Option<crate::simple_type::StringValue>,
+  /// fieldListSortAscending
+  #[sdk(attr(qname = ":fieldListSortAscending"))]
+  pub field_list_sort_ascending: Option<crate::simple_type::BooleanValue>,
+  /// mdxSubqueries
+  #[sdk(attr(qname = ":mdxSubqueries"))]
+  pub mdx_subqueries: Option<crate::simple_type::BooleanValue>,
+  /// customListSort
+  #[sdk(attr(qname = ":customListSort"))]
+  pub custom_list_sort: Option<crate::simple_type::BooleanValue>,
+  /// Defines the Location Class.
+  #[sdk(child(qname = "x:CT_Location/x:location"))]
+  pub location: std::boxed::Box<crate::schemas::x::Location>,
+  /// Defines the PivotFields Class.
+  #[sdk(child(qname = "x:CT_PivotFields/x:pivotFields"))]
+  pub pivot_fields: Option<crate::schemas::x::PivotFields>,
+  /// Defines the RowFields Class.
+  #[sdk(child(qname = "x:CT_RowFields/x:rowFields"))]
+  pub row_fields: Option<crate::schemas::x::RowFields>,
+  /// Defines the RowItems Class.
+  #[sdk(child(qname = "x:CT_rowItems/x:rowItems"))]
+  pub row_items: Option<crate::schemas::x::RowItems>,
+  /// Defines the ColumnFields Class.
+  #[sdk(child(qname = "x:CT_ColFields/x:colFields"))]
+  pub column_fields: Option<crate::schemas::x::ColumnFields>,
+  /// Defines the ColumnItems Class.
+  #[sdk(child(qname = "x:CT_colItems/x:colItems"))]
+  pub column_items: Option<crate::schemas::x::ColumnItems>,
+  /// Defines the PageFields Class.
+  #[sdk(child(qname = "x:CT_PageFields/x:pageFields"))]
+  pub page_fields: Option<crate::schemas::x::PageFields>,
+  /// Defines the DataFields Class.
+  #[sdk(child(qname = "x:CT_DataFields/x:dataFields"))]
+  pub data_fields: Option<crate::schemas::x::DataFields>,
+  /// Defines the Formats Class.
+  #[sdk(child(qname = "x:CT_Formats/x:formats"))]
+  pub formats: Option<crate::schemas::x::Formats>,
+  /// Defines the ConditionalFormats Class.
+  #[sdk(child(qname = "x:CT_ConditionalFormats/x:conditionalFormats"))]
+  pub conditional_formats: Option<crate::schemas::x::ConditionalFormats>,
+  /// Defines the ChartFormats Class.
+  #[sdk(child(qname = "x:CT_ChartFormats/x:chartFormats"))]
+  pub chart_formats: Option<crate::schemas::x::ChartFormats>,
+  /// Defines the PivotHierarchies Class.
+  #[sdk(child(qname = "x:CT_PivotHierarchies/x:pivotHierarchies"))]
+  pub pivot_hierarchies: Option<crate::schemas::x::PivotHierarchies>,
+  /// Defines the PivotTableStyle Class.
+  #[sdk(child(qname = "x:CT_PivotTableStyle/x:pivotTableStyleInfo"))]
+  pub pivot_table_style: Option<crate::schemas::x::PivotTableStyle>,
+  /// Defines the PivotFilters Class.
+  #[sdk(child(qname = "x:CT_PivotFilters/x:filters"))]
+  pub pivot_filters: Option<crate::schemas::x::PivotFilters>,
+  /// Defines the RowHierarchiesUsage Class.
+  #[sdk(child(qname = "x:CT_RowHierarchiesUsage/x:rowHierarchiesUsage"))]
+  pub row_hierarchies_usage: Option<crate::schemas::x::RowHierarchiesUsage>,
+  /// Defines the ColumnHierarchiesUsage Class.
+  #[sdk(child(qname = "x:CT_ColHierarchiesUsage/x:colHierarchiesUsage"))]
+  pub column_hierarchies_usage: Option<crate::schemas::x::ColumnHierarchiesUsage>,
+  /// Defines the PivotTableDefinitionExtensionList Class.
+  #[sdk(child(qname = "x:CT_pivotTableDefinitionExtensionList/x:extLst"))]
+  pub pivot_table_definition_extension_list:
+    Option<crate::schemas::x::PivotTableDefinitionExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExStreamChoice {

@@ -145,6 +145,7 @@ pub(crate) struct TypeContainmentGraph {
   empty_leaf_marker_docs: HashMap<String, String>,
   empty_leaf_marker_docs_by_rust_name: HashMap<String, String>,
   any_children_alias_keys: HashSet<String>,
+  module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
 }
 
@@ -153,6 +154,11 @@ impl TypeContainmentGraph {
     let mut graph = Self::default();
 
     for module in modules {
+      if let Some(alias_path) = schema_prefix_alias_path(module) {
+        graph
+          .module_alias_paths
+          .insert(module_type_namespace(&module.module_name), alias_path);
+      }
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
@@ -248,6 +254,14 @@ impl TypeContainmentGraph {
 
   fn is_any_children_alias(&self, node: &str) -> bool {
     self.any_children_alias_keys.contains(node)
+  }
+
+  fn rendered_module_path<'a>(&'a self, module_path: &'a str) -> &'a str {
+    self
+      .module_alias_paths
+      .get(module_path)
+      .map(String::as_str)
+      .unwrap_or(module_path)
   }
 
   fn empty_leaf_marker_doc(&self, node: &str) -> Option<&str> {
@@ -1023,6 +1037,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .xml_content
           .as_ref()
           .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+        type_graph,
       )?;
 
       if can_alias_leaf_text_wrapper_decl(type_decl, &attr_fields) {
@@ -1040,12 +1055,14 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       fields.extend(gen_support_fields(&type_decl.support));
 
       for attr in &attr_fields {
-        fields.push(gen_attr_from_decl(attr, field_version_cfg).map_err(|err| {
-          format!(
-            "type {} attr {}: {err}",
-            type_decl.rust_name, attr.rust_name
-          )
-        })?);
+        fields.push(
+          gen_attr_from_decl(attr, field_version_cfg, type_graph).map_err(|err| {
+            format!(
+              "type {} attr {}: {err}",
+              type_decl.rust_name, attr.rust_name
+            )
+          })?,
+        );
       }
 
       fields.push(quote! {
@@ -1083,12 +1100,14 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
 
     if type_decl.element_kind == Some(ElementKind::LeafText) {
       for attr in &attr_fields {
-        fields.push(gen_attr_from_decl(attr, field_version_cfg).map_err(|err| {
-          format!(
-            "type {} attr {}: {err}",
-            type_decl.rust_name, attr.rust_name
-          )
-        })?);
+        fields.push(
+          gen_attr_from_decl(attr, field_version_cfg, type_graph).map_err(|err| {
+            format!(
+              "type {} attr {}: {err}",
+              type_decl.rust_name, attr.rust_name
+            )
+          })?,
+        );
       }
 
       let simple_type_name = type_from_decl_ref(
@@ -1096,6 +1115,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           .xml_content
           .as_ref()
           .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+        type_graph,
       )
       .map_err(|err| format!("type {} xml content: {err}", type_decl.rust_name))?;
       fields.push(quote! {
@@ -1104,15 +1124,15 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       });
     } else if type_decl.element_kind == Some(ElementKind::Leaf) {
       for attr in &attr_fields {
-        fields.push(gen_attr_from_decl(attr, field_version_cfg)?);
+        fields.push(gen_attr_from_decl(attr, field_version_cfg, type_graph)?);
       }
     } else if type_decl.element_kind == Some(ElementKind::Composite) {
       for attr in &attr_fields {
-        fields.push(gen_attr_from_decl(attr, field_version_cfg)?);
+        fields.push(gen_attr_from_decl(attr, field_version_cfg, type_graph)?);
       }
 
       if let Some(xml_content) = type_decl.xml_content.as_ref() {
-        let simple_type_name = type_from_decl_ref(xml_content)
+        let simple_type_name = type_from_decl_ref(xml_content, type_graph)
           .map_err(|err| format!("type {} xml content: {err}", type_decl.rust_name))?;
         fields.push(quote! {
           #[sdk(text)]
@@ -1157,6 +1177,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1196,7 +1217,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             _ => None,
           });
           let field_type = any_field
-            .map(|field| type_from_decl_ref(&field.type_ref))
+            .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
             .transpose()?
             .unwrap_or_else(|| parse_str("String").expect("String type"));
           let field_attrs = module_version_cfg_attrs(
@@ -1252,6 +1273,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1271,6 +1293,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1319,7 +1342,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         .collect();
 
       for attr in &attr_fields {
-        fields.push(gen_attr_from_decl(attr, field_version_cfg)?);
+        fields.push(gen_attr_from_decl(attr, field_version_cfg, type_graph)?);
       }
 
       for attr in base_type_decl
@@ -1342,7 +1365,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           continue;
         }
 
-        fields.push(gen_attr_from_decl(attr, field_version_cfg)?);
+        fields.push(gen_attr_from_decl(attr, field_version_cfg, type_graph)?);
 
         if !qname.is_empty() {
           seen_attrs.push(qname.as_str());
@@ -1403,6 +1426,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1497,6 +1521,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1535,7 +1560,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             _ => None,
           });
           let field_type = any_field
-            .map(|field| type_from_decl_ref(&field.type_ref))
+            .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
             .transpose()?
             .unwrap_or_else(|| parse_str("String").expect("String type"));
           let field_attrs = module_version_cfg_attrs(
@@ -1553,6 +1578,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             fields.extend(gen_choice_fields_from_decl(
               &choice_fields,
               ir,
+              type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
@@ -1569,6 +1595,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             .xml_content
             .as_ref()
             .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+          type_graph,
         )?;
         fields.push(quote! {
           #[sdk(text)]
@@ -2007,7 +2034,7 @@ fn inline_single_field_sequence_variant_tokens(
     return Ok(None);
   }
 
-  let payload_type = type_from_decl_ref(&field.type_ref)?;
+  let payload_type = type_from_decl_ref(&field.type_ref, type_graph)?;
   let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
   let empty_leaf_doc_attrs = if let Some(doc) = empty_leaf_marker_doc.and_then(meaningful_doc_text)
   {
@@ -2080,7 +2107,7 @@ fn gen_choice_variant_tokens(
 
   match &variant.wire {
     crate::sdk_code::codegen_ir::VariantWireDecl::Any => {
-      let payload_type = type_from_decl_ref(&variant.payload)?;
+      let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
@@ -2120,7 +2147,7 @@ fn gen_choice_variant_tokens(
           render_context.module,
           render_context.type_graph,
         ) {
-          let payload_type = type_from_decl_ref(&variant.payload)?;
+          let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
           return Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
@@ -2146,7 +2173,7 @@ fn gen_choice_variant_tokens(
           },
         }])
       } else {
-        let payload_type = type_from_decl_ref(&variant.payload)?;
+        let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
         Ok(vec![quote! {
           #prefix_attrs
           #( #variant_attrs )*
@@ -2157,7 +2184,7 @@ fn gen_choice_variant_tokens(
       }
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { qnames } => {
-      let payload_type = type_from_decl_ref(&variant.payload)?;
+      let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
       if qnames.is_empty() {
         return Err(variant.rust_name.clone().into());
       }
@@ -2230,7 +2257,7 @@ fn gen_choice_variant_tokens(
           }
           Ok(tokens)
         } else {
-          let payload_type = type_from_decl_ref(&variant.payload)?;
+          let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
           Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
@@ -2240,7 +2267,7 @@ fn gen_choice_variant_tokens(
           }])
         }
       } else {
-        let payload_type = type_from_decl_ref(&variant.payload)?;
+        let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
         let is_nested_choice = render_context
           .module
           .types
@@ -2307,7 +2334,7 @@ fn gen_choice_variant_tokens(
       }
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
-      let payload_type = type_from_decl_ref(&variant.payload)?;
+      let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
@@ -3054,12 +3081,16 @@ fn is_numeric_literal(value: &str) -> bool {
   }
 }
 
-fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Result<TokenStream> {
+fn gen_attr_from_decl(
+  attr: &FieldDecl,
+  version_cfg: VersionCfgContext,
+  type_graph: &TypeContainmentGraph,
+) -> Result<TokenStream> {
   let FieldWireDecl::Attribute { qname, bit } = &attr.wire else {
     return Err(format!("expected attribute field, got {:?}", attr.wire).into());
   };
   let attr_name_ident: Ident = parse_str(&attr.rust_name)?;
-  let type_ident = type_from_decl_ref(&attr.type_ref)?;
+  let type_ident = type_from_decl_ref(&attr.type_ref, type_graph)?;
   let bit_attrs = if let Some(bit) = bit {
     quote! {
       #[sdk(bit = #bit)]
@@ -3215,9 +3246,10 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
   })
 }
 
-fn type_from_decl_ref(type_ref: &TypeRefDecl) -> Result<Type> {
+fn type_from_decl_ref(type_ref: &TypeRefDecl, type_graph: &TypeContainmentGraph) -> Result<Type> {
   if type_ref.rust_type.contains('<') || type_ref.rust_type.contains("::") {
     if let Some(module_path) = &type_ref.module_path {
+      let module_path = type_graph.rendered_module_path(module_path);
       return Ok(parse_str(&format!(
         "{module_path}::{}",
         type_ref.rust_type
@@ -3228,6 +3260,7 @@ fn type_from_decl_ref(type_ref: &TypeRefDecl) -> Result<Type> {
   }
 
   if let Some(module_path) = &type_ref.module_path {
+    let module_path = type_graph.rendered_module_path(module_path);
     Ok(parse_str(&format!(
       "{module_path}::{}",
       type_ref.rust_type.to_upper_camel_case()
@@ -3261,6 +3294,18 @@ fn is_value_like_type_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> 
 
 fn module_type_namespace(module_name: &str) -> String {
   format!("crate::schemas::{module_name}")
+}
+
+fn schema_prefix_alias_path(module: &SchemaModuleDecl) -> Option<String> {
+  let prefix = module.prefix.trim();
+  if prefix.is_empty() {
+    return None;
+  }
+
+  Some(format!(
+    "crate::schemas::{}",
+    escape_snake_case(prefix.to_snake_case())
+  ))
 }
 
 fn local_type_key(module: &SchemaModuleDecl, rust_type: &str) -> String {
@@ -3519,7 +3564,7 @@ fn gen_direct_child_fields_from_decl_with_context(
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
-    let field_type = type_from_decl_ref(&field.type_ref)?;
+    let field_type = type_from_decl_ref(&field.type_ref, type_graph)?;
     let property_comments_owned = empty_leaf_marker_doc
       .and_then(meaningful_doc_text)
       .or_else(|| meaningful_doc_text(&field.docs))
@@ -3617,7 +3662,7 @@ fn gen_inline_sequence_variant_fields_from_decl(
     let attr = module_version_cfg_attrs(&field.version, field_cfg);
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
     let empty_leaf_marker_doc = empty_leaf_marker_doc_for_ref(module, &field.type_ref, type_graph);
-    let field_type = type_from_decl_ref(&field.type_ref)?;
+    let field_type = type_from_decl_ref(&field.type_ref, type_graph)?;
     let property_comments_owned = empty_leaf_marker_doc
       .and_then(meaningful_doc_text)
       .or_else(|| meaningful_doc_text(&field.docs))
@@ -3713,6 +3758,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
         tokens.extend(gen_choice_fields_from_decl(
           std::slice::from_ref(field),
           module,
+          type_graph,
           field_cfg,
           &HashSet::new(),
         )?);
@@ -3721,7 +3767,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
         let attrs = module_version_cfg_attrs(&field.version, field_cfg);
         let field_name_ident: Ident = parse_str(&field.rust_name)?;
         let property_comments = field.docs.as_str();
-        let field_type = type_from_decl_ref(&field.type_ref)?;
+        let field_type = type_from_decl_ref(&field.type_ref, type_graph)?;
         tokens.push(match field.cardinality {
           Cardinality::Many => quote! {
             #( #attrs )*
@@ -3763,6 +3809,7 @@ fn gen_flatten_one_sequence_fields_from_decl(
 fn gen_choice_fields_from_decl(
   fields: &[&FieldDecl],
   module: &SchemaModuleDecl,
+  type_graph: &TypeContainmentGraph,
   field_cfg: VersionCfgContext,
   _choice_dispatch_field_names: &HashSet<String>,
 ) -> Result<Vec<TokenStream>> {
@@ -3770,7 +3817,7 @@ fn gen_choice_fields_from_decl(
 
   for field in fields {
     let field_name_ident: Ident = parse_str(&field.rust_name)?;
-    let field_type = type_from_decl_ref(&field.type_ref)?;
+    let field_type = type_from_decl_ref(&field.type_ref, type_graph)?;
     let attrs = module_version_cfg_attrs(&field.version, field_cfg);
     let choice_accepts_text = choice_type_accepts_text(module, &field.type_ref.rust_type);
     let choice_accepts_any = choice_type_accepts_any(module, &field.type_ref.rust_type);
@@ -6670,9 +6717,13 @@ mod tests {
       ],
     };
 
-    let generated = gen_attr_from_decl(&attr, VersionCfgContext::default())
-      .unwrap()
-      .to_string();
+    let generated = gen_attr_from_decl(
+      &attr,
+      VersionCfgContext::default(),
+      &TypeContainmentGraph::default(),
+    )
+    .unwrap()
+    .to_string();
 
     assert!(generated.contains("# [sdk (attr (office2016 , qname = \":creationId\"))]"));
     assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));

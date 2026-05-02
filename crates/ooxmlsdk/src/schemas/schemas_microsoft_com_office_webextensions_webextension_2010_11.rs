@@ -67,7 +67,7 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::a::Extension>,
 }
 /// Defines the WebExtensionBinding Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -152,8 +152,7 @@ pub struct Snapshot {
   /// Compression state for blips.
   #[sdk(attr(qname = ":cstate"))]
   #[sdk(string_format(kind = "token"))]
-  pub compression_state:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
+  pub compression_state: Option<crate::schemas::a::BlipCompressionValues>,
   #[sdk(choice(
     qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
     qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling",
@@ -176,15 +175,12 @@ pub struct Snapshot {
   pub snapshot_choice: Vec<SnapshotChoice>,
   /// Future extensions..
   #[sdk(child(qname = "a:CT_BlipExtensionList/a:extLst"))]
-  pub a_ext_lst:
-    Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipExtensionList>,
+  pub a_ext_lst: Option<crate::schemas::a::BlipExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SnapshotChoice {
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
-  AAlphaBiLevel(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaBiLevel>,
-  ),
+  AAlphaBiLevel(std::boxed::Box<crate::schemas::a::AlphaBiLevel>),
   /// Alpha Ceiling Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaCeilingEffect/a:alphaCeiling"))]
   AAlphaCeiling,
@@ -192,62 +188,32 @@ pub enum SnapshotChoice {
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
   AAlphaFloor,
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
-  AAlphaInv(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaInverse>,
-  ),
+  AAlphaInv(std::boxed::Box<crate::schemas::a::AlphaInverse>),
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
-  AAlphaMod(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulationEffect,
-    >,
-  ),
+  AAlphaMod(std::boxed::Box<crate::schemas::a::AlphaModulationEffect>),
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
-  AAlphaModFix(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaModulationFixed,
-    >,
-  ),
+  AAlphaModFix(std::boxed::Box<crate::schemas::a::AlphaModulationFixed>),
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
-  AAlphaRepl(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::AlphaReplace>,
-  ),
+  AAlphaRepl(std::boxed::Box<crate::schemas::a::AlphaReplace>),
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
-  ABiLevel(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BiLevel>,
-  ),
+  ABiLevel(std::boxed::Box<crate::schemas::a::BiLevel>),
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
-  ABlur(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Blur>),
+  ABlur(std::boxed::Box<crate::schemas::a::Blur>),
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
-  AClrChange(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorChange>,
-  ),
+  AClrChange(std::boxed::Box<crate::schemas::a::ColorChange>),
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
-  AClrRepl(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorReplacement,
-    >,
-  ),
+  AClrRepl(std::boxed::Box<crate::schemas::a::ColorReplacement>),
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
-  ADuotone(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Duotone>,
-  ),
+  ADuotone(std::boxed::Box<crate::schemas::a::Duotone>),
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
-  AFillOverlay(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FillOverlay>,
-  ),
+  AFillOverlay(std::boxed::Box<crate::schemas::a::FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
   AGrayscl,
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
-  AHsl(std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Hsl>),
+  AHsl(std::boxed::Box<crate::schemas::a::Hsl>),
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
-  ALum(
-    std::boxed::Box<
-      crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LuminanceEffect,
-    >,
-  ),
+  ALum(std::boxed::Box<crate::schemas::a::LuminanceEffect>),
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
-  ATint(
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TintEffect>,
-  ),
+  ATint(std::boxed::Box<crate::schemas::a::TintEffect>),
 }

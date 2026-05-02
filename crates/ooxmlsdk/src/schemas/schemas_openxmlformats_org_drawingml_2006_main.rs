@@ -11936,40 +11936,22 @@ pub enum SpaceAfterChoice {
 pub enum ShapePropertiesExtensionChoice {
   /// Defines the HiddenFillProperties Class.
   #[sdk(child(office2010, qname = "a:CT_FillProperties/a14:hiddenFill"))]
-  A14HiddenFill(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenFillProperties,
-    >,
-  ),
+  A14HiddenFill(std::boxed::Box<crate::schemas::a14::HiddenFillProperties>),
   /// Defines the HiddenLineProperties Class.
   #[sdk(child(office2010, qname = "a:CT_LineProperties/a14:hiddenLine"))]
-  A14HiddenLine(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenLineProperties,
-    >,
-  ),
+  A14HiddenLine(std::boxed::Box<crate::schemas::a14::HiddenLineProperties>),
   /// Defines the HiddenEffectsProperties Class.
   #[sdk(child(office2010, qname = "a:CT_EffectProperties/a14:hiddenEffects"))]
-  A14HiddenEffects(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenEffectsProperties,
-    >,
-  ),
+  A14HiddenEffects(std::boxed::Box<crate::schemas::a14::HiddenEffectsProperties>),
   /// Defines the HiddenScene3D Class.
   #[sdk(child(office2010, qname = "a:CT_Scene3D/a14:hiddenScene3d"))]
-  A14HiddenScene3d(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenScene3D>,
-  ),
+  A14HiddenScene3d(std::boxed::Box<crate::schemas::a14::HiddenScene3D>),
   /// Defines the HiddenShape3D Class.
   #[sdk(child(office2010, qname = "a:CT_Shape3D/a14:hiddenSp3d"))]
-  A14HiddenSp3d(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::HiddenShape3D>,
-  ),
+  A14HiddenSp3d(std::boxed::Box<crate::schemas::a14::HiddenShape3D>),
   /// Defines the ShadowObscured Class.
   #[sdk(child(office2010, qname = "a14:CT_ShadowObscured/a14:shadowObscured"))]
-  A14ShadowObscured(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ShadowObscured>,
-  ),
+  A14ShadowObscured(std::boxed::Box<crate::schemas::a14::ShadowObscured>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -11977,9 +11959,7 @@ pub enum ShapePropertiesExtensionChoice {
 pub enum GvmlGroupShapeExtensionChoice {
   /// Defines the IsCanvas Class.
   #[sdk(child(office2010, qname = "a14:CT_IsGvmlCanvas/a14:isCanvas"))]
-  A14IsCanvas(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::IsCanvas>,
-  ),
+  A14IsCanvas(std::boxed::Box<crate::schemas::a14::IsCanvas>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -12024,11 +12004,7 @@ pub enum GroupShapeChoice {
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   APic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
-  A14ContentPart(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_main::GvmlContentPart,
-    >,
-  ),
+  A14ContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
   #[sdk(child(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame"))]
   AGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
@@ -12047,11 +12023,7 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
     office2013,
     qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps"
   ))]
-  A15NonVisualGroupProps(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_main::NonVisualGroupProperties,
-    >,
-  ),
+  A15NonVisualGroupProps(std::boxed::Box<crate::schemas::a15::NonVisualGroupProperties>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -12059,9 +12031,7 @@ pub enum NonVisualGroupDrawingShapePropsExtensionChoice {
 pub enum OfficeStyleSheetExtensionChoice {
   /// Defines the ThemeFamily Class.
   #[sdk(child(office2013, qname = "thm15:CT_ThemeFamily/thm15:themeFamily"))]
-  Thm15ThemeFamily(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_thememl_2012_main::ThemeFamily>,
-  ),
+  Thm15ThemeFamily(std::boxed::Box<crate::schemas::thm15::ThemeFamily>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -12077,18 +12047,10 @@ pub enum ConnectorLockingExtensionChoice {
 pub enum DataModelExtensionChoice {
   /// Defines the DataModelExtensionBlock Class.
   #[sdk(child(office2010, qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt"))]
-  DspDataModelExt(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2008_diagram::DataModelExtensionBlock,
-    >,
-  ),
+  DspDataModelExt(std::boxed::Box<crate::schemas::dsp::DataModelExtensionBlock>),
   /// Defines the RecolorImages Class.
   #[sdk(child(office2010, qname = "dgm14:CT_Boolean/dgm14:recolorImg"))]
-  Dgm14RecolorImg(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_diagram::RecolorImages,
-    >,
-  ),
+  Dgm14RecolorImg(std::boxed::Box<crate::schemas::dgm14::RecolorImages>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -12096,11 +12058,7 @@ pub enum DataModelExtensionChoice {
 pub enum PtExtensionChoice {
   /// Defines the NonVisualDrawingProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr"))]
-  Dgm14CNvPr(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2010_diagram::NonVisualDrawingProperties,
-    >,
-  ),
+  Dgm14CNvPr(std::boxed::Box<crate::schemas::dgm14::NonVisualDrawingProperties>),
   #[sdk(any)]
   XmlOther(String),
 }
@@ -12108,184 +12066,99 @@ pub enum PtExtensionChoice {
 pub enum HyperlinkExtensionChoice {
   /// Defines the HyperlinkColor Class.
   #[sdk(child(office2019, qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr"))]
-  AhypHlinkClr(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2018_hyperlinkcolor::HyperlinkColor,
-    >,
-  ),
+  AhypHlinkClr(std::boxed::Box<crate::schemas::ahyp::HyperlinkColor>),
   #[sdk(any)]
   XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LinePropertiesExtensionChoice {
   /// Defines the LineSketchStyleProperties Class.
-    #[sdk(
-        child(
-            office2021,
-            qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"
-        )
-    )]
-    AskLineSketchStyleProps(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2018_sketchyshapes::LineSketchStyleProperties,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(
+    office2021,
+    qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps"
+  ))]
+  AskLineSketchStyleProps(std::boxed::Box<crate::schemas::ask::LineSketchStyleProperties>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualDrawingPropertiesExtensionChoice {
   /// Defines the CompatExtension Class.
-    #[sdk(child(office2010, qname = "a14:CT_CompatExt/a14:compatExt"))]
-    A14CompatExt(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2010_main::CompatExtension,
-        >,
-    ),
-    /// Defines the BackgroundProperties Class.
-    #[sdk(child(office2013, qname = "a15:CT_BackgroundPr/a15:backgroundPr"))]
-    A15BackgroundPr(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2012_main::BackgroundProperties,
-        >,
-    ),
-    /// Defines the CreationId Class.
-    #[sdk(child(office2016, qname = "a16:CT_CreationId/a16:creationId"))]
-    A16CreationId(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2014_main::CreationId,
-        >,
-    ),
-    /// Defines the PredecessorDrawingElementReference Class.
-    #[sdk(
-        child(
-            office2016,
-            qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef"
-        )
-    )]
-    A16PredDeRef(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2014_main::PredecessorDrawingElementReference,
-        >,
-    ),
-    /// Defines the Decorative Class.
-    #[sdk(child(office2019, qname = "adec:CT_Decorative/adec:decorative"))]
-    AdecDecorative(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2017_decorative::Decorative,
-        >,
-    ),
-    /// Defines the ClassificationOutcome Class.
-    #[sdk(
-        child(office2021, qname = "aclsh:CT_ClassificationOutcome/aclsh:classification")
-    )]
-    AclshClassification(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2020_classification_shape::ClassificationOutcome,
-        >,
-    ),
-    /// Defines the ScriptLink Class.
-    #[sdk(child(microsoft365, qname = "asl:CT_ScriptLink/asl:scriptLink"))]
-    AslScriptLink(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2021_scriptlink::ScriptLink,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(office2010, qname = "a14:CT_CompatExt/a14:compatExt"))]
+  A14CompatExt(std::boxed::Box<crate::schemas::a14::CompatExtension>),
+  /// Defines the BackgroundProperties Class.
+  #[sdk(child(office2013, qname = "a15:CT_BackgroundPr/a15:backgroundPr"))]
+  A15BackgroundPr(std::boxed::Box<crate::schemas::a15::BackgroundProperties>),
+  /// Defines the CreationId Class.
+  #[sdk(child(office2016, qname = "a16:CT_CreationId/a16:creationId"))]
+  A16CreationId(std::boxed::Box<crate::schemas::a16::CreationId>),
+  /// Defines the PredecessorDrawingElementReference Class.
+  #[sdk(child(
+    office2016,
+    qname = "a16:CT_PredecessorDrawingElementReference/a16:predDERef"
+  ))]
+  A16PredDeRef(std::boxed::Box<crate::schemas::a16::PredecessorDrawingElementReference>),
+  /// Defines the Decorative Class.
+  #[sdk(child(office2019, qname = "adec:CT_Decorative/adec:decorative"))]
+  AdecDecorative(std::boxed::Box<crate::schemas::adec::Decorative>),
+  /// Defines the ClassificationOutcome Class.
+  #[sdk(child(
+    office2021,
+    qname = "aclsh:CT_ClassificationOutcome/aclsh:classification"
+  ))]
+  AclshClassification(std::boxed::Box<crate::schemas::aclsh::ClassificationOutcome>),
+  /// Defines the ScriptLink Class.
+  #[sdk(child(microsoft365, qname = "asl:CT_ScriptLink/asl:scriptLink"))]
+  AslScriptLink(std::boxed::Box<crate::schemas::asl::ScriptLink>),
+  #[sdk(any)]
+  XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualPicturePropertiesExtensionChoice {
   /// Defines the CameraTool Class.
   #[sdk(child(office2010, qname = "a14:CT_CameraTool/a14:cameraTool"))]
-  A14CameraTool(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2010_main::CameraTool>,
-  ),
+  A14CameraTool(std::boxed::Box<crate::schemas::a14::CameraTool>),
   /// Defines the SignatureLine Class.
   #[sdk(child(office2013, qname = "a15:CT_SignatureLine/a15:signatureLine"))]
-  A15SignatureLine(
-    std::boxed::Box<crate::schemas::schemas_microsoft_com_office_drawing_2012_main::SignatureLine>,
-  ),
+  A15SignatureLine(std::boxed::Box<crate::schemas::a15::SignatureLine>),
   /// Defines the ObjectProperties Class.
   #[sdk(child(office2013, qname = "a15:CT_ObjectPr/a15:objectPr"))]
-  A15ObjectPr(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2012_main::ObjectProperties,
-    >,
-  ),
+  A15ObjectPr(std::boxed::Box<crate::schemas::a15::ObjectProperties>),
   /// Defines the LiveFeedProperties Class.
   #[sdk(child(office2021, qname = "alf:CT_LiveFeedProperties/alf:liveFeedProps"))]
-  AlfLiveFeedProps(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2021_livefeed::LiveFeedProperties,
-    >,
-  ),
+  AlfLiveFeedProps(std::boxed::Box<crate::schemas::alf::LiveFeedProperties>),
   /// Defines the ImageFormula Class.
   #[sdk(child(microsoft365, qname = "aif:CT_ImageFormula/aif:imageFormula"))]
-  AifImageFormula(
-    std::boxed::Box<
-      crate::schemas::schemas_microsoft_com_office_drawing_2022_imageformula::ImageFormula,
-    >,
-  ),
+  AifImageFormula(std::boxed::Box<crate::schemas::aif::ImageFormula>),
   #[sdk(any)]
   XmlOther(String),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipExtensionChoice {
   /// Defines the ImageProperties Class.
-    #[sdk(child(office2010, qname = "a14:CT_Photo/a14:imgProps"))]
-    A14ImgProps(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2010_main::ImageProperties,
-        >,
-    ),
-    /// Defines the UseLocalDpi Class.
-    #[sdk(child(office2010, qname = "a14:CT_UseLocalDpi/a14:useLocalDpi"))]
-    A14UseLocalDpi(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2010_main::UseLocalDpi,
-        >,
-    ),
-    /// Defines the WebVideoProperty Class.
-    #[sdk(child(office2013, qname = "wp15:CT_WebVideoPr/wp15:webVideoPr"))]
-    Wp15WebVideoPr(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_word_2012_wordprocessing_drawing::WebVideoProperty,
-        >,
-    ),
-    /// Defines the SVGBlip Class.
-    #[sdk(child(office2019, qname = "asvg:CT_SVGBlip/asvg:svgBlip"))]
-    AsvgSvgBlip(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2016_svg_main::SvgBlip,
-        >,
-    ),
-    /// Defines the PictureAttributionSourceURL Class.
-    #[sdk(
-        child(
-            office2019,
-            qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl"
-        )
-    )]
-    A1611PicAttrSrcUrl(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2016_11_main::PictureAttributionSourceUrl,
-        >,
-    ),
-    /// Defines the OEmbed Class.
-    #[sdk(child(microsoft365, qname = "woe:CT_OEmbed/woe:oembed"))]
-    WoeOembed(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_word_2020_oembed::OEmbed,
-        >,
-    ),
-    /// Defines the OEmbedShared Class.
-    #[sdk(child(microsoft365, qname = "aoe:CT_OEmbedShared/aoe:oembedShared"))]
-    AoeOembedShared(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2021_oembed::OEmbedShared,
-        >,
-    ),
-    #[sdk(any)]
-    XmlOther(String),
+  #[sdk(child(office2010, qname = "a14:CT_Photo/a14:imgProps"))]
+  A14ImgProps(std::boxed::Box<crate::schemas::a14::ImageProperties>),
+  /// Defines the UseLocalDpi Class.
+  #[sdk(child(office2010, qname = "a14:CT_UseLocalDpi/a14:useLocalDpi"))]
+  A14UseLocalDpi(std::boxed::Box<crate::schemas::a14::UseLocalDpi>),
+  /// Defines the WebVideoProperty Class.
+  #[sdk(child(office2013, qname = "wp15:CT_WebVideoPr/wp15:webVideoPr"))]
+  Wp15WebVideoPr(std::boxed::Box<crate::schemas::wp15::WebVideoProperty>),
+  /// Defines the SVGBlip Class.
+  #[sdk(child(office2019, qname = "asvg:CT_SVGBlip/asvg:svgBlip"))]
+  AsvgSvgBlip(std::boxed::Box<crate::schemas::asvg::SvgBlip>),
+  /// Defines the PictureAttributionSourceURL Class.
+  #[sdk(child(
+    office2019,
+    qname = "a1611:CT_PictureAttributionSourceURL/a1611:picAttrSrcUrl"
+  ))]
+  A1611PicAttrSrcUrl(std::boxed::Box<crate::schemas::a1611::PictureAttributionSourceUrl>),
+  /// Defines the OEmbed Class.
+  #[sdk(child(microsoft365, qname = "woe:CT_OEmbed/woe:oembed"))]
+  WoeOembed(std::boxed::Box<crate::schemas::woe::OEmbed>),
+  /// Defines the OEmbedShared Class.
+  #[sdk(child(microsoft365, qname = "aoe:CT_OEmbedShared/aoe:oembedShared"))]
+  AoeOembedShared(std::boxed::Box<crate::schemas::aoe::OEmbedShared>),
+  #[sdk(any)]
+  XmlOther(String),
 }

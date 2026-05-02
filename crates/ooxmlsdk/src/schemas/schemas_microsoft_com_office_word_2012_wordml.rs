@@ -31,8 +31,7 @@ pub struct Color {
   pub val: crate::simple_type::StringValue,
   /// Run Content Theme Color
   #[sdk(attr(qname = "w:themeColor"))]
-  pub theme_color:
-    Option<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ThemeColorValues>,
+  pub theme_color: Option<crate::schemas::w::ThemeColorValues>,
   /// Run Content Theme Color Tint
   #[sdk(attr(qname = "w:themeTint"))]
   #[sdk(pattern(regex = "[0-9a-fA-F]*"))]

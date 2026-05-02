@@ -52,5 +52,5 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Extension Class.
   #[sdk(child(office2021, qname = "w16cur:CT_Extension/w16cur:ext"))]
-  pub w16cur_ext: Vec<crate::schemas::schemas_microsoft_com_office_word_2018_wordml::Extension>,
+  pub w16cur_ext: Vec<crate::schemas::w16cur::Extension>,
 }

@@ -59,9 +59,7 @@ pub struct AnimationProperties {
   pub end: Option<crate::simple_type::StringValue>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/aanim:extLst"))]
-  pub office_art_extension_list: Option<
-    crate::schemas::schemas_microsoft_com_office_drawing_2018_animation::OfficeArtExtensionList,
-  >,
+  pub office_art_extension_list: Option<crate::schemas::aanim::OfficeArtExtensionList>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -70,5 +68,5 @@ pub struct OfficeArtExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "a:CT_OfficeArtExtension/a:ext"))]
-  pub a_ext: Vec<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extension>,
+  pub a_ext: Vec<crate::schemas::a::Extension>,
 }

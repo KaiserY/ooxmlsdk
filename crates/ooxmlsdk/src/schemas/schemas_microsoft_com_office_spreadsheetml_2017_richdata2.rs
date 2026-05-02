@@ -92,8 +92,7 @@ pub struct RichSortCondition {
   pub descending: Option<crate::simple_type::BooleanValue>,
   /// sortBy
   #[sdk(attr(office2010, qname = ":sortBy"))]
-  pub sort_by:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortByValues>,
+  pub sort_by: Option<crate::schemas::x::SortByValues>,
   /// ref
   #[sdk(attr(office2010, qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -105,9 +104,7 @@ pub struct RichSortCondition {
   pub format_id: Option<crate::simple_type::UInt32Value>,
   /// iconSet
   #[sdk(attr(office2010, qname = ":iconSet"))]
-  pub icon_set: Option<
-    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2009_9_main::IconSetTypeValues,
-  >,
+  pub icon_set: Option<crate::schemas::x14::IconSetTypeValues>,
   /// iconId
   #[sdk(attr(office2010, qname = ":iconId"))]
   pub icon_id: Option<crate::simple_type::UInt32Value>,
@@ -265,8 +262,7 @@ pub struct DynamicRichFilter {
   pub key: Option<crate::simple_type::StringValue>,
   /// Dynamic filter type
   #[sdk(attr(qname = ":type"))]
-  pub r#type:
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DynamicFilterValues,
+  pub r#type: crate::schemas::x::DynamicFilterValues,
   /// Value
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::DoubleValue>,
@@ -287,7 +283,7 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the RichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -333,8 +329,7 @@ pub struct RichDateGroupItem {
   pub second: Option<crate::simple_type::UInt16Value>,
   /// Date Time Grouping
   #[sdk(attr(qname = ":dateTimeGrouping"))]
-  pub date_time_grouping:
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DateTimeGroupingValues,
+  pub date_time_grouping: crate::schemas::x::DateTimeGroupingValues,
 }
 /// Defines the CustomRichFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -345,9 +340,7 @@ pub struct CustomRichFilter {
   pub key: Option<crate::simple_type::StringValue>,
   /// Filter Comparison Operator
   #[sdk(attr(qname = ":operator"))]
-  pub operator: Option<
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterOperatorValues,
-  >,
+  pub operator: Option<crate::schemas::x::FilterOperatorValues>,
   /// Top or Bottom Value
   #[sdk(attr(qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
@@ -469,8 +462,7 @@ pub struct Dxfs {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
-  pub x_dxf:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
+  pub x_dxf: Vec<crate::schemas::x::DifferentialFormat>,
 }
 /// Defines the RichFormatProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

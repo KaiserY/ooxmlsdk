@@ -391,8 +391,7 @@ pub struct DefinedNames {
 pub struct PivotCaches {
   /// PivotCache.
   #[sdk(child(qname = "x:CT_PivotCache/x:pivotCache"))]
-  pub x_pivot_cache:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotCache>,
+  pub x_pivot_cache: Vec<crate::schemas::x::PivotCache>,
 }
 /// Defines the SlicerCaches Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -599,8 +598,7 @@ pub struct DifferentialFormats {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Formatting.
   #[sdk(child(qname = "x:CT_Dxf/x:dxf"))]
-  pub x_dxf:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DifferentialFormat>,
+  pub x_dxf: Vec<crate::schemas::x::DifferentialFormat>,
 }
 /// Defines the OleItem Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -679,8 +677,7 @@ pub struct SortCondition {
   pub descending: Option<crate::simple_type::BooleanValue>,
   /// sortBy
   #[sdk(attr(office2010, qname = ":sortBy"))]
-  pub sort_by:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SortByValues>,
+  pub sort_by: Option<crate::schemas::x::SortByValues>,
   /// ref
   #[sdk(attr(office2010, qname = ":ref"))]
   pub reference: crate::simple_type::StringValue,
@@ -895,78 +892,68 @@ pub struct ConditionalFormatting {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_CfRule/x14:cfRule")]
 pub struct ConditionalFormattingRule {
-    /// type
-    #[sdk(attr(office2010, qname = ":type"))]
-    pub r#type: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormatValues,
-    >,
-    /// priority
-    #[sdk(attr(office2010, qname = ":priority"))]
-    pub priority: Option<crate::simple_type::Int32Value>,
-    /// stopIfTrue
-    #[sdk(attr(office2010, qname = ":stopIfTrue"))]
-    pub stop_if_true: Option<crate::simple_type::BooleanValue>,
-    /// aboveAverage
-    #[sdk(attr(office2010, qname = ":aboveAverage"))]
-    pub above_average: Option<crate::simple_type::BooleanValue>,
-    /// percent
-    #[sdk(attr(office2010, qname = ":percent"))]
-    pub percent: Option<crate::simple_type::BooleanValue>,
-    /// bottom
-    #[sdk(attr(office2010, qname = ":bottom"))]
-    pub bottom: Option<crate::simple_type::BooleanValue>,
-    /// operator
-    #[sdk(attr(office2010, qname = ":operator"))]
-    pub operator: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ConditionalFormattingOperatorValues,
-    >,
-    /// text
-    #[sdk(attr(office2010, qname = ":text"))]
-    pub text: Option<crate::simple_type::StringValue>,
-    /// timePeriod
-    #[sdk(attr(office2010, qname = ":timePeriod"))]
-    pub time_period: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::TimePeriodValues,
-    >,
-    /// rank
-    #[sdk(attr(office2010, qname = ":rank"))]
-    pub rank: Option<crate::simple_type::UInt32Value>,
-    /// stdDev
-    #[sdk(attr(office2010, qname = ":stdDev"))]
-    pub standard_deviation: Option<crate::simple_type::Int32Value>,
-    /// equalAverage
-    #[sdk(attr(office2010, qname = ":equalAverage"))]
-    pub equal_average: Option<crate::simple_type::BooleanValue>,
-    /// activePresent
-    #[sdk(attr(office2010, qname = ":activePresent"))]
-    pub active_present: Option<crate::simple_type::BooleanValue>,
-    /// id
-    #[sdk(attr(office2010, qname = ":id"))]
-    #[sdk(
-        pattern(
-            regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-        )
-    )]
-    #[sdk(string_format(kind = "token"))]
-    pub id: Option<crate::simple_type::StringValue>,
-    /// Defines the Formula Class.
-    #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-    pub xne_f: Vec<crate::simple_type::StringValue>,
-    /// Defines the ColorScale Class.
-    #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
-    pub x14_color_scale: Option<ColorScale>,
-    /// Defines the DataBar Class.
-    #[sdk(child(office2010, qname = "x14:CT_DataBar/x14:dataBar"))]
-    pub x14_data_bar: Option<std::boxed::Box<DataBar>>,
-    /// Defines the IconSet Class.
-    #[sdk(child(office2010, qname = "x14:CT_IconSet/x14:iconSet"))]
-    pub x14_icon_set: Option<IconSet>,
-    /// Defines the DifferentialType Class.
-    #[sdk(child(office2010, qname = "x:CT_Dxf/x14:dxf"))]
-    pub x14_dxf: Option<std::boxed::Box<DifferentialType>>,
-    /// Defines the ExtensionList Class.
-    #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
-    pub x14_ext_lst: Option<ExtensionList>,
+  /// type
+  #[sdk(attr(office2010, qname = ":type"))]
+  pub r#type: Option<crate::schemas::x::ConditionalFormatValues>,
+  /// priority
+  #[sdk(attr(office2010, qname = ":priority"))]
+  pub priority: Option<crate::simple_type::Int32Value>,
+  /// stopIfTrue
+  #[sdk(attr(office2010, qname = ":stopIfTrue"))]
+  pub stop_if_true: Option<crate::simple_type::BooleanValue>,
+  /// aboveAverage
+  #[sdk(attr(office2010, qname = ":aboveAverage"))]
+  pub above_average: Option<crate::simple_type::BooleanValue>,
+  /// percent
+  #[sdk(attr(office2010, qname = ":percent"))]
+  pub percent: Option<crate::simple_type::BooleanValue>,
+  /// bottom
+  #[sdk(attr(office2010, qname = ":bottom"))]
+  pub bottom: Option<crate::simple_type::BooleanValue>,
+  /// operator
+  #[sdk(attr(office2010, qname = ":operator"))]
+  pub operator: Option<crate::schemas::x::ConditionalFormattingOperatorValues>,
+  /// text
+  #[sdk(attr(office2010, qname = ":text"))]
+  pub text: Option<crate::simple_type::StringValue>,
+  /// timePeriod
+  #[sdk(attr(office2010, qname = ":timePeriod"))]
+  pub time_period: Option<crate::schemas::x::TimePeriodValues>,
+  /// rank
+  #[sdk(attr(office2010, qname = ":rank"))]
+  pub rank: Option<crate::simple_type::UInt32Value>,
+  /// stdDev
+  #[sdk(attr(office2010, qname = ":stdDev"))]
+  pub standard_deviation: Option<crate::simple_type::Int32Value>,
+  /// equalAverage
+  #[sdk(attr(office2010, qname = ":equalAverage"))]
+  pub equal_average: Option<crate::simple_type::BooleanValue>,
+  /// activePresent
+  #[sdk(attr(office2010, qname = ":activePresent"))]
+  pub active_present: Option<crate::simple_type::BooleanValue>,
+  /// id
+  #[sdk(attr(office2010, qname = ":id"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
+  pub id: Option<crate::simple_type::StringValue>,
+  /// Defines the Formula Class.
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
+  pub xne_f: Vec<crate::simple_type::StringValue>,
+  /// Defines the ColorScale Class.
+  #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
+  pub x14_color_scale: Option<ColorScale>,
+  /// Defines the DataBar Class.
+  #[sdk(child(office2010, qname = "x14:CT_DataBar/x14:dataBar"))]
+  pub x14_data_bar: Option<std::boxed::Box<DataBar>>,
+  /// Defines the IconSet Class.
+  #[sdk(child(office2010, qname = "x14:CT_IconSet/x14:iconSet"))]
+  pub x14_icon_set: Option<IconSet>,
+  /// Defines the DifferentialType Class.
+  #[sdk(child(office2010, qname = "x:CT_Dxf/x14:dxf"))]
+  pub x14_dxf: Option<std::boxed::Box<DifferentialType>>,
+  /// Defines the ExtensionList Class.
+  #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
+  pub x14_ext_lst: Option<ExtensionList>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -975,65 +962,57 @@ pub struct ExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Extension.
   #[sdk(child(qname = "x:CT_Extension/x:ext"))]
-  pub x_ext: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Extension>,
+  pub x_ext: Vec<crate::schemas::x::Extension>,
 }
 /// Defines the DataValidation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DataValidation/x14:dataValidation")]
 pub struct DataValidation {
-    /// type
-    #[sdk(attr(office2010, qname = ":type"))]
-    pub r#type: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationValues,
-    >,
-    /// errorStyle
-    #[sdk(attr(office2010, qname = ":errorStyle"))]
-    pub error_style: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationErrorStyleValues,
-    >,
-    /// imeMode
-    #[sdk(attr(office2010, qname = ":imeMode"))]
-    pub ime_mode: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationImeModeValues,
-    >,
-    /// operator
-    #[sdk(attr(office2010, qname = ":operator"))]
-    pub operator: Option<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::DataValidationOperatorValues,
-    >,
-    /// allowBlank
-    #[sdk(attr(office2010, qname = ":allowBlank"))]
-    pub allow_blank: Option<crate::simple_type::BooleanValue>,
-    /// showDropDown
-    #[sdk(attr(office2010, qname = ":showDropDown"))]
-    pub show_drop_down: Option<crate::simple_type::BooleanValue>,
-    /// showInputMessage
-    #[sdk(attr(office2010, qname = ":showInputMessage"))]
-    pub show_input_message: Option<crate::simple_type::BooleanValue>,
-    /// showErrorMessage
-    #[sdk(attr(office2010, qname = ":showErrorMessage"))]
-    pub show_error_message: Option<crate::simple_type::BooleanValue>,
-    /// errorTitle
-    #[sdk(attr(office2010, qname = ":errorTitle"))]
-    pub error_title: Option<crate::simple_type::StringValue>,
-    /// error
-    #[sdk(attr(office2010, qname = ":error"))]
-    pub error: Option<crate::simple_type::StringValue>,
-    /// promptTitle
-    #[sdk(attr(office2010, qname = ":promptTitle"))]
-    pub prompt_title: Option<crate::simple_type::StringValue>,
-    /// prompt
-    #[sdk(attr(office2010, qname = ":prompt"))]
-    pub prompt: Option<crate::simple_type::StringValue>,
-    /// Defines the DataValidationForumla1 Class.
-    #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1"))]
-    pub data_validation_forumla1: Option<DataValidationForumla1>,
-    /// Defines the DataValidationForumla2 Class.
-    #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
-    pub data_validation_forumla2: Option<DataValidationForumla2>,
-    /// Defines the ReferenceSequence Class.
-    #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-    pub reference_sequence: crate::simple_type::StringValue,
+  /// type
+  #[sdk(attr(office2010, qname = ":type"))]
+  pub r#type: Option<crate::schemas::x::DataValidationValues>,
+  /// errorStyle
+  #[sdk(attr(office2010, qname = ":errorStyle"))]
+  pub error_style: Option<crate::schemas::x::DataValidationErrorStyleValues>,
+  /// imeMode
+  #[sdk(attr(office2010, qname = ":imeMode"))]
+  pub ime_mode: Option<crate::schemas::x::DataValidationImeModeValues>,
+  /// operator
+  #[sdk(attr(office2010, qname = ":operator"))]
+  pub operator: Option<crate::schemas::x::DataValidationOperatorValues>,
+  /// allowBlank
+  #[sdk(attr(office2010, qname = ":allowBlank"))]
+  pub allow_blank: Option<crate::simple_type::BooleanValue>,
+  /// showDropDown
+  #[sdk(attr(office2010, qname = ":showDropDown"))]
+  pub show_drop_down: Option<crate::simple_type::BooleanValue>,
+  /// showInputMessage
+  #[sdk(attr(office2010, qname = ":showInputMessage"))]
+  pub show_input_message: Option<crate::simple_type::BooleanValue>,
+  /// showErrorMessage
+  #[sdk(attr(office2010, qname = ":showErrorMessage"))]
+  pub show_error_message: Option<crate::simple_type::BooleanValue>,
+  /// errorTitle
+  #[sdk(attr(office2010, qname = ":errorTitle"))]
+  pub error_title: Option<crate::simple_type::StringValue>,
+  /// error
+  #[sdk(attr(office2010, qname = ":error"))]
+  pub error: Option<crate::simple_type::StringValue>,
+  /// promptTitle
+  #[sdk(attr(office2010, qname = ":promptTitle"))]
+  pub prompt_title: Option<crate::simple_type::StringValue>,
+  /// prompt
+  #[sdk(attr(office2010, qname = ":prompt"))]
+  pub prompt: Option<crate::simple_type::StringValue>,
+  /// Defines the DataValidationForumla1 Class.
+  #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1"))]
+  pub data_validation_forumla1: Option<DataValidationForumla1>,
+  /// Defines the DataValidationForumla2 Class.
+  #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
+  pub data_validation_forumla2: Option<DataValidationForumla2>,
+  /// Defines the ReferenceSequence Class.
+  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub reference_sequence: crate::simple_type::StringValue,
 }
 /// Defines the DataValidationForumla1 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1685,35 +1664,25 @@ pub struct IconSet {
 pub struct DifferentialType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Font>,
-  >,
+  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
-  pub numbering_format:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::NumberingFormat>,
+  pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
   /// Fill
   #[sdk(child(qname = "x:CT_Fill/x:fill"))]
-  pub fill: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Fill>,
-  >,
+  pub fill: Option<std::boxed::Box<crate::schemas::x::Fill>>,
   /// Alignment
   #[sdk(child(qname = "x:CT_CellAlignment/x:alignment"))]
-  pub alignment:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Alignment>,
+  pub alignment: Option<crate::schemas::x::Alignment>,
   /// Border Properties
   #[sdk(child(qname = "x:CT_Border/x:border"))]
-  pub border: Option<
-    std::boxed::Box<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Border>,
-  >,
+  pub border: Option<std::boxed::Box<crate::schemas::x::Border>>,
   /// Protection Properties
   #[sdk(child(qname = "x:CT_CellProtection/x:protection"))]
-  pub protection:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Protection>,
+  pub protection: Option<crate::schemas::x::Protection>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the ConditionalFormattingValueObject Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1779,8 +1748,7 @@ pub struct CalculatedMembers {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Calculated Member.
   #[sdk(child(qname = "x:CT_CalculatedMember/x:calculatedMember"))]
-  pub x_calculated_member:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::CalculatedMember>,
+  pub x_calculated_member: Vec<crate::schemas::x::CalculatedMember>,
 }
 /// Defines the PivotEdit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1826,8 +1794,7 @@ pub struct PivotArea {
   pub field: Option<crate::simple_type::Int32Value>,
   /// Rule Type
   #[sdk(attr(qname = ":type"))]
-  pub r#type:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotAreaValues>,
+  pub r#type: Option<crate::schemas::x::PivotAreaValues>,
   /// Data Only
   #[sdk(attr(qname = ":dataOnly"))]
   pub data_only: Option<crate::simple_type::BooleanValue>,
@@ -1854,20 +1821,16 @@ pub struct PivotArea {
   pub collapsed_levels_are_subtotals: Option<crate::simple_type::BooleanValue>,
   /// Axis
   #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotTableAxisValues,
-  >,
+  pub axis: Option<crate::schemas::x::PivotTableAxisValues>,
   /// Field Position
   #[sdk(attr(qname = ":fieldPosition"))]
   pub field_position: Option<crate::simple_type::UInt32Value>,
   /// References
   #[sdk(child(qname = "x:CT_PivotAreaReferences/x:references"))]
-  pub pivot_area_references:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotAreaReferences>,
+  pub pivot_area_references: Option<crate::schemas::x::PivotAreaReferences>,
   /// Future Feature Data Storage Area
   #[sdk(child(qname = "x:CT_ExtensionList/x:extLst"))]
-  pub extension_list:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ExtensionList>,
+  pub extension_list: Option<crate::schemas::x::ExtensionList>,
 }
 /// Defines the PivotChange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1924,7 +1887,7 @@ pub struct DdeValues {
   pub columns: Option<crate::simple_type::UInt32Value>,
   /// Value.
   #[sdk(child(qname = "x:CT_DdeValue/x:value"))]
-  pub x_value: Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Value>,
+  pub x_value: Vec<crate::schemas::x::Value>,
 }
 /// Defines the ConditionalFormat Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1932,12 +1895,10 @@ pub struct DdeValues {
 pub struct ConditionalFormat {
   /// scope
   #[sdk(attr(office2010, qname = ":scope"))]
-  pub scope:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::ScopeValues>,
+  pub scope: Option<crate::schemas::x::ScopeValues>,
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
-  pub r#type:
-    Option<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::RuleValues>,
+  pub r#type: Option<crate::schemas::x::RuleValues>,
   /// priority
   #[sdk(attr(office2010, qname = ":priority"))]
   pub priority: Option<crate::simple_type::UInt32Value>,
@@ -1962,8 +1923,7 @@ pub struct PivotAreas {
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Calculated Item Location.
   #[sdk(child(qname = "x:CT_PivotArea/x:pivotArea"))]
-  pub x_pivot_area:
-    Vec<crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::PivotArea>,
+  pub x_pivot_area: Vec<crate::schemas::x::PivotArea>,
 }
 /// Defines the SlicerStyle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2061,9 +2021,7 @@ pub struct ProtectedRange {
 pub struct CustomFilter {
   /// operator
   #[sdk(attr(office2010, qname = ":operator"))]
-  pub operator: Option<
-    crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::FilterOperatorValues,
-  >,
+  pub operator: Option<crate::schemas::x::FilterOperatorValues>,
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::StringValue>,
@@ -2329,12 +2287,10 @@ pub struct SlicerCacheData {
   qname = "x:CT_SlicerCacheDefinitionExtensionList/x14:extLst"
 )]
 pub struct SlicerCacheDefinitionExtensionList {
-    pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-    /// Defines the SlicerCacheDefinitionExtension Class.
-    #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext"))]
-    pub x_ext: Vec<
-        crate::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SlicerCacheDefinitionExtension,
-    >,
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  /// Defines the SlicerCacheDefinitionExtension Class.
+  #[sdk(child(qname = "x:CT_SlicerCacheDefinitionExtension/x:ext"))]
+  pub x_ext: Vec<crate::schemas::x::SlicerCacheDefinitionExtension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PivotUserEditChoice {

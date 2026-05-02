@@ -251,7 +251,6 @@ pub struct CustomRichFilters {
   #[sdk(attr(office2019, qname = ":and"))]
   pub and: Option<crate::simple_type::BooleanValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "xlrd2:CT_CustomRichFilter/xlrd2:customFilter",
     qname = "x:CT_ExtensionList/xlrd2:extLst"
   ))]

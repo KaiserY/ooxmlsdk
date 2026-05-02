@@ -908,7 +908,6 @@ pub struct RgbColorModelHex {
   #[sdk(string_length(source = 2u32, union = 0u64, min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
   #[sdk(choice(
-    microsoft365,
     qname = "w14:CT_PositiveFixedPercentage/w14:tint",
     qname = "w14:CT_PositiveFixedPercentage/w14:shade",
     qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
@@ -930,7 +929,6 @@ pub struct SchemeColor {
   #[sdk(attr(office2010, qname = "w14:val"))]
   pub val: SchemeColorValues,
   #[sdk(choice(
-    microsoft365,
     qname = "w14:CT_PositiveFixedPercentage/w14:tint",
     qname = "w14:CT_PositiveFixedPercentage/w14:shade",
     qname = "w14:CT_PositiveFixedPercentage/w14:alpha",
@@ -992,7 +990,6 @@ pub struct GradientFillProperties {
   #[sdk(child(office2010, qname = "w14:CT_GradientStopList/w14:gsLst"))]
   pub gradient_stop_list: Option<GradientStopList>,
   #[sdk(choice(
-    microsoft365,
     qname = "w14:CT_LinearShadeProperties/w14:lin",
     qname = "w14:CT_PathShadeProperties/w14:path"
   ))]
@@ -1265,7 +1262,6 @@ pub struct TextOutlineEffect {
   #[sdk(attr(office2010, qname = "w14:algn"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
-    microsoft365,
     qname = "w:CT_Empty/w14:noFill",
     qname = "w14:CT_SolidColorFillProperties/w14:solidFill",
     qname = "w14:CT_GradientFillProperties/w14:gradFill"
@@ -1275,7 +1271,6 @@ pub struct TextOutlineEffect {
   #[sdk(child(office2010, qname = "w14:CT_PresetLineDashProperties/w14:prstDash"))]
   pub w14_prst_dash: Option<PresetLineDashProperties>,
   #[sdk(choice(
-    microsoft365,
     qname = "w:CT_Empty/w14:round",
     qname = "w:CT_Empty/w14:bevel",
     qname = "w14:CT_LineJoinMiterProperties/w14:miter"

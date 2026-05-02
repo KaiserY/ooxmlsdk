@@ -10528,7 +10528,6 @@ pub struct PreviousParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(choice(
-    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
@@ -10801,7 +10800,6 @@ pub struct ParagraphMarkRunProperties {
   #[sdk(child(qname = "w:CT_TrackChange/w:moveTo"))]
   pub move_to: Option<MoveTo>,
   #[sdk(choice(
-    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]
@@ -14462,7 +14460,6 @@ pub struct TableRowProperties {
   #[sdk(child(qname = "w:CT_TrPrChange/w:trPrChange"))]
   pub w_tr_pr_change: Option<std::boxed::Box<TableRowPropertiesChange>>,
   #[sdk(choice(
-    microsoft365,
     qname = "w:CT_TrackChange/w14:conflictIns",
     qname = "w:CT_TrackChange/w14:conflictDel"
   ))]

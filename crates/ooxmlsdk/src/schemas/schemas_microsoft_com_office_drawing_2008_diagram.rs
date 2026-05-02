@@ -339,11 +339,7 @@ pub struct GroupShape {
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
-  #[sdk(choice(
-    microsoft365,
-    qname = "dsp:CT_Shape/dsp:sp",
-    qname = "dsp:CT_GroupShape/dsp:grpSp"
-  ))]
+  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
@@ -359,11 +355,7 @@ pub struct ShapeTree {
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
   pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
-  #[sdk(choice(
-    microsoft365,
-    qname = "dsp:CT_Shape/dsp:sp",
-    qname = "dsp:CT_GroupShape/dsp:grpSp"
-  ))]
+  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]

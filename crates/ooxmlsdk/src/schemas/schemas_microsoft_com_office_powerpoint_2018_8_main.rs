@@ -211,7 +211,6 @@ pub struct Comment {
   #[sdk(attr(office2021, qname = ":title"))]
   pub title: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "pc:CT_SlideMonikerList/pc:sldMkLst",
     qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst",
     qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst",
@@ -248,53 +247,43 @@ pub enum CommentChoice {
             crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideMonikerList,
         >,
     ),
-    #[sdk(child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst"))]
+    #[sdk(
+        any_child(office2016, qname = "pc:CT_SlideLayoutMonikerList/pc:sldLayoutMkLst")
+    )]
     PcSldLayoutMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideLayoutMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::SlideLayoutMonikerList,
     ),
-    #[sdk(child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst"))]
+    #[sdk(
+        any_child(office2016, qname = "pc:CT_MainMasterMonikerList/pc:sldMasterMkLst")
+    )]
     PcSldMasterMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::MainMasterMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_powerpoint_2013_main_command::MainMasterMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
+    #[sdk(any_child(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst"))]
     OacDeMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::DeMkLstDrawingElementMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::DeMkLstDrawingElementMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
+    #[sdk(any_child(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst"))]
     OacTxBodyMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextBodyMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextBodyMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
+    #[sdk(any_child(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst"))]
     OacTxMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextCharRangeMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TextCharRangeMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
+    #[sdk(any_child(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst"))]
     OacTcMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableCellMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableCellMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
+    #[sdk(any_child(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst"))]
     OacTrMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableRowMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableRowMonikerList,
     ),
-    #[sdk(child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst"))]
+    #[sdk(
+        any_child(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")
+    )]
     OacGridColMkLst(
-        std::boxed::Box<
-            crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableColumnMonikerList,
-        >,
+        crate::schemas::schemas_microsoft_com_office_drawing_2013_main_command::TableColumnMonikerList,
     ),
     /// Defines the CommentUnknownAnchor Class.
     #[sdk(

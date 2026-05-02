@@ -189,7 +189,6 @@ pub struct SortRule {
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
   pub differential_format_type: Option<std::boxed::Box<DifferentialFormatType>>,
   #[sdk(choice(
-    microsoft365,
     qname = "x14:CT_SortCondition/xnsv:sortCondition",
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
   ))]

@@ -36,7 +36,6 @@ pub struct Model3D {
   #[sdk(child(office2019, qname = "am3d:CT_Model3DExtensionList/am3d:extLst"))]
   pub model3_d_extension_list: Option<Model3DExtensionList>,
   #[sdk(choice(
-    microsoft365,
     qname = "am3d:CT_ObjectViewport/am3d:objViewport",
     qname = "am3d:CT_WindowViewport/am3d:winViewport"
   ))]
@@ -45,7 +44,6 @@ pub struct Model3D {
   #[sdk(child(office2019, qname = "am3d:CT_AmbientLight/am3d:ambientLight"))]
   pub am3d_ambient_light: Option<std::boxed::Box<AmbientLight>>,
   #[sdk(choice(
-    microsoft365,
     qname = "am3d:CT_PointLight/am3d:ptLight",
     qname = "am3d:CT_SpotLight/am3d:spotLight",
     qname = "am3d:CT_DirectionalLight/am3d:dirLight",
@@ -415,7 +413,6 @@ pub struct Model3DCamera {
   #[sdk(child(office2019, qname = "a:CT_Point3D/am3d:lookAt"))]
   pub look_at_point3_d: Option<LookAtPoint3D>,
   #[sdk(choice(
-    microsoft365,
     qname = "am3d:CT_OrthographicProjection/am3d:orthographic",
     qname = "am3d:CT_PerspectiveProjection/am3d:perspective"
   ))]

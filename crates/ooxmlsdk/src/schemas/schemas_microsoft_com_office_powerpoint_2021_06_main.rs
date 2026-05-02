@@ -146,7 +146,6 @@ pub struct TaskHistoryEvent {
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAnchor/p216:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
   #[sdk(choice(
-    microsoft365,
     qname = "p216:CT_TaskAssignUnassignUser/p216:asgn",
     qname = "p216:CT_TaskAssignUnassignUser/p216:unAsgn",
     qname = "p:CT_Empty/p216:add",

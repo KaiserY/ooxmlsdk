@@ -955,7 +955,6 @@ pub struct SplitButtonRegular {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_VisibleButton/mso14:button",
     qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
   ))]
@@ -1099,7 +1098,6 @@ pub struct MenuRegular {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_CheckBox/mso14:checkBox",
@@ -1330,7 +1328,6 @@ pub struct SplitButtonWithTitle {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_VisibleButton/mso14:button",
     qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
   ))]
@@ -1474,7 +1471,6 @@ pub struct MenuWithTitle {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_CheckBox/mso14:checkBox",
@@ -2907,7 +2903,6 @@ pub struct Menu {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_CheckBox/mso14:checkBox",
@@ -3152,7 +3147,6 @@ pub struct SplitButton {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_VisibleButton/mso14:button",
     qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"
   ))]
@@ -3281,7 +3275,6 @@ pub struct ButtonGroup {
   #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_ToggleButtonRegular/mso14:toggleButton",
@@ -4315,7 +4308,6 @@ pub struct GroupBox {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageGroupButton/mso14:button",
     qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
     qname = "mso14:CT_BackstageEditBox/mso14:editBox",
@@ -4360,7 +4352,6 @@ pub struct LayoutContainer {
   #[sdk(attr(office2010, qname = ":layoutChildren"))]
   pub layout_children: Option<LayoutChildrenValues>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageGroupButton/mso14:button",
     qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
     qname = "mso14:CT_BackstageEditBox/mso14:editBox",
@@ -4517,7 +4508,7 @@ pub struct BackstageGroup {
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
-  #[sdk(choice(microsoft365, qname = "mso14:CT_PrimaryItem/mso14:primaryItem"))]
+  #[sdk(choice(qname = "mso14:CT_PrimaryItem/mso14:primaryItem"))]
   pub backstage_group_choice: Option<BackstageGroupChoice>,
   /// Defines the TopItemsGroupControls Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupControls/mso14:topItems"))]
@@ -4627,7 +4618,6 @@ pub struct MenuRoot {
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_CheckBox/mso14:checkBox",
@@ -5131,7 +5121,6 @@ pub struct Group {
   #[sdk(attr(office2010, qname = ":centerVertically"))]
   pub center_vertically: Option<crate::simple_type::BooleanValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlClone/mso14:control",
     qname = "mso14:CT_LabelControl/mso14:labelControl",
     qname = "mso14:CT_Button/mso14:button",
@@ -5292,7 +5281,6 @@ pub struct ControlCloneQat {
 #[sdk(office2010, qname = "mso14:CT_QatItems/mso14:sharedControls")]
 pub struct SharedControlsQatItems {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneQat/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_Separator/mso14:separator"
@@ -5304,7 +5292,6 @@ pub struct SharedControlsQatItems {
 #[sdk(office2010, qname = "mso14:CT_QatItems/mso14:documentControls")]
 pub struct DocumentControlsQatItems {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneQat/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_Separator/mso14:separator"
@@ -5468,7 +5455,6 @@ pub struct ContextMenu {
   #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_ControlCloneRegular/mso14:control",
     qname = "mso14:CT_ButtonRegular/mso14:button",
     qname = "mso14:CT_CheckBox/mso14:checkBox",
@@ -5727,7 +5713,6 @@ pub struct BackstageMenuGroup {
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageMenuButton/mso14:button",
     qname = "mso14:CT_BackstageMenuCheckBox/mso14:checkBox",
     qname = "mso14:CT_BackstageSubMenu/mso14:menu",
@@ -5750,7 +5735,6 @@ pub struct PrimaryItem {
 #[sdk(office2010, qname = "mso14:CT_GroupControls/mso14:topItems")]
 pub struct TopItemsGroupControls {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageGroupButton/mso14:button",
     qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
     qname = "mso14:CT_BackstageEditBox/mso14:editBox",
@@ -5770,7 +5754,6 @@ pub struct TopItemsGroupControls {
 #[sdk(office2010, qname = "mso14:CT_GroupControls/mso14:bottomItems")]
 pub struct BottomItemsGroupControls {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageGroupButton/mso14:button",
     qname = "mso14:CT_BackstageCheckBox/mso14:checkBox",
     qname = "mso14:CT_BackstageEditBox/mso14:editBox",
@@ -6201,7 +6184,6 @@ pub struct TaskFormGroup {
 #[sdk(office2010, qname = "mso14:CT_BackstageGroups/mso14:firstColumn")]
 pub struct BackstageGroups {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_TaskFormGroup/mso14:taskFormGroup",
     qname = "mso14:CT_BackstageGroup/mso14:group",
     qname = "mso14:CT_TaskGroup/mso14:taskGroup"
@@ -6213,7 +6195,6 @@ pub struct BackstageGroups {
 #[sdk(office2010, qname = "mso14:CT_SimpleGroups/mso14:secondColumn")]
 pub struct SimpleGroups {
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageGroup/mso14:group",
     qname = "mso14:CT_TaskGroup/mso14:taskGroup"
   ))]
@@ -6477,7 +6458,6 @@ pub struct Backstage {
   #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_hide: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "mso14:CT_BackstageTab/mso14:tab",
     qname = "mso14:CT_BackstageFastCommandButton/mso14:button"
   ))]

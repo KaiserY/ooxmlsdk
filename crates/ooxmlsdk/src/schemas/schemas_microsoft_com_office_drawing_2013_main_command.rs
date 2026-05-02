@@ -103,12 +103,7 @@ pub struct InkMoniker {
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DrawingMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst")]
-pub struct DrawingMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DrawingMonikerList = Vec<String>;
 /// Defines the Transform2D Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_Transform2D/oac:xfrm")]
@@ -131,43 +126,15 @@ pub struct Transform2D {
   pub extents: Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::Extents>,
 }
 /// Defines the GroupShapeMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_GroupShapeMonikerList/oac:grpSpMkLst")]
-pub struct GroupShapeMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type GroupShapeMonikerList = Vec<String>;
 /// Defines the DeMkLstDrawingElementMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deMkLst")]
-pub struct DeMkLstDrawingElementMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DeMkLstDrawingElementMonikerList = Vec<String>;
 /// Defines the DeMasterMkLstDrawingElementMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "oac:CT_DrawingElementMonikerList/oac:deMasterMkLst"
-)]
-pub struct DeMasterMkLstDrawingElementMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DeMasterMkLstDrawingElementMonikerList = Vec<String>;
 /// Defines the DeSrcMkLstDrawingElementMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deSrcMkLst")]
-pub struct DeSrcMkLstDrawingElementMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DeSrcMkLstDrawingElementMonikerList = Vec<String>;
 /// Defines the DeTgtMkLstDrawingElementMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DrawingElementMonikerList/oac:deTgtMkLst")]
-pub struct DeTgtMkLstDrawingElementMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DeTgtMkLstDrawingElementMonikerList = Vec<String>;
 /// Defines the ImgDataImgData Class.
 pub type ImgDataImgData = crate::simple_type::Base64BinaryValue;
 /// Defines the OrigImgDataImgData Class.
@@ -201,10 +168,9 @@ pub struct GroupCommand {
   #[sdk(attr(office2016, qname = ":grpId"))]
   pub grp_id: Option<crate::simple_type::UInt32Value>,
   /// Defines the DrawingMonikerList Class.
-  #[sdk(child(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
+  #[sdk(any_child(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
   pub drawing_moniker_list: Option<DrawingMonikerList>,
   #[sdk(choice(
-    microsoft365,
     qname = "oac:CT_ShapeMoniker/oac:spMk",
     qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk",
     qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk",
@@ -236,137 +202,41 @@ pub struct ImgLink {
   pub tgt: crate::simple_type::StringValue,
 }
 /// Defines the DocumentContextMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DocumentContextMonikerList/oac:dcMkLst")]
-pub struct DocumentContextMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DocumentContextMonikerList = Vec<String>;
 /// Defines the GraphicParentMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "oac:CT_GraphicParentMonikerList/oac:graphicParentMkLst"
-)]
-pub struct GraphicParentMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type GraphicParentMonikerList = Vec<String>;
 /// Defines the ShapeMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_ShapeMonikerList/oac:spMkLst")]
-pub struct ShapeMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type ShapeMonikerList = Vec<String>;
 /// Defines the GraphicFrameMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(
-  office2016,
-  qname = "oac:CT_GraphicFrameMonikerList/oac:graphicFrameMkLst"
-)]
-pub struct GraphicFrameMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type GraphicFrameMonikerList = Vec<String>;
 /// Defines the ConnectorMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_ConnectorMonikerList/oac:cxnSpMkLst")]
-pub struct ConnectorMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type ConnectorMonikerList = Vec<String>;
 /// Defines the PictureMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_PictureMonikerList/oac:picMkLst")]
-pub struct PictureMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type PictureMonikerList = Vec<String>;
 /// Defines the InkMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_InkMonikerList/oac:inkMkLst")]
-pub struct InkMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type InkMonikerList = Vec<String>;
 /// Defines the TextBodyMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TextBodyMonikerList/oac:txBodyMkLst")]
-pub struct TextBodyMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TextBodyMonikerList = Vec<String>;
 /// Defines the TextCharRangeMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TextCharRangeMonikerList/oac:txMkLst")]
-pub struct TextCharRangeMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TextCharRangeMonikerList = Vec<String>;
 /// Defines the HyperlinkMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_HyperlinkMonikerList/oac:hlinkMkLst")]
-pub struct HyperlinkMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type HyperlinkMonikerList = Vec<String>;
 /// Defines the Model3DMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_Model3DMonikerList/oac:model3DMkLst")]
-pub struct Model3DMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type Model3DMonikerList = Vec<String>;
 /// Defines the ViewSelectionStgList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_ViewSelectionStgList/oac:viewSelLst")]
-pub struct ViewSelectionStgList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type ViewSelectionStgList = Vec<String>;
 /// Defines the EditorSelectionStgList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_EditorSelectionStgList/oac:editorSelLst")]
-pub struct EditorSelectionStgList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type EditorSelectionStgList = Vec<String>;
 /// Defines the DrawingSelectionStgList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_DrawingSelectionStgList/oac:drSelLst")]
-pub struct DrawingSelectionStgList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type DrawingSelectionStgList = Vec<String>;
 /// Defines the TableMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TableMonikerList/oac:tblMkLst")]
-pub struct TableMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TableMonikerList = Vec<String>;
 /// Defines the TableCellMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TableCellMonikerList/oac:tcMkLst")]
-pub struct TableCellMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TableCellMonikerList = Vec<String>;
 /// Defines the TableRowMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TableRowMonikerList/oac:trMkLst")]
-pub struct TableRowMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TableRowMonikerList = Vec<String>;
 /// Defines the TableColumnMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_TableColumnMonikerList/oac:gridColMkLst")]
-pub struct TableColumnMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type TableColumnMonikerList = Vec<String>;
 /// Defines the ModifyNonVisualDrawingProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "oac:CT_ModifyNonVisualDrawingProps/oac:cNvPr")]
@@ -677,12 +547,7 @@ pub struct ModifyNonVisualDrawingShapeProps {
   pub tx_box: Option<crate::simple_type::BooleanValue>,
 }
 /// Defines the ShapePropsMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_ShapePropsMonikerList/oac:spMkLst")]
-pub struct ShapePropsMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type ShapePropsMonikerList = Vec<String>;
 /// Defines the ShapeProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_ShapeProperties/oac:spPr")]
@@ -1309,12 +1174,7 @@ pub struct BoundRect {
   pub b: crate::simple_type::Int64Value,
 }
 /// Defines the SVGBlipMonikerList Class.
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(office2016, qname = "oac:CT_SVGBlipMonikerList/oac:svgBlipMkLst")]
-pub struct SvgBlipMonikerList {
-  #[sdk(any)]
-  pub xml_children: Vec<String>,
-}
+pub type SvgBlipMonikerList = Vec<String>;
 /// Defines the LinePropertiesType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "a:CT_LineProperties/oac:lineProps")]

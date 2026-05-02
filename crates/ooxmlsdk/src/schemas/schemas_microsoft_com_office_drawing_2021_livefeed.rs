@@ -67,7 +67,6 @@ pub struct OfficeArtExtensionList {
 )]
 pub struct LiveFeedBackgroundProperties {
   #[sdk(choice(
-    microsoft365,
     qname = "alf:CT_BackgroundNormalProperties/alf:Normal",
     qname = "alf:CT_BackgroundRemovedProperties/alf:Removed",
     qname = "alf:CT_BackgroundBlurProperties/alf:Blur",

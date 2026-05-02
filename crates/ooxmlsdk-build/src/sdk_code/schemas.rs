@@ -144,6 +144,7 @@ pub(crate) struct TypeContainmentGraph {
   empty_leaf_marker_ambiguous_rust_names: HashSet<String>,
   empty_leaf_marker_docs: HashMap<String, String>,
   empty_leaf_marker_docs_by_rust_name: HashMap<String, String>,
+  any_children_alias_keys: HashSet<String>,
   nodes: HashSet<String>,
 }
 
@@ -158,7 +159,7 @@ impl TypeContainmentGraph {
         if is_empty_leaf_marker_type(type_decl) {
           graph
             .empty_leaf_marker_docs
-            .insert(type_key, type_decl.docs.clone());
+            .insert(type_key.clone(), type_decl.docs.clone());
           let generated_rust_name = type_decl.rust_name.to_upper_camel_case();
           if graph
             .empty_leaf_marker_docs_by_rust_name
@@ -169,6 +170,9 @@ impl TypeContainmentGraph {
               .empty_leaf_marker_ambiguous_rust_names
               .insert(generated_rust_name);
           }
+        }
+        if can_alias_any_children_wrapper_decl(type_decl, &[]) {
+          graph.any_children_alias_keys.insert(type_key);
         }
       }
     }
@@ -240,6 +244,10 @@ impl TypeContainmentGraph {
       .edges
       .get(node)
       .is_some_and(|children| !children.is_empty())
+  }
+
+  fn is_any_children_alias(&self, node: &str) -> bool {
+    self.any_children_alias_keys.contains(node)
   }
 
   fn empty_leaf_marker_doc(&self, node: &str) -> Option<&str> {
@@ -1053,6 +1061,16 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         pub struct #struct_name_ident {
           #( #fields )*
         }
+      });
+
+      continue;
+    }
+
+    if can_alias_any_children_wrapper_decl(type_decl, &attr_fields) {
+      token_stream_list.push(quote! {
+        #( #type_attrs )*
+        #[doc = #summary_doc]
+        pub type #struct_name_ident = Vec<String>;
       });
 
       continue;
@@ -2257,18 +2275,32 @@ fn gen_choice_variant_tokens(
               #variant_ident,
             }])
           } else {
+            let is_any_children_alias = is_any_children_alias_type_ref(
+              render_context.module,
+              &variant.payload,
+              render_context.type_graph,
+            );
             let qname_attrs = qnames
               .iter()
-              .map(
-                |qname| quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] },
-              )
+              .map(|qname| {
+                if is_any_children_alias {
+                  quote! { #[sdk(any_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
+                } else {
+                  quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] }
+                }
+              })
               .collect::<Vec<_>>();
+            let payload_tokens = if is_any_children_alias {
+              quote! { #payload_type }
+            } else {
+              quote! { std::boxed::Box<#payload_type> }
+            };
             Ok(vec![quote! {
               #prefix_attrs
               #( #variant_attrs )*
               #variant_doc_attrs
               #( #qname_attrs )*
-              #variant_ident(std::boxed::Box<#payload_type>),
+              #variant_ident(#payload_tokens),
             }])
           }
         }
@@ -3266,6 +3298,10 @@ fn direct_child_field_needs_box(
       field.cardinality
     };
 
+  if is_any_children_alias_type_ref(module, &field.type_ref, type_graph) {
+    return false;
+  }
+
   match &field.wire {
     FieldWireDecl::Child { .. } => {}
     FieldWireDecl::TextChild { .. } if !is_value_like_type_ref(module, &field.type_ref) => {}
@@ -3490,9 +3526,13 @@ fn gen_direct_child_fields_from_decl_with_context(
       .unwrap_or_else(|| " _".to_string());
     let property_comments = property_comments_owned.as_str();
     let field_sdk_version_markers = sdk_version_markers(&field.version);
+    let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
+      FieldWireDecl::Child { qname } if is_any_children_alias => {
+        quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } => {
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
@@ -3509,6 +3549,7 @@ fn gen_direct_child_fields_from_decl_with_context(
       field_type
     };
     let wrap_box = empty_leaf_marker_doc.is_none()
+      && !is_any_children_alias
       && direct_child_field_needs_box(
         owner_rust_name,
         field,
@@ -3583,9 +3624,13 @@ fn gen_inline_sequence_variant_fields_from_decl(
       .unwrap_or_else(|| " _".to_string());
     let property_comments = property_comments_owned.as_str();
     let field_sdk_version_markers = sdk_version_markers(&field.version);
+    let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
       FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+      }
+      FieldWireDecl::Child { qname } if is_any_children_alias => {
+        quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::Child { qname } => {
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
@@ -3609,6 +3654,7 @@ fn gen_inline_sequence_variant_fields_from_decl(
       field_type
     };
     let wrap_box = empty_leaf_marker_doc.is_none()
+      && !is_any_children_alias
       && (inline_sequence_field_forces_box(field)
         || direct_child_field_needs_box(owner_rust_name, field, module, type_graph, false));
 
@@ -3738,27 +3784,17 @@ fn gen_choice_fields_from_decl(
       .into_iter()
       .map(|qname| quote! { qname = #qname })
       .collect::<Vec<_>>();
-    let field_sdk_version_markers = sdk_version_markers(&field.version);
     let mut sdk_choice_attrs = Vec::new();
     if choice_qname_attrs.is_empty() && !choice_accepts_text && !choice_accepts_any {
-      if field_sdk_version_markers.is_empty() {
-        sdk_choice_attrs.push(quote! { #[sdk(choice)] });
-      } else {
-        sdk_choice_attrs.push(quote! { #[sdk(choice(#(#field_sdk_version_markers),*))] });
-      }
+      sdk_choice_attrs.push(quote! { #[sdk(choice)] });
     } else if choice_accepts_text && choice_accepts_any {
-      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* text, any))] });
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text, any))] });
     } else if choice_accepts_text {
-      sdk_choice_attrs.push(
-        quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* text))] },
-      );
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* text))] });
     } else if choice_accepts_any {
-      sdk_choice_attrs.push(
-        quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs,)* any))] },
-      );
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs,)* any))] });
     } else {
-      sdk_choice_attrs
-        .push(quote! { #[sdk(choice(#(#field_sdk_version_markers,)* #(#choice_qname_attrs),*))] });
+      sdk_choice_attrs.push(quote! { #[sdk(choice(#(#choice_qname_attrs),*))] });
     }
     if !gated_choice_qname_attrs.is_empty() {
       sdk_choice_attrs.push(quote! {
@@ -3810,6 +3846,38 @@ fn can_alias_leaf_text_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && !type_decl.support.have_xmlns_fields
     && !type_decl.support.has_extra_support_fields()
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
+}
+
+fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&FieldDecl]) -> bool {
+  if type_decl.kind != TypeKind::ElementStruct
+    || type_decl.content_model != Some(ContentModelDecl::SequenceAnyOnly)
+    || !attr_fields.is_empty()
+    || type_decl.xml_content.is_some()
+    || type_decl.support.have_xmlns_fields
+    || type_decl.support.has_extra_support_fields()
+    || type_decl.support.xml_header != crate::sdk_code::codegen_ir::XmlHeaderMode::None
+  {
+    return false;
+  }
+
+  let [MemberDecl::Field(field)] = type_decl.members.as_slice() else {
+    return false;
+  };
+
+  matches!(field.wire, FieldWireDecl::Any)
+    && field.cardinality == Cardinality::Many
+    && field.type_ref.module_path.is_none()
+    && field.type_ref.rust_type == "String"
+}
+
+fn is_any_children_alias_type_ref(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
+  schema_type_key_from_ref(module, type_ref)
+    .as_deref()
+    .is_some_and(|key| type_graph.is_any_children_alias(key))
 }
 
 fn omitted_abstract_helper_type_names(ir: &SchemaModuleDecl) -> HashSet<&str> {
@@ -6640,7 +6708,8 @@ mod tests {
       .unwrap()
       .to_string();
 
-    assert!(generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
+    assert!(generated.contains("pub type AnyHolder = Vec < String >"));
+    assert!(!generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
     assert!(!generated.contains("pub enum AnyHolderChoice"));
     assert!(!generated.contains("UnknownXml (String)"));
   }

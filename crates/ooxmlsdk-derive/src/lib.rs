@@ -155,6 +155,14 @@ struct SdkTextChildField {
 }
 
 #[derive(Clone)]
+struct SdkAnyChildField {
+  ident: Ident,
+  qname: String,
+  optional: bool,
+  repeated: bool,
+}
+
+#[derive(Clone)]
 struct SdkChoiceField {
   ident: Ident,
   ty: Type,
@@ -185,6 +193,7 @@ enum SdkTypeFieldKind {
   Child { qname: String },
   EmptyChild { qname: String },
   TextChild { qname: String },
+  AnyChild { qname: String },
   Choice,
   Any,
   Text,
@@ -339,6 +348,7 @@ impl Parse for StringSetValues {
 enum SdkChoiceVariantKind {
   Child { qnames: Vec<String> },
   EmptyChild { qnames: Vec<String> },
+  AnyChild { qnames: Vec<String> },
   Choice,
   Sequence,
   TextChild { qnames: Vec<String> },
@@ -1018,6 +1028,23 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             qname: qname.unwrap_or_default(),
           });
         }
+        Meta::List(meta) if meta.path.is_ident("any_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk any_child attribute"))
+            }
+          })?;
+          kind = Some(SdkTypeFieldKind::AnyChild {
+            qname: qname.unwrap_or_default(),
+          });
+        }
         Meta::Path(path) if path.is_ident("text") => {
           kind = Some(SdkTypeFieldKind::Text);
         }
@@ -1352,6 +1379,7 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   let mut child_qnames = Vec::new();
   let mut empty_child_qnames = Vec::new();
   let mut text_child_qnames = Vec::new();
+  let mut any_child_qnames = Vec::new();
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
       continue;
@@ -1405,6 +1433,21 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
           })?;
           text_child_qnames.push(qname.unwrap_or_default());
         }
+        Meta::List(meta) if meta.path.is_ident("any_child") => {
+          let mut qname = None;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("qname") {
+              let value: LitStr = nested.value()?.parse()?;
+              qname = Some(value.value());
+              Ok(())
+            } else if is_sdk_version_marker_path(&nested.path) {
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk choice any_child attribute"))
+            }
+          })?;
+          any_child_qnames.push(qname.unwrap_or_default());
+        }
         Meta::Path(path) if path.is_ident("choice") => {
           return Ok(Some(SdkChoiceVariantKind::Choice));
         }
@@ -1432,6 +1475,11 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   if !text_child_qnames.is_empty() {
     return Ok(Some(SdkChoiceVariantKind::TextChild {
       qnames: text_child_qnames,
+    }));
+  }
+  if !any_child_qnames.is_empty() {
+    return Ok(Some(SdkChoiceVariantKind::AnyChild {
+      qnames: any_child_qnames,
     }));
   }
   Ok(None)
@@ -1527,6 +1575,18 @@ fn is_option_type(ty: &Type) -> bool {
 
 fn is_vec_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Vec"))
+}
+
+fn is_vec_string_type(ty: &Type) -> bool {
+  if let Type::Path(TypePath { path, .. }) = ty
+    && let Some(segment) = path.segments.last()
+    && segment.ident == "Vec"
+    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+  {
+    return is_string_type(inner_ty);
+  }
+  false
 }
 
 fn is_box_type(ty: &Type) -> bool {

@@ -15,7 +15,6 @@ pub struct WordprocessingShape {
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingProps/wps:cNvPr"))]
   pub non_visual_drawing_properties: Option<std::boxed::Box<NonVisualDrawingProperties>>,
   #[sdk(choice(
-    microsoft365,
     qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr",
     qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"
   ))]
@@ -30,7 +29,6 @@ pub struct WordprocessingShape {
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wps:extLst"))]
   pub wps_ext_lst: Option<OfficeArtExtensionList>,
   #[sdk(choice(
-    microsoft365,
     qname = "wps:CT_TextboxInfo/wps:txbx",
     qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"
   ))]

@@ -369,7 +369,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     let kind = parse_sdk_choice_variant_kind(&variant.attrs)?.ok_or_else(|| {
       syn::Error::new_spanned(
         variant,
-        "missing #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
+        "missing #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(any_child(...))], #[sdk(choice)], #[sdk(sequence)] or #[sdk(any)] on choice variant",
       )
     })?;
     match (&variant.fields, kind) {
@@ -377,6 +377,113 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         if fields.unnamed.len() == 1 =>
       {
         let payload_ty = choice_variant_payload_type(variant)?;
+        let inner_payload_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
+        if is_vec_string_type(&inner_payload_ty) {
+          let qname_patterns = choice_qname_patterns(&qnames);
+          let QNameInfo {
+            tag_prefix,
+            local_name,
+          } = parse_qname_info(qnames.first().map(String::as_str).unwrap_or_default());
+          let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+          let tag_qname_lit = LitByteStr::new(
+            format!("{tag_prefix}:{local_name}").as_bytes(),
+            Span::call_site(),
+          );
+          let constructor = if is_box_type(&payload_ty) {
+            quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
+          } else {
+            quote! { Self::#variant_ident(parsed_child) }
+          };
+          direct_matcher_arms.push(quote! {
+            #(#cfg_attrs)*
+            #( #qname_patterns )|* => true,
+          });
+          direct_child_dispatch_arms_borrowed.push(quote! {
+            #(#cfg_attrs)*
+            #( #qname_patterns )|* => {
+              let mut parsed_child = Vec::new();
+              if !empty_tag {
+                loop {
+                  match xml_reader.next()? {
+                    quick_xml::events::Event::Start(e) => {
+                      let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, false)?;
+                      parsed_child.push(xml);
+                    }
+                    quick_xml::events::Event::Empty(e) => {
+                      let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, true)?;
+                      parsed_child.push(xml);
+                    }
+                    quick_xml::events::Event::End(end) => {
+                      if end.name().as_ref() == #tag_qname_lit
+                        || end.name().as_ref() == #local_name_lit
+                      {
+                        break;
+                      }
+                    }
+                    quick_xml::events::Event::Eof => {
+                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                    }
+                    _ => {}
+                  }
+                }
+              }
+              return Ok(#constructor);
+            }
+          });
+          direct_child_dispatch_arms_io.push(quote! {
+            #(#cfg_attrs)*
+            #( #qname_patterns )|* => {
+              let mut parsed_child = Vec::new();
+              if !empty_tag {
+                loop {
+                  match xml_reader.next()? {
+                    quick_xml::events::Event::Start(e) => {
+                      let xml = crate::common::read_outer_xml_io(xml_reader, e, false)?;
+                      parsed_child.push(xml);
+                    }
+                    quick_xml::events::Event::Empty(e) => {
+                      let xml = crate::common::read_outer_xml_io(xml_reader, e, true)?;
+                      parsed_child.push(xml);
+                    }
+                    quick_xml::events::Event::End(end) => {
+                      if end.name().as_ref() == #tag_qname_lit
+                        || end.name().as_ref() == #local_name_lit
+                      {
+                        break;
+                      }
+                    }
+                    quick_xml::events::Event::Eof => {
+                      return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                    }
+                    _ => {}
+                  }
+                }
+              }
+              return Ok(#constructor);
+            }
+          });
+          let value_expr = if is_box_type(&payload_ty) {
+            quote! { value.as_ref() }
+          } else {
+            quote! { value }
+          };
+          write_arms.push(quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(value) => {
+              crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+              writer.write_all(b">")?;
+              for value in #value_expr {
+                writer.write_all(value.as_bytes())?;
+              }
+              crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
+            }
+          });
+          validate_arms.push(quote! {
+            #(#cfg_attrs)*
+            Self::#variant_ident(_) => Ok(()),
+          });
+          continue;
+        }
         let inner_ty = choice_variant_inner_type(&payload_ty);
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(parsed_child)) }
@@ -806,6 +913,103 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           Self::#variant_ident(_) => Ok(()),
         });
       }
+      (Fields::Unnamed(fields), SdkChoiceVariantKind::AnyChild { qnames })
+        if fields.unnamed.len() == 1 =>
+      {
+        let qname_patterns = choice_qname_patterns(&qnames);
+        let QNameInfo {
+          tag_prefix,
+          local_name,
+        } = parse_qname_info(qnames.first().map(String::as_str).unwrap_or_default());
+        let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+        let tag_qname_lit = LitByteStr::new(
+          format!("{tag_prefix}:{local_name}").as_bytes(),
+          Span::call_site(),
+        );
+        direct_matcher_arms.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => true,
+        });
+        direct_child_dispatch_arms_borrowed.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            let mut parsed_child = Vec::new();
+            if !empty_tag {
+              loop {
+                match xml_reader.next()? {
+                  quick_xml::events::Event::Start(e) => {
+                    let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, false)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::Empty(e) => {
+                    let xml = crate::common::read_outer_xml_borrowed(xml_reader, e, true)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::End(end) => {
+                    if end.name().as_ref() == #tag_qname_lit
+                      || end.name().as_ref() == #local_name_lit
+                    {
+                      break;
+                    }
+                  }
+                  quick_xml::events::Event::Eof => {
+                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                  }
+                  _ => {}
+                }
+              }
+            }
+            return Ok(Self::#variant_ident(parsed_child));
+          }
+        });
+        direct_child_dispatch_arms_io.push(quote! {
+          #(#cfg_attrs)*
+          #( #qname_patterns )|* => {
+            let mut parsed_child = Vec::new();
+            if !empty_tag {
+              loop {
+                match xml_reader.next()? {
+                  quick_xml::events::Event::Start(e) => {
+                    let xml = crate::common::read_outer_xml_io(xml_reader, e, false)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::Empty(e) => {
+                    let xml = crate::common::read_outer_xml_io(xml_reader, e, true)?;
+                    parsed_child.push(xml);
+                  }
+                  quick_xml::events::Event::End(end) => {
+                    if end.name().as_ref() == #tag_qname_lit
+                      || end.name().as_ref() == #local_name_lit
+                    {
+                      break;
+                    }
+                  }
+                  quick_xml::events::Event::Eof => {
+                    return Err(crate::common::unexpected_eof(stringify!(#ident)));
+                  }
+                  _ => {}
+                }
+              }
+            }
+            return Ok(Self::#variant_ident(parsed_child));
+          }
+        });
+        write_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+            writer.write_all(b">")?;
+            for value in value {
+              writer.write_all(value.as_bytes())?;
+            }
+            crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)
+          }
+        });
+        validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(_) => Ok(()),
+        });
+      }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
@@ -933,7 +1137,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       let xml = crate::common::read_outer_xml_borrowed(xml_reader, e.clone(), empty_tag)?;
       if let Some(child_xml) = crate::common::xml_fragment_find_start_outer_xml_by(
         xml.as_bytes(),
-        |name| <Self as crate::sdk::SdkChoice>::matches_start_qname(name),
+        |name| <Self as crate::sdk::SdkChoice>::matches_specific_start_qname(name),
       )? {
         let mut mce_reader = crate::common::from_bytes_inner(&child_xml)?;
         return <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
@@ -954,7 +1158,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       let xml = crate::common::read_outer_xml_io(xml_reader, e.clone(), empty_tag)?;
       if let Some(child_xml) = crate::common::xml_fragment_find_start_outer_xml_by(
         xml.as_bytes(),
-        |name| <Self as crate::sdk::SdkChoice>::matches_start_qname(name),
+        |name| <Self as crate::sdk::SdkChoice>::matches_specific_start_qname(name),
       )? {
         let mut mce_reader = crate::common::from_bytes_inner(&child_xml)?;
         return <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(

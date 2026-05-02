@@ -31,15 +31,13 @@ pub use package::{
 };
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
+#[cfg(feature = "mce")]
+pub(crate) use xml::xml_fragment_find_start_outer_xml_by;
 pub(crate) use xml::{
   IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
   from_reader_inner, from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,
   write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text, write_start_tag_open,
   write_xmlns_attr,
-};
-#[cfg(feature = "mce")]
-pub(crate) use xml::{
-  xml_fragment_find_start_outer_xml_by, xml_fragment_find_start_qname_outer_xml,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

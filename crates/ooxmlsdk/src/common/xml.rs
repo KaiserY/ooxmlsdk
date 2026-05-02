@@ -695,14 +695,6 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 }
 
 #[cfg(feature = "mce")]
-pub(crate) fn xml_fragment_find_start_qname_outer_xml(
-  xml: &[u8],
-  qnames: &[&[u8]],
-) -> Result<Option<Vec<u8>>, SdkError> {
-  xml_fragment_find_start_outer_xml_by(xml, |name| qnames.contains(&name))
-}
-
-#[cfg(feature = "mce")]
 pub(crate) fn xml_fragment_find_start_outer_xml_by(
   xml: &[u8],
   mut matches: impl FnMut(&[u8]) -> bool,

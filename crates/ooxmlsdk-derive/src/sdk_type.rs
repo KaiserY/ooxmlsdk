@@ -749,6 +749,109 @@ fn build_empty_child_skip_tokens(
   }
 }
 
+fn build_any_child_parse_arm(
+  owner_ident: &Ident,
+  field_ident: &Ident,
+  qname: &str,
+  repeated: bool,
+  as_result: bool,
+  mode: DeserializeMode,
+  xml_child_slot_assign: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let target = text_child_match_target(qname);
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  let tag_qname_lit = LitByteStr::new(
+    format!("{tag_prefix}:{local_name}").as_bytes(),
+    Span::call_site(),
+  );
+  let read_outer_xml = mode.read_outer_xml_fn();
+  let assign_tokens = if repeated {
+    quote! { #field_ident.push(parsed_child); }
+  } else {
+    quote! { #field_ident = Some(parsed_child); }
+  };
+  let finish_tokens = if as_result {
+    quote! { Ok(true) }
+  } else {
+    quote! { true }
+  };
+
+  quote! {
+    #target => {
+      let mut parsed_child = Vec::new();
+      if !next_empty {
+        loop {
+          match xml_reader.next()? {
+            quick_xml::events::Event::Start(e) => {
+              let xml = #read_outer_xml(xml_reader, e, false)?;
+              parsed_child.push(xml);
+            }
+            quick_xml::events::Event::Empty(e) => {
+              let xml = #read_outer_xml(xml_reader, e, true)?;
+              parsed_child.push(xml);
+            }
+            quick_xml::events::Event::End(end) => {
+              if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+                break;
+              }
+            }
+            quick_xml::events::Event::Eof => {
+              return Err(crate::common::unexpected_eof(stringify!(#owner_ident)));
+            }
+            _ => {}
+          }
+        }
+      }
+      #assign_tokens
+      #xml_child_slot_assign
+      #finish_tokens
+    },
+  }
+}
+
+fn build_any_child_write_tokens(
+  field_ident: &Ident,
+  qname: &str,
+  repeated: bool,
+  optional: bool,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let write_value_tokens = quote! {
+    crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+    writer.write_all(b">")?;
+    for value in value {
+      writer.write_all(value.as_bytes())?;
+    }
+    crate::common::write_end_tag(writer, xmlns_prefix, #tag_prefix, #local_name)?;
+  };
+
+  if repeated {
+    quote! {
+      for value in &self.#field_ident {
+        #write_value_tokens
+      }
+    }
+  } else if optional {
+    quote! {
+      if let Some(value) = &self.#field_ident {
+        #write_value_tokens
+      }
+    }
+  } else {
+    quote! {
+      let value = &self.#field_ident;
+      #write_value_tokens
+    }
+  }
+}
+
 fn build_any_child_parse_tokens(
   field_ident: &Ident,
   repeated: bool,
@@ -1146,10 +1249,76 @@ fn expand_sequence_helper_struct(
         child_dispatch_tokens_borrowed.push(text_child_dispatch.clone());
         child_dispatch_tokens_io.push(text_child_dispatch);
       }
+      Some(SdkTypeFieldKind::AnyChild { qname }) => {
+        if contains_vec_type(&field.ty) {
+          child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
+          child_init_tokens.push(quote! { #field_ident });
+        } else {
+          child_decl_tokens.push(quote! { let mut #field_ident = None; });
+          if is_option_type(&field.ty) {
+            child_init_tokens.push(quote! { #field_ident });
+          } else {
+            child_init_tokens.push(quote! {
+              #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+                stringify!(#ident),
+                stringify!(#field_ident),
+              ))?
+            });
+          }
+        }
+        child_write_tokens.push(build_any_child_write_tokens(
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          is_option_type(&field.ty),
+        ));
+        let match_target = text_child_match_target(&qname);
+        matcher_checks.push(quote! {
+          if matches!(name, #match_target) {
+            return true;
+          }
+        });
+        let parse_arm_borrowed = build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          false,
+          DeserializeMode::Borrowed,
+          quote! {},
+        );
+        let parse_arm_io = build_any_child_parse_arm(
+          ident,
+          field_ident,
+          &qname,
+          contains_vec_type(&field.ty),
+          false,
+          DeserializeMode::Io,
+          quote! {},
+        );
+        child_dispatch_tokens_borrowed.push(quote! {
+          if matches!(event_name, #match_target) {
+            match event_name {
+              #parse_arm_borrowed
+              _ => false,
+            };
+            continue;
+          }
+        });
+        child_dispatch_tokens_io.push(quote! {
+          if matches!(event_name, #match_target) {
+            match event_name {
+              #parse_arm_io
+              _ => false,
+            };
+            continue;
+          }
+        });
+      }
       _ => {
         return Err(syn::Error::new_spanned(
           field,
-          "sequence helper structs require only #[sdk(child(...))] or #[sdk(text_child(...))] fields",
+          "sequence helper structs require only #[sdk(child(...))], #[sdk(text_child(...))] or #[sdk(any_child(...))] fields",
         ));
       }
     }
@@ -1273,6 +1442,7 @@ fn expand_helper_struct(
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
+  let mut any_child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   for field in &fields.named {
     let field_ident = field
@@ -1301,6 +1471,12 @@ fn expand_helper_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
+      Some(SdkTypeFieldKind::AnyChild { qname }) => any_child_fields.push(SdkAnyChildField {
+        ident: field_ident.clone(),
+        qname,
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
       Some(SdkTypeFieldKind::Choice) => choice_fields.push(SdkChoiceField {
         ident: field_ident.clone(),
         ty: field.ty.clone(),
@@ -1325,7 +1501,7 @@ fn expand_helper_struct(
       Some(SdkTypeFieldKind::Attr { .. }) | None => {
         return Err(syn::Error::new_spanned(
           field,
-          "helper structs require #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))] or #[sdk(choice)] fields",
+          "helper structs require #[sdk(child(...))], #[sdk(empty_child(...))], #[sdk(text_child(...))], #[sdk(any_child(...))] or #[sdk(choice)] fields",
         ));
       }
     }
@@ -1344,8 +1520,10 @@ fn expand_helper_struct(
   let mut direct_child_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_visit_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_visit_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
-  let mut child_parse_tokens = Vec::new();
-  let mut child_visit_parse_tokens = Vec::new();
+  let mut child_parse_tokens_borrowed = Vec::new();
+  let mut child_parse_tokens_io = Vec::new();
+  let mut child_visit_parse_tokens_borrowed = Vec::new();
+  let mut child_visit_parse_tokens_io = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
@@ -2212,7 +2390,7 @@ fn expand_helper_struct(
       field.repeated,
       field.optional,
     ));
-    child_parse_tokens.push(build_text_child_parse_arm(
+    let parse_arm = build_text_child_parse_arm(
       ident,
       field_ident,
       &field.qname,
@@ -2220,8 +2398,10 @@ fn expand_helper_struct(
       field.repeated,
       false,
       quote! {},
-    ));
-    child_visit_parse_tokens.push(build_text_child_parse_arm(
+    );
+    child_parse_tokens_borrowed.push(parse_arm.clone());
+    child_parse_tokens_io.push(parse_arm);
+    let visit_parse_arm = build_text_child_parse_arm(
       ident,
       field_ident,
       &field.qname,
@@ -2229,15 +2409,86 @@ fn expand_helper_struct(
       field.repeated,
       true,
       quote! {},
+    );
+    child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
+    child_visit_parse_tokens_io.push(visit_parse_arm);
+  }
+
+  for field in &any_child_fields {
+    let field_ident = &field.ident;
+    if field.repeated {
+      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
+      child_init_tokens.push(quote! { #field_ident });
+    } else {
+      child_decl_tokens.push(quote! { let mut #field_ident = None; });
+      if field.optional {
+        child_init_tokens.push(quote! { #field_ident });
+      } else {
+        child_init_tokens.push(quote! {
+          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+            stringify!(#ident),
+            stringify!(#field_ident),
+          ))?
+        });
+      }
+    }
+    child_write_tokens.push(build_any_child_write_tokens(
+      field_ident,
+      &field.qname,
+      field.repeated,
+      field.optional,
+    ));
+    child_parse_tokens_borrowed.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      false,
+      DeserializeMode::Borrowed,
+      quote! {},
+    ));
+    child_parse_tokens_io.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      false,
+      DeserializeMode::Io,
+      quote! {},
+    ));
+    child_visit_parse_tokens_borrowed.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Borrowed,
+      quote! {},
+    ));
+    child_visit_parse_tokens_io.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Io,
+      quote! {},
     ));
   }
 
-  if child_fields.len() + empty_child_fields.len() + text_child_fields.len() == fields.named.len() {
+  if child_fields.len()
+    + empty_child_fields.len()
+    + text_child_fields.len()
+    + any_child_fields.len()
+    == fields.named.len()
+  {
     return expand_sequence_helper_struct(input, fields);
   }
 
-  let has_child_dispatch =
-    !child_fields.is_empty() || !empty_child_fields.is_empty() || !text_child_fields.is_empty();
+  let has_child_dispatch = !child_fields.is_empty()
+    || !empty_child_fields.is_empty()
+    || !text_child_fields.is_empty()
+    || !any_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
@@ -2260,7 +2511,7 @@ fn expand_helper_struct(
         let event_name = event_name.as_ref();
         match event_name {
           #( #direct_child_visit_match_tokens_borrowed )*
-          #( #child_visit_parse_tokens )*
+          #( #child_visit_parse_tokens_borrowed )*
           _ => Ok(false),
         }
       };
@@ -2277,7 +2528,7 @@ fn expand_helper_struct(
         let matched: bool = match event_name {
           #( #direct_child_visit_match_tokens_borrowed )*
           #( #flat_choice_visit_match_tokens_borrowed )*
-          #( #child_visit_parse_tokens )*
+          #( #child_visit_parse_tokens_borrowed )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -2317,7 +2568,7 @@ fn expand_helper_struct(
         let event_name = event_name.as_ref();
         match event_name {
           #( #direct_child_visit_match_tokens_io )*
-          #( #child_visit_parse_tokens )*
+          #( #child_visit_parse_tokens_io )*
           _ => Ok(false),
         }
       };
@@ -2334,7 +2585,7 @@ fn expand_helper_struct(
         let matched: bool = match event_name {
           #( #direct_child_visit_match_tokens_io )*
           #( #flat_choice_visit_match_tokens_io )*
-          #( #child_visit_parse_tokens )*
+          #( #child_visit_parse_tokens_io )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -2357,7 +2608,7 @@ fn expand_helper_struct(
     quote! {
       let matched = match event_name {
         #( #direct_child_match_tokens_borrowed )*
-        #( #child_parse_tokens )*
+        #( #child_parse_tokens_borrowed )*
         _ => false,
       };
       if matched {
@@ -2370,7 +2621,7 @@ fn expand_helper_struct(
       let matched = match event_name {
         #( #direct_child_match_tokens_borrowed )*
         #( #flat_choice_match_tokens_borrowed )*
-        #( #child_parse_tokens )*
+        #( #child_parse_tokens_borrowed )*
         _ => {
           {
             #choice_match_count_decl_tokens
@@ -2393,7 +2644,7 @@ fn expand_helper_struct(
     quote! {
       let matched = match event_name {
         #( #direct_child_match_tokens_io )*
-        #( #child_parse_tokens )*
+        #( #child_parse_tokens_io )*
         _ => false,
       };
       if matched {
@@ -2406,7 +2657,7 @@ fn expand_helper_struct(
       let matched = match event_name {
         #( #direct_child_match_tokens_io )*
         #( #flat_choice_match_tokens_io )*
-        #( #child_parse_tokens )*
+        #( #child_parse_tokens_io )*
         _ => {
           {
             #choice_match_count_decl_tokens
@@ -2635,6 +2886,7 @@ fn expand_named_struct(
   let mut child_fields = Vec::new();
   let mut empty_child_fields = Vec::new();
   let mut text_child_fields = Vec::new();
+  let mut any_child_fields = Vec::new();
   let mut choice_fields = Vec::new();
   let mut any_fields = Vec::new();
   let mut text_field = None;
@@ -2703,6 +2955,12 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
+      SdkTypeFieldKind::AnyChild { qname } => any_child_fields.push(SdkAnyChildField {
+        ident: field_ident.clone(),
+        qname,
+        optional: is_option_type(&field.ty),
+        repeated: contains_vec_type(&field.ty),
+      }),
       SdkTypeFieldKind::Choice => choice_fields.push(SdkChoiceField {
         ident: field_ident.clone(),
         ty: field.ty.clone(),
@@ -2747,6 +3005,7 @@ fn expand_named_struct(
       SdkTypeFieldKind::Child { .. }
         | SdkTypeFieldKind::EmptyChild { .. }
         | SdkTypeFieldKind::TextChild { .. }
+        | SdkTypeFieldKind::AnyChild { .. }
         | SdkTypeFieldKind::Choice
         | SdkTypeFieldKind::Any
     ) {
@@ -3042,8 +3301,10 @@ fn expand_named_struct(
   let mut direct_child_visit_match_tokens_borrowed: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut direct_child_visit_match_tokens_io: Vec<proc_macro2::TokenStream> = Vec::new();
   let mut child_decl_tokens = Vec::new();
-  let mut child_parse_tokens = Vec::new();
-  let mut child_visit_parse_tokens = Vec::new();
+  let mut child_parse_tokens_borrowed = Vec::new();
+  let mut child_parse_tokens_io = Vec::new();
+  let mut child_visit_parse_tokens_borrowed = Vec::new();
+  let mut child_visit_parse_tokens_io = Vec::new();
   let mut child_write_tokens = Vec::new();
   let mut child_init_tokens = Vec::new();
   let mut child_validate_tokens = Vec::new();
@@ -3546,7 +3807,7 @@ fn expand_named_struct(
       field.repeated,
       field.optional,
     ));
-    child_parse_tokens.push(build_text_child_parse_arm(
+    let parse_arm = build_text_child_parse_arm(
       ident,
       field_ident,
       &field.qname,
@@ -3554,14 +3815,85 @@ fn expand_named_struct(
       field.repeated,
       false,
       xml_child_slot_assign.clone(),
-    ));
-    child_visit_parse_tokens.push(build_text_child_parse_arm(
+    );
+    child_parse_tokens_borrowed.push(parse_arm.clone());
+    child_parse_tokens_io.push(parse_arm);
+    let visit_parse_arm = build_text_child_parse_arm(
       ident,
       field_ident,
       &field.qname,
       &field.ty,
       field.repeated,
       true,
+      xml_child_slot_assign,
+    );
+    child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
+    child_visit_parse_tokens_io.push(visit_parse_arm);
+  }
+
+  for field in &any_child_fields {
+    let field_ident = &field.ident;
+    let xml_child_slot = xml_child_slot_by_field
+      .get(&field_ident.to_string())
+      .copied()
+      .unwrap_or_default();
+    let xml_child_slot_assign = xml_child_slot_assign_tokens(xml_child_slot);
+    if field.repeated {
+      child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
+      child_init_tokens.push(quote! { #field_ident });
+    } else {
+      child_decl_tokens.push(quote! { let mut #field_ident = None; });
+      if field.optional {
+        child_init_tokens.push(quote! { #field_ident });
+      } else {
+        child_init_tokens.push(quote! {
+          #field_ident: #field_ident.ok_or_else(|| crate::common::missing_field(
+            stringify!(#ident),
+            stringify!(#field_ident),
+          ))?
+        });
+      }
+    }
+    child_write_tokens.push(build_any_child_write_tokens(
+      field_ident,
+      &field.qname,
+      field.repeated,
+      field.optional,
+    ));
+    child_parse_tokens_borrowed.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      false,
+      DeserializeMode::Borrowed,
+      xml_child_slot_assign.clone(),
+    ));
+    child_parse_tokens_io.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      false,
+      DeserializeMode::Io,
+      xml_child_slot_assign.clone(),
+    ));
+    child_visit_parse_tokens_borrowed.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Borrowed,
+      xml_child_slot_assign.clone(),
+    ));
+    child_visit_parse_tokens_io.push(build_any_child_parse_arm(
+      ident,
+      field_ident,
+      &field.qname,
+      field.repeated,
+      true,
+      DeserializeMode::Io,
       xml_child_slot_assign,
     ));
   }
@@ -4124,9 +4456,11 @@ fn expand_named_struct(
     }
   };
 
-  let has_child_dispatch =
-    !child_fields.is_empty() || !empty_child_fields.is_empty() || !text_child_fields.is_empty();
-  let has_text_child_dispatch = !text_child_fields.is_empty();
+  let has_child_dispatch = !child_fields.is_empty()
+    || !empty_child_fields.is_empty()
+    || !text_child_fields.is_empty()
+    || !any_child_fields.is_empty();
+  let has_text_child_dispatch = !text_child_fields.is_empty() || !any_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
   let has_any_dispatch = !any_fields.is_empty();
   let _visit_foreign_child_tokens_borrowed =
@@ -4225,7 +4559,7 @@ fn expand_named_struct(
             _ => {}
           }
           match event_name {
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_borrowed )*
             _ => Ok(false),
           }
         };
@@ -4291,7 +4625,7 @@ fn expand_named_struct(
             #choice_match_conflict_tokens
           }
           match event_name {
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_borrowed )*
             _ => Ok(false),
           }
         };
@@ -4322,7 +4656,7 @@ fn expand_named_struct(
             #choice_match_conflict_tokens
           }
           let matched: bool = match event_name {
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_borrowed )*
             _ => {
               let mut matched = false;
               #( #choice_visit_parse_tokens )*
@@ -4423,7 +4757,7 @@ fn expand_named_struct(
           let event_name = event_name.as_ref();
           match event_name {
             #( #direct_child_visit_match_tokens_io )*
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_io )*
             _ => Ok(false),
           }
         };
@@ -4489,7 +4823,7 @@ fn expand_named_struct(
             #choice_match_conflict_tokens
           }
           match event_name {
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_io )*
             _ => Ok(false),
           }
         };
@@ -4520,7 +4854,7 @@ fn expand_named_struct(
             #choice_match_conflict_tokens
           }
           let matched: bool = match event_name {
-            #( #child_visit_parse_tokens )*
+            #( #child_visit_parse_tokens_io )*
             _ => {
               let mut matched = false;
               #( #choice_visit_parse_tokens )*
@@ -4608,7 +4942,7 @@ fn expand_named_struct(
         #mce_direct_child_dispatch_tokens_borrowed
         let matched = match event_name {
           #( #direct_child_match_tokens_borrowed )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_borrowed )*
           _ => false,
         };
         if matched {
@@ -4639,7 +4973,7 @@ fn expand_named_struct(
         let matched = match event_name {
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_borrowed )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -4661,7 +4995,7 @@ fn expand_named_struct(
         let matched = match event_name {
           #( #direct_child_match_tokens_borrowed )*
           #( #flat_choice_match_tokens_borrowed )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_borrowed )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -4736,7 +5070,7 @@ fn expand_named_struct(
         #mce_direct_child_dispatch_tokens_io
         let matched = match event_name {
           #( #direct_child_match_tokens_io )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_io )*
           _ => false,
         };
         if matched {
@@ -4767,7 +5101,7 @@ fn expand_named_struct(
         let matched = match event_name {
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_io )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -4789,7 +5123,7 @@ fn expand_named_struct(
         let matched = match event_name {
           #( #direct_child_match_tokens_io )*
           #( #flat_choice_match_tokens_io )*
-          #( #child_parse_tokens )*
+          #( #child_parse_tokens_io )*
           _ => {
             #( #choice_match_init_tokens )*
             {
@@ -4897,6 +5231,7 @@ fn expand_named_struct(
         SdkTypeFieldKind::Child { .. }
           | SdkTypeFieldKind::EmptyChild { .. }
           | SdkTypeFieldKind::TextChild { .. }
+          | SdkTypeFieldKind::AnyChild { .. }
           | SdkTypeFieldKind::Choice
           | SdkTypeFieldKind::Any
       )
@@ -4954,6 +5289,14 @@ fn expand_named_struct(
           field_ident,
           qname,
           field_ty,
+          contains_vec_type(field_ty),
+          is_option_type(field_ty),
+        ));
+      }
+      SdkTypeFieldKind::AnyChild { qname } => {
+        ordered_write_tokens.push(build_any_child_write_tokens(
+          field_ident,
+          qname,
           contains_vec_type(field_ty),
           is_option_type(field_ty),
         ));

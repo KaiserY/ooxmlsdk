@@ -439,7 +439,6 @@ pub struct NumericDimension {
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: NumericDimensionType,
   #[sdk(choice(
-    microsoft365,
     qname = "cx:CT_Formula/cx:f",
     qname = "cx:CT_Formula/cx:nf",
     qname = "cx:CT_NumericLevel/cx:lvl"
@@ -454,7 +453,6 @@ pub struct StringDimension {
   #[sdk(attr(office2016, qname = ":type"))]
   pub r#type: StringDimensionType,
   #[sdk(choice(
-    microsoft365,
     qname = "cx:CT_Formula/cx:f",
     qname = "cx:CT_Formula/cx:nf",
     qname = "cx:CT_StringLevel/cx:lvl"
@@ -489,7 +487,6 @@ pub struct Data {
   #[sdk(attr(office2016, qname = ":id"))]
   pub id: crate::simple_type::UInt32Value,
   #[sdk(choice(
-    microsoft365,
     qname = "cx:CT_NumericDimension/cx:numDim",
     qname = "cx:CT_StringDimension/cx:strDim"
   ))]
@@ -520,7 +517,7 @@ pub type FirstFooterXsdstring = crate::simple_type::StringValue;
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2016, qname = "cx:CT_TextData/cx:txData")]
 pub struct TextData {
-  #[sdk(choice(microsoft365, qname = "cx:CT_Formula/cx:f", qname = "xsd:string/cx:v"))]
+  #[sdk(choice(qname = "cx:CT_Formula/cx:f", qname = "xsd:string/cx:v"))]
   pub text_data_choice: Option<TextDataChoice>,
 }
 /// Defines the RichTextBody Class.
@@ -1546,7 +1543,6 @@ pub struct SeriesLayoutProperties {
   #[sdk(child(office2016, qname = "cx:CT_SeriesElementVisibilities/cx:visibility"))]
   pub series_element_visibilities: Option<SeriesElementVisibilities>,
   #[sdk(choice(
-    microsoft365,
     qname = "cx:CT_Aggregation/cx:aggregation",
     qname = "cx:CT_Binning/cx:binning"
   ))]
@@ -1652,7 +1648,6 @@ pub struct Axis {
   #[sdk(attr(office2016, qname = ":hidden"))]
   pub hidden: Option<crate::simple_type::BooleanValue>,
   #[sdk(choice(
-    microsoft365,
     qname = "cx:CT_CategoryAxisScaling/cx:catScaling",
     qname = "cx:CT_ValueAxisScaling/cx:valScaling"
   ))]

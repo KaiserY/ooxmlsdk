@@ -148,6 +148,30 @@ fn any_child_dispatch_tokens(
   }
 }
 
+fn mce_process_field_tokens(
+  ident: &Ident,
+  optional: bool,
+  repeated: bool,
+) -> proc_macro2::TokenStream {
+  if repeated {
+    quote! {
+      for child in #ident {
+        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+      }
+    }
+  } else if optional {
+    quote! {
+      if let Some(child) = #ident {
+        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+      }
+    }
+  } else {
+    quote! {
+      crate::sdk::SdkMce::process_mce_with_context(#ident, settings, context)?;
+    }
+  }
+}
+
 fn named_sequence_helper_ident(enum_ident: &Ident, variant_ident: &Ident) -> syn::Result<Ident> {
   parse_str(&format!("__{}{}SequenceHelper", enum_ident, variant_ident))
 }
@@ -358,6 +382,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut any_dispatch_tokens_io = Vec::new();
   let mut text_from_string_tokens = Vec::new();
   let mut validate_arms = Vec::new();
+  let mut mce_choice_arms = Vec::new();
+  let mut mce_any_arms = Vec::new();
   let mut has_any_variant = false;
   let mut helper_items = Vec::new();
   let deserialize_borrowed_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Borrowed);
@@ -527,6 +553,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         };
         validate_arms.push(validate_arm);
+        mce_choice_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)
+          },
+        });
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Choice) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
@@ -573,6 +605,21 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         };
         validate_arms.push(validate_arm);
+        let mce_value = if is_box_type(&payload_ty) {
+          quote! { value.as_mut() }
+        } else {
+          quote! { value }
+        };
+        mce_choice_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            crate::sdk::SdkMceChoice::process_mce_choice_with_context(
+              #mce_value,
+              settings,
+              context,
+            )
+          },
+        });
       }
       (Fields::Unit, SdkChoiceVariantKind::EmptyChild { qnames }) => {
         let qname_patterns = choice_qname_patterns(&qnames);
@@ -613,6 +660,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           },
         });
         validate_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident => Ok(()),
+        });
+        mce_choice_arms.push(quote! {
           #(#cfg_attrs)*
           Self::#variant_ident => Ok(()),
         });
@@ -662,6 +713,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           }
         };
         validate_arms.push(validate_arm);
+        mce_choice_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(value) => {
+            crate::sdk::SdkMce::process_mce_with_context(value, settings, context)
+          },
+        });
       }
       (Fields::Named(fields), SdkChoiceVariantKind::Sequence) => {
         let helper_ident = named_sequence_helper_ident(ident, variant_ident)?;
@@ -746,6 +803,32 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident { #( #validate_pattern_fields ),* } => {
             #( #validate_tokens )*
+            Ok(())
+          },
+        });
+        let mce_named_field_tokens = named_fields
+          .iter()
+          .filter(|field| matches!(field.kind, NamedSequenceVariantFieldKind::Child { .. }))
+          .map(|field| {
+            let ident = &field.ident;
+            mce_process_field_tokens(ident, field.optional, field.repeated)
+          })
+          .collect::<Vec<_>>();
+        let mce_pattern_fields = named_fields
+          .iter()
+          .map(|field| {
+            let ident = &field.ident;
+            if matches!(field.kind, NamedSequenceVariantFieldKind::Child { .. }) {
+              quote! { #ident }
+            } else {
+              quote! { #ident: _ }
+            }
+          })
+          .collect::<Vec<_>>();
+        mce_choice_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident { #( #mce_pattern_fields ),* } => {
+            #( #mce_named_field_tokens )*
             Ok(())
           },
         });
@@ -1013,6 +1096,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
+        let any_xml_expr = if is_box_type(&payload_ty) {
+          quote! { xml.as_ref().as_str() }
+        } else {
+          quote! { xml.as_str() }
+        };
         let constructor = if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(xml)) }
         } else {
@@ -1026,6 +1114,37 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         validate_arms.push(quote! {
           #(#cfg_attrs)*
           Self::#variant_ident(_) => Ok(()),
+        });
+        mce_any_arms.push(quote! {
+          #(#cfg_attrs)*
+          Self::#variant_ident(xml) => {
+            if let Some(children) = crate::common::mce_choice_replacement_children(
+              #any_xml_expr,
+              settings,
+              context,
+            )? {
+              for child_xml in children {
+                let mut child_reader = crate::common::from_bytes_inner(child_xml.as_bytes())?;
+                let mut child = <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
+                  &mut child_reader,
+                  None,
+                )?;
+                <Self as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
+                  &mut child,
+                  settings,
+                  context,
+                )?;
+                processed.push(child);
+              }
+            } else {
+              <Self as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
+                &mut item,
+                settings,
+                context,
+              )?;
+              processed.push(item);
+            }
+          }
         });
         any_dispatch_tokens_borrowed.push(any_child_dispatch_tokens(
           DeserializeMode::Borrowed,
@@ -1131,48 +1250,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
   };
 
-  let mce_choice_dispatch_tokens_borrowed = quote! {
-    #[cfg(feature = "mce")]
-    if matches!(event_name, b"mc:AlternateContent" | b"AlternateContent") {
-      let xml = crate::common::read_outer_xml_borrowed(xml_reader, e.clone(), empty_tag)?;
-      if let Some(child_xml) = crate::common::xml_fragment_find_start_outer_xml_by(
-        xml.as_bytes(),
-        |name| <Self as crate::sdk::SdkChoice>::matches_specific_start_qname(name),
-      )? {
-        let mut mce_reader = crate::common::from_bytes_inner(&child_xml)?;
-        return <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
-          &mut mce_reader,
-          None,
-        );
-      }
-      return Err(crate::common::unexpected_tag(
-        stringify!(#ident),
-        "known MCE choice child",
-        event_name,
-      ));
-    }
-  };
-  let mce_choice_dispatch_tokens_io = quote! {
-    #[cfg(feature = "mce")]
-    if matches!(event_name, b"mc:AlternateContent" | b"AlternateContent") {
-      let xml = crate::common::read_outer_xml_io(xml_reader, e.clone(), empty_tag)?;
-      if let Some(child_xml) = crate::common::xml_fragment_find_start_outer_xml_by(
-        xml.as_bytes(),
-        |name| <Self as crate::sdk::SdkChoice>::matches_specific_start_qname(name),
-      )? {
-        let mut mce_reader = crate::common::from_bytes_inner(&child_xml)?;
-        return <Self as crate::sdk::SdkChoice>::deserialize_borrowed_inner(
-          &mut mce_reader,
-          None,
-        );
-      }
-      return Err(crate::common::unexpected_tag(
-        stringify!(#ident),
-        "known MCE choice child",
-        event_name,
-      ));
-    }
-  };
+  let mce_choice_dispatch_tokens_borrowed = quote! {};
+  let mce_choice_dispatch_tokens_io = quote! {};
 
   let read_tokens_borrowed = if any_dispatch_tokens_borrowed.is_empty() {
     quote! {
@@ -1312,6 +1391,49 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         match self {
           #( #validate_arms )*
         }
+      }
+    }
+
+    #[cfg(feature = "mce")]
+    impl #impl_generics crate::sdk::SdkMceChoice for #ident #type_generics #where_clause {
+      fn process_mce_choice_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        match self {
+          #( #mce_choice_arms )*
+          _ => Ok(()),
+        }
+      }
+
+      fn process_mce_choices_with_context(
+        values: &mut Vec<Self>,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        let mut processed = Vec::with_capacity(values.len());
+        for mut item in std::mem::take(values) {
+          match &mut item {
+            #( #mce_any_arms )*
+            _ => {
+              <Self as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
+                &mut item,
+                settings,
+                context,
+              )?;
+              processed.push(item);
+            }
+          }
+        }
+        *values = processed;
+        Ok(())
       }
     }
 

@@ -29,10 +29,10 @@ pub(crate) use package::{
 pub use package::{
   PartId, ReferenceRelationshipKind, Relationship, RelationshipRef, RelationshipTargetKind,
 };
+#[cfg(feature = "mce")]
+pub(crate) use xml::mce_choice_replacement_children;
 pub use xml::resolve_relationship_target_path;
 pub use xml::resolve_zip_file_path;
-#[cfg(feature = "mce")]
-pub(crate) use xml::xml_fragment_find_start_outer_xml_by;
 pub(crate) use xml::{
   IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
   from_reader_inner, from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,

@@ -227,6 +227,8 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
     )),
     _ => Ok(quote! {
       impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {}
+      #[cfg(feature = "mce")]
+      impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
       #[cfg(feature = "validators")]
       impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {}
     }),
@@ -258,6 +260,8 @@ fn sdk_type_impl_tokens(
         Self::#deserialize_io_inner_ident(xml_reader, xml_event)
       }
     }
+    #[cfg(feature = "mce")]
+    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
     #[cfg(feature = "validators")]
     impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
       fn validate(&self) -> Result<(), crate::common::SdkError> {
@@ -295,6 +299,112 @@ fn sdk_type_impl_tokens(
 
       #impl_items
     }
+  }
+}
+
+fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenStream {
+  let ident = &field.ident;
+  if field.repeated {
+    quote! {
+      for child in &mut self.#ident {
+        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+      }
+    }
+  } else if field.optional {
+    quote! {
+      if let Some(child) = &mut self.#ident {
+        crate::sdk::SdkMce::process_mce_with_context(child, settings, context)?;
+      }
+    }
+  } else {
+    quote! {
+      crate::sdk::SdkMce::process_mce_with_context(&mut self.#ident, settings, context)?;
+    }
+  }
+}
+
+fn mce_process_choice_field_tokens(field: &SdkChoiceField) -> proc_macro2::TokenStream {
+  let ident = &field.ident;
+  let choice_ty = unwrap_option_vec_type(&field.ty);
+  if field.repeated {
+    quote! {
+      <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choices_with_context(
+        &mut self.#ident,
+        settings,
+        context,
+      )?;
+    }
+  } else if field.optional {
+    quote! {
+      if let Some(choice) = &mut self.#ident {
+        <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
+          choice,
+          settings,
+          context,
+        )?;
+      }
+    }
+  } else {
+    quote! {
+      <#choice_ty as crate::sdk::SdkMceChoice>::process_mce_choice_with_context(
+        &mut self.#ident,
+        settings,
+        context,
+      )?;
+    }
+  }
+}
+
+fn mce_xml_other_children_process_tokens(
+  has_xml_other_children_field: bool,
+) -> proc_macro2::TokenStream {
+  if !has_xml_other_children_field {
+    return quote! {};
+  }
+
+  quote! {
+    let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
+    for (slot, xml) in std::mem::take(&mut self.xml_other_children) {
+      if let Some(children) = crate::common::mce_choice_replacement_children(
+        xml.as_str(),
+        settings,
+        context,
+      )? {
+        xml_other_children.extend(children.into_iter().map(|child| (slot, child)));
+      } else {
+        xml_other_children.push((slot, xml));
+      }
+    }
+    self.xml_other_children = xml_other_children;
+  }
+}
+
+fn mce_context_scope_tokens(
+  xmlns_fields: &[Ident],
+  xml_other_attrs_field: Option<&Ident>,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+  let xmlns_expr = if let Some(ident) = xmlns_fields.first() {
+    quote! { self.#ident.as_slice() }
+  } else {
+    quote! { &[] as &[crate::common::XmlNamespaceDecl] }
+  };
+  let attrs_expr = if let Some(ident) = xml_other_attrs_field {
+    quote! { self.#ident.as_slice() }
+  } else {
+    quote! { &[] as &[(String, String)] }
+  };
+
+  if xmlns_fields.is_empty() && xml_other_attrs_field.is_none() {
+    (quote! {}, quote! {})
+  } else {
+    (
+      quote! {
+        let __mce_checkpoint = context.push(#xmlns_expr, #attrs_expr);
+      },
+      quote! {
+        context.pop(__mce_checkpoint);
+      },
+    )
   }
 }
 
@@ -2708,6 +2818,14 @@ fn expand_helper_struct(
       event_name,
     ));
   };
+  let mce_child_process_tokens = child_fields
+    .iter()
+    .map(mce_process_child_field_tokens)
+    .collect::<Vec<_>>();
+  let mce_choice_process_tokens = choice_fields
+    .iter()
+    .map(mce_process_choice_field_tokens)
+    .collect::<Vec<_>>();
 
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
@@ -2730,6 +2848,25 @@ fn expand_helper_struct(
       fn validate(&self) -> Result<(), crate::common::SdkError> {
         #( #child_validate_tokens )*
         #( #choice_validate_tokens )*
+        Ok(())
+      }
+    }
+
+    #[cfg(feature = "mce")]
+    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {
+      fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        #( #mce_child_process_tokens )*
+        #( #mce_choice_process_tokens )*
         Ok(())
       }
     }
@@ -5789,6 +5926,18 @@ fn expand_named_struct(
     || !any_fields.is_empty()
     || has_xml_other_children_field
     || text_field.is_some();
+  let mce_child_process_tokens = child_fields
+    .iter()
+    .map(mce_process_child_field_tokens)
+    .collect::<Vec<_>>();
+  let mce_choice_process_tokens = choice_fields
+    .iter()
+    .map(mce_process_choice_field_tokens)
+    .collect::<Vec<_>>();
+  let (mce_context_push_tokens, mce_context_pop_tokens) =
+    mce_context_scope_tokens(&xmlns_fields, xml_other_attrs_field.as_ref());
+  let mce_xml_other_children_process_tokens =
+    mce_xml_other_children_process_tokens(has_xml_other_children_field);
   Ok(quote! {
     impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
       fn deserialize_type_borrowed_inner<'de>(
@@ -5824,6 +5973,28 @@ fn expand_named_struct(
         #( #attr_validate_tokens )*
         #( #child_validate_tokens )*
         #( #choice_validate_tokens )*
+        Ok(())
+      }
+    }
+
+    #[cfg(feature = "mce")]
+    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {
+      fn process_mce_with_context(
+        &mut self,
+        settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+        context: &mut crate::sdk::MceContext,
+      ) -> Result<(), crate::common::SdkError> {
+        if matches!(
+          settings.process_mode,
+          crate::sdk::MarkupCompatibilityProcessMode::NoProcess
+        ) {
+          return Ok(());
+        }
+        #mce_context_push_tokens
+        #mce_xml_other_children_process_tokens
+        #( #mce_child_process_tokens )*
+        #( #mce_choice_process_tokens )*
+        #mce_context_pop_tokens
         Ok(())
       }
     }

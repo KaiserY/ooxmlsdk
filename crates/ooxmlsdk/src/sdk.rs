@@ -325,6 +325,180 @@ pub trait SdkChoice: Sized {
   }
 }
 
+#[cfg(feature = "mce")]
+pub trait SdkMce {
+  fn process_mce(
+    &mut self,
+    settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<(), crate::common::SdkError> {
+    let mut context = MceContext::default();
+    self.process_mce_with_context(settings, &mut context)
+  }
+
+  fn process_mce_with_context(
+    &mut self,
+    _settings: &MarkupCompatibilityProcessSettings,
+    _context: &mut MceContext,
+  ) -> Result<(), crate::common::SdkError> {
+    Ok(())
+  }
+}
+
+#[cfg(feature = "mce")]
+impl<T: SdkMce + ?Sized> SdkMce for Box<T> {
+  #[inline]
+  fn process_mce(
+    &mut self,
+    settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<(), crate::common::SdkError> {
+    self.as_mut().process_mce(settings)
+  }
+
+  #[inline]
+  fn process_mce_with_context(
+    &mut self,
+    settings: &MarkupCompatibilityProcessSettings,
+    context: &mut MceContext,
+  ) -> Result<(), crate::common::SdkError> {
+    self.as_mut().process_mce_with_context(settings, context)
+  }
+}
+
+#[cfg(feature = "mce")]
+pub trait SdkMceChoice: SdkChoice {
+  fn process_mce_choice(
+    &mut self,
+    _settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<(), crate::common::SdkError> {
+    Ok(())
+  }
+
+  fn process_mce_choice_with_context(
+    &mut self,
+    settings: &MarkupCompatibilityProcessSettings,
+    _context: &mut MceContext,
+  ) -> Result<(), crate::common::SdkError> {
+    self.process_mce_choice(settings)
+  }
+
+  fn process_mce_choices(
+    values: &mut Vec<Self>,
+    settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<(), crate::common::SdkError> {
+    let mut context = MceContext::default();
+    Self::process_mce_choices_with_context(values, settings, &mut context)
+  }
+
+  fn process_mce_choices_with_context(
+    values: &mut Vec<Self>,
+    settings: &MarkupCompatibilityProcessSettings,
+    context: &mut MceContext,
+  ) -> Result<(), crate::common::SdkError> {
+    for value in values {
+      value.process_mce_choice_with_context(settings, context)?;
+    }
+    Ok(())
+  }
+}
+
+#[cfg(feature = "mce")]
+#[derive(Clone, Debug, Default)]
+pub struct MceContext {
+  namespaces: Vec<(String, String)>,
+  ignorable_namespaces: Vec<String>,
+  process_content: Vec<String>,
+}
+
+#[cfg(feature = "mce")]
+#[derive(Clone, Copy, Debug)]
+pub struct MceContextCheckpoint {
+  namespaces: usize,
+  ignorable_namespaces: usize,
+  process_content: usize,
+}
+
+#[cfg(feature = "mce")]
+impl MceContext {
+  pub(crate) fn push(
+    &mut self,
+    namespaces: &[crate::common::XmlNamespaceDecl],
+    attrs: &[(String, String)],
+  ) -> MceContextCheckpoint {
+    let checkpoint = MceContextCheckpoint {
+      namespaces: self.namespaces.len(),
+      ignorable_namespaces: self.ignorable_namespaces.len(),
+      process_content: self.process_content.len(),
+    };
+
+    self.namespaces.extend(
+      namespaces
+        .iter()
+        .map(|decl| (decl.prefix.clone(), decl.uri.clone())),
+    );
+
+    if let Some(value) = mce_attr(attrs, "Ignorable") {
+      for prefix in value.split_whitespace() {
+        if let Some(ns) = self.namespace_for_prefix(prefix) {
+          self.ignorable_namespaces.push(ns.to_string());
+        }
+      }
+    }
+
+    if let Some(value) = mce_attr(attrs, "ProcessContent") {
+      self
+        .process_content
+        .extend(value.split_whitespace().map(str::to_string));
+    }
+
+    checkpoint
+  }
+
+  pub(crate) fn pop(&mut self, checkpoint: MceContextCheckpoint) {
+    self.namespaces.truncate(checkpoint.namespaces);
+    self
+      .ignorable_namespaces
+      .truncate(checkpoint.ignorable_namespaces);
+    self.process_content.truncate(checkpoint.process_content);
+  }
+
+  pub(crate) fn is_process_content_qname(&self, qname: &str) -> bool {
+    self.process_content.iter().any(|candidate| {
+      candidate == "*"
+        || candidate == qname
+        || candidate
+          .strip_suffix(":*")
+          .zip(qname.split_once(':'))
+          .is_some_and(|(prefix, (qname_prefix, _))| prefix == qname_prefix)
+    })
+  }
+
+  pub(crate) fn is_ignorable_namespace(&self, namespace: &str) -> bool {
+    self
+      .ignorable_namespaces
+      .iter()
+      .any(|candidate| candidate == namespace)
+  }
+
+  pub(crate) fn namespace_for_prefix(&self, prefix: &str) -> Option<&str> {
+    self
+      .namespaces
+      .iter()
+      .rev()
+      .find_map(|(candidate, uri)| (candidate == prefix).then_some(uri.as_str()))
+  }
+
+  pub(crate) fn namespaces(&self) -> &[(String, String)] {
+    self.namespaces.as_slice()
+  }
+}
+
+#[cfg(feature = "mce")]
+fn mce_attr<'a>(attrs: &'a [(String, String)], local_name: &str) -> Option<&'a str> {
+  attrs.iter().find_map(|(name, value)| {
+    (name == &format!("mc:{local_name}") || name == local_name).then_some(value.as_str())
+  })
+}
+
 #[cfg(feature = "parts")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AlternativeFormatImportPartType {

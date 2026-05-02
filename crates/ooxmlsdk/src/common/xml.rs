@@ -695,59 +695,321 @@ pub(crate) fn read_outer_xml_io<R: BufRead>(
 }
 
 #[cfg(feature = "mce")]
-pub(crate) fn xml_fragment_find_start_outer_xml_by(
-  xml: &[u8],
-  mut matches: impl FnMut(&[u8]) -> bool,
-) -> Result<Option<Vec<u8>>, SdkError> {
-  let mut reader = Reader::from_reader(xml);
+const MC_ALTERNATE_CONTENT_NAMES: &[&[u8]] = &[b"mc:AlternateContent", b"AlternateContent"];
+#[cfg(feature = "mce")]
+const MC_CHOICE_NAMES: &[&[u8]] = &[b"mc:Choice", b"Choice"];
+#[cfg(feature = "mce")]
+const MC_FALLBACK_NAMES: &[&[u8]] = &[b"mc:Fallback", b"Fallback"];
+
+#[cfg(feature = "mce")]
+pub(crate) fn mce_choice_replacement_children(
+  xml: &str,
+  settings: &crate::sdk::MarkupCompatibilityProcessSettings,
+  context: &crate::sdk::MceContext,
+) -> Result<Option<Vec<String>>, SdkError> {
+  let mut reader = Reader::from_str(xml);
   reader.config_mut().check_end_names = false;
+  let mut fallback = None;
 
   loop {
     match reader.read_event()? {
-      Event::Start(e) => {
-        let name = e.name();
-        let name = name.as_ref();
-        if matches(name) {
-          let mut writer = Writer::new(Cursor::new(Vec::new()));
-          writer.write_event(Event::Start(e))?;
-
-          let mut depth = 1usize;
-          loop {
-            let event = reader.read_event()?;
-            match &event {
-              Event::Start(_) => {
-                depth += 1;
+      Event::Start(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
+        let namespaces = namespaces_from_context_with(context, &e)?;
+        loop {
+          match reader.read_event()? {
+            Event::Start(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
+              let choice_namespaces = namespaces_with(&namespaces, &e)?;
+              let requires = attr_value(&reader, &e, b"Requires")?;
+              let children = read_mce_container_children(&mut reader, MC_CHOICE_NAMES)?;
+              if choice_requires_supported(
+                requires.as_deref(),
+                &choice_namespaces,
+                settings.target_file_format_version,
+              )? {
+                return Ok(Some(children));
               }
-              Event::End(_) => {
-                depth -= 1;
+            }
+            Event::Empty(e) if qname_in(e.name().as_ref(), MC_CHOICE_NAMES) => {
+              let choice_namespaces = namespaces_with(&namespaces, &e)?;
+              let requires = attr_value(&reader, &e, b"Requires")?;
+              if choice_requires_supported(
+                requires.as_deref(),
+                &choice_namespaces,
+                settings.target_file_format_version,
+              )? {
+                return Ok(Some(Vec::new()));
               }
-              Event::Eof => return Err(unexpected_eof("xml_fragment_find_start_qname_outer_xml")),
-              _ => {}
             }
-
-            writer.write_event(event)?;
-
-            if depth == 0 {
-              break;
+            Event::Start(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
+              fallback = Some(read_mce_container_children(&mut reader, MC_FALLBACK_NAMES)?);
             }
+            Event::Empty(e) if qname_in(e.name().as_ref(), MC_FALLBACK_NAMES) => {
+              fallback = Some(Vec::new());
+            }
+            Event::Start(_) => {
+              skip_element(&mut reader)?;
+            }
+            Event::End(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
+              return Ok(Some(fallback.unwrap_or_default()));
+            }
+            Event::Eof => return Err(unexpected_eof("mce AlternateContent")),
+            _ => {}
           }
-
-          return Ok(Some(writer.into_inner().into_inner()));
         }
       }
-      Event::Empty(e) => {
-        let name = e.name();
-        let name = name.as_ref();
-        if matches(name) {
-          let mut writer = Writer::new(Cursor::new(Vec::new()));
-          writer.write_event(Event::Empty(e))?;
-          return Ok(Some(writer.into_inner().into_inner()));
-        }
+      Event::Empty(e) if qname_in(e.name().as_ref(), MC_ALTERNATE_CONTENT_NAMES) => {
+        return Ok(Some(Vec::new()));
       }
+      Event::Start(e) => return mce_unknown_element_replacement(&mut reader, e, context, false),
+      Event::Empty(e) => return mce_unknown_element_replacement(&mut reader, e, context, true),
       Event::Eof => return Ok(None),
       _ => {}
     }
   }
+}
+
+#[cfg(feature = "mce")]
+fn mce_unknown_element_replacement(
+  reader: &mut Reader<&[u8]>,
+  start: quick_xml::events::BytesStart<'_>,
+  context: &crate::sdk::MceContext,
+  empty_tag: bool,
+) -> Result<Option<Vec<String>>, SdkError> {
+  let qname = String::from_utf8_lossy(start.name().as_ref()).into_owned();
+  let namespaces = namespaces_from_context_with(context, &start)?;
+  let ignorable_namespace = qname.split_once(':').and_then(|(prefix, _)| {
+    namespaces
+      .iter()
+      .rev()
+      .find_map(|(candidate, ns)| (candidate == prefix).then_some(ns.as_str()))
+      .filter(|ns| context.is_ignorable_namespace(ns))
+  });
+
+  if ignorable_namespace.is_some() && context.is_process_content_qname(qname.as_str()) {
+    if empty_tag {
+      return Ok(Some(Vec::new()));
+    }
+    let end_name = start.name().as_ref().to_vec();
+    return read_mce_container_children(reader, &[end_name.as_slice()]).map(Some);
+  }
+
+  if ignorable_namespace.is_some() {
+    if !empty_tag {
+      skip_element(reader)?;
+    }
+    return Ok(Some(Vec::new()));
+  }
+
+  if !qname.contains(':') {
+    if !empty_tag {
+      skip_element(reader)?;
+    }
+    return Ok(None);
+  }
+
+  if !empty_tag {
+    skip_element(reader)?;
+  }
+  Ok(None)
+}
+
+#[cfg(feature = "mce")]
+fn read_mce_container_children(
+  reader: &mut Reader<&[u8]>,
+  end_names: &[&[u8]],
+) -> Result<Vec<String>, SdkError> {
+  let mut children = Vec::new();
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) => {
+        children.push(read_outer_xml_from_str_reader(reader, e, false)?);
+      }
+      Event::Empty(e) => {
+        children.push(read_outer_xml_from_str_reader(reader, e, true)?);
+      }
+      Event::End(e) if qname_in(e.name().as_ref(), end_names) => return Ok(children),
+      Event::Eof => return Err(unexpected_eof("mce choice/fallback")),
+      _ => {}
+    }
+  }
+}
+
+#[cfg(feature = "mce")]
+fn read_outer_xml_from_str_reader(
+  reader: &mut Reader<&[u8]>,
+  start: quick_xml::events::BytesStart<'_>,
+  empty_tag: bool,
+) -> Result<String, SdkError> {
+  let mut writer = Writer::new(Cursor::new(Vec::new()));
+  if empty_tag {
+    writer.write_event(Event::Empty(start))?;
+    return String::from_utf8(writer.into_inner().into_inner())
+      .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")));
+  }
+
+  writer.write_event(Event::Start(start))?;
+  let mut depth = 1usize;
+  loop {
+    let event = reader.read_event()?;
+    match &event {
+      Event::Start(_) => depth += 1,
+      Event::End(_) => depth -= 1,
+      Event::Eof => return Err(unexpected_eof("mce selected child")),
+      _ => {}
+    }
+    writer.write_event(event)?;
+    if depth == 0 {
+      break;
+    }
+  }
+
+  String::from_utf8(writer.into_inner().into_inner())
+    .map_err(|err| SdkError::CommonError(format!("invalid utf-8 xml fragment: {err}")))
+}
+
+#[cfg(feature = "mce")]
+fn skip_element(reader: &mut Reader<&[u8]>) -> Result<(), SdkError> {
+  let mut depth = 1usize;
+  loop {
+    match reader.read_event()? {
+      Event::Start(_) => depth += 1,
+      Event::End(_) => {
+        depth -= 1;
+        if depth == 0 {
+          return Ok(());
+        }
+      }
+      Event::Eof => return Err(unexpected_eof("mce skipped element")),
+      _ => {}
+    }
+  }
+}
+
+#[cfg(feature = "mce")]
+fn attr_value(
+  reader: &Reader<&[u8]>,
+  start: &quick_xml::events::BytesStart<'_>,
+  name: &[u8],
+) -> Result<Option<String>, SdkError> {
+  for attr in start.attributes() {
+    let attr = attr?;
+    if attr.key.as_ref() == name {
+      return Ok(Some(decode_attr_value(&attr, reader.decoder())?));
+    }
+  }
+  Ok(None)
+}
+
+#[cfg(feature = "mce")]
+fn choice_requires_supported(
+  requires: Option<&str>,
+  namespaces: &[(String, String)],
+  target: crate::sdk::FileFormatVersion,
+) -> Result<bool, SdkError> {
+  let Some(requires) = requires else {
+    return Ok(false);
+  };
+  for prefix in requires.split_whitespace() {
+    let Some((_, ns)) = namespaces
+      .iter()
+      .rev()
+      .find(|(candidate, _)| candidate == prefix)
+    else {
+      return Ok(false);
+    };
+    if !namespace_supported(ns, target) {
+      return Ok(false);
+    }
+  }
+  Ok(true)
+}
+
+#[cfg(feature = "mce")]
+fn namespaces_with(
+  namespaces: &[(String, String)],
+  start: &quick_xml::events::BytesStart<'_>,
+) -> Result<Vec<(String, String)>, SdkError> {
+  let mut merged = namespaces.to_vec();
+  merged.extend(namespace_decls(start)?);
+  Ok(merged)
+}
+
+#[cfg(feature = "mce")]
+fn namespaces_from_context_with(
+  context: &crate::sdk::MceContext,
+  start: &quick_xml::events::BytesStart<'_>,
+) -> Result<Vec<(String, String)>, SdkError> {
+  let mut namespaces = context.namespaces().to_vec();
+  namespaces.extend(namespace_decls(start)?);
+  Ok(namespaces)
+}
+
+#[cfg(feature = "mce")]
+fn namespace_decls(
+  start: &quick_xml::events::BytesStart<'_>,
+) -> Result<Vec<(String, String)>, SdkError> {
+  let mut namespaces = Vec::new();
+  for attr in start.attributes() {
+    let attr = attr?;
+    let key = attr.key.as_ref();
+    if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+      namespaces.push((
+        String::from_utf8_lossy(prefix).into_owned(),
+        String::from_utf8_lossy(attr.value.as_ref()).into_owned(),
+      ));
+    }
+  }
+  Ok(namespaces)
+}
+
+#[cfg(feature = "mce")]
+fn namespace_supported(ns: &str, target: crate::sdk::FileFormatVersion) -> bool {
+  namespace_minimum_version(ns)
+    .is_some_and(|version| file_format_rank(version) <= file_format_rank(target))
+}
+
+#[cfg(feature = "mce")]
+fn namespace_minimum_version(ns: &str) -> Option<crate::sdk::FileFormatVersion> {
+  use crate::sdk::FileFormatVersion;
+  if ns.contains("openxmlformats.org") || ns.contains("/2006/") || ns.contains(":office:") {
+    Some(FileFormatVersion::Office2007)
+  } else if ns.contains("/2010/") || ns.contains("14") {
+    Some(FileFormatVersion::Office2010)
+  } else if ns.contains("/2012/") || ns.contains("15") {
+    Some(FileFormatVersion::Office2013)
+  } else if ns.contains("/2016/") || ns.contains("16") {
+    Some(FileFormatVersion::Office2016)
+  } else if ns.contains("/2019/") {
+    Some(FileFormatVersion::Office2019)
+  } else if ns.contains("/2021/") {
+    Some(FileFormatVersion::Office2021)
+  } else if ns.contains("/2022/")
+    || ns.contains("/2023/")
+    || ns.contains("/2024/")
+    || ns.contains("/2025/")
+  {
+    Some(FileFormatVersion::Microsoft365)
+  } else {
+    None
+  }
+}
+
+#[cfg(feature = "mce")]
+fn file_format_rank(version: crate::sdk::FileFormatVersion) -> u8 {
+  match version {
+    crate::sdk::FileFormatVersion::Office2007 => 0,
+    crate::sdk::FileFormatVersion::Office2010 => 1,
+    crate::sdk::FileFormatVersion::Office2013 => 2,
+    crate::sdk::FileFormatVersion::Office2016 => 3,
+    crate::sdk::FileFormatVersion::Office2019 => 4,
+    crate::sdk::FileFormatVersion::Office2021 => 5,
+    crate::sdk::FileFormatVersion::Microsoft365 => 6,
+  }
+}
+
+#[cfg(feature = "mce")]
+fn qname_in(name: &[u8], expected: &[&[u8]]) -> bool {
+  expected.contains(&name)
 }
 
 #[inline(always)]

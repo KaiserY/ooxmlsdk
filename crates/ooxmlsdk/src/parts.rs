@@ -3948,12 +3948,17 @@ macro_rules! define_part_root_element {
         .as_mut()), _ => None, } })* pub fn to_xml_bytes(& self) -> Result < Vec < u8 >,
         crate ::common::SdkError > { match self { $($(#[$attrs])* Self:: $variant (root)
         => Ok(root.to_xml_bytes() ?),)* } } pub (crate) fn from_part_id(storage : & crate
-        ::common::SdkPackageStorage, part_id : crate ::common::PartId,) -> Result <
-        Option < Self >, crate ::common::SdkError > { let Some(part) = storage
-        .part(part_id) else { return Ok(None); }; $($(#[$attrs])* if !
+        ::common::SdkPackageStorage, part_id : crate ::common::PartId, open_settings : &
+        crate ::sdk::OpenSettings,) -> Result < Option < Self >, crate ::common::SdkError
+        > { let Some(part) = storage.part(part_id) else { return Ok(None); };
+        #[cfg(not(feature = "mce"))] let _ = open_settings; $($(#[$attrs])* if !
         matches!($content_type, "" | "application/xml" | "text/xml") && part
-        .content_type() == $content_type { return < $root_ty > ::from_bytes(part.data()
-        .bytes()).map(Box::new).map(Self:: $variant).map(Some); })* Ok(None) } }
+        .content_type() == $content_type { #[cfg(feature = "mce")] let mut root = <
+        $root_ty > ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
+        ::sdk::SdkMce::process_mce(& mut root, & open_settings
+        .markup_compatibility_process_settings,) ?; #[cfg(not(feature = "mce"))] let root
+        = < $root_ty > ::from_bytes(part.data().bytes()) ?; return Ok(Some(Self::
+        $variant (Box::new(root)))); })* Ok(None) } }
     };
 }
 define_part_root_element! {
@@ -4333,7 +4338,9 @@ pub(crate) fn initialize_root_elements(
   ) {
     for (index, slot) in root_elements.iter_mut().enumerate() {
       let part_id = crate::common::PartId::from_index(index);
-      if let Some(root_element) = crate::parts::PartRootElement::from_part_id(storage, part_id)? {
+      if let Some(root_element) =
+        crate::parts::PartRootElement::from_part_id(storage, part_id, open_settings)?
+      {
         *slot = Some(root_element);
       }
     }
@@ -4360,6 +4367,7 @@ where
     let root_element = crate::parts::PartRootElement::from_part_id(
       crate::sdk::SdkPackageInternal::storage(package),
       part_id,
+      crate::sdk::SdkPackageInternal::open_settings(package),
     )?;
     if let Some(root_element) = root_element
       && let Some(slot) = crate::sdk::SdkPackageInternal::root_element_slot_mut(package, part_id)

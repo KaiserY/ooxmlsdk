@@ -104,6 +104,34 @@ fn empty_package() -> Cursor<Vec<u8>> {
   buffer
 }
 
+#[cfg(feature = "mce")]
+fn minimal_wordprocessing_package(document_xml: &str) -> Cursor<Vec<u8>> {
+  let mut buffer = Cursor::new(Vec::new());
+  {
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file("[Content_Types].xml", options).unwrap();
+    zip
+      .write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+      )
+      .unwrap();
+    zip.start_file("_rels/.rels", options).unwrap();
+    zip
+      .write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+      )
+      .unwrap();
+    zip.start_file("word/document.xml", options).unwrap();
+    zip.write_all(document_xml.as_bytes()).unwrap();
+    zip.finish().unwrap();
+  }
+  buffer.set_position(0);
+  buffer
+}
+
 fn media_data_part_by_id<P: SdkPackage>(package: &P, part_id: PartId) -> MediaDataPart {
   package
     .media_data_parts()
@@ -284,6 +312,82 @@ fn process_all_parts_forces_lazy_package_roots_to_load_on_open() {
 
   assert_eq!(package.open_settings(), &settings);
   assert!(main_part.is_root_element_loaded(&package));
+}
+
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   Bug718314
+  //   Bug718316
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w13="http://example.com/w13" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:body><mc:AlternateContent/><mc:AlternateContent><mc:Choice Requires="w13"/></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="w13"><w:p><w:r><w:t>choice1</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w14"><w:p><w:r><w:t>choice2</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2010,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  assert!(main_part.is_root_element_loaded(&package));
+  let root = main_part.root_element(&mut package).unwrap();
+  let body = root.body.as_ref().unwrap();
+
+  assert!(body.body_choice.iter().all(
+    |choice| !matches!(choice, BodyChoice::XmlOther(xml) if xml.contains("AlternateContent"))
+  ));
+  assert_eq!(
+    body
+      .body_choice
+      .iter()
+      .filter(|choice| matches!(choice, BodyChoice::WP(_)))
+      .count(),
+    2
+  );
+  let serialized = root.to_xml().unwrap();
+  assert!(!serialized.contains("<mc:AlternateContent"));
+  assert!(serialized.contains("<w:t>choice2</w:t>"));
+  assert!(serialized.contains("<w:t>after</w:t>"));
+}
+
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_uses_process_content_for_ignorable_wrapper() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadProcessContent
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14" mc:ProcessContent="w14:paraWrap"><w:body><w14:paraWrap><w:p><w:r><w:t>wrapped</w:t></w:r></w:p></w14:paraWrap><w14:discarded><w:p><w:r><w:t>discarded</w:t></w:r></w:p></w14:discarded></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2007,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+  let body = root.body.as_ref().unwrap();
+
+  assert_eq!(
+    body
+      .body_choice
+      .iter()
+      .filter(|choice| matches!(choice, BodyChoice::WP(_)))
+      .count(),
+    1
+  );
+  let serialized = root.to_xml().unwrap();
+  assert!(serialized.contains("<w:t>wrapped</w:t>"));
+  assert!(!serialized.contains("<w14:paraWrap"));
+  assert!(!serialized.contains("<w14:discarded"));
+  assert!(!serialized.contains("<w:t>discarded</w:t>"));
 }
 
 #[test]

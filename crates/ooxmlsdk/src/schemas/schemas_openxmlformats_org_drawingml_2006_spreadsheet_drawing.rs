@@ -22,7 +22,7 @@ pub struct TwoCellAnchor {
   pub xml_other_children: Vec<(usize, String)>,
   /// Positioning and Resizing Behaviors
   #[sdk(attr(qname = ":editAs"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub edit_as: Option<EditAsValues>,
   /// Starting Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
@@ -219,7 +219,7 @@ pub struct ContentPart {
     pub relationship_id: crate::simple_type::StringValue,
     /// bwMode
     #[sdk(attr(office2010, qname = ":bwMode"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub black_white_mode: Option<
         crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues,
     >,
@@ -285,7 +285,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -512,23 +512,11 @@ pub struct ClientData {
 pub struct Extent {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Position.
@@ -537,23 +525,11 @@ pub struct Extent {
 pub struct Position {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Non-Visual Drawing Properties.
@@ -709,7 +685,7 @@ pub struct NonVisualGroupShapeProperties {
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects

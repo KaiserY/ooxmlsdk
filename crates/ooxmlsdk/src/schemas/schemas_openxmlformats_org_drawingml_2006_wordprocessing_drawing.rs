@@ -90,7 +90,7 @@ pub enum VerticalRelativePositionValues {
 pub struct WrapSquare {
   /// Text Wrapping Location
   #[sdk(attr(qname = ":wrapText"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap_text: WrapTextValues,
   /// Distance From Text (Top)
   #[sdk(attr(qname = ":distT"))]
@@ -114,7 +114,7 @@ pub struct WrapSquare {
 pub struct WrapTight {
   /// Text Wrapping Location
   #[sdk(attr(qname = ":wrapText"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap_text: WrapTextValues,
   /// Distance From Test on Left Edge
   #[sdk(attr(qname = ":distL"))]
@@ -132,7 +132,7 @@ pub struct WrapTight {
 pub struct WrapThrough {
   /// Text Wrapping Location
   #[sdk(attr(qname = ":wrapText"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap_text: WrapTextValues,
   /// Distance From Text on Left Edge
   #[sdk(attr(qname = ":distL"))]
@@ -299,23 +299,11 @@ pub struct Anchor {
 pub struct StartPoint {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Wrapping Polygon Line End Position.
@@ -324,23 +312,11 @@ pub struct StartPoint {
 pub struct LineTo {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Simple Positioning Coordinates.
@@ -349,23 +325,11 @@ pub struct LineTo {
 pub struct SimplePosition {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Object Extents Including Effects.
@@ -374,43 +338,19 @@ pub struct SimplePosition {
 pub struct EffectExtent {
   /// Additional Extent on Left Edge
   #[sdk(attr(qname = ":l"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub left_edge: crate::simple_type::Int64Value,
   /// Additional Extent on Top Edge
   #[sdk(attr(qname = ":t"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub top_edge: crate::simple_type::Int64Value,
   /// Additional Extent on Right Edge
   #[sdk(attr(qname = ":r"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub right_edge: crate::simple_type::Int64Value,
   /// Additional Extent on Bottom Edge
   #[sdk(attr(qname = ":b"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub bottom_edge: crate::simple_type::Int64Value,
 }
 /// Tight Wrapping Extents Polygon.
@@ -435,7 +375,7 @@ pub struct HorizontalPosition {
   pub xml_other_children: Vec<(usize, String)>,
   /// Horizontal Position Relative Base
   #[sdk(attr(qname = ":relativeFrom"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub relative_from: HorizontalRelativePositionValues,
   #[sdk(choice(
     qname = "wp:ST_AlignH/wp:align",
@@ -452,7 +392,7 @@ pub struct VerticalPosition {
   pub xml_other_children: Vec<(usize, String)>,
   /// Vertical Position Relative Base
   #[sdk(attr(qname = ":relativeFrom"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub relative_from: VerticalRelativePositionValues,
   #[sdk(choice(
     qname = "wp:ST_AlignV/wp:align",
@@ -467,23 +407,11 @@ pub struct VerticalPosition {
 pub struct Extent {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Drawing Object Non-Visual Properties.

@@ -728,11 +728,11 @@ pub struct FormControlProperties {
   pub xml_other_attrs: Vec<(String, String)>,
   /// objectType
   #[sdk(attr(office2010, qname = ":objectType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub object_type: Option<ObjectTypeValues>,
   /// checked
   #[sdk(attr(office2010, qname = ":checked"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub checked: Option<CheckedValues>,
   /// colored
   #[sdk(attr(office2010, qname = ":colored"))]
@@ -742,7 +742,7 @@ pub struct FormControlProperties {
   pub drop_lines: Option<crate::simple_type::UInt32Value>,
   /// dropStyle
   #[sdk(attr(office2010, qname = ":dropStyle"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub drop_style: Option<DropStyleValues>,
   /// dx
   #[sdk(attr(office2010, qname = ":dx"))]
@@ -797,7 +797,7 @@ pub struct FormControlProperties {
   pub selected: Option<crate::simple_type::UInt32Value>,
   /// seltype
   #[sdk(attr(office2010, qname = ":seltype"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub selection_type: Option<SelectionTypeValues>,
   /// textHAlign
   #[sdk(attr(office2010, qname = ":textHAlign"))]
@@ -813,7 +813,7 @@ pub struct FormControlProperties {
   pub minimum_width: Option<crate::simple_type::UInt32Value>,
   /// editVal
   #[sdk(attr(office2010, qname = ":editVal"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub edit_val: Option<EditValidationValues>,
   /// multiLine
   #[sdk(attr(office2010, qname = ":multiLine"))]
@@ -944,11 +944,10 @@ pub struct ConditionalFormattingRule {
     #[sdk(attr(office2010, qname = ":id"))]
     #[sdk(
         pattern(
-            source = 0u32,
             regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
         )
     )]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub id: Option<crate::simple_type::StringValue>,
     /// Defines the Formula Class.
     #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
@@ -1150,7 +1149,7 @@ pub struct SeriesColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1171,7 +1170,7 @@ pub struct NegativeColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1192,7 +1191,7 @@ pub struct AxisColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1213,7 +1212,7 @@ pub struct MarkersColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1234,7 +1233,7 @@ pub struct FirstMarkerColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1255,7 +1254,7 @@ pub struct LastMarkerColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1276,7 +1275,7 @@ pub struct HighMarkerColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1297,7 +1296,7 @@ pub struct LowMarkerColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1318,7 +1317,7 @@ pub struct Color {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1339,7 +1338,7 @@ pub struct FillColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1360,7 +1359,7 @@ pub struct BorderColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1381,7 +1380,7 @@ pub struct NegativeFillColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1402,7 +1401,7 @@ pub struct NegativeBorderColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1423,7 +1422,7 @@ pub struct BarAxisColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -1944,11 +1943,8 @@ pub struct ConditionalFormat {
   pub priority: Option<crate::simple_type::UInt32Value>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the PivotAreas Class.
   #[sdk(child(office2010, qname = "x:CT_PivotAreas/x14:pivotAreas"))]
@@ -2035,7 +2031,7 @@ pub struct IgnoredError {
 pub struct ProtectedRange {
   /// password
   #[sdk(attr(office2010, qname = ":password"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub password: Option<crate::simple_type::HexBinaryValue>,
   /// algorithmName
   #[sdk(attr(office2010, qname = ":algorithmName"))]

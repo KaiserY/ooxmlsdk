@@ -25,7 +25,7 @@ pub struct ClassificationExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   #[sdk(attr(office2021, qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -52,10 +52,9 @@ pub struct ClassificationLabel {
   /// siteId
   #[sdk(attr(office2021, qname = ":siteId"))]
   #[sdk(pattern(
-    source = 1u32,
     regex = "\\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\}"
   ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub site_id: crate::simple_type::StringValue,
   /// actionId
   #[sdk(attr(office2021, qname = ":actionId"))]

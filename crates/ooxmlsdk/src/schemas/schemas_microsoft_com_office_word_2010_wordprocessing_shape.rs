@@ -137,7 +137,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -249,24 +249,24 @@ pub struct TextBodyProperties {
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,
   /// Text Vertical Overflow
   #[sdk(attr(qname = ":vertOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalOverflowValues,
   >,
   /// Text Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextHorizontalOverflowValues,
   >,
   /// Vertical Text
   #[sdk(attr(qname = ":vert"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalValues>,
   /// Text Wrapping Type
   #[sdk(attr(qname = ":wrap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextWrappingValues>,
   /// Left Inset
@@ -283,17 +283,11 @@ pub struct TextBodyProperties {
   pub bottom_inset: Option<crate::simple_type::Int32Value>,
   /// Number of Columns
   #[sdk(attr(qname = ":numCol"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "16",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 16))]
   pub column_count: Option<crate::simple_type::Int32Value>,
   /// Space Between Columns
   #[sdk(attr(qname = ":spcCol"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub column_spacing: Option<crate::simple_type::Int32Value>,
   /// Columns Right-To-Left
   #[sdk(attr(qname = ":rtlCol"))]
@@ -303,7 +297,7 @@ pub struct TextBodyProperties {
   pub from_word_art: Option<crate::simple_type::BooleanValue>,
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub anchor:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues>,
   /// Anchor Center

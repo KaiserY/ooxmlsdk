@@ -1140,7 +1140,7 @@ pub struct StyleDefinitionHeaderList {
 pub struct ColorTransformCategory {
   /// Category Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
   #[sdk(attr(qname = ":pri"))]
@@ -1153,11 +1153,11 @@ pub struct FillColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1178,11 +1178,11 @@ pub struct LineColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1203,11 +1203,11 @@ pub struct EffectColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1228,11 +1228,11 @@ pub struct TextLineColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1253,11 +1253,11 @@ pub struct TextFillColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1278,11 +1278,11 @@ pub struct TextEffectColorList {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub method: Option<ColorApplicationMethodValues>,
   /// Hue Direction
   #[sdk(attr(qname = ":hueDir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hue_direction: Option<HueDirectionValues>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -1379,7 +1379,7 @@ pub struct Point {
   pub model_id: crate::simple_type::StringValue,
   /// Point Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<PointValues>,
   /// Connection Identifier
   #[sdk(attr(qname = ":cxnId"))]
@@ -1418,7 +1418,7 @@ pub struct Connection {
   pub model_id: crate::simple_type::StringValue,
   /// Point Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<ConnectionValues>,
   /// Source Identifier
   #[sdk(attr(qname = ":srcId"))]
@@ -1475,37 +1475,37 @@ pub struct Connection {
 pub struct Constraint {
   /// Constraint Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: ConstraintValues,
   /// For
   #[sdk(attr(qname = ":for"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#for: Option<ConstraintRelationshipValues>,
   /// For Name
   #[sdk(attr(qname = ":forName"))]
   pub for_name: Option<crate::simple_type::StringValue>,
   /// Data Point Type
   #[sdk(attr(qname = ":ptType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub point_type: Option<ElementValues>,
   /// Reference Type
   #[sdk(attr(qname = ":refType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub reference_type: Option<ConstraintValues>,
   /// Reference For
   #[sdk(attr(qname = ":refFor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub reference_for: Option<ConstraintRelationshipValues>,
   /// Reference For Name
   #[sdk(attr(qname = ":refForName"))]
   pub reference_for_name: Option<crate::simple_type::StringValue>,
   /// Reference Point Type
   #[sdk(attr(qname = ":refPtType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub reference_point_type: Option<ElementValues>,
   /// Operator
   #[sdk(attr(qname = ":op"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub operator: Option<BoolOperatorValues>,
   /// Value
   #[sdk(attr(qname = ":val"))]
@@ -1523,18 +1523,18 @@ pub struct Constraint {
 pub struct Rule {
   /// Constraint Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: ConstraintValues,
   /// For
   #[sdk(attr(qname = ":for"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#for: Option<ConstraintRelationshipValues>,
   /// For Name
   #[sdk(attr(qname = ":forName"))]
   pub for_name: Option<crate::simple_type::StringValue>,
   /// Data Point Type
   #[sdk(attr(qname = ":ptType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub point_type: Option<ElementValues>,
   /// Value
   #[sdk(attr(qname = ":val"))]
@@ -1555,7 +1555,7 @@ pub struct Rule {
 pub struct Adjust {
   /// Adjust Handle Index
   #[sdk(attr(qname = ":idx"))]
-  #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 1..))]
   pub index: crate::simple_type::UInt32Value,
   /// Value
   #[sdk(attr(qname = ":val"))]
@@ -1575,7 +1575,7 @@ pub struct AdjustList {
 pub struct Parameter {
   /// Parameter Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: ParameterIdValues,
   /// Value
   #[sdk(attr(qname = ":val"))]
@@ -1704,7 +1704,7 @@ pub struct Parameter {
 pub struct Algorithm {
   /// Algorithm Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: AlgorithmValues,
   /// Revision Number
   #[sdk(attr(qname = ":rev"))]
@@ -2102,7 +2102,7 @@ pub struct LayoutNode {
   pub style_label: Option<crate::simple_type::StringValue>,
   /// Child Order
   #[sdk(attr(qname = ":chOrder"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub child_order: Option<ChildOrderValues>,
   /// Move With
   #[sdk(attr(qname = ":moveWith"))]
@@ -2162,13 +2162,12 @@ pub struct DiagramChooseIf {
   pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
   /// Function
   #[sdk(attr(qname = ":func"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub function: FunctionValues,
   /// Argument
   #[sdk(attr(qname = ":arg"))]
   #[sdk(
         string_set(
-            source = 0u32,
             values = &["none",
             "orgChart",
             "chMax",
@@ -2184,7 +2183,7 @@ pub struct DiagramChooseIf {
   pub argument: Option<crate::simple_type::StringValue>,
   /// Operator
   #[sdk(attr(qname = ":op"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub operator: FunctionOperatorValues,
   /// Value
   #[sdk(attr(qname = ":val"))]
@@ -2265,7 +2264,7 @@ pub struct DataModel {
 pub struct Category {
   /// Category Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
   #[sdk(attr(qname = ":pri"))]
@@ -2337,7 +2336,7 @@ pub struct OrganizationChart {
 pub struct MaxNumberOfChildren {
   /// Maximum Children Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 0u32, min = "-1", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = -1..))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
 /// Preferred Number of Children.
@@ -2346,7 +2345,7 @@ pub struct MaxNumberOfChildren {
 pub struct PreferredNumberOfChildren {
   /// Preferred Number of CHildren Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 0u32, min = "-1", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = -1..))]
   pub val: Option<crate::simple_type::Int32Value>,
 }
 /// Show Insert Bullet.
@@ -2363,7 +2362,7 @@ pub struct BulletEnabled {
 pub struct Direction {
   /// Diagram Direction Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<DirectionValues>,
 }
 /// Organization Chart Branch Style.
@@ -2372,7 +2371,7 @@ pub struct Direction {
 pub struct HierarchyBranch {
   /// Organization Chart Branch Style Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<HierarchyBranchStyleValues>,
 }
 /// One by One Animation String.
@@ -2381,7 +2380,7 @@ pub struct HierarchyBranch {
 pub struct AnimateOneByOne {
   /// One By One Animation Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<AnimateOneByOneValues>,
 }
 /// Level Animation.
@@ -2390,7 +2389,7 @@ pub struct AnimateOneByOne {
 pub struct AnimationLevel {
   /// Level Animation Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<AnimationLevelStringValues>,
 }
 /// Shape Resize Style.
@@ -2399,7 +2398,7 @@ pub struct AnimationLevel {
 pub struct ResizeHandles {
   /// Shape Resize Style Type
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<ResizeHandlesStringValues>,
 }
 /// Category.
@@ -2408,7 +2407,7 @@ pub struct ResizeHandles {
 pub struct StyleDisplayCategory {
   /// Category Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub r#type: crate::simple_type::StringValue,
   /// Priority
   #[sdk(attr(qname = ":pri"))]
@@ -2442,37 +2441,19 @@ pub struct Scene3D {
 pub struct Shape3D {
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: Option<crate::simple_type::Int64Value>,
   /// Extrusion Height
   #[sdk(attr(qname = ":extrusionH"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// Contour Width
   #[sdk(attr(qname = ":contourW"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// Preset Material Type
   #[sdk(attr(qname = ":prstMaterial"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset_material: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetMaterialTypeValues,
   >,
@@ -2726,7 +2707,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -2811,7 +2792,7 @@ pub struct DiagramDefinitionExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "dgm1611:CT_NumberDiagramInfoList/dgm1611:autoBuNodeInfoLst",

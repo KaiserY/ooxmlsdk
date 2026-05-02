@@ -261,7 +261,6 @@ pub struct VtvStreamData {
   /// VSTREAM Version Attribute
   #[sdk(attr(qname = ":version"))]
   #[sdk(pattern(
-    source = 1u32,
     regex = "\\s*\\{[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\\}\\s*"
   ))]
   pub version: crate::simple_type::StringValue,
@@ -276,7 +275,7 @@ pub type VtClassId = crate::simple_type::StringValue;
 pub struct VtClipboardData {
   /// Format Attribute
   #[sdk(attr(qname = ":format"))]
-  #[sdk(number_range(source = 0u32, min = "-3", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = -3..))]
   pub format: Option<crate::simple_type::Int32Value>,
   /// size
   #[sdk(attr(qname = ":size"))]

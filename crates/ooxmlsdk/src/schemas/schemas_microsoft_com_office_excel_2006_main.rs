@@ -161,12 +161,7 @@ pub struct RowSortMap {
   pub r#ref: crate::simple_type::StringValue,
   /// Count
   #[sdk(attr(qname = ":count"))]
-  #[sdk(number_range(
-    source = 0u32,
-    max = "536870910",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 536870910, min_inclusive = false))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Row.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:row"))]
@@ -181,12 +176,7 @@ pub struct ColumnSortMap {
   pub r#ref: crate::simple_type::StringValue,
   /// Count
   #[sdk(attr(qname = ":count"))]
-  #[sdk(number_range(
-    source = 0u32,
-    max = "536870910",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 536870910, min_inclusive = false))]
   pub count: Option<crate::simple_type::UInt32Value>,
   /// Column.
   #[sdk(child(qname = "xne:CT_SortMapItem/xne:col"))]

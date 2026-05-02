@@ -41,11 +41,8 @@ pub struct Person {
   pub display_name: crate::simple_type::StringValue,
   /// id
   #[sdk(attr(office2019, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// userId
   #[sdk(attr(office2019, qname = ":userId"))]
@@ -78,27 +75,18 @@ pub struct ThreadedComment {
   pub d_t: Option<crate::simple_type::DateTimeValue>,
   /// personId
   #[sdk(attr(office2019, qname = ":personId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub person_id: crate::simple_type::StringValue,
   /// id
   #[sdk(attr(office2019, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// parentId
   #[sdk(attr(office2019, qname = ":parentId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub parent_id: Option<crate::simple_type::StringValue>,
   /// done
   #[sdk(attr(office2019, qname = ":done"))]
@@ -129,19 +117,13 @@ pub struct ThreadedCommentMentions {
 pub struct Mention {
   /// mentionpersonId
   #[sdk(attr(office2019, qname = ":mentionpersonId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub mentionperson_id: crate::simple_type::StringValue,
   /// mentionId
   #[sdk(attr(office2019, qname = ":mentionId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub mention_id: crate::simple_type::StringValue,
   /// startIndex
   #[sdk(attr(office2019, qname = ":startIndex"))]

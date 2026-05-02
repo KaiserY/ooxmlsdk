@@ -381,7 +381,7 @@ pub struct NumberingFormat {
 pub struct ChartShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -1493,7 +1493,7 @@ pub struct Extension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Uniform Resource Identifier
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -1732,13 +1732,7 @@ pub struct ManualLayout {
 pub struct RotateX {
   /// X Rotation Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-90",
-    max = "90",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -90..= 90))]
   pub val: Option<crate::simple_type::SByteValue>,
 }
 /// Height Percent.
@@ -1747,13 +1741,7 @@ pub struct RotateX {
 pub struct HeightPercent {
   /// Height Percent Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "5",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 5..= 500))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Y Rotation.
@@ -1762,13 +1750,7 @@ pub struct HeightPercent {
 pub struct RotateY {
   /// Y Rotation Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "360",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 360))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Depth Percent.
@@ -1777,13 +1759,7 @@ pub struct RotateY {
 pub struct DepthPercent {
   /// Depth Percent Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "20",
-    max = "2000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 20..= 2000))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Perspective.
@@ -1792,13 +1768,7 @@ pub struct DepthPercent {
 pub struct Perspective {
   /// Perspective Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "240",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 240))]
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Symbol.
@@ -1815,13 +1785,7 @@ pub struct Symbol {
 pub struct Size {
   /// Marker Size Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "2",
-    max = "72",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 2..= 72))]
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Marker.
@@ -1876,13 +1840,7 @@ pub struct TrendlineType {
 pub struct PolynomialOrder {
   /// Order Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "2",
-    max = "6",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 2..= 6))]
   pub val: crate::simple_type::ByteValue,
 }
 /// Period.
@@ -1891,7 +1849,7 @@ pub struct PolynomialOrder {
 pub struct Period {
   /// Period Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "2", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 2..))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Trendline Label.
@@ -1982,13 +1940,7 @@ pub struct BubbleSize {
 pub struct GapWidth {
   /// Gap Size Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 500))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the GapDepth Class.
@@ -1997,13 +1949,7 @@ pub struct GapWidth {
 pub struct GapDepth {
   /// Gap Size Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 500))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Up Bars.
@@ -2052,13 +1998,7 @@ pub struct CustomSplit {
 pub struct SecondPieSize {
   /// Second Pie Size Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "5",
-    max = "200",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 5..= 200))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Band Format.
@@ -2086,7 +2026,7 @@ pub struct PictureFormat {
 pub struct PictureStackUnit {
   /// Picture Stack Unit
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Built in Display Unit Value.
@@ -2120,13 +2060,7 @@ pub struct DisplayUnitsLabel {
 pub struct LogBase {
   /// Logarithmic Base Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "2",
-    max = "1000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 2..= 1000))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Axis Orientation.
@@ -2272,7 +2206,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -3082,13 +3016,7 @@ pub struct DataTable {
 pub struct FirstSliceAngle {
   /// First Slice Angle Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "360",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 360))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Hole Size.
@@ -3097,13 +3025,7 @@ pub struct FirstSliceAngle {
 pub struct HoleSize {
   /// Hole Size Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "1",
-    max = "90",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 90))]
   pub val: crate::simple_type::ByteValue,
 }
 /// String Point.
@@ -3123,13 +3045,7 @@ pub struct StringPoint {
 pub struct Thickness {
   /// val
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Defines the StockChartExtension Class.
@@ -3141,7 +3057,7 @@ pub struct StockChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub stock_chart_extension_choice: Option<StockChartExtensionChoice>,
@@ -3155,7 +3071,7 @@ pub struct PieChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
   pub pie_chart_extension_choice: Option<PieChartExtensionChoice>,
@@ -3169,7 +3085,7 @@ pub struct Pie3DChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries", any))]
   pub pie3_d_chart_extension_choice: Option<Pie3DChartExtensionChoice>,
@@ -3183,7 +3099,7 @@ pub struct NumRefExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FullRef/c15:fullRef",
@@ -3202,7 +3118,7 @@ pub struct StrDataExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_Boolean/c15:autoCat", any))]
   pub str_data_extension_choice: Option<StrDataExtensionChoice>,
@@ -3216,7 +3132,7 @@ pub struct StrRefExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FullRef/c15:fullRef",
@@ -3235,7 +3151,7 @@ pub struct MultiLvlStrRefExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FullRef/c15:fullRef",
@@ -3254,7 +3170,7 @@ pub struct DLblsExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c:CT_Tx/c15:tx",
@@ -3277,7 +3193,7 @@ pub struct LineChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub line_chart_extension_choice: Option<LineChartExtensionChoice>,
@@ -3291,7 +3207,7 @@ pub struct Line3DChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries", any))]
   pub line3_d_chart_extension_choice: Option<Line3DChartExtensionChoice>,
@@ -3305,7 +3221,7 @@ pub struct ScatterChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredScatterSer/c15:filteredScatterSeries", any))]
   pub scatter_chart_extension_choice: Option<ScatterChartExtensionChoice>,
@@ -3319,7 +3235,7 @@ pub struct RadarChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries", any))]
   pub radar_chart_extension_choice: Option<RadarChartExtensionChoice>,
@@ -3333,7 +3249,7 @@ pub struct BarChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
   pub bar_chart_extension_choice: Option<BarChartExtensionChoice>,
@@ -3347,7 +3263,7 @@ pub struct Bar3DChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries", any))]
   pub bar3_d_chart_extension_choice: Option<Bar3DChartExtensionChoice>,
@@ -3361,7 +3277,7 @@ pub struct AreaChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
   pub area_chart_extension_choice: Option<AreaChartExtensionChoice>,
@@ -3375,7 +3291,7 @@ pub struct Area3DChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries", any))]
   pub area3_d_chart_extension_choice: Option<Area3DChartExtensionChoice>,
@@ -3389,7 +3305,7 @@ pub struct BubbleChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredBubbleSer/c15:filteredBubbleSeries", any))]
   pub bubble_chart_extension_choice: Option<BubbleChartExtensionChoice>,
@@ -3403,7 +3319,7 @@ pub struct SurfaceChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
   pub surface_chart_extension_choice: Option<SurfaceChartExtensionChoice>,
@@ -3417,7 +3333,7 @@ pub struct Surface3DChartExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c15:CT_FilteredSurfaceSer/c15:filteredSurfaceSeries", any))]
   pub surface3_d_chart_extension_choice: Option<Surface3DChartExtensionChoice>,
@@ -3431,7 +3347,7 @@ pub struct CatAxExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub cat_ax_extension_choice: Option<CatAxExtensionChoice>,
@@ -3445,7 +3361,7 @@ pub struct DateAxExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub date_ax_extension_choice: Option<DateAxExtensionChoice>,
@@ -3459,7 +3375,7 @@ pub struct SerAxExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub ser_ax_extension_choice: Option<SerAxExtensionChoice>,
@@ -3473,7 +3389,7 @@ pub struct ValAxExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "c:CT_NumFmt/c15:numFmt", any))]
   pub val_ax_extension_choice: Option<ValAxExtensionChoice>,
@@ -3721,13 +3637,7 @@ pub struct RadarChartExtensionList {
 pub struct Overlap {
   /// Overlap Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100..= 100))]
   pub val: Option<crate::simple_type::SByteValue>,
 }
 /// Defines the BarChartExtensionList Class.
@@ -3831,13 +3741,7 @@ pub struct BubbleChartSeries {
 pub struct BubbleScale {
   /// Bubble Scale Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "300",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 300))]
   pub val: Option<crate::simple_type::UInt32Value>,
 }
 /// Defines the SizeRepresents Class.
@@ -3889,13 +3793,7 @@ pub struct LabelAlignment {
 pub struct LabelOffset {
   /// Label Offset Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1000))]
   pub val: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the TickLabelSkip Class.
@@ -3904,7 +3802,7 @@ pub struct LabelOffset {
 pub struct TickLabelSkip {
   /// Tick Skip Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 1..))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the TickMarkSkip Class.
@@ -3913,7 +3811,7 @@ pub struct TickLabelSkip {
 pub struct TickMarkSkip {
   /// Tick Skip Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "1", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 1..))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the CatAxExtensionList Class.
@@ -3955,7 +3853,7 @@ pub struct MinorTimeUnit {
 pub struct MajorUnit {
   /// Major Unit Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
+  #[sdk(number_range(min = 0, min_inclusive = false, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the MinorUnit Class.
@@ -3964,7 +3862,7 @@ pub struct MajorUnit {
 pub struct MinorUnit {
   /// Major Unit Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = false, max_inclusive = false))]
+  #[sdk(number_range(min = 0, min_inclusive = false, max_inclusive = false))]
   pub val: crate::simple_type::DoubleValue,
 }
 /// Defines the DateAxExtensionList Class.
@@ -4036,7 +3934,7 @@ pub struct DLblExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_DataLabelFieldTable/c15:dlblFieldTable",
@@ -4195,7 +4093,7 @@ pub struct LineSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4227,7 +4125,7 @@ pub struct ScatterSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4259,7 +4157,7 @@ pub struct RadarSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4291,7 +4189,7 @@ pub struct BarSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
@@ -4324,7 +4222,7 @@ pub struct AreaSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4356,7 +4254,7 @@ pub struct PieSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4388,7 +4286,7 @@ pub struct BubbleSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c14:CT_InvertSolidFillFmt/c14:invertSolidFillFmt",
@@ -4420,7 +4318,7 @@ pub struct SurfaceSerExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c15:CT_FilteredSeriesTitle/c15:filteredSeriesTitle",
@@ -4629,13 +4527,7 @@ pub struct EditingLanguage {
 pub struct Style {
   /// Style Type
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "48",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 48))]
   pub val: Option<crate::simple_type::ByteValue>,
 }
 /// Defines the ColorMapOverride Class.
@@ -4644,60 +4536,60 @@ pub struct Style {
 pub struct ColorMapOverride {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text1: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text2: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent3:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent4:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent5:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent6:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
@@ -4829,7 +4721,7 @@ pub struct ChartSpaceExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "c14:CT_PivotOptions/c14:pivotOptions",

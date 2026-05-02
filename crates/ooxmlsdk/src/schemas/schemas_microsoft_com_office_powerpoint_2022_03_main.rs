@@ -30,7 +30,7 @@ pub struct ReactionInstance {
   pub time: crate::simple_type::DateTimeValue,
   /// authorId
   #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p223:extLst"))]

@@ -27,11 +27,8 @@ pub struct NamedSheetView {
   pub name: crate::simple_type::StringValue,
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the NsvFilter Class.
   #[sdk(child(office2021, qname = "xnsv:CT_NsvFilter/xnsv:nsvFilter"))]
@@ -55,11 +52,8 @@ pub struct ExtensionList {
 pub struct NsvFilter {
   /// filterId
   #[sdk(attr(office2021, qname = ":filterId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub filter_id: crate::simple_type::StringValue,
   /// ref
   #[sdk(attr(office2021, qname = ":ref"))]
@@ -86,11 +80,8 @@ pub struct ColumnFilter {
   pub col_id: crate::simple_type::UInt32Value,
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]
@@ -191,11 +182,8 @@ pub struct SortRule {
   pub col_id: crate::simple_type::UInt32Value,
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the DifferentialFormatType Class.
   #[sdk(child(office2021, qname = "x:CT_Dxf/xnsv:dxf"))]

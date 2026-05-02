@@ -183,12 +183,6 @@ pub struct SlideMoniker {
   pub c_id: Option<crate::simple_type::UInt32Value>,
   /// sldId
   #[sdk(attr(office2016, qname = ":sldId"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "256",
-    max = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 256..2147483648))]
   pub sld_id: crate::simple_type::UInt32Value,
 }

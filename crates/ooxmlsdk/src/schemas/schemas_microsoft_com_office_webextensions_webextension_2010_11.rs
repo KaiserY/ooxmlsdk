@@ -151,7 +151,7 @@ pub struct Snapshot {
   pub link: Option<crate::simple_type::StringValue>,
   /// Compression state for blips.
   #[sdk(attr(qname = ":cstate"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compression_state:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
   #[sdk(choice(

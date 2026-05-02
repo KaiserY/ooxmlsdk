@@ -66,11 +66,11 @@ pub struct FixedCommandKeyboardCustomization {
   pub command_name: Option<crate::simple_type::StringValue>,
   /// fciIndex
   #[sdk(attr(qname = "wne:fciIndex"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub command_index: Option<crate::simple_type::HexBinaryValue>,
   /// swArg
   #[sdk(attr(qname = "wne:swArg"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub argument: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the MacroKeyboardCustomization Class.
@@ -111,7 +111,7 @@ pub struct AllocatedCommandManifestEntry {
 pub struct CharacterInsertion {
   /// val
   #[sdk(attr(qname = "wne:val"))]
-  #[sdk(string_length(source = 1u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub val: crate::simple_type::HexBinaryValue,
 }
 /// Defines the KeyMapEntry Class.
@@ -120,19 +120,19 @@ pub struct CharacterInsertion {
 pub struct KeyMapEntry {
   /// chmPrimary
   #[sdk(attr(qname = "wne:chmPrimary"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub character_map_primary: Option<crate::simple_type::HexBinaryValue>,
   /// chmSecondary
   #[sdk(attr(qname = "wne:chmSecondary"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub character_map_secondary: Option<crate::simple_type::HexBinaryValue>,
   /// kcmPrimary
   #[sdk(attr(qname = "wne:kcmPrimary"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub key_code_primary: Option<crate::simple_type::HexBinaryValue>,
   /// kcmSecondary
   #[sdk(attr(qname = "wne:kcmSecondary"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub key_code_secondary: Option<crate::simple_type::HexBinaryValue>,
   /// mask
   #[sdk(attr(qname = "wne:mask"))]
@@ -158,7 +158,7 @@ pub struct AllocatedCommand {
   pub command_based_on: Option<crate::simple_type::StringValue>,
   /// fciIndexBasedOn
   #[sdk(attr(qname = "wne:fciIndexBasedOn"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub command_index_based_on: Option<crate::simple_type::HexBinaryValue>,
   /// acdName
   #[sdk(attr(qname = "wne:acdName"))]
@@ -179,11 +179,11 @@ pub struct Mcd {
   pub wne_menu_help: Option<crate::simple_type::StringValue>,
   /// bEncrypt
   #[sdk(attr(qname = "wne:bEncrypt"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1u32))]
+  #[sdk(string_length(min = 1u32, max = 1u32))]
   pub wne_b_encrypt: Option<crate::simple_type::HexBinaryValue>,
   /// cmg
   #[sdk(attr(qname = "wne:cmg"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1u32))]
+  #[sdk(string_length(min = 1u32, max = 1u32))]
   pub wne_cmg: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Defines the EventDocNewXsdString Class.

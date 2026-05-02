@@ -37,11 +37,8 @@ pub struct CommentReplyV2MonikerList {
 pub struct CommentV2Moniker {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CommentReplyV2Moniker Class.
@@ -50,10 +47,7 @@ pub struct CommentV2Moniker {
 pub struct CommentReplyV2Moniker {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }

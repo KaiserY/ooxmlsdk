@@ -49,13 +49,7 @@ pub struct InvertSolidFillFormat {
 pub struct Style {
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "101",
-    max = "148",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 101..= 148))]
   pub val: crate::simple_type::ByteValue,
 }
 /// Defines the ShapeProperties Class.
@@ -65,7 +59,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects

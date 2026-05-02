@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-  Attribute, Data, DataEnum, DeriveInput, Fields, Ident, LitByteStr, LitStr, Meta, Token, Type,
-  TypePath, bracketed,
+  Attribute, Data, DataEnum, DeriveInput, Expr, ExprLit, ExprRange, ExprUnary, Fields, Ident, Lit,
+  LitByteStr, LitStr, Meta, RangeLimits, Token, Type, TypePath, UnOp, bracketed,
   parse::{Parse, ParseStream},
   parse_macro_input, parse_str,
   punctuated::Punctuated,
@@ -247,6 +247,64 @@ enum SdkStringFormatKind {
 enum SdkNumberSignKind {
   NonNegative,
   Positive,
+}
+
+fn parse_number_range_bound(value: Expr) -> syn::Result<String> {
+  match value {
+    Expr::Lit(ExprLit {
+      lit: Lit::Str(value),
+      ..
+    }) => Ok(value.value()),
+    Expr::Lit(ExprLit {
+      lit: Lit::Int(value),
+      ..
+    }) => Ok(value.base10_digits().to_string()),
+    Expr::Lit(ExprLit {
+      lit: Lit::Float(value),
+      ..
+    }) => Ok(value.base10_digits().to_string()),
+    Expr::Unary(ExprUnary {
+      op: UnOp::Neg(_),
+      expr,
+      ..
+    }) => match *expr {
+      Expr::Lit(ExprLit {
+        lit: Lit::Int(value),
+        ..
+      }) => Ok(format!("-{}", value.base10_digits())),
+      Expr::Lit(ExprLit {
+        lit: Lit::Float(value),
+        ..
+      }) => Ok(format!("-{}", value.base10_digits())),
+      other => Err(syn::Error::new_spanned(
+        other,
+        "sdk number_range bound expects a string or numeric literal",
+      )),
+    },
+    other => Err(syn::Error::new_spanned(
+      other,
+      "sdk number_range bound expects a string or numeric literal",
+    )),
+  }
+}
+
+fn parse_number_range(value: Expr) -> syn::Result<(Option<String>, Option<String>, bool, bool)> {
+  match value {
+    Expr::Range(ExprRange {
+      start, limits, end, ..
+    }) => {
+      let min = start
+        .map(|start| parse_number_range_bound(*start))
+        .transpose()?;
+      let max = end.map(|end| parse_number_range_bound(*end)).transpose()?;
+      let max_inclusive = matches!(limits, RangeLimits::Closed(_));
+      Ok((min, max, true, max_inclusive))
+    }
+    other => Err(syn::Error::new_spanned(
+      other,
+      "sdk number_range range expects a Rust range expression",
+    )),
+  }
 }
 
 #[derive(Clone)]
@@ -1127,13 +1185,19 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           let mut source_id = 0;
           let mut union_id = None;
           meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("min") {
-              let value: LitStr = nested.value()?.parse()?;
-              min = Some(value.value());
+            if nested.path.is_ident("range") {
+              let (range_min, range_max, range_min_inclusive, range_max_inclusive) =
+                parse_number_range(nested.value()?.parse()?)?;
+              min = range_min;
+              max = range_max;
+              min_inclusive = range_min_inclusive;
+              max_inclusive = range_max_inclusive;
+              Ok(())
+            } else if nested.path.is_ident("min") {
+              min = Some(parse_number_range_bound(nested.value()?.parse()?)?);
               Ok(())
             } else if nested.path.is_ident("max") {
-              let value: LitStr = nested.value()?.parse()?;
-              max = Some(value.value());
+              max = Some(parse_number_range_bound(nested.value()?.parse()?)?);
               Ok(())
             } else if nested.path.is_ident("min_inclusive") {
               let value: syn::LitBool = nested.value()?.parse()?;

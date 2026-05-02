@@ -478,7 +478,7 @@ pub enum NumberSpacingValues {
 pub struct RunConflictInsertion {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -493,14 +493,14 @@ pub struct RunConflictInsertion {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
@@ -569,7 +569,7 @@ pub struct RunConflictInsertion {
 pub struct RunConflictDeletion {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -584,14 +584,14 @@ pub struct RunConflictDeletion {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
   #[sdk(choice(
@@ -660,7 +660,7 @@ pub struct RunConflictDeletion {
 pub struct ConflictInsertion {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -675,14 +675,14 @@ pub struct ConflictInsertion {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -692,7 +692,7 @@ pub struct ConflictInsertion {
 pub struct ConflictDeletion {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -707,14 +707,14 @@ pub struct ConflictDeletion {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -727,7 +727,7 @@ pub struct ConflictDeletion {
 pub struct CustomXmlConflictInsertionRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -742,14 +742,14 @@ pub struct CustomXmlConflictInsertionRangeStart {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -762,7 +762,7 @@ pub struct CustomXmlConflictInsertionRangeStart {
 pub struct CustomXmlConflictDeletionRangeStart {
   /// author
   #[sdk(attr(qname = "w:author"))]
-  #[sdk(string_length(source = 1u32, max = 255u32))]
+  #[sdk(string_length(max = 255u32))]
   pub author: crate::simple_type::StringValue,
   /// date
   #[sdk(attr(qname = "w:date"))]
@@ -777,14 +777,14 @@ pub struct CustomXmlConflictDeletionRangeStart {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -800,7 +800,7 @@ pub struct Tint {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub val: crate::simple_type::Int32Value,
 }
@@ -816,7 +816,7 @@ pub struct Shade {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub val: crate::simple_type::Int32Value,
 }
@@ -832,7 +832,7 @@ pub struct Alpha {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub val: crate::simple_type::Int32Value,
 }
@@ -847,7 +847,7 @@ pub struct HueModulation {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub val: crate::simple_type::Int32Value,
 }
@@ -956,7 +956,7 @@ pub struct LinearShadeProperties {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub angle: Option<crate::simple_type::Int32Value>,
   /// scaled
@@ -1017,7 +1017,7 @@ pub struct LineJoinMiterProperties {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub limit: Option<crate::simple_type::Int32Value>,
 }
@@ -1033,7 +1033,7 @@ pub struct Glow {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub glow_radius: Option<crate::simple_type::Int64Value>,
   #[sdk(choice(
@@ -1054,7 +1054,7 @@ pub struct Shadow {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// dist
@@ -1065,7 +1065,7 @@ pub struct Shadow {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub distance_from_text: Option<crate::simple_type::Int64Value>,
   /// dir
@@ -1076,7 +1076,7 @@ pub struct Shadow {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub direction_angle: Option<crate::simple_type::Int32Value>,
   /// sx
@@ -1093,7 +1093,7 @@ pub struct Shadow {
     min = "-5400000",
     max = "5400000",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
   /// ky
@@ -1104,7 +1104,7 @@ pub struct Shadow {
     min = "-5400000",
     max = "5400000",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
   /// algn
@@ -1128,7 +1128,7 @@ pub struct Reflection {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// stA
@@ -1139,7 +1139,7 @@ pub struct Reflection {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub starting_opacity: Option<crate::simple_type::Int32Value>,
   /// stPos
@@ -1150,7 +1150,7 @@ pub struct Reflection {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub start_position: Option<crate::simple_type::Int32Value>,
   /// endA
@@ -1161,7 +1161,7 @@ pub struct Reflection {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub ending_opacity: Option<crate::simple_type::Int32Value>,
   /// endPos
@@ -1172,7 +1172,7 @@ pub struct Reflection {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub end_position: Option<crate::simple_type::Int32Value>,
   /// dist
@@ -1183,7 +1183,7 @@ pub struct Reflection {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub distance_from_text: Option<crate::simple_type::Int64Value>,
   /// dir
@@ -1194,7 +1194,7 @@ pub struct Reflection {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub direction_angle: Option<crate::simple_type::Int32Value>,
   /// fadeDir
@@ -1205,7 +1205,7 @@ pub struct Reflection {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub fade_direction: Option<crate::simple_type::Int32Value>,
   /// sx
@@ -1222,7 +1222,7 @@ pub struct Reflection {
     min = "-5400000",
     max = "5400000",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub horizontal_skew_angle: Option<crate::simple_type::Int32Value>,
   /// ky
@@ -1233,7 +1233,7 @@ pub struct Reflection {
     min = "-5400000",
     max = "5400000",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub vertical_skew_angle: Option<crate::simple_type::Int32Value>,
   /// algn
@@ -1252,7 +1252,7 @@ pub struct TextOutlineEffect {
     min = "0",
     max = "20116800",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub line_width: Option<crate::simple_type::Int32Value>,
   /// cap
@@ -1316,7 +1316,7 @@ pub struct Properties3D {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// contourW
@@ -1327,7 +1327,7 @@ pub struct Properties3D {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// prstMaterial
@@ -1457,14 +1457,14 @@ pub struct CustomXmlConflictInsertionRangeEnd {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -1479,14 +1479,14 @@ pub struct CustomXmlConflictDeletionRangeEnd {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(number_range(
     source = 2u32,
     union = 0u64,
     max = "-2",
     min_inclusive = false,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub id: crate::simple_type::StringValue,
 }
@@ -1524,7 +1524,7 @@ pub struct GradientStop {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub stop_position: crate::simple_type::Int32Value,
   #[sdk(choice(
@@ -1570,7 +1570,7 @@ pub struct SphereCoordinates {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub lattitude: crate::simple_type::Int32Value,
   /// lon
@@ -1581,7 +1581,7 @@ pub struct SphereCoordinates {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub longitude: crate::simple_type::Int32Value,
   /// rev
@@ -1592,7 +1592,7 @@ pub struct SphereCoordinates {
     min = "0",
     max = "21600000",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   pub revolution: crate::simple_type::Int32Value,
 }
@@ -1633,7 +1633,7 @@ pub struct BevelTop {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// h
@@ -1644,7 +1644,7 @@ pub struct BevelTop {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// prst
@@ -1664,7 +1664,7 @@ pub struct BevelBottom {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// h
@@ -1675,7 +1675,7 @@ pub struct BevelBottom {
     min = "0",
     max = "2147483647",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// prst

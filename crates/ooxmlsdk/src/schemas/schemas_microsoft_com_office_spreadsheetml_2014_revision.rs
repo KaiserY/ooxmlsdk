@@ -285,27 +285,18 @@ pub struct RevExFuture {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -326,27 +317,18 @@ pub struct RevExUnsupported {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -361,27 +343,18 @@ pub struct RevExTrimmed {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -396,27 +369,18 @@ pub struct RevExRowColumn {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -440,27 +404,18 @@ pub struct RevExMove {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -473,11 +428,8 @@ pub struct RevExMove {
   pub dst: crate::simple_type::StringValue,
   /// srcSh
   #[sdk(attr(office2016, qname = ":srcSh"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub src_sh: Option<crate::simple_type::StringValue>,
 }
 /// Defines the RevExChangeCell Class.
@@ -486,38 +438,26 @@ pub struct RevExMove {
 pub struct RevExChangeCell {
   /// listUid
   #[sdk(attr(office2016, qname = ":listUid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub list_uid: Option<crate::simple_type::StringValue>,
   /// rev
   #[sdk(attr(office2016, qname = ":rev"))]
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -550,27 +490,18 @@ pub struct RevExFormatting {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -595,11 +526,8 @@ pub struct RevExFormatting {
   pub length: Option<crate::simple_type::UInt32Value>,
   /// styleUid
   #[sdk(attr(office2016, qname = ":styleUid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub style_uid: Option<crate::simple_type::StringValue>,
   /// fBlankCell
   #[sdk(attr(office2016, qname = ":fBlankCell"))]
@@ -638,27 +566,18 @@ pub struct RevExDefinedName {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -712,27 +631,18 @@ pub struct RevExDelObj {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -750,27 +660,18 @@ pub struct RevExChgObj {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -794,27 +695,18 @@ pub struct RevExSheetOp {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -841,27 +733,18 @@ pub struct RevisionList {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -900,27 +783,18 @@ pub struct RevListAutoExpandRw {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -930,11 +804,8 @@ pub struct RevListAutoExpandRw {
   pub ref_added: crate::simple_type::StringValue,
   /// listGuid
   #[sdk(attr(office2016, qname = ":listGuid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub list_guid: crate::simple_type::StringValue,
 }
 /// Defines the RevGroup Class.
@@ -946,27 +817,18 @@ pub struct RevGroup {
   pub rev: crate::simple_type::UInt64Value,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// sh
   #[sdk(attr(office2016, qname = ":sh"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sh: crate::simple_type::StringValue,
   /// uidp
   #[sdk(attr(office2016, qname = ":uidp"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uidp: Option<crate::simple_type::StringValue>,
   /// ctx
   #[sdk(attr(office2016, qname = ":ctx"))]
@@ -1053,11 +915,8 @@ pub type FFormula = crate::simple_type::StringValue;
 pub struct StateBasedHeader {
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
   /// eft
   #[sdk(attr(office2016, qname = ":eft"))]
@@ -1154,11 +1013,8 @@ pub struct ShowGridlinesHeadings {
 pub struct FreezePanes {
   /// sheetViewUid
   #[sdk(attr(office2016, qname = ":sheetViewUid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub sheet_view_uid: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Outlines Class.
@@ -1224,19 +1080,13 @@ pub struct RefCell {
   pub r: crate::simple_type::ListValue<crate::simple_type::StringValue>,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: Option<crate::simple_type::StringValue>,
   /// uidLast
   #[sdk(attr(office2016, qname = ":uidLast"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid_last: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SheetXluid Class.
@@ -1257,11 +1107,8 @@ pub struct SheetXluid {
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub uid: crate::simple_type::StringValue,
 }
 /// Defines the RefOartAnchor Class.
@@ -1285,83 +1132,35 @@ pub struct RefOartAnchor {
   pub r: Option<crate::simple_type::StringValue>,
   /// fromRowOff
   #[sdk(attr(office2016, qname = ":fromRowOff"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub from_row_off: Option<crate::simple_type::Int64Value>,
   /// fromColOff
   #[sdk(attr(office2016, qname = ":fromColOff"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub from_col_off: Option<crate::simple_type::Int64Value>,
   /// toRowOff
   #[sdk(attr(office2016, qname = ":toRowOff"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub to_row_off: Option<crate::simple_type::Int64Value>,
   /// toColOff
   #[sdk(attr(office2016, qname = ":toColOff"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub to_col_off: Option<crate::simple_type::Int64Value>,
   /// cx
   #[sdk(attr(office2016, qname = ":cx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
   #[sdk(attr(office2016, qname = ":cy"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// x
   #[sdk(attr(office2016, qname = ":x"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
   #[sdk(attr(office2016, qname = ":y"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// oat
   #[sdk(attr(office2016, qname = ":oat"))]

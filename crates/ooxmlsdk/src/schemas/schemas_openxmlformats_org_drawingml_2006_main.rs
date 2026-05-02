@@ -2019,13 +2019,7 @@ pub struct QuickTimeFromFile {
 pub struct Tint {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Shade.
@@ -2034,13 +2028,7 @@ pub struct Tint {
 pub struct Shade {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Alpha.
@@ -2049,13 +2037,7 @@ pub struct Shade {
 pub struct Alpha {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Alpha Offset.
@@ -2064,13 +2046,7 @@ pub struct Alpha {
 pub struct AlphaOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Alpha Modulation.
@@ -2079,7 +2055,7 @@ pub struct AlphaOffset {
 pub struct AlphaModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Hue Modulate.
@@ -2088,7 +2064,7 @@ pub struct AlphaModulation {
 pub struct HueModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Hue.
@@ -2097,13 +2073,7 @@ pub struct HueModulation {
 pub struct Hue {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Hue Offset.
@@ -2241,7 +2211,7 @@ pub struct Extension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -2299,7 +2269,7 @@ pub struct RgbColorModelHex {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_length(source = 1u32, min = 3u32, max = 3u32))]
+  #[sdk(string_length(min = 3u32, max = 3u32))]
   pub val: crate::simple_type::HexBinaryValue,
   /// legacySpreadsheetColorIndex
   #[sdk(attr(office2010, qname = "a14:legacySpreadsheetColorIndex"))]
@@ -2309,7 +2279,7 @@ pub struct RgbColorModelHex {
     min = "0",
     max = "80",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub legacy_spreadsheet_color_index: Option<crate::simple_type::Int32Value>,
   #[sdk(choice(
@@ -2350,13 +2320,7 @@ pub struct RgbColorModelHex {
 pub struct HslColor {
   /// Hue
   #[sdk(attr(qname = ":hue"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub hue_value: crate::simple_type::Int32Value,
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
@@ -2402,11 +2366,11 @@ pub struct HslColor {
 pub struct SystemColor {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: SystemColorValues,
   /// Last Color
   #[sdk(attr(qname = ":lastClr"))]
-  #[sdk(string_length(source = 0u32, min = 3u32, max = 3u32))]
+  #[sdk(string_length(min = 3u32, max = 3u32))]
   pub last_color: Option<crate::simple_type::HexBinaryValue>,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
@@ -2446,7 +2410,7 @@ pub struct SystemColor {
 pub struct SchemeColor {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: SchemeColorValues,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
@@ -2486,7 +2450,7 @@ pub struct SchemeColor {
 pub struct PresetColor {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: PresetColorValues,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
@@ -2526,37 +2490,19 @@ pub struct PresetColor {
 pub struct Shape3DType {
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: Option<crate::simple_type::Int64Value>,
   /// Extrusion Height
   #[sdk(attr(qname = ":extrusionH"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// Contour Width
   #[sdk(attr(qname = ":contourW"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// Preset Material Type
   #[sdk(attr(qname = ":prstMaterial"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset_material: Option<PresetMaterialTypeValues>,
   /// Top Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevelT"))]
@@ -2580,13 +2526,7 @@ pub struct Shape3DType {
 pub struct FlatText {
   /// Z Coordinate
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: Option<crate::simple_type::Int64Value>,
 }
 /// Linear Gradient Fill.
@@ -2595,13 +2535,7 @@ pub struct FlatText {
 pub struct LinearGradientFill {
   /// Angle
   #[sdk(attr(qname = ":ang"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub angle: Option<crate::simple_type::Int32Value>,
   /// Scaled
   #[sdk(attr(qname = ":scaled"))]
@@ -2613,7 +2547,7 @@ pub struct LinearGradientFill {
 pub struct PathGradientFill {
   /// Gradient Fill Path
   #[sdk(attr(qname = ":path"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub path: Option<PathShadeValues>,
   /// Fill To Rectangle
   #[sdk(child(qname = "a:CT_RelativeRect/a:fillToRect"))]
@@ -2625,23 +2559,11 @@ pub struct PathGradientFill {
 pub struct Tile {
   /// Horizontal Offset
   #[sdk(attr(qname = ":tx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub horizontal_offset: Option<crate::simple_type::Int64Value>,
   /// Vertical Offset
   #[sdk(attr(qname = ":ty"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub vertical_offset: Option<crate::simple_type::Int64Value>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
@@ -2651,11 +2573,11 @@ pub struct Tile {
   pub vertical_ratio: Option<crate::simple_type::Int32Value>,
   /// Tile Flipping
   #[sdk(attr(qname = ":flip"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub flip: Option<TileFlipValues>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<RectangleAlignmentValues>,
 }
 /// Stretch.
@@ -2694,7 +2616,7 @@ pub struct SolidFill {
 pub struct GradientFill {
   /// Tile Flip
   #[sdk(attr(qname = ":flip"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub flip: Option<TileFlipValues>,
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
@@ -2739,7 +2661,7 @@ pub struct BlipFill {
 pub struct PatternFill {
   /// Preset Pattern
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: Option<PresetPatternValues>,
   /// Foreground color
   #[sdk(child(qname = "a:CT_Color/a:fgClr"))]
@@ -2754,11 +2676,11 @@ pub struct PatternFill {
 pub struct EffectContainer {
   /// Effect Container Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<EffectContainerValues>,
   /// Name
   #[sdk(attr(qname = ":name"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "a:CT_EffectContainer/a:cont",
@@ -2800,11 +2722,11 @@ pub struct EffectContainer {
 pub struct EffectDag {
   /// Effect Container Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<EffectContainerValues>,
   /// Name
   #[sdk(attr(qname = ":name"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub name: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "a:CT_EffectContainer/a:cont",
@@ -2846,7 +2768,7 @@ pub struct EffectDag {
 pub struct Effect {
   /// Reference
   #[sdk(attr(qname = ":ref"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub reference: Option<crate::simple_type::StringValue>,
 }
 /// Defines the AlphaBiLevel Class.
@@ -2855,13 +2777,7 @@ pub struct Effect {
 pub struct AlphaBiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub threshold: crate::simple_type::Int32Value,
 }
 /// Alpha Inverse Effect.
@@ -2894,7 +2810,7 @@ pub struct AlphaModulationEffect {
 pub struct AlphaModulationFixed {
   /// Amount
   #[sdk(attr(qname = ":amt"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub amount: Option<crate::simple_type::Int32Value>,
 }
 /// Alpha Inset/Outset Effect.
@@ -2903,13 +2819,7 @@ pub struct AlphaModulationFixed {
 pub struct AlphaOutset {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub radius: Option<crate::simple_type::Int64Value>,
 }
 /// Alpha Replace Effect.
@@ -2918,13 +2828,7 @@ pub struct AlphaOutset {
 pub struct AlphaReplace {
   /// Alpha
   #[sdk(attr(qname = ":a"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub alpha: crate::simple_type::Int32Value,
 }
 /// Defines the BiLevel Class.
@@ -2933,13 +2837,7 @@ pub struct AlphaReplace {
 pub struct BiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub threshold: crate::simple_type::Int32Value,
 }
 /// Blend Effect.
@@ -2948,7 +2846,7 @@ pub struct BiLevel {
 pub struct Blend {
   /// Blend Mode
   #[sdk(attr(qname = ":blend"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub blend_mode: BlendModeValues,
   /// Effect to blend
   #[sdk(child(qname = "a:CT_EffectContainer/a:cont"))]
@@ -2960,13 +2858,7 @@ pub struct Blend {
 pub struct Blur {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub radius: Option<crate::simple_type::Int64Value>,
   /// Grow Bounds
   #[sdk(attr(qname = ":grow"))]
@@ -3039,7 +2931,7 @@ pub struct Fill {
 pub struct FillOverlay {
   /// Blend
   #[sdk(attr(qname = ":blend"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub blend: BlendModeValues,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -3059,13 +2951,7 @@ pub struct Glow {
   pub xml_other_children: Vec<(usize, String)>,
   /// Radius
   #[sdk(attr(qname = ":rad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub radius: Option<crate::simple_type::Int64Value>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3083,33 +2969,15 @@ pub struct Glow {
 pub struct Hsl {
   /// Hue
   #[sdk(attr(qname = ":hue"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub hue: Option<crate::simple_type::Int32Value>,
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub saturation: Option<crate::simple_type::Int32Value>,
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub luminance: Option<crate::simple_type::Int32Value>,
 }
 /// Inner Shadow Effect.
@@ -3120,33 +2988,15 @@ pub struct InnerShadow {
   pub xml_other_children: Vec<(usize, String)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub distance: Option<crate::simple_type::Int64Value>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3164,23 +3014,11 @@ pub struct InnerShadow {
 pub struct LuminanceEffect {
   /// Brightness
   #[sdk(attr(qname = ":bright"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub brightness: Option<crate::simple_type::Int32Value>,
   /// Contrast
   #[sdk(attr(qname = ":contrast"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub contrast: Option<crate::simple_type::Int32Value>,
 }
 /// Outer Shadow Effect.
@@ -3191,33 +3029,15 @@ pub struct OuterShadow {
   pub xml_other_children: Vec<(usize, String)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// Shadow Offset Distance
   #[sdk(attr(qname = ":dist"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub distance: Option<crate::simple_type::Int64Value>,
   /// Shadow Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Scaling Factor
   #[sdk(attr(qname = ":sx"))]
@@ -3227,27 +3047,29 @@ pub struct OuterShadow {
   pub vertical_ratio: Option<crate::simple_type::Int32Value>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub horizontal_skew: Option<crate::simple_type::Int32Value>,
   /// Vertical Skew
   #[sdk(attr(qname = ":ky"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub vertical_skew: Option<crate::simple_type::Int32Value>,
   /// Shadow Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<RectangleAlignmentValues>,
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
@@ -3270,27 +3092,15 @@ pub struct PresetShadow {
   pub xml_other_children: Vec<(usize, String)>,
   /// Preset Shadow
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: PresetShadowValues,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub distance: Option<crate::simple_type::Int64Value>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3308,83 +3118,35 @@ pub struct PresetShadow {
 pub struct Reflection {
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub blur_radius: Option<crate::simple_type::Int64Value>,
   /// Start Opacity
   #[sdk(attr(qname = ":stA"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub start_opacity: Option<crate::simple_type::Int32Value>,
   /// Start Position
   #[sdk(attr(qname = ":stPos"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub start_position: Option<crate::simple_type::Int32Value>,
   /// End Alpha
   #[sdk(attr(qname = ":endA"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub end_alpha: Option<crate::simple_type::Int32Value>,
   /// End Position
   #[sdk(attr(qname = ":endPos"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub end_position: Option<crate::simple_type::Int32Value>,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub distance: Option<crate::simple_type::Int64Value>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
   /// Fade Direction
   #[sdk(attr(qname = ":fadeDir"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub fade_direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
@@ -3394,27 +3156,29 @@ pub struct Reflection {
   pub vertical_ratio: Option<crate::simple_type::Int32Value>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub horizontal_skew: Option<crate::simple_type::Int32Value>,
   /// Vertical Skew
   #[sdk(attr(qname = ":ky"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub vertical_skew: Option<crate::simple_type::Int32Value>,
   /// Shadow Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<RectangleAlignmentValues>,
   /// Rotate With Shape
   #[sdk(attr(qname = ":rotWithShape"))]
@@ -3437,13 +3201,7 @@ pub struct RelativeOffset {
 pub struct SoftEdge {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub radius: crate::simple_type::Int64Value,
 }
 /// Defines the TintEffect Class.
@@ -3452,23 +3210,11 @@ pub struct SoftEdge {
 pub struct TintEffect {
   /// Hue
   #[sdk(attr(qname = ":hue"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub hue: Option<crate::simple_type::Int32Value>,
   /// Amount
   #[sdk(attr(qname = ":amt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub amount: Option<crate::simple_type::Int32Value>,
 }
 /// Transform Effect.
@@ -3483,43 +3229,33 @@ pub struct TransformEffect {
   pub vertical_ratio: Option<crate::simple_type::Int32Value>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub horizontal_skew: Option<crate::simple_type::Int32Value>,
   /// Vertical Skew
   #[sdk(attr(qname = ":ky"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-5400000",
-    max = "5400000",
-    min_inclusive = false,
-    max_inclusive = false
-  ))]
+  #[sdk(
+        number_range(
+            min = -5400000,
+            max = 5400000,
+            min_inclusive = false,
+            max_inclusive = false,
+        )
+    )]
   pub vertical_skew: Option<crate::simple_type::Int32Value>,
   /// Horizontal Shift
   #[sdk(attr(qname = ":tx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub horizontal_shift: Option<crate::simple_type::Int64Value>,
   /// Vertical Shift
   #[sdk(attr(qname = ":ty"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub vertical_shift: Option<crate::simple_type::Int64Value>,
 }
 /// Effect Container.
@@ -3582,7 +3318,7 @@ pub struct PresetGeometry {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Preset Shape
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: ShapeTypeValues,
   /// List of Shape Adjust Values
   #[sdk(child(qname = "a:CT_GeomGuideList/a:avLst"))]
@@ -3594,7 +3330,7 @@ pub struct PresetGeometry {
 pub struct PresetTextWarp {
   /// Preset Warp Shape
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: TextShapeValues,
   /// Adjust Value List
   #[sdk(child(qname = "a:CT_GeomGuideList/a:avLst"))]
@@ -3606,7 +3342,7 @@ pub struct PresetTextWarp {
 pub struct Miter {
   /// Miter Join Limit
   #[sdk(attr(qname = ":lim"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub limit: Option<crate::simple_type::Int32Value>,
 }
 /// Preset Dash.
@@ -3615,7 +3351,7 @@ pub struct Miter {
 pub struct PresetDash {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<PresetLineDashValues>,
 }
 /// Custom Dash.
@@ -3775,7 +3511,7 @@ pub struct FontReference {
   pub xml_other_children: Vec<(usize, String)>,
   /// Identifier
   #[sdk(attr(qname = ":idx"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub index: FontCollectionIndexValues,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3793,23 +3529,11 @@ pub struct FontReference {
 pub struct NormalAutoFit {
   /// Font Scale
   #[sdk(attr(qname = ":fontScale"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1000..= 100000))]
   pub font_scale: Option<crate::simple_type::Int32Value>,
   /// Line Space Reduction
   #[sdk(attr(qname = ":lnSpcReduction"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "13200000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 13200000))]
   pub line_space_reduction: Option<crate::simple_type::Int32Value>,
 }
 /// Shape AutoFit.
@@ -3952,13 +3676,7 @@ pub struct Highlight {
 pub struct BulletSizePercentage {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "25000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 25000..= 400000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Bullet Size Points.
@@ -3967,13 +3685,7 @@ pub struct BulletSizePercentage {
 pub struct BulletSizePoints {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 100..= 400000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Specified.
@@ -3985,7 +3697,7 @@ pub struct BulletFont {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -4004,7 +3716,7 @@ pub struct LatinFont {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -4023,7 +3735,7 @@ pub struct EastAsianFont {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -4042,7 +3754,7 @@ pub struct ComplexScriptFont {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -4060,7 +3772,7 @@ pub struct SymbolFont {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -4075,17 +3787,11 @@ pub struct SymbolFont {
 pub struct AutoNumberedBullet {
   /// Bullet Autonumbering Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: TextAutoNumberSchemeValues,
   /// Start Numbering At
   #[sdk(attr(qname = ":startAt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "32767",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 32767))]
   pub start_at: Option<crate::simple_type::Int32Value>,
 }
 /// Character Bullet.
@@ -4111,25 +3817,19 @@ pub struct Underline {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4166,25 +3866,19 @@ pub struct Outline {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4221,25 +3915,19 @@ pub struct LeftBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4276,25 +3964,19 @@ pub struct RightBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4331,25 +4013,19 @@ pub struct TopBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4386,25 +4062,19 @@ pub struct BottomBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4441,25 +4111,19 @@ pub struct TopLeftToBottomRightBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4499,25 +4163,19 @@ pub struct BottomLeftToTopRightBorderLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type: Option<LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type: Option<CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<PenAlignmentValues>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
@@ -4590,11 +4248,8 @@ pub struct Break {
 pub struct Field {
   /// Field ID
   #[sdk(attr(qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Field Type
   #[sdk(attr(qname = ":type"))]
@@ -4631,7 +4286,7 @@ pub struct Blip {
   pub link: Option<crate::simple_type::StringValue>,
   /// Compression state for blips.
   #[sdk(attr(qname = ":cstate"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compression_state: Option<BlipCompressionValues>,
   #[sdk(choice(
     qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel",
@@ -4732,11 +4387,8 @@ pub struct TableStyleList {
   pub xml_other_children: Vec<(usize, String)>,
   /// Default
   #[sdk(attr(qname = ":def"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub default: crate::simple_type::StringValue,
   /// Table Style.
   #[sdk(child(qname = "a:CT_TableStyle/a:tblStyle"))]
@@ -5172,23 +4824,11 @@ pub struct ScaleY {
 pub struct Offset {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Child Offset.
@@ -5197,23 +4837,11 @@ pub struct Offset {
 pub struct ChildOffset {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Extents.
@@ -5222,23 +4850,11 @@ pub struct ChildOffset {
 pub struct Extents {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Child Extents.
@@ -5247,23 +4863,11 @@ pub struct Extents {
 pub struct ChildExtents {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Shape Locks.
@@ -5402,7 +5006,7 @@ pub struct GraphicData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Uniform Resource Identifier
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -5413,15 +5017,12 @@ pub struct GraphicData {
 pub struct Diagram {
   /// Identifier
   #[sdk(attr(qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Animation Build Step
   #[sdk(attr(qname = ":bldStep"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub build_step: Option<DiagramBuildStepValues>,
 }
 /// Chart to Animate.
@@ -5436,7 +5037,7 @@ pub struct Chart {
   pub category_index: Option<crate::simple_type::Int32Value>,
   /// Animation Build Step
   #[sdk(attr(qname = ":bldStep"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub build_step: ChartBuildStepValues,
 }
 /// Build Diagram.
@@ -5577,7 +5178,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
@@ -5742,33 +5343,15 @@ pub struct NonVisualGroupShapeDrawingProperties {
 pub struct Rotation {
   /// Latitude
   #[sdk(attr(qname = ":lat"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub latitude: crate::simple_type::Int32Value,
   /// Longitude
   #[sdk(attr(qname = ":lon"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub longitude: crate::simple_type::Int32Value,
   /// Revolution
   #[sdk(attr(qname = ":rev"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "21600000",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 0..21600000))]
   pub revolution: crate::simple_type::Int32Value,
 }
 /// Camera.
@@ -5777,21 +5360,15 @@ pub struct Rotation {
 pub struct Camera {
   /// Preset Camera Type
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: PresetCameraValues,
   /// Field of View
   #[sdk(attr(qname = ":fov"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10800000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10800000))]
   pub field_of_view: Option<crate::simple_type::Int32Value>,
   /// Zoom
   #[sdk(attr(qname = ":zoom"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub zoom: Option<crate::simple_type::Int32Value>,
   /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
@@ -5803,11 +5380,11 @@ pub struct Camera {
 pub struct LightRig {
   /// Rig Preset
   #[sdk(attr(qname = ":rig"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub rig: LightRigValues,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: LightRigDirectionValues,
   /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
@@ -5836,33 +5413,15 @@ pub struct Backdrop {
 pub struct Anchor {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Coordinate in 3D
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
   /// Z-Coordinate in 3D
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: crate::simple_type::Int64Value,
 }
 /// Normal.
@@ -5871,33 +5430,15 @@ pub struct Anchor {
 pub struct Normal {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dx: crate::simple_type::Int64Value,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dy: crate::simple_type::Int64Value,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dz: crate::simple_type::Int64Value,
 }
 /// Up Vector.
@@ -5906,33 +5447,15 @@ pub struct Normal {
 pub struct UpVector {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dx: crate::simple_type::Int64Value,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dy: crate::simple_type::Int64Value,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dz: crate::simple_type::Int64Value,
 }
 /// Top Bevel.
@@ -5941,27 +5464,15 @@ pub struct UpVector {
 pub struct BevelTop {
   /// Width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// Height
   #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: Option<BevelPresetValues>,
 }
 /// Bottom Bevel.
@@ -5970,27 +5481,15 @@ pub struct BevelTop {
 pub struct BevelBottom {
   /// Width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// Height
   #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: Option<BevelPresetValues>,
 }
 /// Bevel.
@@ -5999,27 +5498,15 @@ pub struct BevelBottom {
 pub struct Bevel {
   /// Width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// Height
   #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset: Option<BevelPresetValues>,
 }
 /// Fill To Rectangle.
@@ -6098,13 +5585,7 @@ pub struct GradientStop {
   pub xml_other_children: Vec<(usize, String)>,
   /// Position
   #[sdk(attr(qname = ":pos"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub position: crate::simple_type::Int32Value,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -6130,7 +5611,7 @@ pub struct GradientStopList {
 pub struct ShapeGuide {
   /// Shape Guide Name
   #[sdk(attr(qname = ":name"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub name: crate::simple_type::StringValue,
   /// Shape Guide Formula
   #[sdk(attr(qname = ":fmla"))]
@@ -6148,7 +5629,7 @@ pub struct Position {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub x: crate::simple_type::StringValue,
@@ -6160,7 +5641,7 @@ pub struct Position {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub y: crate::simple_type::StringValue,
@@ -6177,7 +5658,7 @@ pub struct Point {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub x: crate::simple_type::StringValue,
@@ -6189,7 +5670,7 @@ pub struct Point {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub y: crate::simple_type::StringValue,
@@ -6200,7 +5681,7 @@ pub struct Point {
 pub struct AdjustHandleXy {
   /// Horizontal Adjustment Guide
   #[sdk(attr(qname = ":gdRefX"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub x_adjustment_guide: Option<crate::simple_type::StringValue>,
   /// Minimum Horizontal Adjustment
   #[sdk(attr(qname = ":minX"))]
@@ -6210,7 +5691,7 @@ pub struct AdjustHandleXy {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub min_x: Option<crate::simple_type::StringValue>,
@@ -6222,13 +5703,13 @@ pub struct AdjustHandleXy {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub max_x: Option<crate::simple_type::StringValue>,
   /// Vertical Adjustment Guide
   #[sdk(attr(qname = ":gdRefY"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub y_adjustment_guide: Option<crate::simple_type::StringValue>,
   /// Minimum Vertical Adjustment
   #[sdk(attr(qname = ":minY"))]
@@ -6238,7 +5719,7 @@ pub struct AdjustHandleXy {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub min_y: Option<crate::simple_type::StringValue>,
@@ -6250,7 +5731,7 @@ pub struct AdjustHandleXy {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub max_y: Option<crate::simple_type::StringValue>,
@@ -6264,7 +5745,7 @@ pub struct AdjustHandleXy {
 pub struct AdjustHandlePolar {
   /// Radial Adjustment Guide
   #[sdk(attr(qname = ":gdRefR"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub radial_adjustment_guide: Option<crate::simple_type::StringValue>,
   /// Minimum Radial Adjustment
   #[sdk(attr(qname = ":minR"))]
@@ -6274,7 +5755,7 @@ pub struct AdjustHandlePolar {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub min_radial: Option<crate::simple_type::StringValue>,
@@ -6286,13 +5767,13 @@ pub struct AdjustHandlePolar {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub max_radial: Option<crate::simple_type::StringValue>,
   /// Angle Adjustment Guide
   #[sdk(attr(qname = ":gdRefAng"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub angle_adjustment_guide: Option<crate::simple_type::StringValue>,
   /// Minimum Angle Adjustment
   #[sdk(attr(qname = ":minAng"))]
@@ -6349,7 +5830,7 @@ pub struct ArcTo {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub width_radius: crate::simple_type::StringValue,
@@ -6361,7 +5842,7 @@ pub struct ArcTo {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub height_radius: crate::simple_type::StringValue,
@@ -6398,27 +5879,15 @@ pub struct CubicBezierCurveTo {
 pub struct Path {
   /// Path Width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub width: Option<crate::simple_type::Int64Value>,
   /// Path Height
   #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub height: Option<crate::simple_type::Int64Value>,
   /// Path Fill
   #[sdk(attr(qname = ":fill"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub fill: Option<PathFillModeValues>,
   /// Path Stroke
   #[sdk(attr(qname = ":stroke"))]
@@ -6482,7 +5951,7 @@ pub struct Rectangle {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub left: crate::simple_type::StringValue,
@@ -6494,7 +5963,7 @@ pub struct Rectangle {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub top: crate::simple_type::StringValue,
@@ -6506,7 +5975,7 @@ pub struct Rectangle {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub right: crate::simple_type::StringValue,
@@ -6518,7 +5987,7 @@ pub struct Rectangle {
     min = "-27273042329600",
     max = "27273042316900",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_format(source = 2u32, union = 0u64, kind = "token"))]
   pub bottom: crate::simple_type::StringValue,
@@ -6537,11 +6006,11 @@ pub struct PathList {
 pub struct DashStop {
   /// Dash Length
   #[sdk(attr(qname = ":d"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub dash_length: crate::simple_type::Int32Value,
   /// Space Length
   #[sdk(attr(qname = ":sp"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub space_length: crate::simple_type::Int32Value,
 }
 /// 2D Transform for Grouped Objects.
@@ -6583,19 +6052,19 @@ pub struct BodyProperties {
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,
   /// Text Vertical Overflow
   #[sdk(attr(qname = ":vertOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_overflow: Option<TextVerticalOverflowValues>,
   /// Text Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_overflow: Option<TextHorizontalOverflowValues>,
   /// Vertical Text
   #[sdk(attr(qname = ":vert"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical: Option<TextVerticalValues>,
   /// Text Wrapping Type
   #[sdk(attr(qname = ":wrap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap: Option<TextWrappingValues>,
   /// Left Inset
   #[sdk(attr(qname = ":lIns"))]
@@ -6611,17 +6080,11 @@ pub struct BodyProperties {
   pub bottom_inset: Option<crate::simple_type::Int32Value>,
   /// Number of Columns
   #[sdk(attr(qname = ":numCol"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "16",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 16))]
   pub column_count: Option<crate::simple_type::Int32Value>,
   /// Space Between Columns
   #[sdk(attr(qname = ":spcCol"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub column_spacing: Option<crate::simple_type::Int32Value>,
   /// Columns Right-To-Left
   #[sdk(attr(qname = ":rtlCol"))]
@@ -6631,7 +6094,7 @@ pub struct BodyProperties {
   pub from_word_art: Option<crate::simple_type::BooleanValue>,
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub anchor: Option<TextAnchoringTypeValues>,
   /// Anchor Center
   #[sdk(attr(qname = ":anchorCtr"))]
@@ -6768,51 +6231,51 @@ pub struct TextDefault {
 pub struct OverrideColorMapping {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background1: ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text1: ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background2: ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text2: ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent1: ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent2: ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent3: ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent4: ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent5: ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent6: ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hyperlink: ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink: ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -6824,51 +6287,51 @@ pub struct OverrideColorMapping {
 pub struct ColorMap {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background1: ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text1: ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background2: ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text2: ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent1: ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent2: ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent3: ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent4: ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent5: ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent6: ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hyperlink: ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink: ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -6908,7 +6371,7 @@ pub struct ThemeElements {
 pub struct Cell3DProperties {
   /// Preset Material
   #[sdk(attr(qname = ":prstMaterial"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset_material: Option<PresetMaterialTypeValues>,
   /// Bevel
   #[sdk(child(qname = "a:CT_Bevel/a:bevel"))]
@@ -6938,18 +6401,18 @@ pub struct TableCellProperties {
   pub bottom_margin: Option<crate::simple_type::Int32Value>,
   /// Text Direction
   #[sdk(attr(qname = ":vert"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical: Option<TextVerticalValues>,
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub anchor: Option<TextAnchoringTypeValues>,
   /// Anchor Center
   #[sdk(attr(qname = ":anchorCtr"))]
   pub anchor_center: Option<crate::simple_type::BooleanValue>,
   /// Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_overflow: Option<TextHorizontalOverflowValues>,
   /// Left Border Line Properties
   #[sdk(child(qname = "a:CT_LineProperties/a:lnL"))]
@@ -7019,11 +6482,8 @@ pub struct TableCell {
 pub struct TableStyle {
   /// Style ID
   #[sdk(attr(qname = ":styleId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub style_id: crate::simple_type::StringValue,
   /// Name
   #[sdk(attr(qname = ":styleName"))]
@@ -7080,11 +6540,8 @@ pub struct TableStyle {
 pub struct TableStyleEntry {
   /// Style ID
   #[sdk(attr(qname = ":styleId"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub style_id: crate::simple_type::StringValue,
   /// Name
   #[sdk(attr(qname = ":styleName"))]
@@ -7143,13 +6600,7 @@ pub type TableStyleId = crate::simple_type::StringValue;
 pub struct GridColumn {
   /// Width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub width: crate::simple_type::Int64Value,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
@@ -7217,13 +6668,7 @@ pub struct TableGrid {
 pub struct TableRow {
   /// Height
   #[sdk(attr(qname = ":h"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub height: crate::simple_type::Int64Value,
   /// Table Cell.
   #[sdk(child(qname = "a:CT_TableCell/a:tc"))]
@@ -7352,11 +6797,11 @@ pub struct TableCellTextStyle {
   pub xml_other_children: Vec<(usize, String)>,
   /// Bold
   #[sdk(attr(qname = ":b"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub bold: Option<BooleanStyleValues>,
   /// Italic
   #[sdk(attr(qname = ":i"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub italic: Option<BooleanStyleValues>,
   #[sdk(choice(
     qname = "a:CT_FontCollection/a:font",
@@ -7557,47 +7002,23 @@ pub struct ParagraphProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -7610,7 +7031,7 @@ pub struct ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -7666,47 +7087,23 @@ pub struct ParagraphProperties {
 pub struct DefaultParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -7719,7 +7116,7 @@ pub struct DefaultParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -7775,47 +7172,23 @@ pub struct DefaultParagraphProperties {
 pub struct Level1ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -7828,7 +7201,7 @@ pub struct Level1ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -7884,47 +7257,23 @@ pub struct Level1ParagraphProperties {
 pub struct Level2ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -7937,7 +7286,7 @@ pub struct Level2ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -7993,47 +7342,23 @@ pub struct Level2ParagraphProperties {
 pub struct Level3ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8046,7 +7371,7 @@ pub struct Level3ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8102,47 +7427,23 @@ pub struct Level3ParagraphProperties {
 pub struct Level4ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8155,7 +7456,7 @@ pub struct Level4ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8211,47 +7512,23 @@ pub struct Level4ParagraphProperties {
 pub struct Level5ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8264,7 +7541,7 @@ pub struct Level5ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8320,47 +7597,23 @@ pub struct Level5ParagraphProperties {
 pub struct Level6ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8373,7 +7626,7 @@ pub struct Level6ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8429,47 +7682,23 @@ pub struct Level6ParagraphProperties {
 pub struct Level7ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8482,7 +7711,7 @@ pub struct Level7ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8538,47 +7767,23 @@ pub struct Level7ParagraphProperties {
 pub struct Level8ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8591,7 +7796,7 @@ pub struct Level8ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8647,47 +7852,23 @@ pub struct Level8ParagraphProperties {
 pub struct Level9ParagraphProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
@@ -8700,7 +7881,7 @@ pub struct Level9ParagraphProperties {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment: Option<TextFontAlignmentValues>,
   /// Latin Line Break
   #[sdk(attr(qname = ":latinLnBrk"))]
@@ -8766,13 +7947,7 @@ pub struct EndParagraphRunProperties {
   pub alternative_language: Option<crate::simple_type::StringValue>,
   /// sz
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 100..= 400000))]
   pub font_size: Option<crate::simple_type::Int32Value>,
   /// b
   #[sdk(attr(qname = ":b"))]
@@ -8782,35 +7957,23 @@ pub struct EndParagraphRunProperties {
   pub italic: Option<crate::simple_type::BooleanValue>,
   /// u
   #[sdk(attr(qname = ":u"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub underline: Option<TextUnderlineValues>,
   /// strike
   #[sdk(attr(qname = ":strike"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub strike: Option<TextStrikeValues>,
   /// kern
   #[sdk(attr(qname = ":kern"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 400000))]
   pub kerning: Option<crate::simple_type::Int32Value>,
   /// cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub capital: Option<TextCapsValues>,
   /// spc
   #[sdk(attr(qname = ":spc"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-400000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -400000..= 400000))]
   pub spacing: Option<crate::simple_type::Int32Value>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
@@ -8907,13 +8070,7 @@ pub struct RunProperties {
   pub alternative_language: Option<crate::simple_type::StringValue>,
   /// sz
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 100..= 400000))]
   pub font_size: Option<crate::simple_type::Int32Value>,
   /// b
   #[sdk(attr(qname = ":b"))]
@@ -8923,35 +8080,23 @@ pub struct RunProperties {
   pub italic: Option<crate::simple_type::BooleanValue>,
   /// u
   #[sdk(attr(qname = ":u"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub underline: Option<TextUnderlineValues>,
   /// strike
   #[sdk(attr(qname = ":strike"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub strike: Option<TextStrikeValues>,
   /// kern
   #[sdk(attr(qname = ":kern"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 400000))]
   pub kerning: Option<crate::simple_type::Int32Value>,
   /// cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub capital: Option<TextCapsValues>,
   /// spc
   #[sdk(attr(qname = ":spc"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-400000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -400000..= 400000))]
   pub spacing: Option<crate::simple_type::Int32Value>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
@@ -9048,13 +8193,7 @@ pub struct DefaultRunProperties {
   pub alternative_language: Option<crate::simple_type::StringValue>,
   /// sz
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 100..= 400000))]
   pub font_size: Option<crate::simple_type::Int32Value>,
   /// b
   #[sdk(attr(qname = ":b"))]
@@ -9064,35 +8203,23 @@ pub struct DefaultRunProperties {
   pub italic: Option<crate::simple_type::BooleanValue>,
   /// u
   #[sdk(attr(qname = ":u"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub underline: Option<TextUnderlineValues>,
   /// strike
   #[sdk(attr(qname = ":strike"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub strike: Option<TextStrikeValues>,
   /// kern
   #[sdk(attr(qname = ":kern"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 400000))]
   pub kerning: Option<crate::simple_type::Int32Value>,
   /// cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub capital: Option<TextCapsValues>,
   /// spc
   #[sdk(attr(qname = ":spc"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-400000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -400000..= 400000))]
   pub spacing: Option<crate::simple_type::Int32Value>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
@@ -9204,7 +8331,7 @@ pub struct TabStop {
   pub position: Option<crate::simple_type::Int32Value>,
   /// Tab Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment: Option<TextTabAlignmentValues>,
 }
 /// Spacing Percent.
@@ -9213,13 +8340,7 @@ pub struct TabStop {
 pub struct SpacingPercent {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "13200000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 13200000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Spacing Points.
@@ -9228,13 +8349,7 @@ pub struct SpacingPercent {
 pub struct SpacingPoints {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "158400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 158400))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Line Spacing.
@@ -9286,7 +8401,7 @@ pub struct ShapePropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "a:CT_FillProperties/a14:hiddenFill",
@@ -9308,7 +8423,7 @@ pub struct GvmlGroupShapeExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "a14:CT_IsGvmlCanvas/a14:isCanvas", any))]
   pub gvml_group_shape_extension_choice: Option<GvmlGroupShapeExtensionChoice>,
@@ -9340,7 +8455,7 @@ pub struct NonVisualGroupShapeProperties {
 pub struct VisualGroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode: Option<BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
   #[sdk(child(qname = "a:CT_GroupTransform2D/a:xfrm"))]
@@ -9486,7 +8601,7 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "a15:CT_NonVisualGroupProps/a15:nonVisualGroupProps", any))]
   pub non_visual_group_drawing_shape_props_extension_choice:
@@ -9501,7 +8616,7 @@ pub struct OfficeStyleSheetExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "thm15:CT_ThemeFamily/thm15:themeFamily", any))]
   pub office_style_sheet_extension_choice: Option<OfficeStyleSheetExtensionChoice>,
@@ -9515,7 +8630,7 @@ pub struct ConnectorLockingExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "a:CT_GraphicalObject/a:graphic", any))]
   pub connector_locking_extension_choice: Option<ConnectorLockingExtensionChoice>,
@@ -9743,7 +8858,7 @@ pub struct DataModelExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "dsp:CT_DataModelExtBlock/dsp:dataModelExt",
@@ -9761,7 +8876,7 @@ pub struct PtExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "a:CT_NonVisualDrawingProps/dgm14:cNvPr", any))]
   pub pt_extension_choice: Option<PtExtensionChoice>,
@@ -9775,7 +8890,7 @@ pub struct HyperlinkExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "ahyp:CT_HyperlinkColor/ahyp:hlinkClr", any))]
   pub hyperlink_extension_choice: Option<HyperlinkExtensionChoice>,
@@ -9798,7 +8913,7 @@ pub struct LinePropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "ask:CT_LineSketchStyleProperties/ask:lineSketchStyleProps",
@@ -9812,15 +8927,15 @@ pub struct LinePropertiesExtension {
 pub struct HeadEnd {
   /// Line Head/End Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<LineEndValues>,
   /// Width of Head/End
   #[sdk(attr(qname = ":w"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub width: Option<LineEndWidthValues>,
   /// Length of Head/End
   #[sdk(attr(qname = ":len"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub length: Option<LineEndLengthValues>,
 }
 /// default tail line end style is none.
@@ -9829,15 +8944,15 @@ pub struct HeadEnd {
 pub struct TailEnd {
   /// Line Head/End Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<LineEndValues>,
   /// Width of Head/End
   #[sdk(attr(qname = ":w"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub width: Option<LineEndWidthValues>,
   /// Length of Head/End
   #[sdk(attr(qname = ":len"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub length: Option<LineEndLengthValues>,
 }
 /// Future extensions..
@@ -9858,7 +8973,7 @@ pub struct NonVisualDrawingPropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "a14:CT_CompatExt/a14:compatExt",
@@ -9932,7 +9047,7 @@ pub struct NonVisualPicturePropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "a14:CT_CameraTool/a14:cameraTool",
@@ -9963,7 +9078,7 @@ pub struct BlipExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "a14:CT_Photo/a14:imgProps",

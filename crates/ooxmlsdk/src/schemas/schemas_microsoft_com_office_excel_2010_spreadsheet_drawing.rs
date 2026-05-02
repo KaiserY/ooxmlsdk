@@ -13,7 +13,7 @@ pub struct ContentPart {
   pub relationship_id: crate::simple_type::StringValue,
   /// bwMode
   #[sdk(attr(office2010, qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// Defines the ExcelNonVisualContentPartShapeProperties Class.

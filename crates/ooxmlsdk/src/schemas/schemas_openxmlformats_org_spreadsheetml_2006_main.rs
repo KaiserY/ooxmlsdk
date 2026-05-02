@@ -1565,7 +1565,7 @@ pub struct Extension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -2122,19 +2122,13 @@ pub struct Headers {
   pub xml_other_children: Vec<(usize, String)>,
   /// Last Revision GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// Last GUID
   #[sdk(attr(qname = ":lastGuid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub last_guid: Option<crate::simple_type::StringValue>,
   /// Shared Workbook
   #[sdk(attr(qname = ":shared"))]
@@ -2843,11 +2837,8 @@ pub struct Comment {
   pub author_id: crate::simple_type::UInt32Value,
   /// Unique Identifier for Comment
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: Option<crate::simple_type::StringValue>,
   /// shapeId
   #[sdk(attr(office2010, qname = ":shapeId"))]
@@ -3407,11 +3398,11 @@ pub struct MissingItem {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// background Color
   #[sdk(attr(qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// Foreground Color
   #[sdk(attr(qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// Italic
   #[sdk(attr(qname = ":i"))]
@@ -3456,11 +3447,11 @@ pub struct NumberItem {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// Background Color
   #[sdk(attr(qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// Foreground Color
   #[sdk(attr(qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// Italic
   #[sdk(attr(qname = ":i"))]
@@ -3528,11 +3519,11 @@ pub struct ErrorItem {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// background Color
   #[sdk(attr(qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// Foreground Color
   #[sdk(attr(qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// Italic
   #[sdk(attr(qname = ":i"))]
@@ -3577,11 +3568,11 @@ pub struct StringItem {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// Background Color
   #[sdk(attr(qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// Foreground Color
   #[sdk(attr(qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// Italic
   #[sdk(attr(qname = ":i"))]
@@ -4958,7 +4949,7 @@ pub struct Color {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -4979,7 +4970,7 @@ pub struct TabColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -5000,7 +4991,7 @@ pub struct ForegroundColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -5021,7 +5012,7 @@ pub struct BackgroundColor {
   pub indexed: Option<crate::simple_type::UInt32Value>,
   /// Alpha Red Green Blue Color Value
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
   /// Theme Color
   #[sdk(attr(qname = ":theme"))]
@@ -5158,11 +5149,8 @@ pub struct Header {
   pub xml_other_attrs: Vec<(String, String)>,
   /// GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// Date Time
   #[sdk(attr(qname = ":dateTime"))]
@@ -5273,11 +5261,8 @@ pub struct RevisionMove {
 pub struct RevisionCustomView {
   /// GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// User Action
   #[sdk(attr(qname = ":action"))]
@@ -5557,11 +5542,8 @@ pub struct RevisionComment {
   pub cell: crate::simple_type::StringValue,
   /// GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// User Action
   #[sdk(attr(qname = ":action"))]
@@ -5932,11 +5914,8 @@ pub struct UserInfo {
   pub xml_other_attrs: Vec<(String, String)>,
   /// User Revisions GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// User Name
   #[sdk(attr(qname = ":name"))]
@@ -6515,7 +6494,7 @@ pub struct Scenario {
 pub struct ProtectedRange {
   /// password
   #[sdk(attr(qname = ":password"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub password: Option<crate::simple_type::HexBinaryValue>,
   /// algorithmName
   #[sdk(attr(qname = ":algorithmName"))]
@@ -6663,11 +6642,8 @@ pub struct ChartSheetView {
 pub struct CustomChartsheetView {
   /// GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// Print Scale
   #[sdk(attr(qname = ":scale"))]
@@ -6908,11 +6884,8 @@ pub struct CustomSheetView {
   pub xml_other_attrs: Vec<(String, String)>,
   /// GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// Print Scale
   #[sdk(attr(qname = ":scale"))]
@@ -7260,11 +7233,11 @@ pub struct MdxTuple {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// Server Formatting Background Color
   #[sdk(attr(qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// Server Formatting Foreground Color
   #[sdk(attr(qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// Server Formatting Italic Font
   #[sdk(attr(qname = ":i"))]
@@ -7645,7 +7618,7 @@ pub struct TableStyle {
 pub struct RgbColor {
   /// Alpha Red Green Blue
   #[sdk(attr(qname = ":rgb"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub rgb: Option<crate::simple_type::HexBinaryValue>,
 }
 /// Cell Style.
@@ -7735,7 +7708,7 @@ pub struct CellFormat {
 pub struct FontName {
   /// String Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_length(source = 1u32, min = 1u32))]
+  #[sdk(string_length(min = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Font Family.
@@ -7744,13 +7717,7 @@ pub struct FontName {
 pub struct FontFamilyNumbering {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "5",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 5))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Character Set.
@@ -7759,13 +7726,7 @@ pub struct FontFamilyNumbering {
 pub struct FontCharSet {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "255",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 255))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Table Style.
@@ -8183,11 +8144,8 @@ pub struct CustomWorkbookView {
   pub name: crate::simple_type::StringValue,
   /// Custom View GUID
   #[sdk(attr(qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// Auto Update
   #[sdk(attr(qname = ":autoUpdate"))]
@@ -8448,7 +8406,7 @@ pub struct ConditionalFormattingRuleExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x:ST_Guid/x14:id", any))]
   pub conditional_formatting_rule_extension_choice:
@@ -8463,7 +8421,7 @@ pub struct PivotHierarchyExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_PivotHierarchy/x14:pivotHierarchy", any))]
   pub pivot_hierarchy_extension_choice: Option<PivotHierarchyExtensionChoice>,
@@ -8477,7 +8435,7 @@ pub struct PivotFieldExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_PivotField/x14:pivotField", any))]
   pub pivot_field_extension_choice: Option<PivotFieldExtensionChoice>,
@@ -8491,7 +8449,7 @@ pub struct CacheSourceExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x14:CT_SourceConnection/x14:sourceConnection", any))]
   pub cache_source_extension_choice: Option<CacheSourceExtensionChoice>,
@@ -8740,7 +8698,7 @@ pub struct ChartSheetViews {
 pub struct ChartSheetProtection {
   /// Password
   #[sdk(attr(qname = ":password"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub password: Option<crate::simple_type::HexBinaryValue>,
   /// Cryptographic Algorithm Name
   #[sdk(attr(qname = ":algorithmName"))]
@@ -9044,7 +9002,7 @@ pub struct SheetFormatProperties {
 pub struct SheetProtection {
   /// Password
   #[sdk(attr(qname = ":password"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub password: Option<crate::simple_type::HexBinaryValue>,
   /// Cryptographic Algorithm Name
   #[sdk(attr(qname = ":algorithmName"))]
@@ -9528,7 +9486,7 @@ pub struct SlicerCacheDefinitionExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_SlicerCachePivotTables/x15:slicerCachePivotTables",
@@ -9547,7 +9505,7 @@ pub struct PivotFilterExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x15:CT_PivotFilter/x15:pivotFilter",
@@ -9565,7 +9523,7 @@ pub struct QueryTableExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "x15:CT_QueryTable/x15:queryTable", any))]
   pub query_table_extension_choice: Option<QueryTableExtensionChoice>,
@@ -9751,7 +9709,7 @@ pub struct ConnectionExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_Connection/x14:connection",
@@ -9864,7 +9822,7 @@ pub struct CacheFieldExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_CacheField/x14:cacheField",
@@ -9913,7 +9871,7 @@ pub struct CacheHierarchyExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_CacheHierarchy/x14:cacheHierarchy",
@@ -9940,7 +9898,7 @@ pub struct CalculatedMemberExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_CalculatedMember/x14:calculatedMember",
@@ -9967,7 +9925,7 @@ pub struct DataFieldExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_DataField/x14:dataField",
@@ -10154,7 +10112,7 @@ pub struct WorksheetExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_ConditionalFormattings/x14:conditionalFormattings",
@@ -10308,7 +10266,7 @@ pub struct StylesheetExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x:CT_Dxfs/x14:dxfs",
@@ -10537,7 +10495,7 @@ pub struct PivotTableDefinitionExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_PivotTableDefinition/x14:pivotTableDefinition",
@@ -10694,7 +10652,7 @@ pub struct PivotCacheDefinitionExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_PivotCacheDefinition/x14:pivotCacheDefinition",
@@ -10783,7 +10741,7 @@ pub struct TableExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_Table/x14:table",
@@ -10810,11 +10768,8 @@ pub struct FileVersion {
   pub build_version: Option<crate::simple_type::StringValue>,
   /// Code Name
   #[sdk(attr(qname = ":codeName"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub code_name: Option<crate::simple_type::StringValue>,
 }
 /// Defines the FileSharing Class.
@@ -10829,7 +10784,7 @@ pub struct FileSharing {
   pub user_name: Option<crate::simple_type::StringValue>,
   /// Write Reservation Password
   #[sdk(attr(qname = ":reservationPassword"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub reservation_password: Option<crate::simple_type::HexBinaryValue>,
   /// Password hash algorithm
   #[sdk(attr(qname = ":algorithmName"))]
@@ -10913,11 +10868,11 @@ pub struct WorkbookProperties {
 pub struct WorkbookProtection {
   /// Workbook Password
   #[sdk(attr(qname = ":workbookPassword"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub workbook_password: Option<crate::simple_type::HexBinaryValue>,
   /// Revisions Password
   #[sdk(attr(qname = ":revisionsPassword"))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 2u32))]
+  #[sdk(string_length(min = 2u32, max = 2u32))]
   pub revisions_password: Option<crate::simple_type::HexBinaryValue>,
   /// Lock Structure
   #[sdk(attr(qname = ":lockStructure"))]
@@ -11142,7 +11097,7 @@ pub struct WorkbookExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "x14:CT_DefinedNames/x14:definedNames",

@@ -120,7 +120,7 @@ pub struct ExtendedGuide {
   pub name: Option<crate::simple_type::StringValue>,
   /// orient
   #[sdk(attr(office2013, qname = ":orient"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub orientation:
     Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
   /// pos

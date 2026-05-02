@@ -56,7 +56,7 @@ pub struct NumberDiagramInfo {
   pub lvl: crate::simple_type::UInt32Value,
   /// ptType
   #[sdk(attr(office2019, qname = ":ptType"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub pt_type: STorageType,
   /// Defines the DiagramAutoBullet Class.
   #[sdk(child(office2019, qname = "dgm1611:CT_DiagramAutoBullet/dgm1611:buPr"))]

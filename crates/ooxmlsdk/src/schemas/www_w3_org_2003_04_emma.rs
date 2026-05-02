@@ -52,7 +52,7 @@ pub enum DisjunctionTypeValues {
 pub struct DerivedFrom {
   /// resource
   #[sdk(attr(qname = ":resource"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub resource: crate::simple_type::StringValue,
   /// composite
   #[sdk(attr(qname = ":composite"))]
@@ -64,9 +64,9 @@ pub struct DerivedFrom {
 pub struct Info {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -77,7 +77,7 @@ pub struct Info {
 pub struct Lattice {
   /// initial
   #[sdk(attr(qname = ":initial"))]
-  #[sdk(number_sign(source = 1u32, kind = "non_negative"))]
+  #[sdk(number_sign(kind = "non_negative"))]
   pub initial: crate::simple_type::IntegerValue,
   /// final
   #[sdk(attr(qname = ":final"))]
@@ -99,9 +99,9 @@ pub type Literal = crate::simple_type::StringValue;
 pub struct Interpretation {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// tokens
   #[sdk(attr(qname = "emma:tokens"))]
@@ -123,13 +123,7 @@ pub struct Interpretation {
   pub media_type: Option<crate::simple_type::StringValue>,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// source
   #[sdk(attr(qname = "emma:source"))]
@@ -166,13 +160,7 @@ pub struct Interpretation {
   pub verbal: Option<crate::simple_type::BooleanValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// grammar-ref
   #[sdk(attr(qname = "emma:grammar-ref"))]
@@ -210,9 +198,9 @@ pub struct OneOf {
   pub disjunction_type: Option<DisjunctionTypeValues>,
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// tokens
   #[sdk(attr(qname = "emma:tokens"))]
@@ -234,13 +222,7 @@ pub struct OneOf {
   pub media_type: Option<crate::simple_type::StringValue>,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// source
   #[sdk(attr(qname = "emma:source"))]
@@ -277,13 +259,7 @@ pub struct OneOf {
   pub verbal: Option<crate::simple_type::BooleanValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// grammar-ref
   #[sdk(attr(qname = "emma:grammar-ref"))]
@@ -313,9 +289,9 @@ pub struct OneOf {
 pub struct Group {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// tokens
   #[sdk(attr(qname = "emma:tokens"))]
@@ -337,13 +313,7 @@ pub struct Group {
   pub media_type: Option<crate::simple_type::StringValue>,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// source
   #[sdk(attr(qname = "emma:source"))]
@@ -380,13 +350,7 @@ pub struct Group {
   pub verbal: Option<crate::simple_type::BooleanValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// grammar-ref
   #[sdk(attr(qname = "emma:grammar-ref"))]
@@ -417,9 +381,9 @@ pub struct Group {
 pub struct Sequence {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// tokens
   #[sdk(attr(qname = "emma:tokens"))]
@@ -441,13 +405,7 @@ pub struct Sequence {
   pub media_type: Option<crate::simple_type::StringValue>,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// source
   #[sdk(attr(qname = "emma:source"))]
@@ -484,13 +442,7 @@ pub struct Sequence {
   pub verbal: Option<crate::simple_type::BooleanValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// grammar-ref
   #[sdk(attr(qname = "emma:grammar-ref"))]
@@ -520,7 +472,7 @@ pub struct Sequence {
 pub struct GroupInfo {
   /// ref
   #[sdk(attr(qname = ":ref"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -543,13 +495,13 @@ pub struct Derivation {
 pub struct Grammar {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// ref
   #[sdk(attr(qname = ":ref"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub reference: crate::simple_type::StringValue,
 }
 /// Defines the Model Class.
@@ -558,13 +510,13 @@ pub struct Grammar {
 pub struct Model {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// ref
   #[sdk(attr(qname = ":ref"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -575,9 +527,9 @@ pub struct Model {
 pub struct EndPointInfo {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the EndPoint Class.
   #[sdk(child(qname = "emma:CT_EndPoint/emma:endpoint"))]
@@ -589,9 +541,9 @@ pub struct EndPointInfo {
 pub struct EndPoint {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
-  #[sdk(string_format(source = 1u32, kind = "id"))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: crate::simple_type::StringValue,
   /// endpoint-role
   #[sdk(attr(qname = "emma:endpoint-role"))]
@@ -632,27 +584,15 @@ pub struct EndPoint {
 pub struct Node {
   /// node-number
   #[sdk(attr(qname = ":node-number"))]
-  #[sdk(number_sign(source = 1u32, kind = "non_negative"))]
+  #[sdk(number_sign(kind = "non_negative"))]
   pub node_number: crate::simple_type::IntegerValue,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// Defines the Info Class.
   #[sdk(child(qname = "emma:CT_Info/emma:info"))]
@@ -664,11 +604,11 @@ pub struct Node {
 pub struct Arc {
   /// from
   #[sdk(attr(qname = ":from"))]
-  #[sdk(number_sign(source = 1u32, kind = "non_negative"))]
+  #[sdk(number_sign(kind = "non_negative"))]
   pub from: crate::simple_type::IntegerValue,
   /// to
   #[sdk(attr(qname = ":to"))]
-  #[sdk(number_sign(source = 1u32, kind = "non_negative"))]
+  #[sdk(number_sign(kind = "non_negative"))]
   pub to: crate::simple_type::IntegerValue,
   /// start
   #[sdk(attr(qname = "emma:start"))]
@@ -684,23 +624,11 @@ pub struct Arc {
   pub duration: Option<crate::simple_type::IntegerValue>,
   /// confidence
   #[sdk(attr(qname = "emma:confidence"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "1",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 1))]
   pub confidence: Option<crate::simple_type::DecimalValue>,
   /// cost
   #[sdk(attr(qname = "emma:cost"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10000000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10000000))]
   pub cost: Option<crate::simple_type::DecimalValue>,
   /// lang
   #[sdk(attr(qname = "emma:lang"))]

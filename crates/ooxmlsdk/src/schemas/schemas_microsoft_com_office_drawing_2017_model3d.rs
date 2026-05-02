@@ -136,33 +136,15 @@ pub struct IntensityPositiveRatio {
 pub struct PreTransVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dx: crate::simple_type::Int64Value,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dy: crate::simple_type::Int64Value,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dz: crate::simple_type::Int64Value,
 }
 /// Defines the PostTransVector3D Class.
@@ -171,33 +153,15 @@ pub struct PreTransVector3D {
 pub struct PostTransVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dx: crate::simple_type::Int64Value,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dy: crate::simple_type::Int64Value,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dz: crate::simple_type::Int64Value,
 }
 /// Defines the UpVector3D Class.
@@ -206,33 +170,15 @@ pub struct PostTransVector3D {
 pub struct UpVector3D {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dx: crate::simple_type::Int64Value,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dy: crate::simple_type::Int64Value,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub dz: crate::simple_type::Int64Value,
 }
 /// Defines the Scale3D Class.
@@ -278,33 +224,15 @@ pub struct OfficeArtExtensionList {
 pub struct PosPoint3D {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Coordinate in 3D
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
   /// Z-Coordinate in 3D
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: crate::simple_type::Int64Value,
 }
 /// Defines the LookAtPoint3D Class.
@@ -313,33 +241,15 @@ pub struct PosPoint3D {
 pub struct LookAtPoint3D {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Coordinate in 3D
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
   /// Z-Coordinate in 3D
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: crate::simple_type::Int64Value,
 }
 /// Defines the OrthographicProjection Class.
@@ -359,13 +269,7 @@ pub struct OrthographicProjection {
 pub struct PerspectiveProjection {
   /// fov
   #[sdk(attr(office2019, qname = ":fov"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "10800000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10800000))]
   pub fov: crate::simple_type::Int32Value,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]
@@ -384,7 +288,7 @@ pub struct Blip {
   pub link: Option<crate::simple_type::StringValue>,
   /// Compression state for blips.
   #[sdk(attr(qname = ":cstate"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compression_state:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
   #[sdk(choice(
@@ -433,7 +337,7 @@ pub struct Model3DExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   #[sdk(attr(office2019, qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "a3danim:CT_EmbeddedAnimation/a3danim:embedAnim",
@@ -449,7 +353,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -583,13 +487,7 @@ pub struct Model3DExtensionList {
 pub struct ObjectViewport {
   /// viewportSz
   #[sdk(attr(office2019, qname = ":viewportSz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub viewport_sz: crate::simple_type::Int64Value,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]
@@ -629,13 +527,7 @@ pub struct PointLight {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// rad
   #[sdk(attr(office2019, qname = ":rad"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub rad: crate::simple_type::Int64Value,
   /// Defines the ColorType Class.
   #[sdk(child(office2019, qname = "a:CT_Color/am3d:clr"))]
@@ -659,23 +551,11 @@ pub struct SpotLight {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// rad
   #[sdk(attr(office2019, qname = ":rad"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub rad: crate::simple_type::Int64Value,
   /// spotAng
   #[sdk(attr(office2019, qname = ":spotAng"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "10800000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10800000))]
   pub spot_ang: crate::simple_type::Int32Value,
   /// Defines the ColorType Class.
   #[sdk(child(office2019, qname = "a:CT_Color/am3d:clr"))]
@@ -702,13 +582,7 @@ pub struct DirectionalLight {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// angularRad
   #[sdk(attr(office2019, qname = ":angularRad"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "5400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 5400000))]
   pub angular_rad: crate::simple_type::Int32Value,
   /// Defines the ColorType Class.
   #[sdk(child(office2019, qname = "a:CT_Color/am3d:clr"))]

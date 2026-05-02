@@ -27,13 +27,7 @@ pub struct PosterFrame {
   pub anim_id: crate::simple_type::UInt32Value,
   /// frame
   #[sdk(attr(office2019, qname = ":frame"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub frame: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the AnimationProperties Class.

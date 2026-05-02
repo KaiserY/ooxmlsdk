@@ -38,7 +38,7 @@ pub struct IsCanvas {
 pub struct GvmlContentPart {
   /// bwMode
   #[sdk(attr(office2010, qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// id
@@ -86,27 +86,21 @@ pub struct HiddenLineProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PenAlignmentValues>,
   #[sdk(choice(
@@ -177,37 +171,19 @@ pub struct HiddenScene3D {
 pub struct HiddenShape3D {
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub z: Option<crate::simple_type::Int64Value>,
   /// Extrusion Height
   #[sdk(attr(qname = ":extrusionH"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub extrusion_height: Option<crate::simple_type::Int64Value>,
   /// Contour Width
   #[sdk(attr(qname = ":contourW"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub contour_width: Option<crate::simple_type::Int64Value>,
   /// Preset Material Type
   #[sdk(attr(qname = ":prstMaterial"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset_material: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PresetMaterialTypeValues,
   >,
@@ -307,43 +283,19 @@ pub struct ContentPartLocks {
 pub struct ForegroundMark {
   /// x1
   #[sdk(attr(office2010, qname = ":x1"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub first_x_coordinate: crate::simple_type::Int32Value,
   /// y1
   #[sdk(attr(office2010, qname = ":y1"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub first_y_coordinate: crate::simple_type::Int32Value,
   /// x2
   #[sdk(attr(office2010, qname = ":x2"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub second_x_coordinate: crate::simple_type::Int32Value,
   /// y2
   #[sdk(attr(office2010, qname = ":y2"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub second_y_coordinate: crate::simple_type::Int32Value,
 }
 /// Defines the BackgroundMark Class.
@@ -355,43 +307,19 @@ pub struct ForegroundMark {
 pub struct BackgroundMark {
   /// x1
   #[sdk(attr(office2010, qname = ":x1"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub first_x_coordinate: crate::simple_type::Int32Value,
   /// y1
   #[sdk(attr(office2010, qname = ":y1"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub first_y_coordinate: crate::simple_type::Int32Value,
   /// x2
   #[sdk(attr(office2010, qname = ":x2"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub second_x_coordinate: crate::simple_type::Int32Value,
   /// y2
   #[sdk(attr(office2010, qname = ":y2"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub second_y_coordinate: crate::simple_type::Int32Value,
 }
 /// Defines the ArtisticBlur Class.
@@ -400,13 +328,7 @@ pub struct BackgroundMark {
 pub struct ArtisticBlur {
   /// radius
   #[sdk(attr(office2010, qname = ":radius"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub radius: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticCement Class.
@@ -415,23 +337,11 @@ pub struct ArtisticBlur {
 pub struct ArtisticCement {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// crackSpacing
   #[sdk(attr(office2010, qname = ":crackSpacing"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub crack_spacing: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticChalkSketch Class.
@@ -443,23 +353,11 @@ pub struct ArtisticCement {
 pub struct ArtisticChalkSketch {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pressure
   #[sdk(attr(office2010, qname = ":pressure"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "4",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 4))]
   pub pressure: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticCrisscrossEtching Class.
@@ -471,23 +369,11 @@ pub struct ArtisticChalkSketch {
 pub struct ArtisticCrisscrossEtching {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pressure
   #[sdk(attr(office2010, qname = ":pressure"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub pressure: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticCutout Class.
@@ -496,23 +382,11 @@ pub struct ArtisticCrisscrossEtching {
 pub struct ArtisticCutout {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// numberOfShades
   #[sdk(attr(office2010, qname = ":numberOfShades"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "6",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 6))]
   pub number_of_shades: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticFilmGrain Class.
@@ -524,23 +398,11 @@ pub struct ArtisticCutout {
 pub struct ArtisticFilmGrain {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// grainSize
   #[sdk(attr(office2010, qname = ":grainSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub grain_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticGlass Class.
@@ -549,23 +411,11 @@ pub struct ArtisticFilmGrain {
 pub struct ArtisticGlass {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// scaling
   #[sdk(attr(office2010, qname = ":scaling"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub scaling: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticGlowDiffused Class.
@@ -577,23 +427,11 @@ pub struct ArtisticGlass {
 pub struct ArtisticGlowDiffused {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// intensity
   #[sdk(attr(office2010, qname = ":intensity"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub intensity: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticGlowEdges Class.
@@ -605,23 +443,11 @@ pub struct ArtisticGlowDiffused {
 pub struct ArtisticGlowEdges {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// smoothness
   #[sdk(attr(office2010, qname = ":smoothness"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub smoothness: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticLightScreen Class.
@@ -633,23 +459,11 @@ pub struct ArtisticGlowEdges {
 pub struct ArtisticLightScreen {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// gridSize
   #[sdk(attr(office2010, qname = ":gridSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub grid_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticLineDrawing Class.
@@ -661,23 +475,11 @@ pub struct ArtisticLightScreen {
 pub struct ArtisticLineDrawing {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pencilSize
   #[sdk(attr(office2010, qname = ":pencilSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub pencil_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticMarker Class.
@@ -686,23 +488,11 @@ pub struct ArtisticLineDrawing {
 pub struct ArtisticMarker {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// size
   #[sdk(attr(office2010, qname = ":size"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticMosaicBubbles Class.
@@ -714,23 +504,11 @@ pub struct ArtisticMarker {
 pub struct ArtisticMosaicBubbles {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pressure
   #[sdk(attr(office2010, qname = ":pressure"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub pressure: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPaintStrokes Class.
@@ -742,23 +520,11 @@ pub struct ArtisticMosaicBubbles {
 pub struct ArtisticPaintStrokes {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// intensity
   #[sdk(attr(office2010, qname = ":intensity"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub intensity: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPaintBrush Class.
@@ -770,23 +536,11 @@ pub struct ArtisticPaintStrokes {
 pub struct ArtisticPaintBrush {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// brushSize
   #[sdk(attr(office2010, qname = ":brushSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub brush_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPastelsSmooth Class.
@@ -798,23 +552,11 @@ pub struct ArtisticPaintBrush {
 pub struct ArtisticPastelsSmooth {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// scaling
   #[sdk(attr(office2010, qname = ":scaling"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub brush_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPencilGrayscale Class.
@@ -826,23 +568,11 @@ pub struct ArtisticPastelsSmooth {
 pub struct ArtisticPencilGrayscale {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pencilSize
   #[sdk(attr(office2010, qname = ":pencilSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub brush_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPencilSketch Class.
@@ -854,23 +584,11 @@ pub struct ArtisticPencilGrayscale {
 pub struct ArtisticPencilSketch {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// pressure
   #[sdk(attr(office2010, qname = ":pressure"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub pressure: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPhotocopy Class.
@@ -882,23 +600,11 @@ pub struct ArtisticPencilSketch {
 pub struct ArtisticPhotocopy {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// detail
   #[sdk(attr(office2010, qname = ":detail"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub detail: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticPlasticWrap Class.
@@ -910,23 +616,11 @@ pub struct ArtisticPhotocopy {
 pub struct ArtisticPlasticWrap {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// smoothness
   #[sdk(attr(office2010, qname = ":smoothness"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub smoothness: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticTexturizer Class.
@@ -938,23 +632,11 @@ pub struct ArtisticPlasticWrap {
 pub struct ArtisticTexturizer {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// scaling
   #[sdk(attr(office2010, qname = ":scaling"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub scaling: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ArtisticWatercolorSponge Class.
@@ -966,23 +648,11 @@ pub struct ArtisticTexturizer {
 pub struct ArtisticWatercolorSponge {
   /// trans
   #[sdk(attr(office2010, qname = ":trans"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub transparancy: Option<crate::simple_type::Int32Value>,
   /// brushSize
   #[sdk(attr(office2010, qname = ":brushSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub brush_size: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the BackgroundRemoval Class.
@@ -994,43 +664,19 @@ pub struct ArtisticWatercolorSponge {
 pub struct BackgroundRemoval {
   /// t
   #[sdk(attr(office2010, qname = ":t"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub marquee_top: crate::simple_type::Int32Value,
   /// b
   #[sdk(attr(office2010, qname = ":b"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub marquee_bottom: crate::simple_type::Int32Value,
   /// l
   #[sdk(attr(office2010, qname = ":l"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub marquee_left: crate::simple_type::Int32Value,
   /// r
   #[sdk(attr(office2010, qname = ":r"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub marquee_right: crate::simple_type::Int32Value,
   /// Defines the ForegroundMark Class.
   #[sdk(child(
@@ -1054,23 +700,11 @@ pub struct BackgroundRemoval {
 pub struct BrightnessContrast {
   /// bright
   #[sdk(attr(office2010, qname = ":bright"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub bright: Option<crate::simple_type::Int32Value>,
   /// contrast
   #[sdk(attr(office2010, qname = ":contrast"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub contrast: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ColorTemperature Class.
@@ -1082,13 +716,7 @@ pub struct BrightnessContrast {
 pub struct ColorTemperature {
   /// colorTemp
   #[sdk(attr(office2010, qname = ":colorTemp"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1500",
-    max = "11500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1500..= 11500))]
   pub color_temperature_value: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the Saturation Class.
@@ -1097,13 +725,7 @@ pub struct ColorTemperature {
 pub struct Saturation {
   /// sat
   #[sdk(attr(office2010, qname = ":sat"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 400000))]
   pub saturation_amount: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the SharpenSoften Class.
@@ -1115,13 +737,7 @@ pub struct Saturation {
 pub struct SharpenSoften {
   /// amount
   #[sdk(attr(office2010, qname = ":amount"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub amount: Option<crate::simple_type::Int32Value>,
 }
 /// Defines the ImageEffect Class.

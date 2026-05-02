@@ -313,7 +313,7 @@ pub struct Extension2 {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// uri
   #[sdk(attr(office2016, qname = ":uri"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -573,7 +573,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -660,7 +660,7 @@ pub struct CategoryAxisScaling {
     union = 0u64,
     min = "0",
     min_inclusive = true,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub gap_width: Option<crate::simple_type::StringValue>,
@@ -686,7 +686,7 @@ pub struct ValueAxisScaling {
     union = 0u64,
     min = "0",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub major_unit: Option<crate::simple_type::StringValue>,
@@ -697,7 +697,7 @@ pub struct ValueAxisScaling {
     union = 0u64,
     min = "0",
     min_inclusive = false,
-    max_inclusive = false
+    max_inclusive = false,
   ))]
   #[sdk(string_format(source = 1u32, union = 0u64, kind = "token"))]
   pub minor_unit: Option<crate::simple_type::StringValue>,
@@ -1316,7 +1316,7 @@ pub struct Geography {
   pub viewed_region_type: Option<GeoMappingLevel>,
   /// cultureLanguage
   #[sdk(attr(office2016, qname = ":cultureLanguage"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub culture_language: crate::simple_type::StringValue,
   /// cultureRegion
   #[sdk(attr(office2016, qname = ":cultureRegion"))]
@@ -1466,13 +1466,7 @@ pub struct ValueColors {
 pub struct ValueColorPositions {
   /// count
   #[sdk(attr(office2016, qname = ":count"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "2",
-    max = "3",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 2..= 3))]
   pub count: Option<crate::simple_type::Int32Value>,
   /// Defines the MinValueColorEndPosition Class.
   #[sdk(child(office2016, qname = "cx:CT_ValueColorEndPosition/cx:min"))]
@@ -1907,60 +1901,60 @@ pub struct Chart {
 pub struct ColorMappingType {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text1: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text2: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent3:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent4:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent5:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent6:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.

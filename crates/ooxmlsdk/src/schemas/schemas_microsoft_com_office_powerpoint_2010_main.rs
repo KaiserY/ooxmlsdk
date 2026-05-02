@@ -116,7 +116,7 @@ pub struct Media {
 pub struct VortexTransition {
     /// Direction
     #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
     >,
@@ -127,7 +127,7 @@ pub struct VortexTransition {
 pub struct PanTransition {
     /// Direction
     #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
     >,
@@ -138,7 +138,7 @@ pub struct PanTransition {
 pub struct SwitchTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the FlipTransition Class.
@@ -147,7 +147,7 @@ pub struct SwitchTransition {
 pub struct FlipTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the FerrisTransition Class.
@@ -156,7 +156,7 @@ pub struct FlipTransition {
 pub struct FerrisTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the GalleryTransition Class.
@@ -165,7 +165,7 @@ pub struct FerrisTransition {
 pub struct GalleryTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the ConveyorTransition Class.
@@ -174,7 +174,7 @@ pub struct GalleryTransition {
 pub struct ConveyorTransition {
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the RippleTransition Class.
@@ -193,7 +193,7 @@ pub struct RippleTransition {
 pub struct PrismTransition {
     /// dir
     #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
     >,
@@ -210,7 +210,7 @@ pub struct PrismTransition {
 pub struct DoorsTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction:
     Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
 }
@@ -220,7 +220,7 @@ pub struct DoorsTransition {
 pub struct WindowTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction:
     Option<crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::DirectionValues>,
 }
@@ -230,13 +230,13 @@ pub struct WindowTransition {
 pub struct GlitterTransition {
     /// dir
     #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionSlideDirectionValues,
     >,
     /// pattern
     #[sdk(attr(office2010, qname = ":pattern"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub pattern: Option<TransitionPatternValues>,
 }
 /// Defines the WarpTransition Class.
@@ -245,7 +245,7 @@ pub struct GlitterTransition {
 pub struct WarpTransition {
     /// Direction
     #[sdk(attr(qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
     >,
@@ -256,7 +256,7 @@ pub struct WarpTransition {
 pub struct FlythroughTransition {
     /// dir
     #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
     >,
@@ -270,11 +270,11 @@ pub struct FlythroughTransition {
 pub struct ShredTransition {
     /// pattern
     #[sdk(attr(office2010, qname = ":pattern"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub pattern: Option<TransitionShredPatternValues>,
     /// dir
     #[sdk(attr(office2010, qname = ":dir"))]
-    #[sdk(string_format(source = 0u32, kind = "token"))]
+    #[sdk(string_format(kind = "token"))]
     pub direction: Option<
         crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TransitionInOutDirectionValues,
     >,
@@ -288,7 +288,7 @@ pub struct RevealTransition {
   pub through_black: Option<crate::simple_type::BooleanValue>,
   /// dir
   #[sdk(attr(office2010, qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionLeftRightDirectionTypeValues>,
 }
 /// Defines the WheelReverseTransition Class.
@@ -581,21 +581,12 @@ pub struct SectionOld {
   pub name: Option<crate::simple_type::StringValue>,
   /// slideIdLst
   #[sdk(attr(office2010, qname = ":slideIdLst"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "256",
-    max = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 256..2147483648))]
   pub slide_id_list: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "p:CT_ExtensionList/p14:extLst"))]
@@ -607,13 +598,7 @@ pub struct SectionOld {
 pub struct SectionSlideIdListEntry {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "256",
-    max = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 256..2147483648))]
   pub id: crate::simple_type::UInt32Value,
 }
 /// Defines the SectionSlideIdList Class.
@@ -633,11 +618,8 @@ pub struct Section {
   pub name: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the SectionSlideIdList Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionSlideIdList/p14:sldIdLst"))]
@@ -655,23 +637,11 @@ pub struct TracePoint {
   pub time: crate::simple_type::StringValue,
   /// x
   #[sdk(attr(office2010, qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x_coordinate: crate::simple_type::Int64Value,
   /// y
   #[sdk(attr(office2010, qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y_coordinate: crate::simple_type::Int64Value,
 }
 /// Defines the TracePointList Class.
@@ -688,7 +658,7 @@ pub struct TracePointList {
 pub struct TriggerEventRecord {
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type:
     crate::schemas::schemas_openxmlformats_org_presentationml_2006_main::TriggerEventValues,
   /// time

@@ -417,23 +417,13 @@ fn validator_token(
       max_inclusive,
       ..
     } => {
-      let min_tokens = match min {
-        Some(min) => quote! { Some(#min) },
-        None => quote! { None },
-      };
-      let max_tokens = match max {
-        Some(max) => quote! { Some(#max) },
-        None => quote! { None },
-      };
+      let range_tokens = number_range_runtime_bounds(min, max, *min_inclusive, *max_inclusive);
       quote! {
         crate::validator::validate_number_range(
           stringify!(#ident),
           stringify!(#field_ident),
           value,
-          #min_tokens,
-          #max_tokens,
-          #min_inclusive,
-          #max_inclusive,
+          #range_tokens,
         )?;
       }
     }
@@ -462,6 +452,33 @@ fn validator_token(
       }
     }
   }
+}
+
+fn number_range_runtime_bounds(
+  min: &Option<String>,
+  max: &Option<String>,
+  min_inclusive: bool,
+  max_inclusive: bool,
+) -> proc_macro2::TokenStream {
+  let min_tokens = min.as_ref().map(|min| number_range_f64_literal(min));
+  let max_tokens = max.as_ref().map(|max| number_range_f64_literal(max));
+  let start = match (min_tokens, min_inclusive) {
+    (Some(min), true) => quote! { std::ops::Bound::Included(#min) },
+    (Some(min), false) => quote! { std::ops::Bound::Excluded(#min) },
+    (None, _) => quote! { std::ops::Bound::Unbounded },
+  };
+  let end = match (max_tokens, max_inclusive) {
+    (Some(max), true) => quote! { std::ops::Bound::Included(#max) },
+    (Some(max), false) => quote! { std::ops::Bound::Excluded(#max) },
+    (None, _) => quote! { std::ops::Bound::Unbounded },
+  };
+  quote! { (#start, #end) }
+}
+
+fn number_range_f64_literal(value: &str) -> proc_macro2::TokenStream {
+  format!("{value}f64")
+    .parse()
+    .unwrap_or_else(|_| quote! { #value.parse::<f64>().expect("numeric validator bound") })
 }
 
 fn text_child_match_target(qname: &str) -> proc_macro2::TokenStream {

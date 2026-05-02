@@ -19,15 +19,12 @@ pub struct ContentTypeSchema {
   pub content_type_name: Option<crate::simple_type::StringValue>,
   /// contentTypeID
   #[sdk(attr(qname = "ma:contentTypeID"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "0x([0-9A-Fa-f][1-9A-Fa-f]|[1-9A-Fa-f][0-9A-Fa-f]|00[0-9A-Fa-f]{32})*"
-  ))]
-  #[sdk(string_length(source = 0u32, min = 2u32, max = 1026u32))]
+  #[sdk(pattern(regex = "0x([0-9A-Fa-f][1-9A-Fa-f]|[1-9A-Fa-f][0-9A-Fa-f]|00[0-9A-Fa-f]{32})*"))]
+  #[sdk(string_length(min = 2u32, max = 1026u32))]
   pub content_type_id: Option<crate::simple_type::StringValue>,
   /// contentTypeVersion
   #[sdk(attr(qname = "ma:contentTypeVersion"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub content_type_version: Option<crate::simple_type::Int32Value>,
   /// contentTypeDescription
   #[sdk(attr(qname = "ma:contentTypeDescription"))]

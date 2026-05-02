@@ -24,11 +24,8 @@ pub struct Tasks {
 pub struct Task {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
@@ -77,11 +74,8 @@ pub struct TaskHistoryEvent {
   pub time: crate::simple_type::DateTimeValue,
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the AttributionTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Attribution"))]
@@ -175,13 +169,7 @@ pub struct TaskScheduleEventInfo {
 pub struct TaskProgressEventInfo {
   /// percentComplete
   #[sdk(attr(office2021, qname = ":percentComplete"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100))]
   pub percent_complete: crate::simple_type::Int32Value,
 }
 /// Defines the TaskPriorityEventInfo Class.
@@ -190,13 +178,7 @@ pub struct TaskProgressEventInfo {
 pub struct TaskPriorityEventInfo {
   /// value
   #[sdk(attr(office2021, qname = ":value"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub value: crate::simple_type::Int32Value,
 }
 /// Defines the TaskUndo Class.
@@ -205,11 +187,8 @@ pub struct TaskPriorityEventInfo {
 pub struct TaskUndo {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the CommentAnchor Class.

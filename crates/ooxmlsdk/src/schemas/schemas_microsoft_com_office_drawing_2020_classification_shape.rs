@@ -25,6 +25,6 @@ pub enum ClassificationOutcomeType {
 pub struct ClassificationOutcome {
   /// classificationOutcomeType
   #[sdk(attr(office2021, qname = ":classificationOutcomeType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub classification_outcome_type: Option<ClassificationOutcomeType>,
 }

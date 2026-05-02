@@ -96,11 +96,8 @@ pub enum KnownSemanticTypeValues {
 pub struct ContextNode {
   /// id
   #[sdk(attr(qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -141,7 +138,7 @@ pub struct ContextNode {
   pub r#type: crate::simple_type::StringValue,
   /// rotatedBoundingBox
   #[sdk(attr(qname = ":rotatedBoundingBox"))]
-  #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
+  #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
   pub rotated_bounding_box: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// alignmentLevel
   #[sdk(attr(qname = ":alignmentLevel"))]
@@ -171,11 +168,8 @@ pub struct ContextNode {
   pub midline: Option<crate::simple_type::StringValue>,
   /// customRecognizerId
   #[sdk(attr(qname = ":customRecognizerId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub custom_recognizer_id: Option<crate::simple_type::StringValue>,
   /// mathML
   #[sdk(attr(qname = ":mathML"))]
@@ -197,11 +191,11 @@ pub struct ContextNode {
   pub rotation_angle: Option<crate::simple_type::Int32Value>,
   /// hotPoints
   #[sdk(attr(qname = ":hotPoints"))]
-  #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
+  #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
   pub hot_points: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// centroid
   #[sdk(attr(qname = ":centroid"))]
-  #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
+  #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
   pub centroid: Option<crate::simple_type::StringValue>,
   /// semanticType
   #[sdk(attr(qname = ":semanticType"))]
@@ -229,7 +223,7 @@ pub struct ContextNode {
   pub shape_name: Option<crate::simple_type::StringValue>,
   /// shapeGeometry
   #[sdk(attr(qname = ":shapeGeometry"))]
-  #[sdk(pattern(source = 0u32, regex = "-?[0-9]+,-?[0-9]+"))]
+  #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
   pub shape_geometry: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// Defines the ContextNodeProperty Class.
   #[sdk(child(qname = "msink:CT_Property/msink:property"))]
@@ -247,11 +241,8 @@ pub struct ContextNode {
 pub struct ContextNodeProperty {
   /// type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<crate::simple_type::StringValue>,
   #[sdk(text)]
   pub xml_content: Option<crate::simple_type::HexBinaryValue>,

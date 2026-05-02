@@ -22,7 +22,6 @@ pub struct CustomDocumentProperty {
   /// Format ID
   #[sdk(attr(qname = ":fmtid"))]
   #[sdk(pattern(
-    source = 1u32,
     regex = "\\s*\\{[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\\}\\s*"
   ))]
   pub format_id: crate::simple_type::StringValue,

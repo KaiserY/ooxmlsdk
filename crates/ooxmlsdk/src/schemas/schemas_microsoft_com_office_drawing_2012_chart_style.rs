@@ -450,7 +450,7 @@ pub type LineWidthScale = crate::simple_type::DoubleValue;
 pub struct FontReference {
   /// idx
   #[sdk(attr(office2013, qname = ":idx"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub index:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontCollectionIndexValues,
   /// mods
@@ -476,7 +476,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -540,13 +540,7 @@ pub struct TextCharacterPropertiesType {
   pub alternative_language: Option<crate::simple_type::StringValue>,
   /// sz
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "100",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 100..= 400000))]
   pub font_size: Option<crate::simple_type::Int32Value>,
   /// b
   #[sdk(attr(qname = ":b"))]
@@ -556,38 +550,26 @@ pub struct TextCharacterPropertiesType {
   pub italic: Option<crate::simple_type::BooleanValue>,
   /// u
   #[sdk(attr(qname = ":u"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub underline:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextUnderlineValues>,
   /// strike
   #[sdk(attr(qname = ":strike"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub strike:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextStrikeValues>,
   /// kern
   #[sdk(attr(qname = ":kern"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 400000))]
   pub kerning: Option<crate::simple_type::Int32Value>,
   /// cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub capital:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextCapsValues>,
   /// spc
   #[sdk(attr(qname = ":spc"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-400000",
-    max = "400000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -400000..= 400000))]
   pub spacing: Option<crate::simple_type::Int32Value>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
@@ -695,24 +677,24 @@ pub struct TextBodyProperties {
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,
   /// Text Vertical Overflow
   #[sdk(attr(qname = ":vertOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalOverflowValues,
   >,
   /// Text Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextHorizontalOverflowValues,
   >,
   /// Vertical Text
   #[sdk(attr(qname = ":vert"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalValues>,
   /// Text Wrapping Type
   #[sdk(attr(qname = ":wrap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextWrappingValues>,
   /// Left Inset
@@ -729,17 +711,11 @@ pub struct TextBodyProperties {
   pub bottom_inset: Option<crate::simple_type::Int32Value>,
   /// Number of Columns
   #[sdk(attr(qname = ":numCol"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "16",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 16))]
   pub column_count: Option<crate::simple_type::Int32Value>,
   /// Space Between Columns
   #[sdk(attr(qname = ":spcCol"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub column_spacing: Option<crate::simple_type::Int32Value>,
   /// Columns Right-To-Left
   #[sdk(attr(qname = ":rtlCol"))]
@@ -749,7 +725,7 @@ pub struct TextBodyProperties {
   pub from_word_art: Option<crate::simple_type::BooleanValue>,
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub anchor:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues>,
   /// Anchor Center
@@ -793,31 +769,31 @@ pub struct TextBodyProperties {
 pub struct CategoryAxisProperties {
   /// visible
   #[sdk(attr(office2013, qname = ":visible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
   #[sdk(attr(office2013, qname = ":majorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
   #[sdk(attr(office2013, qname = ":minorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
   #[sdk(attr(office2013, qname = ":labelPosition"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
   #[sdk(attr(office2013, qname = ":majorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
   #[sdk(attr(office2013, qname = ":minorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
   #[sdk(attr(office2013, qname = ":title"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the SeriesAxisProperties Class.
@@ -826,31 +802,31 @@ pub struct CategoryAxisProperties {
 pub struct SeriesAxisProperties {
   /// visible
   #[sdk(attr(office2013, qname = ":visible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
   #[sdk(attr(office2013, qname = ":majorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
   #[sdk(attr(office2013, qname = ":minorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
   #[sdk(attr(office2013, qname = ":labelPosition"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
   #[sdk(attr(office2013, qname = ":majorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
   #[sdk(attr(office2013, qname = ":minorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
   #[sdk(attr(office2013, qname = ":title"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the ValueAxisProperties Class.
@@ -859,31 +835,31 @@ pub struct SeriesAxisProperties {
 pub struct ValueAxisProperties {
   /// visible
   #[sdk(attr(office2013, qname = ":visible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// majorTick
   #[sdk(attr(office2013, qname = ":majorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_tick: Option<TickMarkNinch>,
   /// minorTick
   #[sdk(attr(office2013, qname = ":minorTick"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_tick_prop: Option<TickMarkNinch>,
   /// labelPosition
   #[sdk(attr(office2013, qname = ":labelPosition"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub label_position: Option<TickLabelPositionNinch>,
   /// majorGridlines
   #[sdk(attr(office2013, qname = ":majorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub major_gridlines: Option<Boolean>,
   /// minorGridlines
   #[sdk(attr(office2013, qname = ":minorGridlines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub minor_gridlines_prop: Option<Boolean>,
   /// title
   #[sdk(attr(office2013, qname = ":title"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub title_prop: Option<Boolean>,
 }
 /// Defines the DataSeries Class.
@@ -892,59 +868,35 @@ pub struct ValueAxisProperties {
 pub struct DataSeries {
   /// overlap
   #[sdk(attr(office2013, qname = ":overlap"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-100",
-    max = "100",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100..= 100))]
   pub overlap: Option<crate::simple_type::SByteValue>,
   /// gapWidth
   #[sdk(attr(office2013, qname = ":gapWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 500))]
   pub gap_width: Option<crate::simple_type::UInt16Value>,
   /// gapDepth
   #[sdk(attr(office2013, qname = ":gapDepth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 500))]
   pub gap_depth: Option<crate::simple_type::UInt16Value>,
   /// doughnutHoleSize
   #[sdk(attr(office2013, qname = ":doughnutHoleSize"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "10",
-    max = "90",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 10..= 90))]
   pub doughnut_hole_size: Option<crate::simple_type::ByteValue>,
   /// markerVisible
   #[sdk(attr(office2013, qname = ":markerVisible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub marker_visible: Option<Boolean>,
   /// hiloLines
   #[sdk(attr(office2013, qname = ":hiloLines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hilo_lines: Option<Boolean>,
   /// dropLines
   #[sdk(attr(office2013, qname = ":dropLines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub drop_lines: Option<Boolean>,
   /// seriesLines
   #[sdk(attr(office2013, qname = ":seriesLines"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub series_lines: Option<Boolean>,
 }
 /// Defines the DataLabels Class.
@@ -953,27 +905,27 @@ pub struct DataSeries {
 pub struct DataLabels {
   /// position
   #[sdk(attr(office2013, qname = ":position"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub position: Option<DataLabelsPosition>,
   /// value
   #[sdk(attr(office2013, qname = ":value"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub value: Option<Boolean>,
   /// seriesName
   #[sdk(attr(office2013, qname = ":seriesName"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub series_name: Option<Boolean>,
   /// categoryName
   #[sdk(attr(office2013, qname = ":categoryName"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub category_name: Option<Boolean>,
   /// legendKey
   #[sdk(attr(office2013, qname = ":legendKey"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub legend_key: Option<Boolean>,
   /// percentage
   #[sdk(attr(office2013, qname = ":percentage"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub percentage: Option<Boolean>,
 }
 /// Defines the DataTable Class.
@@ -982,19 +934,19 @@ pub struct DataLabels {
 pub struct DataTable {
   /// legendKeys
   #[sdk(attr(office2013, qname = ":legendKeys"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub legend_keys: Option<Boolean>,
   /// horizontalBorder
   #[sdk(attr(office2013, qname = ":horizontalBorder"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_border: Option<Boolean>,
   /// verticalBorder
   #[sdk(attr(office2013, qname = ":verticalBorder"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_border: Option<Boolean>,
   /// outlineBorder
   #[sdk(attr(office2013, qname = ":outlineBorder"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub outline_border: Option<Boolean>,
 }
 /// Defines the Legend Class.
@@ -1003,15 +955,15 @@ pub struct DataTable {
 pub struct Legend {
   /// visible
   #[sdk(attr(office2013, qname = ":visible"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub visible: Option<Boolean>,
   /// includeInLayout
   #[sdk(attr(office2013, qname = ":includeInLayout"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub include_in_layout: Option<Boolean>,
   /// position
   #[sdk(attr(office2013, qname = ":position"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub position: Option<LegendPosition>,
 }
 /// Defines the Title Class.
@@ -1020,7 +972,7 @@ pub struct Legend {
 pub struct Title {
   /// position
   #[sdk(attr(office2013, qname = ":position"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub position: Option<TitlePosition>,
 }
 /// Defines the Trendline Class.
@@ -1029,15 +981,15 @@ pub struct Title {
 pub struct Trendline {
   /// add
   #[sdk(attr(office2013, qname = ":add"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub add: Option<Boolean>,
   /// equation
   #[sdk(attr(office2013, qname = ":equation"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub equation: Option<Boolean>,
   /// rsquared
   #[sdk(attr(office2013, qname = ":rsquared"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r_squared: Option<Boolean>,
 }
 /// Defines the View3DProperties Class.
@@ -1046,57 +998,27 @@ pub struct Trendline {
 pub struct View3DProperties {
   /// rotX
   #[sdk(attr(office2013, qname = ":rotX"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-90",
-    max = "90",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -90..= 90))]
   pub rot_x: Option<crate::simple_type::SByteValue>,
   /// rotY
   #[sdk(attr(office2013, qname = ":rotY"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "360",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 360))]
   pub rot_y: Option<crate::simple_type::UInt16Value>,
   /// rAngAx
   #[sdk(attr(office2013, qname = ":rAngAx"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub right_angle_axes: Option<Boolean>,
   /// perspective
   #[sdk(attr(office2013, qname = ":perspective"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "240",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 240))]
   pub perspective: Option<crate::simple_type::ByteValue>,
   /// heightPercent
   #[sdk(attr(office2013, qname = ":heightPercent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "5",
-    max = "500",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 5..= 500))]
   pub height_percent: Option<crate::simple_type::UInt16Value>,
   /// depthPercent
   #[sdk(attr(office2013, qname = ":depthPercent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "20",
-    max = "2000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 20..= 2000))]
   pub depth_percent: Option<crate::simple_type::UInt16Value>,
 }
 /// Defines the AxisTitle Class.
@@ -2155,17 +2077,11 @@ pub struct Wall {
 pub struct MarkerLayoutProperties {
   /// symbol
   #[sdk(attr(office2013, qname = ":symbol"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub symbol: Option<MarkerStyle>,
   /// size
   #[sdk(attr(office2013, qname = ":size"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "2",
-    max = "72",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 2..= 72))]
   pub size: Option<crate::simple_type::ByteValue>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

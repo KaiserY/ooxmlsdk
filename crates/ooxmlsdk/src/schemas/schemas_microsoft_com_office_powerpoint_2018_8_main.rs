@@ -91,7 +91,7 @@ pub struct ExtensionList {
 pub struct Author {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// name
   #[sdk(attr(office2021, qname = ":name"))]
@@ -115,15 +115,15 @@ pub struct Author {
 pub struct CommentReply {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// authorId
   #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
   /// status
   #[sdk(attr(office2021, qname = ":status"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub status: Option<CommentStatus>,
   /// created
   #[sdk(attr(office2021, qname = ":created"))]
@@ -150,23 +150,11 @@ pub struct CommentReply {
 pub struct Point2DType {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Defines the CommentReplyList Class.
@@ -183,15 +171,15 @@ pub struct CommentReplyList {
 pub struct Comment {
   /// id
   #[sdk(attr(office2021, qname = ":id"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// authorId
   #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
   /// status
   #[sdk(attr(office2021, qname = ":status"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub status: Option<CommentStatus>,
   /// created
   #[sdk(attr(office2021, qname = ":created"))]
@@ -213,23 +201,11 @@ pub struct Comment {
   pub assigned_to: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   /// complete
   #[sdk(attr(office2021, qname = ":complete"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub complete: Option<crate::simple_type::Int32Value>,
   /// priority
   #[sdk(attr(office2021, qname = ":priority"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "10",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 10))]
   pub priority: Option<crate::simple_type::UInt32Value>,
   /// title
   #[sdk(attr(office2021, qname = ":title"))]

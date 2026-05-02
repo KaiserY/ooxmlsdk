@@ -2960,6 +2960,68 @@ fn schema_item_version(schema_type: &SchemaType) -> &str {
   schema_type.version.as_deref().unwrap_or_default()
 }
 
+fn number_range_bound_tokens(value: &str, use_literal: bool) -> TokenStream {
+  if use_literal
+    && is_numeric_literal(value)
+    && let Ok(value_tokens) = value.parse::<TokenStream>()
+  {
+    value_tokens
+  } else {
+    quote! { #value }
+  }
+}
+
+fn number_range_attr(
+  min: Option<&String>,
+  max: Option<&String>,
+  min_inclusive: bool,
+  max_inclusive: bool,
+) -> Option<TokenStream> {
+  if !min_inclusive {
+    return None;
+  }
+  let min = min.map(|min| number_range_bound_tokens(min, true));
+  let max = max.map(|max| number_range_bound_tokens(max, true));
+  Some(match (min, max, max_inclusive) {
+    (Some(min), Some(max), true) => quote! { range = #min..=#max, },
+    (Some(min), Some(max), false) => quote! { range = #min..#max, },
+    (Some(min), None, _) => quote! { range = #min.., },
+    (None, Some(max), true) => quote! { range = ..=#max, },
+    (None, Some(max), false) => quote! { range = ..#max, },
+    (None, None, _) => quote! {},
+  })
+}
+
+fn number_range_limit_attr(name: &str, value: &str, use_literal: bool) -> TokenStream {
+  let name_ident = TokenIdent::new(name, Span::call_site());
+  if use_literal
+    && is_numeric_literal(value)
+    && let Ok(value_tokens) = value.parse::<TokenStream>()
+  {
+    quote! { #name_ident = #value_tokens, }
+  } else {
+    quote! { #name_ident = #value, }
+  }
+}
+
+fn is_numeric_literal(value: &str) -> bool {
+  let value = value.strip_prefix('-').unwrap_or(value);
+  let mut parts = value.split('.');
+  let Some(whole) = parts.next() else {
+    return false;
+  };
+  if whole.is_empty() || !whole.bytes().all(|byte| byte.is_ascii_digit()) {
+    return false;
+  }
+  match (parts.next(), parts.next()) {
+    (None, None) => true,
+    (Some(fraction), None) => {
+      !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit())
+    }
+    _ => false,
+  }
+}
+
 fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Result<TokenStream> {
   let FieldWireDecl::Attribute { qname, bit } = &attr.wire else {
     return Err(format!("expected attribute field, got {:?}", attr.wire).into());
@@ -2982,78 +3044,119 @@ fn gen_attr_from_decl(attr: &FieldDecl, version_cfg: VersionCfgContext) -> Resul
     .validators
     .iter()
     .map(|validator| {
-      let source_attr = validator.source_id;
-      let union_attr = validator.union_id.map(|union_id| quote! { union = #union_id, });
+      let source_attr = validator
+        .union_id
+        .map(|_| {
+          let source_id = validator.source_id;
+          quote! { source = #source_id, }
+        })
+        .unwrap_or_default();
+      let union_attr = validator
+        .union_id
+        .map(|union_id| quote! { union = #union_id, });
       match &validator.kind {
-      ValidatorKind::Pattern { regex } => quote! {
-        #[sdk(pattern(source = #source_attr, #union_attr regex = #regex))]
-      },
-      ValidatorKind::StringFormat { kind } => {
-        let kind_lit = match kind {
-          crate::sdk_code::codegen_ir::StringFormatKind::Token => "token",
-          crate::sdk_code::codegen_ir::StringFormatKind::NcName => "ncname",
-          crate::sdk_code::codegen_ir::StringFormatKind::QName => "qname",
-          crate::sdk_code::codegen_ir::StringFormatKind::Uri => "uri",
-          crate::sdk_code::codegen_ir::StringFormatKind::Id => "id",
-        };
-        quote! {
-          #[sdk(string_format(source = #source_attr, #union_attr kind = #kind_lit))]
+        ValidatorKind::Pattern { regex } => quote! {
+          #[sdk(pattern(#source_attr #union_attr regex = #regex))]
+        },
+        ValidatorKind::StringFormat { kind } => {
+          let kind_lit = match kind {
+            crate::sdk_code::codegen_ir::StringFormatKind::Token => "token",
+            crate::sdk_code::codegen_ir::StringFormatKind::NcName => "ncname",
+            crate::sdk_code::codegen_ir::StringFormatKind::QName => "qname",
+            crate::sdk_code::codegen_ir::StringFormatKind::Uri => "uri",
+            crate::sdk_code::codegen_ir::StringFormatKind::Id => "id",
+          };
+          quote! {
+            #[sdk(string_format(#source_attr #union_attr kind = #kind_lit))]
+          }
         }
-      }
-      ValidatorKind::StringLength {
-        min,
-        max,
-        exact,
-        type_name,
-      } => {
-        let effective_min = exact.or(*min);
-        let effective_max = exact.or(*max);
-        let min_attr = effective_min.map(|min| quote! { min = #min, });
-        let max_attr = effective_max.map(|max| quote! { max = #max, });
-        let type_name_attr = type_name.as_ref().map(|type_name| quote! { type_name = #type_name, });
-        quote! {
-          #[sdk(string_length(source = #source_attr, #union_attr #type_name_attr #min_attr #max_attr))]
+        ValidatorKind::StringLength {
+          min,
+          max,
+          exact,
+          type_name,
+        } => {
+          let effective_min = exact.or(*min);
+          let effective_max = exact.or(*max);
+          let min_attr = effective_min.map(|min| quote! { min = #min, });
+          let max_attr = effective_max.map(|max| quote! { max = #max, });
+          let type_name_attr = type_name
+            .as_ref()
+            .map(|type_name| quote! { type_name = #type_name, });
+          quote! {
+            #[sdk(string_length(#source_attr #union_attr #type_name_attr #min_attr #max_attr))]
+          }
         }
-      }
-      ValidatorKind::NumberRange {
-        min,
-        max,
-        min_inclusive,
-        max_inclusive,
-      } => {
-        let min_attr = min.as_ref().map(|min| quote! { min = #min, });
-        let max_attr = max.as_ref().map(|max| quote! { max = #max, });
-        quote! {
+        ValidatorKind::NumberRange {
+          min,
+          max,
+          min_inclusive,
+          max_inclusive,
+        } => {
+          let use_range_attr = validator.union_id.is_none();
+          let range_attr = use_range_attr
+            .then(|| number_range_attr(min.as_ref(), max.as_ref(), *min_inclusive, *max_inclusive))
+            .flatten();
+          let use_limit_literal_bounds = validator.union_id.is_none();
+          let min_attr = if range_attr.is_some() {
+            None
+          } else {
+            min
+              .as_ref()
+              .map(|min| number_range_limit_attr("min", min, use_limit_literal_bounds))
+          };
+          let max_attr = if range_attr.is_some() {
+            None
+          } else {
+            max
+              .as_ref()
+              .map(|max| number_range_limit_attr("max", max, use_limit_literal_bounds))
+          };
+          let min_inclusive_attr =
+            if range_attr.is_some() || (validator.union_id.is_none() && *min_inclusive) {
+              quote! {}
+            } else {
+              quote! { min_inclusive = #min_inclusive, }
+            };
+          let max_inclusive_attr =
+            if range_attr.is_some() || (validator.union_id.is_none() && *max_inclusive) {
+              quote! {}
+            } else {
+              quote! { max_inclusive = #max_inclusive, }
+            };
+          quote! {
           #[sdk(number_range(
-            source = #source_attr,
+            #source_attr
             #union_attr
+            #range_attr
             #min_attr
             #max_attr
-            min_inclusive = #min_inclusive,
-            max_inclusive = #max_inclusive
-          ))]
+            #min_inclusive_attr
+              #max_inclusive_attr
+            ))]
+          }
         }
-      }
-      ValidatorKind::NumberType { type_name } => quote! {
-        #[sdk(number_type(source = #source_attr, #union_attr type_name = #type_name))]
-      },
-      ValidatorKind::NumberSign { kind } => {
-        let kind_lit = match kind {
-          crate::sdk_code::codegen_ir::NumberSignKind::NonNegative => "non_negative",
-          crate::sdk_code::codegen_ir::NumberSignKind::Positive => "positive",
-        };
-        quote! {
-          #[sdk(number_sign(source = #source_attr, #union_attr kind = #kind_lit))]
+        ValidatorKind::NumberType { type_name } => quote! {
+          #[sdk(number_type(#source_attr #union_attr type_name = #type_name))]
+        },
+        ValidatorKind::NumberSign { kind } => {
+          let kind_lit = match kind {
+            crate::sdk_code::codegen_ir::NumberSignKind::NonNegative => "non_negative",
+            crate::sdk_code::codegen_ir::NumberSignKind::Positive => "positive",
+          };
+          quote! {
+            #[sdk(number_sign(#source_attr #union_attr kind = #kind_lit))]
+          }
         }
+        ValidatorKind::StringSet { values } => quote! {
+          #[sdk(string_set(#source_attr #union_attr values = &[ #( #values ),* ]))]
+        },
+        ValidatorKind::Required
+        | ValidatorKind::EnumRef { .. }
+        | ValidatorKind::Unsupported { .. }
+        | ValidatorKind::Placeholder => quote! {},
       }
-      ValidatorKind::StringSet { values } => quote! {
-        #[sdk(string_set(source = #source_attr, #union_attr values = &[ #( #values ),* ]))]
-      },
-      ValidatorKind::Required
-      | ValidatorKind::EnumRef { .. }
-      | ValidatorKind::Unsupported { .. }
-      | ValidatorKind::Placeholder => quote! {},
-    }})
+    })
     .collect();
   let property_comments_doc = format!(" {}", attr.docs);
 
@@ -6504,15 +6607,11 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("# [sdk (attr (office2016 , qname = \":creationId\"))]"));
-    assert!(generated.contains("# [sdk (pattern (source = 0u32 , regex = \"[A-Z]+\"))]"));
-    assert!(generated.contains("# [sdk (string_format (source = 1u32 , kind = \"token\"))]"));
-    assert!(
-      generated.contains("# [sdk (string_length (source = 2u32 , min = 2u32 , max = 8u32 ,))]")
-    );
-    assert!(generated.contains(
-      "# [sdk (number_range (source = 3u32 , min = \"0\" , max = \"10\" , min_inclusive = true , max_inclusive = false))]"
-    ));
-    assert!(generated.contains("# [sdk (number_sign (source = 4u32 , kind = \"non_negative\"))]"));
+    assert!(generated.contains("# [sdk (pattern (regex = \"[A-Z]+\"))]"));
+    assert!(generated.contains("# [sdk (string_format (kind = \"token\"))]"));
+    assert!(generated.contains("# [sdk (string_length (min = 2u32 , max = 8u32 ,))]"));
+    assert!(generated.contains("# [sdk (number_range (range = 0 .. 10 ,))]"));
+    assert!(generated.contains("# [sdk (number_sign (kind = \"non_negative\"))]"));
   }
 
   #[test]

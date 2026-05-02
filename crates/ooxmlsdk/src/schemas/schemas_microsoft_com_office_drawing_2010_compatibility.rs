@@ -10,6 +10,6 @@
 pub struct CompatibilityShape {
   /// spid
   #[sdk(attr(office2010, qname = ":spid"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_id: crate::simple_type::StringValue,
 }

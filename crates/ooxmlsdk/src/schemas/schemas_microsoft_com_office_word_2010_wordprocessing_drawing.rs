@@ -46,7 +46,7 @@ pub type PercentagePositionVerticalOffset = crate::simple_type::Int32Value;
 pub struct RelativeWidth {
   /// relativeFrom
   #[sdk(attr(office2010, qname = ":relativeFrom"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub object_id: SizeRelativeHorizontallyValues,
   /// Defines the PercentageWidth Class.
   #[sdk(text_child(office2010, qname = "a:ST_PositivePercentage/wp14:pctWidth"))]
@@ -58,7 +58,7 @@ pub struct RelativeWidth {
 pub struct RelativeHeight {
   /// relativeFrom
   #[sdk(attr(office2010, qname = ":relativeFrom"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub relative_from: SizeRelativeVerticallyValues,
   /// Defines the PercentageHeight Class.
   #[sdk(text_child(office2010, qname = "a:ST_PositivePercentage/wp14:pctHeight"))]

@@ -489,11 +489,8 @@ pub struct Survey {
   pub id: crate::simple_type::UInt32Value,
   /// guid
   #[sdk(attr(office2013, qname = ":guid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub guid: crate::simple_type::StringValue,
   /// title
   #[sdk(attr(office2013, qname = ":title"))]
@@ -867,11 +864,11 @@ pub struct PivotValueCellExtra {
   pub format_index: Option<crate::simple_type::UInt32Value>,
   /// bc
   #[sdk(attr(office2013, qname = ":bc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub background_color: Option<crate::simple_type::HexBinaryValue>,
   /// fc
   #[sdk(attr(office2013, qname = ":fc"))]
-  #[sdk(string_length(source = 0u32, min = 4u32, max = 4u32))]
+  #[sdk(string_length(min = 4u32, max = 4u32))]
   pub foreground_color: Option<crate::simple_type::HexBinaryValue>,
   /// i
   #[sdk(attr(office2013, qname = ":i"))]

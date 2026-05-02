@@ -117,7 +117,7 @@ pub struct TopBorder {
   pub r#type: Option<BorderValues>,
   /// Border Width
   #[sdk(attr(qname = ":width"))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_sign(kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
   #[sdk(attr(qname = ":shadow"))]
@@ -132,7 +132,7 @@ pub struct LeftBorder {
   pub r#type: Option<BorderValues>,
   /// Border Width
   #[sdk(attr(qname = ":width"))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_sign(kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
   #[sdk(attr(qname = ":shadow"))]
@@ -147,7 +147,7 @@ pub struct RightBorder {
   pub r#type: Option<BorderValues>,
   /// Border Width
   #[sdk(attr(qname = ":width"))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_sign(kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
   #[sdk(attr(qname = ":shadow"))]
@@ -162,7 +162,7 @@ pub struct BottomBorder {
   pub r#type: Option<BorderValues>,
   /// Border Width
   #[sdk(attr(qname = ":width"))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_sign(kind = "positive"))]
   pub width: Option<crate::simple_type::IntegerValue>,
   /// Border shadow
   #[sdk(attr(qname = ":shadow"))]

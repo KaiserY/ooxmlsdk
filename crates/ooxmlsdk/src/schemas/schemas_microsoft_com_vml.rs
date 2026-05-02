@@ -703,13 +703,7 @@ pub struct Shape {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -915,13 +909,7 @@ pub struct Shapetype {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -1129,8 +1117,8 @@ pub struct Group {
 pub struct Background {
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_length(source = 0u32, max = 255u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(max = 255u32))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Shape Fill Toggle
   #[sdk(attr(qname = ":fill"))]
@@ -1252,13 +1240,7 @@ pub struct Arc {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -1298,8 +1280,8 @@ pub struct Arc {
   pub o_gfxdata: Option<crate::simple_type::Base64BinaryValue>,
   /// Unique Identifier
   #[sdk(attr(qname = ":id"))]
-  #[sdk(string_length(source = 0u32, max = 255u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(max = 255u32))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Shape Styling Properties
   #[sdk(attr(qname = ":style"))]
@@ -1488,13 +1470,7 @@ pub struct Curve {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -1695,13 +1671,7 @@ pub struct ImageFile {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -1923,13 +1893,7 @@ pub struct Line {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -2127,13 +2091,7 @@ pub struct Oval {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -2325,13 +2283,7 @@ pub struct PolyLine {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -2527,13 +2479,7 @@ pub struct Rectangle {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]
@@ -2722,13 +2668,7 @@ pub struct RoundRectangle {
   pub inset_pen: Option<crate::simple_type::TrueFalseValue>,
   /// Optional Number
   #[sdk(attr(qname = "o:spt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "202",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 202))]
   pub optional_number: Option<crate::simple_type::Int32Value>,
   /// Shape Connector Type
   #[sdk(attr(qname = "o:connectortype"))]

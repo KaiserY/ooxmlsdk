@@ -25,7 +25,7 @@ pub struct DataModelExtensionBlock {
   pub rel_id: Option<crate::simple_type::StringValue>,
   /// minVer
   #[sdk(attr(office2010, qname = ":minVer"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub min_ver: Option<crate::simple_type::StringValue>,
 }
 /// Defines the NonVisualDrawingProperties Class.
@@ -105,7 +105,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -264,7 +264,7 @@ pub struct GroupShapeNonVisualProperties {
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects

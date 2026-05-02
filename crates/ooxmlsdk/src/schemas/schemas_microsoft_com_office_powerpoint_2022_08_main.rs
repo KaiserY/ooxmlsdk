@@ -27,11 +27,8 @@ pub struct TaskDetails {
 pub struct CommentAnchor {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the ExtensionList Class.
@@ -49,7 +46,7 @@ pub struct ExtensionList {
 pub struct AtrbtnTaskAssignUnassignUser {
   /// authorId
   #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
 }
 /// Defines the AsgnTaskAssignUnassignUser Class.
@@ -58,7 +55,7 @@ pub struct AtrbtnTaskAssignUnassignUser {
 pub struct AsgnTaskAssignUnassignUser {
   /// authorId
   #[sdk(attr(office2021, qname = ":authorId"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub author_id: crate::simple_type::StringValue,
 }
 /// Defines the TaskAnchor Class.
@@ -97,13 +94,7 @@ pub struct TaskScheduleEventInfo {
 pub struct TaskProgressEventInfo {
   /// val
   #[sdk(attr(microsoft365, qname = ":val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Defines the TaskUndo Class.
@@ -112,11 +103,8 @@ pub struct TaskProgressEventInfo {
 pub struct TaskUndo {
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
 }
 /// Defines the TaskHistoryEvent Class.
@@ -128,11 +116,8 @@ pub struct TaskHistoryEvent {
   pub time: crate::simple_type::DateTimeValue,
   /// id
   #[sdk(attr(microsoft365, qname = ":id"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: crate::simple_type::StringValue,
   /// Defines the AtrbtnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskAssignUnassignUser/p228:atrbtn"))]

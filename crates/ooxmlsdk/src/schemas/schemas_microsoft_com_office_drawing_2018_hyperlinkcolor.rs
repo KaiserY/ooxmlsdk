@@ -18,6 +18,6 @@ pub enum HyperlinkColorEnum {
 pub struct HyperlinkColor {
   /// val
   #[sdk(attr(office2019, qname = ":val"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: HyperlinkColorEnum,
 }

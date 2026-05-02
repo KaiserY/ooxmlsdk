@@ -331,19 +331,13 @@ pub struct SignatureLine {
   pub is_signature_line: Option<crate::simple_type::TrueFalseValue>,
   /// Unique ID
   #[sdk(attr(qname = ":id"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// Signature Provider ID
   #[sdk(attr(qname = ":provid"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub provider_id: Option<crate::simple_type::StringValue>,
   /// Use Signing Instructions Flag
   #[sdk(attr(qname = ":signinginstructionsset"))]
@@ -1187,7 +1181,7 @@ pub struct Rule {
   pub how: Option<AlignmentValues>,
   /// Rule Shape Reference
   #[sdk(attr(qname = ":idref"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_reference: Option<crate::simple_type::StringValue>,
   /// Shape Reference.
   #[sdk(child(qname = "o:CT_Proxy/o:proxy"))]
@@ -1213,15 +1207,15 @@ pub struct Relation {
   pub extension: Option<crate::schemas::schemas_microsoft_com_vml::ExtensionHandlingBehaviorValues>,
   /// Diagram Relationship Source Shape
   #[sdk(attr(qname = ":idsrc"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub source_id: Option<crate::simple_type::StringValue>,
   /// Diagram Relationship Destination Shape
   #[sdk(attr(qname = ":iddest"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub destination_id: Option<crate::simple_type::StringValue>,
   /// Diagram Relationship Center Shape
   #[sdk(attr(qname = ":idcntr"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub center_shape_id: Option<crate::simple_type::StringValue>,
 }
 /// Embedded Object Alternate Image Request.
@@ -1242,7 +1236,7 @@ pub struct Proxy {
   pub end: Option<crate::simple_type::TrueFalseBlankValue>,
   /// Proxy Shape Reference
   #[sdk(attr(qname = ":idref"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_reference: crate::simple_type::StringValue,
   /// Connection Location
   #[sdk(attr(qname = ":connectloc"))]

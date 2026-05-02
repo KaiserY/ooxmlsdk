@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::ops::{Bound, RangeBounds};
 
 pub trait SdkValidator {
   fn validate(&self) -> Result<(), crate::common::SdkError> {
@@ -136,14 +137,11 @@ pub fn validate_string_format<T: Display>(
   }
 }
 
-pub fn validate_number_range<T: Display>(
+pub fn validate_number_range<T: Display, R: RangeBounds<f64>>(
   ty: &'static str,
   field: &'static str,
   value: &T,
-  min: Option<&str>,
-  max: Option<&str>,
-  min_inclusive: bool,
-  max_inclusive: bool,
+  range: R,
 ) -> Result<(), crate::common::SdkError> {
   let value_string = value.to_string();
   let parsed_value = value_string.parse::<f64>().map_err(|err| {
@@ -152,50 +150,48 @@ pub fn validate_number_range<T: Display>(
     ))
   })?;
 
-  if let Some(min) = min {
-    let parsed_min = min.parse::<f64>().map_err(|err| {
-      crate::common::SdkError::CommonError(format!(
-        "failed to parse numeric validator minimum for {ty}.{field}: {err}"
-      ))
-    })?;
-    let valid = if min_inclusive {
-      parsed_value >= parsed_min
-    } else {
-      parsed_value > parsed_min
-    };
-    if !valid {
-      let comparator = if min_inclusive { ">=" } else { ">" };
+  match range.start_bound() {
+    Bound::Included(min) if parsed_value < *min => {
       return Err(crate::common::validation_error(
         ty,
         field,
         "number_range",
         value_string,
-        format!("value must be {comparator} {min}"),
+        format!("value must be >= {min}"),
       ));
     }
+    Bound::Excluded(min) if parsed_value <= *min => {
+      return Err(crate::common::validation_error(
+        ty,
+        field,
+        "number_range",
+        value_string,
+        format!("value must be > {min}"),
+      ));
+    }
+    Bound::Included(_) | Bound::Excluded(_) | Bound::Unbounded => {}
   }
 
-  if let Some(max) = max {
-    let parsed_max = max.parse::<f64>().map_err(|err| {
-      crate::common::SdkError::CommonError(format!(
-        "failed to parse numeric validator maximum for {ty}.{field}: {err}"
-      ))
-    })?;
-    let valid = if max_inclusive {
-      parsed_value <= parsed_max
-    } else {
-      parsed_value < parsed_max
-    };
-    if !valid {
-      let comparator = if max_inclusive { "<=" } else { "<" };
+  match range.end_bound() {
+    Bound::Included(max) if parsed_value > *max => {
       return Err(crate::common::validation_error(
         ty,
         field,
         "number_range",
         value_string,
-        format!("value must be {comparator} {max}"),
+        format!("value must be <= {max}"),
       ));
     }
+    Bound::Excluded(max) if parsed_value >= *max => {
+      return Err(crate::common::validation_error(
+        ty,
+        field,
+        "number_range",
+        value_string,
+        format!("value must be < {max}"),
+      ));
+    }
+    Bound::Included(_) | Bound::Excluded(_) | Bound::Unbounded => {}
   }
 
   Ok(())

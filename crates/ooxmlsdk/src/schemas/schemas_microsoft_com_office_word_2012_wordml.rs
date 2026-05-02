@@ -35,13 +35,13 @@ pub struct Color {
     Option<crate::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::ThemeColorValues>,
   /// Run Content Theme Color Tint
   #[sdk(attr(qname = "w:themeTint"))]
-  #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
+  #[sdk(pattern(regex = "[0-9a-fA-F]*"))]
+  #[sdk(string_length(min = 1u32, max = 2u32))]
   pub theme_tint: Option<crate::simple_type::StringValue>,
   /// Run Content Theme Color Shade
   #[sdk(attr(qname = "w:themeShade"))]
-  #[sdk(pattern(source = 0u32, regex = "[0-9a-fA-F]*"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 2u32))]
+  #[sdk(pattern(regex = "[0-9a-fA-F]*"))]
+  #[sdk(string_length(min = 1u32, max = 2u32))]
   pub theme_shade: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DataBinding Class.

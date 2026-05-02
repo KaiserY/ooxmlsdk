@@ -33,11 +33,8 @@ pub struct ShapeMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GroupShapeMoniker Class.
@@ -49,11 +46,8 @@ pub struct GroupShapeMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GraphicFrameMoniker Class.
@@ -65,11 +59,8 @@ pub struct GraphicFrameMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ConnectorMoniker Class.
@@ -81,11 +72,8 @@ pub struct ConnectorMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PictureMoniker Class.
@@ -97,11 +85,8 @@ pub struct PictureMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the InkMoniker Class.
@@ -113,11 +98,8 @@ pub struct InkMoniker {
   pub id: crate::simple_type::UInt32Value,
   /// creationId
   #[sdk(attr(office2016, qname = ":creationId"))]
-  #[sdk(pattern(
-    source = 0u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub creation_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DrawingMonikerList Class.
@@ -198,11 +180,11 @@ pub type SndDataImgData = crate::simple_type::Base64BinaryValue;
 pub struct ResourceUrl {
   /// src
   #[sdk(attr(office2016, qname = ":src"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub src: Option<crate::simple_type::StringValue>,
   /// linkage
   #[sdk(attr(office2016, qname = ":linkage"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub linkage: Option<ResourceLinkage>,
 }
 /// Defines the GroupCommand Class.
@@ -250,7 +232,7 @@ pub struct GroupCommand {
 pub struct ImgLink {
   /// tgt
   #[sdk(attr(office2016, qname = ":tgt"))]
-  #[sdk(string_format(source = 1u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub tgt: crate::simple_type::StringValue,
 }
 /// Defines the DocumentContextMonikerList Class.
@@ -414,43 +396,19 @@ pub struct ModifyNonVisualDrawingProps {
 pub struct ModifyTransformProps {
   /// x
   #[sdk(attr(office2016, qname = ":x"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: Option<crate::simple_type::Int64Value>,
   /// y
   #[sdk(attr(office2016, qname = ":y"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: Option<crate::simple_type::Int64Value>,
   /// cx
   #[sdk(attr(office2016, qname = ":cx"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: Option<crate::simple_type::Int64Value>,
   /// cy
   #[sdk(attr(office2016, qname = ":cy"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: Option<crate::simple_type::Int64Value>,
   /// rot
   #[sdk(attr(office2016, qname = ":rot"))]
@@ -468,23 +426,11 @@ pub struct ModifyTransformProps {
 pub struct Point2DType {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Defines the TextParagraphPropertiesType Class.
@@ -494,47 +440,23 @@ pub struct TextParagraphPropertiesType {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub left_margin: Option<crate::simple_type::Int32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 51206400))]
   pub right_margin: Option<crate::simple_type::Int32Value>,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "8",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 8))]
   pub level: Option<crate::simple_type::Int32Value>,
   /// Indent
   #[sdk(attr(qname = ":indent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "-51206400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -51206400..= 51206400))]
   pub indent: Option<crate::simple_type::Int32Value>,
   /// Alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAlignmentTypeValues>,
   /// Default Tab Size
@@ -548,7 +470,7 @@ pub struct TextParagraphPropertiesType {
   pub east_asian_line_break: Option<crate::simple_type::BooleanValue>,
   /// Font Alignment
   #[sdk(attr(qname = ":fontAlgn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub font_alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextFontAlignmentValues>,
   /// Latin Line Break
@@ -624,24 +546,24 @@ pub struct TextBodyProperties {
   pub use_paragraph_spacing: Option<crate::simple_type::BooleanValue>,
   /// Text Vertical Overflow
   #[sdk(attr(qname = ":vertOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalOverflowValues,
   >,
   /// Text Horizontal Overflow
   #[sdk(attr(qname = ":horzOverflow"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_overflow: Option<
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextHorizontalOverflowValues,
   >,
   /// Vertical Text
   #[sdk(attr(qname = ":vert"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextVerticalValues>,
   /// Text Wrapping Type
   #[sdk(attr(qname = ":wrap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub wrap:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextWrappingValues>,
   /// Left Inset
@@ -658,17 +580,11 @@ pub struct TextBodyProperties {
   pub bottom_inset: Option<crate::simple_type::Int32Value>,
   /// Number of Columns
   #[sdk(attr(qname = ":numCol"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "16",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 16))]
   pub column_count: Option<crate::simple_type::Int32Value>,
   /// Space Between Columns
   #[sdk(attr(qname = ":spcCol"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub column_spacing: Option<crate::simple_type::Int32Value>,
   /// Columns Right-To-Left
   #[sdk(attr(qname = ":rtlCol"))]
@@ -678,7 +594,7 @@ pub struct TextBodyProperties {
   pub from_word_art: Option<crate::simple_type::BooleanValue>,
   /// Anchor
   #[sdk(attr(qname = ":anchor"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub anchor:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::TextAnchoringTypeValues>,
   /// Anchor Center
@@ -774,7 +690,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -911,7 +827,7 @@ pub struct EffectRefStyleMatrixReference {
 pub struct FontReference {
   /// Identifier
   #[sdk(attr(qname = ":idx"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub index:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::FontCollectionIndexValues,
   #[sdk(choice(
@@ -1055,7 +971,7 @@ pub struct ModifyNonVisualGroupDrawingShapeProps {
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
@@ -1318,7 +1234,7 @@ pub struct CompressPictureProps {
   pub use_local_dpi: Option<crate::simple_type::BooleanValue>,
   /// cstate
   #[sdk(attr(office2016, qname = ":cstate"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cstate:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlipCompressionValues>,
 }
@@ -1377,43 +1293,19 @@ pub struct ResetNonVisualPictureProps {
 pub struct BoundRect {
   /// l
   #[sdk(attr(qname = ":l"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub l: crate::simple_type::Int64Value,
   /// t
   #[sdk(attr(qname = ":t"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub t: crate::simple_type::Int64Value,
   /// r
   #[sdk(attr(qname = ":r"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub r: crate::simple_type::Int64Value,
   /// b
   #[sdk(attr(qname = ":b"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub b: crate::simple_type::Int64Value,
 }
 /// Defines the SVGBlipMonikerList Class.
@@ -1430,27 +1322,21 @@ pub struct LinePropertiesType {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// line width
   #[sdk(attr(qname = ":w"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "20116800",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 20116800))]
   pub width: Option<crate::simple_type::Int32Value>,
   /// line cap
   #[sdk(attr(qname = ":cap"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub cap_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::LineCapValues>,
   /// compound line type
   #[sdk(attr(qname = ":cmpd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub compound_line_type:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::CompoundLineValues>,
   /// pen alignment
   #[sdk(attr(qname = ":algn"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub alignment:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::PenAlignmentValues>,
   #[sdk(choice(

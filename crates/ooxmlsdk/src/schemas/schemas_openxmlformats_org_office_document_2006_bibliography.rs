@@ -51,15 +51,15 @@ pub struct Sources {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Selected Style
   #[sdk(attr(qname = ":SelectedStyle"))]
-  #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
+  #[sdk(string_length(min = 0u32, max = 255u32))]
   pub selected_style: Option<crate::simple_type::StringValue>,
   /// Documentation Style Name
   #[sdk(attr(qname = ":StyleName"))]
-  #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
+  #[sdk(string_length(min = 0u32, max = 255u32))]
   pub style_name: Option<crate::simple_type::StringValue>,
   /// Uniform Resource Identifier
   #[sdk(attr(qname = ":URI"))]
-  #[sdk(string_length(source = 0u32, min = 0u32, max = 255u32))]
+  #[sdk(string_length(min = 0u32, max = 255u32))]
   pub uri: Option<crate::simple_type::StringValue>,
   /// Source.
   #[sdk(child(qname = "b:CT_SourceType/b:Source"))]

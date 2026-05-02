@@ -108,115 +108,115 @@ pub enum LayoutChildrenValues {
 pub struct ControlCloneRegular {
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ButtonRegular Class.
@@ -225,134 +225,134 @@ pub struct ControlCloneRegular {
 pub struct ButtonRegular {
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the CheckBox Class.
@@ -361,110 +361,110 @@ pub struct ButtonRegular {
 pub struct CheckBox {
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the GalleryRegular Class.
@@ -473,66 +473,42 @@ pub struct CheckBox {
 pub struct GalleryRegular {
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// invalidateContentOnDrop
   #[sdk(attr(office2010, qname = ":invalidateContentOnDrop"))]
   pub invalidate_content_on_drop: Option<crate::simple_type::BooleanValue>,
   /// columns
   #[sdk(attr(office2010, qname = ":columns"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub columns: Option<crate::simple_type::IntegerValue>,
   /// rows
   #[sdk(attr(office2010, qname = ":rows"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub rows: Option<crate::simple_type::IntegerValue>,
   /// itemWidth
   #[sdk(attr(office2010, qname = ":itemWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "4096",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 4096))]
+  #[sdk(number_sign(kind = "positive"))]
   pub item_width: Option<crate::simple_type::IntegerValue>,
   /// itemHeight
   #[sdk(attr(office2010, qname = ":itemHeight"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "4096",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 4096))]
+  #[sdk(number_sign(kind = "positive"))]
   pub item_height: Option<crate::simple_type::IntegerValue>,
   /// getItemWidth
   #[sdk(attr(office2010, qname = ":getItemWidth"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_width: Option<crate::simple_type::StringValue>,
   /// getItemHeight
   #[sdk(attr(office2010, qname = ":getItemHeight"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_height: Option<crate::simple_type::StringValue>,
   /// showItemLabel
   #[sdk(attr(office2010, qname = ":showItemLabel"))]
@@ -542,165 +518,165 @@ pub struct GalleryRegular {
   pub show_in_ribbon: Option<GalleryShowInRibbonValues>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// showItemImage
   #[sdk(attr(office2010, qname = ":showItemImage"))]
   pub show_item_image: Option<crate::simple_type::BooleanValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemScreentip
   #[sdk(attr(office2010, qname = ":getItemScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_screentip: Option<crate::simple_type::StringValue>,
   /// getItemSupertip
   #[sdk(attr(office2010, qname = ":getItemSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_supertip: Option<crate::simple_type::StringValue>,
   /// getItemImage
   #[sdk(attr(office2010, qname = ":getItemImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_image: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// getSelectedItemID
   #[sdk(attr(office2010, qname = ":getSelectedItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_id: Option<crate::simple_type::StringValue>,
   /// getSelectedItemIndex
   #[sdk(attr(office2010, qname = ":getSelectedItemIndex"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_index: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
@@ -715,138 +691,138 @@ pub struct GalleryRegular {
 pub struct ToggleButtonRegular {
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the MenuSeparator Class.
@@ -855,49 +831,49 @@ pub struct ToggleButtonRegular {
 pub struct MenuSeparator {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// title
   #[sdk(attr(office2010, qname = ":title"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub title: Option<crate::simple_type::StringValue>,
   /// getTitle
   #[sdk(attr(office2010, qname = ":getTitle"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_title: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SplitButtonRegular Class.
@@ -909,74 +885,74 @@ pub struct SplitButtonRegular {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -997,130 +973,130 @@ pub struct MenuRegular {
   pub item_size: Option<ItemSizeValues>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -1142,137 +1118,137 @@ pub struct MenuRegular {
 pub struct DynamicMenuRegular {
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// getContent
   #[sdk(attr(office2010, qname = ":getContent"))]
-  #[sdk(string_length(source = 1u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_content: crate::simple_type::StringValue,
   /// invalidateContentOnDrop
   #[sdk(attr(office2010, qname = ":invalidateContentOnDrop"))]
   pub invalidate_content_on_drop: Option<crate::simple_type::BooleanValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SplitButtonWithTitle Class.
@@ -1284,74 +1260,74 @@ pub struct SplitButtonWithTitle {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -1369,133 +1345,133 @@ pub struct SplitButtonWithTitle {
 pub struct MenuWithTitle {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
   /// title
   #[sdk(attr(office2010, qname = ":title"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub title: Option<crate::simple_type::StringValue>,
   /// getTitle
   #[sdk(attr(office2010, qname = ":getTitle"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_title: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -1520,41 +1496,41 @@ pub struct MenuWithTitle {
 pub struct MenuSeparatorNoTitle {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ControlClone Class.
@@ -1566,127 +1542,127 @@ pub struct ControlClone {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the LabelControl Class.
@@ -1695,92 +1671,92 @@ pub struct ControlClone {
 pub struct LabelControl {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Button Class.
@@ -1792,138 +1768,138 @@ pub struct Button {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ToggleButton Class.
@@ -1935,142 +1911,142 @@ pub struct ToggleButton {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the EditBox Class.
@@ -2082,142 +2058,136 @@ pub struct EditBox {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// maxLength
   #[sdk(attr(office2010, qname = ":maxLength"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub max_length: Option<crate::simple_type::IntegerValue>,
   /// getText
   #[sdk(attr(office2010, qname = ":getText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_text: Option<crate::simple_type::StringValue>,
   /// onChange
   #[sdk(attr(office2010, qname = ":onChange"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_change: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the ComboBox Class.
@@ -2229,31 +2199,31 @@ pub struct ComboBox {
   pub show_item_image: Option<crate::simple_type::BooleanValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemScreentip
   #[sdk(attr(office2010, qname = ":getItemScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_screentip: Option<crate::simple_type::StringValue>,
   /// getItemSupertip
   #[sdk(attr(office2010, qname = ":getItemSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_supertip: Option<crate::simple_type::StringValue>,
   /// getItemImage
   #[sdk(attr(office2010, qname = ":getItemImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_image: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// invalidateContentOnDrop
   #[sdk(attr(office2010, qname = ":invalidateContentOnDrop"))]
@@ -2263,138 +2233,132 @@ pub struct ComboBox {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// maxLength
   #[sdk(attr(office2010, qname = ":maxLength"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub max_length: Option<crate::simple_type::IntegerValue>,
   /// getText
   #[sdk(attr(office2010, qname = ":getText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_text: Option<crate::simple_type::StringValue>,
   /// onChange
   #[sdk(attr(office2010, qname = ":onChange"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_change: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
@@ -2406,168 +2370,168 @@ pub struct ComboBox {
 pub struct DropDownRegular {
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// showItemImage
   #[sdk(attr(office2010, qname = ":showItemImage"))]
   pub show_item_image: Option<crate::simple_type::BooleanValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemScreentip
   #[sdk(attr(office2010, qname = ":getItemScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_screentip: Option<crate::simple_type::StringValue>,
   /// getItemSupertip
   #[sdk(attr(office2010, qname = ":getItemSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_supertip: Option<crate::simple_type::StringValue>,
   /// getItemImage
   #[sdk(attr(office2010, qname = ":getItemImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_image: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// getSelectedItemID
   #[sdk(attr(office2010, qname = ":getSelectedItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_id: Option<crate::simple_type::StringValue>,
   /// getSelectedItemIndex
   #[sdk(attr(office2010, qname = ":getSelectedItemIndex"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_index: Option<crate::simple_type::StringValue>,
   /// showItemLabel
   #[sdk(attr(office2010, qname = ":showItemLabel"))]
   pub show_item_label: Option<crate::simple_type::BooleanValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
@@ -2585,70 +2549,46 @@ pub struct Gallery {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// invalidateContentOnDrop
   #[sdk(attr(office2010, qname = ":invalidateContentOnDrop"))]
   pub invalidate_content_on_drop: Option<crate::simple_type::BooleanValue>,
   /// columns
   #[sdk(attr(office2010, qname = ":columns"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub columns: Option<crate::simple_type::IntegerValue>,
   /// rows
   #[sdk(attr(office2010, qname = ":rows"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub rows: Option<crate::simple_type::IntegerValue>,
   /// itemWidth
   #[sdk(attr(office2010, qname = ":itemWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "4096",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 4096))]
+  #[sdk(number_sign(kind = "positive"))]
   pub item_width: Option<crate::simple_type::IntegerValue>,
   /// itemHeight
   #[sdk(attr(office2010, qname = ":itemHeight"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "4096",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 4096))]
+  #[sdk(number_sign(kind = "positive"))]
   pub item_height: Option<crate::simple_type::IntegerValue>,
   /// getItemWidth
   #[sdk(attr(office2010, qname = ":getItemWidth"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_width: Option<crate::simple_type::StringValue>,
   /// getItemHeight
   #[sdk(attr(office2010, qname = ":getItemHeight"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_height: Option<crate::simple_type::StringValue>,
   /// showItemLabel
   #[sdk(attr(office2010, qname = ":showItemLabel"))]
@@ -2658,165 +2598,165 @@ pub struct Gallery {
   pub show_in_ribbon: Option<GalleryShowInRibbonValues>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// showItemImage
   #[sdk(attr(office2010, qname = ":showItemImage"))]
   pub show_item_image: Option<crate::simple_type::BooleanValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemScreentip
   #[sdk(attr(office2010, qname = ":getItemScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_screentip: Option<crate::simple_type::StringValue>,
   /// getItemSupertip
   #[sdk(attr(office2010, qname = ":getItemSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_supertip: Option<crate::simple_type::StringValue>,
   /// getItemImage
   #[sdk(attr(office2010, qname = ":getItemImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_image: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// getSelectedItemID
   #[sdk(attr(office2010, qname = ":getSelectedItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_id: Option<crate::simple_type::StringValue>,
   /// getSelectedItemIndex
   #[sdk(attr(office2010, qname = ":getSelectedItemIndex"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_index: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   /// Defines the Item Class.
   #[sdk(child(office2010, qname = "mso14:CT_Item/mso14:item"))]
@@ -2834,137 +2774,137 @@ pub struct Menu {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
   pub item_size: Option<ItemSizeValues>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -2989,141 +2929,141 @@ pub struct DynamicMenu {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// getContent
   #[sdk(attr(office2010, qname = ":getContent"))]
-  #[sdk(string_length(source = 1u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_content: crate::simple_type::StringValue,
   /// invalidateContentOnDrop
   #[sdk(attr(office2010, qname = ":invalidateContentOnDrop"))]
   pub invalidate_content_on_drop: Option<crate::simple_type::BooleanValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SplitButton Class.
@@ -3135,81 +3075,81 @@ pub struct SplitButton {
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -3227,48 +3167,48 @@ pub struct SplitButton {
 pub struct Box {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// boxStyle
   #[sdk(attr(office2010, qname = ":boxStyle"))]
@@ -3297,48 +3237,48 @@ pub struct Box {
 pub struct ButtonGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -3359,31 +3299,31 @@ pub struct ButtonGroup {
 pub struct BackstageMenuButton {
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// isDefinitive
   #[sdk(attr(office2010, qname = ":isDefinitive"))]
@@ -3393,45 +3333,45 @@ pub struct BackstageMenuButton {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageMenuCheckBox Class.
@@ -3440,66 +3380,66 @@ pub struct BackstageMenuButton {
 pub struct BackstageMenuCheckBox {
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageSubMenu Class.
@@ -3508,72 +3448,72 @@ pub struct BackstageMenuCheckBox {
 pub struct BackstageSubMenu {
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageMenuGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageMenuGroup/mso14:menuGroup"))]
@@ -3588,80 +3528,80 @@ pub struct BackstageSubMenu {
 pub struct BackstageMenuToggleButton {
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageGroupButton Class.
@@ -3676,39 +3616,39 @@ pub struct BackstageGroupButton {
   pub style: Option<Style2Values>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// isDefinitive
   #[sdk(attr(office2010, qname = ":isDefinitive"))]
@@ -3718,45 +3658,45 @@ pub struct BackstageGroupButton {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageCheckBox Class.
@@ -3768,82 +3708,82 @@ pub struct BackstageCheckBox {
   pub expand: Option<ExpandValues>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageEditBox Class.
@@ -3852,19 +3792,19 @@ pub struct BackstageCheckBox {
 pub struct BackstageEditBox {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -3877,54 +3817,48 @@ pub struct BackstageEditBox {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// getText
   #[sdk(attr(office2010, qname = ":getText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_text: Option<crate::simple_type::StringValue>,
   /// onChange
   #[sdk(attr(office2010, qname = ":onChange"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_change: Option<crate::simple_type::StringValue>,
   /// maxLength
   #[sdk(attr(office2010, qname = ":maxLength"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "1024",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 1024))]
+  #[sdk(number_sign(kind = "positive"))]
   pub max_length: Option<crate::simple_type::IntegerValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageDropDown Class.
@@ -3933,19 +3867,19 @@ pub struct BackstageEditBox {
 pub struct BackstageDropDown {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -3958,71 +3892,71 @@ pub struct BackstageDropDown {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// getSelectedItemIndex
   #[sdk(attr(office2010, qname = ":getSelectedItemIndex"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_index: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the ItemBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:item"))]
@@ -4034,19 +3968,19 @@ pub struct BackstageDropDown {
 pub struct RadioGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -4059,51 +3993,51 @@ pub struct RadioGroup {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// getSelectedItemIndex
   #[sdk(attr(office2010, qname = ":getSelectedItemIndex"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_selected_item_index: Option<crate::simple_type::StringValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the RadioButtonBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:radioButton"))]
@@ -4115,19 +4049,19 @@ pub struct RadioGroup {
 pub struct BackstageComboBox {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -4140,55 +4074,55 @@ pub struct BackstageComboBox {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// getText
   #[sdk(attr(office2010, qname = ":getText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_text: Option<crate::simple_type::StringValue>,
   /// onChange
   #[sdk(attr(office2010, qname = ":onChange"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_change: Option<crate::simple_type::StringValue>,
   /// sizeString
   #[sdk(attr(office2010, qname = ":sizeString"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub size_string: Option<crate::simple_type::StringValue>,
   /// getItemCount
   #[sdk(attr(office2010, qname = ":getItemCount"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_count: Option<crate::simple_type::StringValue>,
   /// getItemLabel
   #[sdk(attr(office2010, qname = ":getItemLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_label: Option<crate::simple_type::StringValue>,
   /// getItemID
   #[sdk(attr(office2010, qname = ":getItemID"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_item_id: Option<crate::simple_type::StringValue>,
   /// Defines the ItemBackstageItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageItem/mso14:item"))]
@@ -4200,19 +4134,19 @@ pub struct BackstageComboBox {
 pub struct Hyperlink {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -4225,73 +4159,73 @@ pub struct Hyperlink {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// target
   #[sdk(attr(office2010, qname = ":target"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub target: Option<crate::simple_type::StringValue>,
   /// getTarget
   #[sdk(attr(office2010, qname = ":getTarget"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_target: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageLabelControl Class.
@@ -4303,19 +4237,19 @@ pub struct Hyperlink {
 pub struct BackstageLabelControl {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// alignLabel
   #[sdk(attr(office2010, qname = ":alignLabel"))]
@@ -4328,22 +4262,22 @@ pub struct BackstageLabelControl {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// noWrap
   #[sdk(attr(office2010, qname = ":noWrap"))]
@@ -4355,30 +4289,30 @@ pub struct BackstageLabelControl {
 pub struct GroupBox {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// expand
   #[sdk(attr(office2010, qname = ":expand"))]
   pub expand: Option<ExpandValues>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -4402,19 +4336,19 @@ pub struct GroupBox {
 pub struct LayoutContainer {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// align
   #[sdk(attr(office2010, qname = ":align"))]
@@ -4447,55 +4381,55 @@ pub struct LayoutContainer {
 pub struct ImageControl {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// altText
   #[sdk(attr(office2010, qname = ":altText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub alt_text: Option<crate::simple_type::StringValue>,
   /// getAltText
   #[sdk(attr(office2010, qname = ":getAltText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_alt_text: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageGroup Class.
@@ -4504,84 +4438,84 @@ pub struct ImageControl {
 pub struct BackstageGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// style
   #[sdk(attr(office2010, qname = ":style"))]
   pub style: Option<StyleValues>,
   /// getStyle
   #[sdk(attr(office2010, qname = ":getStyle"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_style: Option<crate::simple_type::StringValue>,
   /// helperText
   #[sdk(attr(office2010, qname = ":helperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub helper_text: Option<crate::simple_type::StringValue>,
   /// getHelperText
   #[sdk(attr(office2010, qname = ":getHelperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_helper_text: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   #[sdk(choice(microsoft365, qname = "mso14:CT_PrimaryItem/mso14:primaryItem"))]
   pub backstage_group_choice: Option<BackstageGroupChoice>,
@@ -4598,77 +4532,77 @@ pub struct BackstageGroup {
 pub struct TaskGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// helperText
   #[sdk(attr(office2010, qname = ":helperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub helper_text: Option<crate::simple_type::StringValue>,
   /// getHelperText
   #[sdk(attr(office2010, qname = ":getHelperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_helper_text: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// allowedTaskSizes
   #[sdk(attr(office2010, qname = ":allowedTaskSizes"))]
@@ -4683,11 +4617,11 @@ pub struct TaskGroup {
 pub struct MenuRoot {
   /// title
   #[sdk(attr(office2010, qname = ":title"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub title: Option<crate::simple_type::StringValue>,
   /// getTitle
   #[sdk(attr(office2010, qname = ":getTitle"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_title: Option<crate::simple_type::StringValue>,
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
@@ -4715,11 +4649,11 @@ pub struct CustomUi {
   pub xml_other_attrs: Vec<(String, String)>,
   /// onLoad
   #[sdk(attr(office2010, qname = ":onLoad"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_load: Option<crate::simple_type::StringValue>,
   /// loadImage
   #[sdk(attr(office2010, qname = ":loadImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub load_image: Option<crate::simple_type::StringValue>,
   /// Defines the Commands Class.
   #[sdk(child(office2010, qname = "mso14:CT_Commands/mso14:commands"))]
@@ -4740,32 +4674,32 @@ pub struct CustomUi {
 pub struct Item {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the VisibleButton Class.
@@ -4774,127 +4708,127 @@ pub struct Item {
 pub struct VisibleButton {
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the VisibleToggleButton Class.
@@ -4903,131 +4837,131 @@ pub struct VisibleButton {
 pub struct VisibleToggleButton {
   /// getPressed
   #[sdk(attr(office2010, qname = ":getPressed"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_pressed: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Separator Class.
@@ -5036,48 +4970,48 @@ pub struct VisibleToggleButton {
 pub struct Separator {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
 }
 /// Defines the DialogBoxLauncher Class.
@@ -5094,101 +5028,101 @@ pub struct DialogBoxLauncher {
 pub struct Group {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// autoScale
   #[sdk(attr(office2010, qname = ":autoScale"))]
@@ -5225,132 +5159,132 @@ pub struct Group {
 pub struct ControlCloneQat {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub id_q: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// size
   #[sdk(attr(office2010, qname = ":size"))]
   pub size: Option<SizeValues>,
   /// getSize
   #[sdk(attr(office2010, qname = ":getSize"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_size: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// showImage
   #[sdk(attr(office2010, qname = ":showImage"))]
   pub show_image: Option<crate::simple_type::BooleanValue>,
   /// getShowImage
   #[sdk(attr(office2010, qname = ":getShowImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the SharedControlsQatItems Class.
@@ -5383,71 +5317,71 @@ pub struct DocumentControlsQatItems {
 pub struct Tab {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the Group Class.
   #[sdk(child(office2010, qname = "mso14:CT_Group/mso14:group"))]
@@ -5459,16 +5393,16 @@ pub struct Tab {
 pub struct TabSet {
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 1u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
-  #[sdk(string_format(source = 1u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: crate::simple_type::StringValue,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// Defines the Tab Class.
   #[sdk(child(office2010, qname = "mso14:CT_Tab/mso14:tab"))]
@@ -5480,20 +5414,20 @@ pub struct TabSet {
 pub struct Command {
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
 }
 /// Defines the QuickAccessToolbar Class.
@@ -5529,9 +5463,9 @@ pub struct ContextualTabs {
 pub struct ContextMenu {
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,
@@ -5553,18 +5487,18 @@ pub struct ContextMenu {
 pub struct ItemBackstageItem {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
 }
 /// Defines the RadioButtonBackstageItem Class.
@@ -5573,18 +5507,18 @@ pub struct ItemBackstageItem {
 pub struct RadioButtonBackstageItem {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstageRegularButton Class.
@@ -5593,39 +5527,39 @@ pub struct RadioButtonBackstageItem {
 pub struct BackstageRegularButton {
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// isDefinitive
   #[sdk(attr(office2010, qname = ":isDefinitive"))]
@@ -5635,45 +5569,45 @@ pub struct BackstageRegularButton {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the BackstagePrimaryMenu Class.
@@ -5682,80 +5616,80 @@ pub struct BackstageRegularButton {
 pub struct BackstagePrimaryMenu {
   /// screentip
   #[sdk(attr(office2010, qname = ":screentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub screentip: Option<crate::simple_type::StringValue>,
   /// getScreentip
   #[sdk(attr(office2010, qname = ":getScreentip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_screentip: Option<crate::simple_type::StringValue>,
   /// supertip
   #[sdk(attr(office2010, qname = ":supertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub supertip: Option<crate::simple_type::StringValue>,
   /// getSupertip
   #[sdk(attr(office2010, qname = ":getSupertip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_supertip: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageMenuGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageMenuGroup/mso14:menuGroup"))]
@@ -5767,27 +5701,27 @@ pub struct BackstagePrimaryMenu {
 pub struct BackstageMenuGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// itemSize
   #[sdk(attr(office2010, qname = ":itemSize"))]
@@ -5857,62 +5791,62 @@ pub struct BottomItemsGroupControls {
 pub struct TaskGroupCategory {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// Defines the TaskGroupTask Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskGroupTask/mso14:task"))]
@@ -5924,107 +5858,107 @@ pub struct TaskGroupCategory {
 pub struct TaskGroupTask {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// isDefinitive
   #[sdk(attr(office2010, qname = ":isDefinitive"))]
   pub is_definitive: Option<crate::simple_type::BooleanValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TaskFormGroupCategory Class.
@@ -6033,62 +5967,62 @@ pub struct TaskGroupTask {
 pub struct TaskFormGroupCategory {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// Defines the TaskFormGroupTask Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskFormGroupTask/mso14:task"))]
@@ -6100,100 +6034,100 @@ pub struct TaskFormGroupCategory {
 pub struct TaskFormGroupTask {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(office2010, qname = ":description"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub description: Option<crate::simple_type::StringValue>,
   /// getDescription
   #[sdk(attr(office2010, qname = ":getDescription"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_description: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// Defines the BackstageGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroup/mso14:group"))]
@@ -6205,55 +6139,55 @@ pub struct TaskFormGroupTask {
 pub struct TaskFormGroup {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// helperText
   #[sdk(attr(office2010, qname = ":helperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 4096u32))]
+  #[sdk(string_length(min = 1u32, max = 4096u32))]
   pub helper_text: Option<crate::simple_type::StringValue>,
   /// getHelperText
   #[sdk(attr(office2010, qname = ":getHelperText"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_helper_text: Option<crate::simple_type::StringValue>,
   /// showLabel
   #[sdk(attr(office2010, qname = ":showLabel"))]
   pub show_label: Option<crate::simple_type::BooleanValue>,
   /// getShowLabel
   #[sdk(attr(office2010, qname = ":getShowLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_show_label: Option<crate::simple_type::StringValue>,
   /// allowedTaskSizes
   #[sdk(attr(office2010, qname = ":allowedTaskSizes"))]
@@ -6291,141 +6225,111 @@ pub struct SimpleGroups {
 pub struct BackstageTab {
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// enabled
   #[sdk(attr(office2010, qname = ":enabled"))]
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// title
   #[sdk(attr(office2010, qname = ":title"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub title: Option<crate::simple_type::StringValue>,
   /// getTitle
   #[sdk(attr(office2010, qname = ":getTitle"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_title: Option<crate::simple_type::StringValue>,
   /// columnWidthPercent
   #[sdk(attr(office2010, qname = ":columnWidthPercent"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "99",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 99))]
+  #[sdk(number_sign(kind = "positive"))]
   pub column_width_percent: Option<crate::simple_type::IntegerValue>,
   /// firstColumnMinWidth
   #[sdk(attr(office2010, qname = ":firstColumnMinWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "10000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 10000))]
+  #[sdk(number_sign(kind = "positive"))]
   pub first_column_min_width: Option<crate::simple_type::IntegerValue>,
   /// firstColumnMaxWidth
   #[sdk(attr(office2010, qname = ":firstColumnMaxWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "10000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 10000))]
+  #[sdk(number_sign(kind = "positive"))]
   pub first_column_max_width: Option<crate::simple_type::IntegerValue>,
   /// secondColumnMinWidth
   #[sdk(attr(office2010, qname = ":secondColumnMinWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "10000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 10000))]
+  #[sdk(number_sign(kind = "positive"))]
   pub second_column_min_width: Option<crate::simple_type::IntegerValue>,
   /// secondColumnMaxWidth
   #[sdk(attr(office2010, qname = ":secondColumnMaxWidth"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "10000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
-  #[sdk(number_sign(source = 0u32, kind = "positive"))]
+  #[sdk(number_range(range = 1..= 10000))]
+  #[sdk(number_sign(kind = "positive"))]
   pub second_column_max_width: Option<crate::simple_type::IntegerValue>,
   /// Defines the BackstageGroups Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroups/mso14:firstColumn"))]
@@ -6440,51 +6344,51 @@ pub struct BackstageTab {
 pub struct BackstageFastCommandButton {
   /// idMso
   #[sdk(attr(office2010, qname = ":idMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub id_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterMso
   #[sdk(attr(office2010, qname = ":insertAfterMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_after_mso: Option<crate::simple_type::StringValue>,
   /// insertBeforeMso
   #[sdk(attr(office2010, qname = ":insertBeforeMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub insert_before_mso: Option<crate::simple_type::StringValue>,
   /// insertAfterQ
   #[sdk(attr(office2010, qname = ":insertAfterQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_after_qulified_id: Option<crate::simple_type::StringValue>,
   /// insertBeforeQ
   #[sdk(attr(office2010, qname = ":insertBeforeQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub insert_before_qulified_id: Option<crate::simple_type::StringValue>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
-  #[sdk(string_format(source = 0u32, kind = "id"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
+  #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   /// idQ
   #[sdk(attr(office2010, qname = ":idQ"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "qname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "qname"))]
   pub qualified_id: Option<crate::simple_type::StringValue>,
   /// tag
   #[sdk(attr(office2010, qname = ":tag"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub tag: Option<crate::simple_type::StringValue>,
   /// onAction
   #[sdk(attr(office2010, qname = ":onAction"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_action: Option<crate::simple_type::StringValue>,
   /// isDefinitive
   #[sdk(attr(office2010, qname = ":isDefinitive"))]
@@ -6494,45 +6398,45 @@ pub struct BackstageFastCommandButton {
   pub enabled: Option<crate::simple_type::BooleanValue>,
   /// getEnabled
   #[sdk(attr(office2010, qname = ":getEnabled"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_enabled: Option<crate::simple_type::StringValue>,
   /// label
   #[sdk(attr(office2010, qname = ":label"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub label: Option<crate::simple_type::StringValue>,
   /// getLabel
   #[sdk(attr(office2010, qname = ":getLabel"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_label: Option<crate::simple_type::StringValue>,
   /// visible
   #[sdk(attr(office2010, qname = ":visible"))]
   pub visible: Option<crate::simple_type::BooleanValue>,
   /// getVisible
   #[sdk(attr(office2010, qname = ":getVisible"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_visible: Option<crate::simple_type::StringValue>,
   /// keytip
   #[sdk(attr(office2010, qname = ":keytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 3u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_length(min = 1u32, max = 3u32))]
+  #[sdk(string_format(kind = "token"))]
   pub keytip: Option<crate::simple_type::StringValue>,
   /// getKeytip
   #[sdk(attr(office2010, qname = ":getKeytip"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_keytip: Option<crate::simple_type::StringValue>,
   /// image
   #[sdk(attr(office2010, qname = ":image"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub image: Option<crate::simple_type::StringValue>,
   /// imageMso
   #[sdk(attr(office2010, qname = ":imageMso"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
-  #[sdk(string_format(source = 0u32, kind = "ncname"))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
+  #[sdk(string_format(kind = "token"))]
+  #[sdk(string_format(kind = "ncname"))]
   pub image_mso: Option<crate::simple_type::StringValue>,
   /// getImage
   #[sdk(attr(office2010, qname = ":getImage"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub get_image: Option<crate::simple_type::StringValue>,
 }
 /// Defines the Commands Class.
@@ -6566,11 +6470,11 @@ pub struct Ribbon {
 pub struct Backstage {
   /// onShow
   #[sdk(attr(office2010, qname = ":onShow"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_show: Option<crate::simple_type::StringValue>,
   /// onHide
   #[sdk(attr(office2010, qname = ":onHide"))]
-  #[sdk(string_length(source = 0u32, min = 1u32, max = 1024u32))]
+  #[sdk(string_length(min = 1u32, max = 1024u32))]
   pub on_hide: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     microsoft365,

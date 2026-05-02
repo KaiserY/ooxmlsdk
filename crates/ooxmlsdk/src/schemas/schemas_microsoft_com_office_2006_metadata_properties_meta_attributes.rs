@@ -37,7 +37,7 @@ pub struct Dummy {
   pub hidden: Option<crate::simple_type::StringValue>,
   /// index
   #[sdk(attr(qname = ":index"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub index: Option<crate::simple_type::Int32Value>,
   /// internalName
   #[sdk(attr(qname = ":internalName"))]
@@ -66,7 +66,6 @@ pub struct Dummy {
   /// web
   #[sdk(attr(qname = ":web"))]
   #[sdk(pattern(
-    source = 0u32,
     regex = "[0-9a-fA-F]{8}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{4}\\-[0-9a-fA-F]{12}"
   ))]
   pub web: Option<crate::simple_type::StringValue>,

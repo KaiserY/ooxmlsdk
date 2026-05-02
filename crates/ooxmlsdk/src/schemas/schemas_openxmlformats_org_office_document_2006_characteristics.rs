@@ -44,6 +44,6 @@ pub struct Characteristic {
   pub val: crate::simple_type::StringValue,
   /// Characteristic Grammar
   #[sdk(attr(qname = ":vocabulary"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub vocabulary: Option<crate::simple_type::StringValue>,
 }

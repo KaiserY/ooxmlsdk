@@ -371,7 +371,7 @@ pub struct Ink {
   pub xml_other_attrs: Vec<(String, String)>,
   /// documentID
   #[sdk(attr(qname = ":documentID"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub document_id: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "inkml:CT_Annotation/inkml:annotation",
@@ -439,7 +439,7 @@ pub struct Mapping {
   pub r#type: Option<MappingTypeValues>,
   /// mappingRef
   #[sdk(attr(qname = ":mappingRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub mapping_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Bind Class.
   #[sdk(child(qname = "inkml:CT_Bind/inkml:bind"))]
@@ -523,7 +523,7 @@ pub struct Channel {
   pub orientation: Option<ChannelValueOrientationValues>,
   /// respectTo
   #[sdk(attr(qname = ":respectTo"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub respect_to: Option<crate::simple_type::StringValue>,
   /// units
   #[sdk(attr(qname = ":units"))]
@@ -908,7 +908,7 @@ pub struct AnnotationXml {
   pub encoding: Option<crate::simple_type::StringValue>,
   /// href
   #[sdk(attr(qname = ":href"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub href: Option<crate::simple_type::StringValue>,
   /// Defines the Emma Class.
   #[sdk(child(qname = "emma:CT_Emma/emma:emma"))]
@@ -1042,7 +1042,7 @@ pub struct Canvas {
   pub id: Option<crate::simple_type::StringValue>,
   /// traceFormatRef
   #[sdk(attr(qname = ":traceFormatRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub trace_format_ref: Option<crate::simple_type::StringValue>,
   /// Defines the TraceFormat Class.
   #[sdk(child(qname = "inkml:CT_TraceFormat/inkml:traceFormat"))]
@@ -1080,7 +1080,7 @@ pub struct InkSource {
   pub serial_no: Option<crate::simple_type::StringValue>,
   /// specificationRef
   #[sdk(attr(qname = ":specificationRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub specification_ref: Option<crate::simple_type::StringValue>,
   /// description
   #[sdk(attr(qname = ":description"))]
@@ -1113,7 +1113,7 @@ pub struct Brush {
   pub id: Option<crate::simple_type::StringValue>,
   /// brushRef
   #[sdk(attr(qname = ":brushRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Annotation Class.
   #[sdk(child(qname = "inkml:CT_Annotation/inkml:annotation"))]
@@ -1137,7 +1137,7 @@ pub struct Timestamp {
   pub time: Option<crate::simple_type::DecimalValue>,
   /// timestampRef
   #[sdk(attr(qname = ":timestampRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub timestamp_ref: Option<crate::simple_type::StringValue>,
   /// timeString
   #[sdk(attr(qname = ":timeString"))]
@@ -1161,15 +1161,15 @@ pub struct Trace {
   pub continuation: Option<TraceContinuationValues>,
   /// priorRef
   #[sdk(attr(qname = ":priorRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub prior_ref: Option<crate::simple_type::StringValue>,
   /// contextRef
   #[sdk(attr(qname = ":contextRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
   #[sdk(attr(qname = ":brushRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// duration
   #[sdk(attr(qname = ":duration"))]
@@ -1189,11 +1189,11 @@ pub struct TraceGroup {
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
   #[sdk(attr(qname = ":contextRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
   #[sdk(attr(qname = ":brushRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   #[sdk(choice(
     qname = "inkml:CT_Annotation/inkml:annotation",
@@ -1212,11 +1212,11 @@ pub struct TraceView {
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
   #[sdk(attr(qname = ":contextRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// traceDataRef
   #[sdk(attr(qname = ":traceDataRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub trace_data_ref: Option<crate::simple_type::StringValue>,
   /// from
   #[sdk(attr(qname = ":from"))]
@@ -1240,31 +1240,31 @@ pub struct Context {
   pub id: Option<crate::simple_type::StringValue>,
   /// contextRef
   #[sdk(attr(qname = ":contextRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub context_ref: Option<crate::simple_type::StringValue>,
   /// canvasRef
   #[sdk(attr(qname = ":canvasRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub canvas_ref: Option<crate::simple_type::StringValue>,
   /// canvasTransformRef
   #[sdk(attr(qname = ":canvasTransformRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub canvas_transform_ref: Option<crate::simple_type::StringValue>,
   /// traceFormatRef
   #[sdk(attr(qname = ":traceFormatRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub trace_fromat_ref: Option<crate::simple_type::StringValue>,
   /// inkSourceRef
   #[sdk(attr(qname = ":inkSourceRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub ink_source_ref: Option<crate::simple_type::StringValue>,
   /// brushRef
   #[sdk(attr(qname = ":brushRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub brush_ref: Option<crate::simple_type::StringValue>,
   /// timestampRef
   #[sdk(attr(qname = ":timestampRef"))]
-  #[sdk(string_format(source = 0u32, kind = "uri"))]
+  #[sdk(string_format(kind = "uri"))]
   pub timestamp_ref: Option<crate::simple_type::StringValue>,
   /// Defines the Canvas Class.
   #[sdk(child(qname = "inkml:CT_Canvas/inkml:canvas"))]

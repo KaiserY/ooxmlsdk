@@ -868,23 +868,11 @@ pub struct WrapRight {
 pub struct Break {
   /// Index of Operator to Align To
   #[sdk(attr(qname = "m:alnAt"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "255",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 255))]
   pub align_at: Option<crate::simple_type::IntegerValue>,
   /// Index of Operator to Align To
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "255",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 255))]
   pub val: Option<crate::simple_type::IntegerValue>,
 }
 /// Run Properties.
@@ -923,7 +911,7 @@ pub struct Text {
 pub struct AccentChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(string_length(source = 1u32, max = 1u32))]
+  #[sdk(string_length(max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Beginning Character.
@@ -932,7 +920,7 @@ pub struct AccentChar {
 pub struct BeginChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(string_length(source = 1u32, max = 1u32))]
+  #[sdk(string_length(max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Separator Character.
@@ -941,7 +929,7 @@ pub struct BeginChar {
 pub struct SeparatorChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(string_length(source = 1u32, max = 1u32))]
+  #[sdk(string_length(max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Delimiter Ending Character.
@@ -950,7 +938,7 @@ pub struct SeparatorChar {
 pub struct EndChar {
   /// value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(string_length(source = 1u32, max = 1u32))]
+  #[sdk(string_length(max = 1u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Control Properties.
@@ -1690,13 +1678,7 @@ pub struct BaseJustification {
 pub struct RowSpacingRule {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "4",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 4))]
   pub val: crate::simple_type::IntegerValue,
 }
 /// Matrix Column Gap Rule.
@@ -1705,13 +1687,7 @@ pub struct RowSpacingRule {
 pub struct ColumnGapRule {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "4",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 4))]
   pub val: crate::simple_type::IntegerValue,
 }
 /// Row Spacing (Equation Array).
@@ -1819,13 +1795,7 @@ pub struct LimitUpperProperties {
 pub struct MatrixColumnCount {
   /// val
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "1",
-    max = "64",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 1..= 64))]
   pub val: crate::simple_type::IntegerValue,
 }
 /// Matrix Column Justification.
@@ -1861,12 +1831,7 @@ pub struct MatrixColumn {
 pub struct ColumnSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Left Margin.
@@ -1875,12 +1840,7 @@ pub struct ColumnSpacing {
 pub struct LeftMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Right Margin.
@@ -1889,12 +1849,7 @@ pub struct LeftMargin {
 pub struct RightMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Pre-Equation Spacing.
@@ -1903,12 +1858,7 @@ pub struct RightMargin {
 pub struct PreSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Post-Equation Spacing.
@@ -1917,12 +1867,7 @@ pub struct PreSpacing {
 pub struct PostSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Inter-Equation Spacing.
@@ -1931,12 +1876,7 @@ pub struct PostSpacing {
 pub struct InterSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Intra-Equation Spacing.
@@ -1945,12 +1885,7 @@ pub struct InterSpacing {
 pub struct IntraSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Wrap Indent.
@@ -1959,12 +1894,7 @@ pub struct IntraSpacing {
 pub struct WrapIndent {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    max = "31680",
-    min_inclusive = false,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(max = 31680, min_inclusive = false))]
   pub val: crate::simple_type::UInt32Value,
 }
 /// Matrix Columns.
@@ -2137,13 +2067,7 @@ pub struct SuperscriptProperties {
 pub struct ArgumentSize {
   /// Value
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-2",
-    max = "2",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -2..= 2))]
   pub val: crate::simple_type::IntegerValue,
 }
 /// Argument Properties.
@@ -2176,7 +2100,7 @@ pub struct DefaultJustification {
 pub struct MathFont {
   /// val
   #[sdk(attr(qname = "m:val"))]
-  #[sdk(string_length(source = 1u32, max = 31u32))]
+  #[sdk(string_length(max = 31u32))]
   pub val: crate::simple_type::StringValue,
 }
 /// Break on Binary Operators.

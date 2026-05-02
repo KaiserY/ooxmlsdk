@@ -25,6 +25,6 @@ pub enum ClassificationOutcomeType {
 pub struct ClassificationOutcome {
   /// val
   #[sdk(attr(office2019, qname = ":val"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: Option<ClassificationOutcomeType>,
 }

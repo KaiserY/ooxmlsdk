@@ -10,11 +10,8 @@
 pub struct PivotCacheRichInfo {
   /// pivotCacheGuid
   #[sdk(attr(microsoft365, qname = ":pivotCacheGuid"))]
-  #[sdk(pattern(
-    source = 1u32,
-    regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"
-  ))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
+  #[sdk(string_format(kind = "token"))]
   pub pivot_cache_guid: crate::simple_type::StringValue,
   /// pivotIgnoreInvalidCache
   #[sdk(attr(microsoft365, qname = ":pivotIgnoreInvalidCache"))]

@@ -792,7 +792,7 @@ pub struct Extension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
   pub xml_children: Vec<String>,
@@ -819,60 +819,60 @@ pub struct KioskSlideMode {
 pub struct ColorMap {
   /// Background 1
   #[sdk(attr(qname = ":bg1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 1
   #[sdk(attr(qname = ":tx1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text1: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Background 2
   #[sdk(attr(qname = ":bg2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub background2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Text 2
   #[sdk(attr(qname = ":tx2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub text2: crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 1
   #[sdk(attr(qname = ":accent1"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent1:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 2
   #[sdk(attr(qname = ":accent2"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent2:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 3
   #[sdk(attr(qname = ":accent3"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent3:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 4
   #[sdk(attr(qname = ":accent4"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent4:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 5
   #[sdk(attr(qname = ":accent5"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent5:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Accent 6
   #[sdk(attr(qname = ":accent6"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accent6:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Hyperlink
   #[sdk(attr(qname = ":hlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Followed Hyperlink
   #[sdk(attr(qname = ":folHlink"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub followed_hyperlink:
     crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::ColorSchemeIndexValues,
   /// Defines the ExtensionList Class.
@@ -980,7 +980,7 @@ pub struct CommentList {
 pub struct OleObject {
   /// spid
   #[sdk(attr(qname = ":spid"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_id: Option<crate::simple_type::StringValue>,
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -993,11 +993,11 @@ pub struct OleObject {
   pub id: Option<crate::simple_type::StringValue>,
   /// imgW
   #[sdk(attr(qname = ":imgW"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub image_width: Option<crate::simple_type::Int32Value>,
   /// imgH
   #[sdk(attr(qname = ":imgH"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub image_height: Option<crate::simple_type::Int32Value>,
   /// progId
   #[sdk(attr(qname = ":progId"))]
@@ -1051,13 +1051,7 @@ pub struct Presentation {
   pub auto_compress_pictures: Option<crate::simple_type::BooleanValue>,
   /// bookmarkIdSeed
   #[sdk(attr(qname = ":bookmarkIdSeed"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "1",
-    max = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 1..2147483648))]
   pub bookmark_id_seed: Option<crate::simple_type::UInt32Value>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
@@ -1183,7 +1177,7 @@ pub struct SlideLayout {
   pub matching_name: Option<crate::simple_type::StringValue>,
   /// type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<SlideLayoutValues>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
@@ -1353,7 +1347,7 @@ pub struct ViewProperties {
   pub xml_other_attrs: Vec<(String, String)>,
   /// Last View
   #[sdk(attr(qname = ":lastView"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub last_view: Option<ViewValues>,
   /// Show Comments
   #[sdk(attr(qname = ":showComments"))]
@@ -1472,7 +1466,7 @@ pub struct TimeAbsolute {
 pub struct TimePercentage {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(number_range(source = 1u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub val: crate::simple_type::Int32Value,
 }
 /// Target Element Trigger Choice.
@@ -1504,7 +1498,7 @@ pub struct TimeNode {
 pub struct RuntimeNodeTrigger {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub val: TriggerRuntimeNodeValues,
 }
 /// Condition.
@@ -1513,7 +1507,7 @@ pub struct RuntimeNodeTrigger {
 pub struct Condition {
   /// Trigger Event
   #[sdk(attr(qname = ":evt"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub event: Option<TriggerEventValues>,
   /// Trigger Delay
   #[sdk(attr(qname = ":delay"))]
@@ -1535,7 +1529,7 @@ pub struct Condition {
 pub struct EndSync {
   /// Trigger Event
   #[sdk(attr(qname = ":evt"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub event: Option<TriggerEventValues>,
   /// Trigger Delay
   #[sdk(attr(qname = ":delay"))]
@@ -1572,11 +1566,11 @@ pub struct SequenceTimeNode {
   pub concurrent: Option<crate::simple_type::BooleanValue>,
   /// Previous Action
   #[sdk(attr(qname = ":prevAc"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub previous_action: Option<PreviousActionValues>,
   /// Next Action
   #[sdk(attr(qname = ":nextAc"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub next_action: Option<NextActionValues>,
   /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -1614,11 +1608,11 @@ pub struct Animate {
   pub to: Option<crate::simple_type::StringValue>,
   /// calcmode
   #[sdk(attr(qname = ":calcmode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub calculation_mode: Option<AnimateBehaviorCalculateModeValues>,
   /// valueType
   #[sdk(attr(qname = ":valueType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub value_type: Option<AnimateBehaviorValues>,
   /// bounceEnd
   #[sdk(attr(office2010, qname = "p14:bounceEnd"))]
@@ -1628,7 +1622,7 @@ pub struct Animate {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
   /// Defines the CommonBehavior Class.
@@ -1644,11 +1638,11 @@ pub struct Animate {
 pub struct AnimateColor {
   /// Color Space
   #[sdk(attr(qname = ":clrSpc"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub color_space: Option<AnimateColorSpaceValues>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<AnimateColorDirectionValues>,
   /// Defines the CommonBehavior Class.
   #[sdk(child(qname = "p:CT_TLCommonBehaviorData/p:cBhvr"))]
@@ -1669,7 +1663,7 @@ pub struct AnimateColor {
 pub struct AnimateEffect {
   /// Transition
   #[sdk(attr(qname = ":transition"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub transition: Option<AnimateEffectTransitionValues>,
   /// Filter
   #[sdk(attr(qname = ":filter"))]
@@ -1691,14 +1685,14 @@ pub struct AnimateMotion {
   pub xml_other_attrs: Vec<(String, String)>,
   /// origin
   #[sdk(attr(qname = ":origin"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub origin: Option<AnimateMotionBehaviorOriginValues>,
   /// path
   #[sdk(attr(qname = ":path"))]
   pub path: Option<crate::simple_type::StringValue>,
   /// pathEditMode
   #[sdk(attr(qname = ":pathEditMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub path_edit_mode: Option<AnimateMotionPathEditModeValues>,
   /// rAng
   #[sdk(attr(qname = ":rAng"))]
@@ -1714,7 +1708,7 @@ pub struct AnimateMotion {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
   /// Defines the CommonBehavior Class.
@@ -1755,7 +1749,7 @@ pub struct AnimateRotation {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
   /// Defines the CommonBehavior Class.
@@ -1778,7 +1772,7 @@ pub struct AnimateScale {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub bounce_end: Option<crate::simple_type::Int32Value>,
   /// Defines the CommonBehavior Class.
@@ -1800,7 +1794,7 @@ pub struct AnimateScale {
 pub struct Command {
   /// Command Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<CommandValues>,
   /// Command
   #[sdk(attr(qname = ":cmd"))]
@@ -1855,7 +1849,7 @@ pub struct CommonTimeNode {
   pub preset_id: Option<crate::simple_type::Int32Value>,
   /// presetClass
   #[sdk(attr(qname = ":presetClass"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub preset_class: Option<TimeNodePresetClassValues>,
   /// presetSubtype
   #[sdk(attr(qname = ":presetSubtype"))]
@@ -1874,38 +1868,26 @@ pub struct CommonTimeNode {
   pub speed: Option<crate::simple_type::Int32Value>,
   /// accel
   #[sdk(attr(qname = ":accel"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub acceleration: Option<crate::simple_type::Int32Value>,
   /// decel
   #[sdk(attr(qname = ":decel"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub deceleration: Option<crate::simple_type::Int32Value>,
   /// autoRev
   #[sdk(attr(qname = ":autoRev"))]
   pub auto_reverse: Option<crate::simple_type::BooleanValue>,
   /// restart
   #[sdk(attr(qname = ":restart"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub restart: Option<TimeNodeRestartValues>,
   /// fill
   #[sdk(attr(qname = ":fill"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub fill: Option<TimeNodeFillValues>,
   /// syncBehavior
   #[sdk(attr(qname = ":syncBehavior"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub sync_behavior: Option<TimeNodeSyncValues>,
   /// tmFilter
   #[sdk(attr(qname = ":tmFilter"))]
@@ -1918,7 +1900,7 @@ pub struct CommonTimeNode {
   pub display: Option<crate::simple_type::BooleanValue>,
   /// masterRel
   #[sdk(attr(qname = ":masterRel"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub master_relation: Option<TimeNodeMasterRelationValues>,
   /// bldLvl
   #[sdk(attr(qname = ":bldLvl"))]
@@ -1931,7 +1913,7 @@ pub struct CommonTimeNode {
   pub after_effect: Option<crate::simple_type::BooleanValue>,
   /// nodeType
   #[sdk(attr(qname = ":nodeType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub node_type: Option<TimeNodeValues>,
   /// nodePh
   #[sdk(attr(qname = ":nodePh"))]
@@ -1944,7 +1926,7 @@ pub struct CommonTimeNode {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   pub preset_bounce_end: Option<crate::simple_type::Int32Value>,
   /// Defines the StartConditionList Class.
@@ -2086,7 +2068,7 @@ pub struct TimeAnimateValue {
     min = "0",
     max = "100000",
     min_inclusive = true,
-    max_inclusive = true
+    max_inclusive = true,
   ))]
   #[sdk(string_set(source = 1u32, union = 0u64, values = &["indefinite"]))]
   pub time: Option<crate::simple_type::StringValue>,
@@ -2103,33 +2085,15 @@ pub struct TimeAnimateValue {
 pub struct RgbColor {
   /// Red
   #[sdk(attr(qname = ":r"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub red: crate::simple_type::Int32Value,
   /// Green
   #[sdk(attr(qname = ":g"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub green: crate::simple_type::Int32Value,
   /// Blue
   #[sdk(attr(qname = ":b"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub blue: crate::simple_type::Int32Value,
 }
 /// HSL.
@@ -2141,23 +2105,11 @@ pub struct HslColor {
   pub hue: crate::simple_type::Int32Value,
   /// Saturation
   #[sdk(attr(qname = ":s"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub saturation: crate::simple_type::Int32Value,
   /// Lightness
   #[sdk(attr(qname = ":l"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-100000",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -100000..= 100000))]
   pub lightness: crate::simple_type::Int32Value,
 }
 /// Defines the CommonBehavior Class.
@@ -2168,15 +2120,15 @@ pub struct CommonBehavior {
   pub xml_other_children: Vec<(usize, String)>,
   /// Additive
   #[sdk(attr(qname = ":additive"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub additive: Option<BehaviorAdditiveValues>,
   /// Accumulate
   #[sdk(attr(qname = ":accumulate"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub accumulate: Option<BehaviorAccumulateValues>,
   /// Transform Type
   #[sdk(attr(qname = ":xfrmType"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub transform_type: Option<BehaviorTransformValues>,
   /// From
   #[sdk(attr(qname = ":from"))]
@@ -2192,7 +2144,7 @@ pub struct CommonBehavior {
   pub runtime_context: Option<crate::simple_type::StringValue>,
   /// Override
   #[sdk(attr(qname = ":override"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#override: Option<BehaviorOverrideValues>,
   /// Parallel TimeNode.
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -2246,13 +2198,7 @@ pub struct CommonMediaNode {
   pub xml_other_children: Vec<(usize, String)>,
   /// Volume
   #[sdk(attr(qname = ":vol"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub volume: Option<crate::simple_type::Int32Value>,
   /// Mute
   #[sdk(attr(qname = ":mute"))]
@@ -2325,7 +2271,7 @@ pub struct BuildParagraph {
   pub ui_expand: Option<crate::simple_type::BooleanValue>,
   /// Build Types
   #[sdk(attr(qname = ":build"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub build: Option<ParagraphBuildValues>,
   /// Build Level
   #[sdk(attr(qname = ":bldLvl"))]
@@ -2368,7 +2314,7 @@ pub struct BuildDiagram {
   pub ui_expand: Option<crate::simple_type::BooleanValue>,
   /// Diagram Build Types
   #[sdk(attr(qname = ":bld"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub build: Option<DiagramBuildValues>,
 }
 /// Build OLE Chart.
@@ -2389,7 +2335,7 @@ pub struct BuildOleChart {
   pub ui_expand: Option<crate::simple_type::BooleanValue>,
   /// Build
   #[sdk(attr(qname = ":bld"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub build: Option<OleChartBuildValues>,
   /// Animate Background
   #[sdk(attr(qname = ":animBg"))]
@@ -2568,7 +2514,7 @@ pub struct ExtensionList {
 pub struct Control {
   /// spid
   #[sdk(attr(qname = ":spid"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_id: Option<crate::simple_type::StringValue>,
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -2581,11 +2527,11 @@ pub struct Control {
   pub id: Option<crate::simple_type::StringValue>,
   /// imgW
   #[sdk(attr(qname = ":imgW"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub image_width: Option<crate::simple_type::Int32Value>,
   /// imgH
   #[sdk(attr(qname = ":imgH"))]
-  #[sdk(number_range(source = 0u32, min = "0", min_inclusive = true, max_inclusive = false))]
+  #[sdk(number_range(range = 0..))]
   pub image_height: Option<crate::simple_type::Int32Value>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -2600,13 +2546,7 @@ pub struct Control {
 pub struct SlideId {
   /// Slide Identifier
   #[sdk(attr(qname = ":id"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "256",
-    max = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 256..2147483648))]
   pub id: crate::simple_type::UInt32Value,
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
@@ -2621,12 +2561,7 @@ pub struct SlideId {
 pub struct SlideMasterId {
   /// Slide Master Identifier
   #[sdk(attr(qname = ":id"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 2147483648..))]
   pub id: Option<crate::simple_type::UInt32Value>,
   /// Relationship Identifier
   #[sdk(attr(qname = "r:id"))]
@@ -2666,7 +2601,7 @@ pub struct Font {
   pub typeface: Option<crate::simple_type::StringValue>,
   /// Panose Setting
   #[sdk(attr(qname = ":panose"))]
-  #[sdk(string_length(source = 0u32, min = 10u32, max = 10u32))]
+  #[sdk(string_length(min = 10u32, max = 10u32))]
   pub panose: Option<crate::simple_type::HexBinaryValue>,
   /// Similar Font Family
   #[sdk(attr(qname = ":pitchFamily"))]
@@ -2861,7 +2796,7 @@ pub struct ShapeProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Individual Objects
@@ -3525,12 +3460,7 @@ pub struct NotesStyle {
 pub struct SlideLayoutId {
   /// ID Tag
   #[sdk(attr(qname = ":id"))]
-  #[sdk(number_range(
-    source = 0u32,
-    min = "2147483648",
-    min_inclusive = true,
-    max_inclusive = false
-  ))]
+  #[sdk(number_range(range = 2147483648..))]
   pub id: Option<crate::simple_type::UInt32Value>,
   /// ID Tag
   #[sdk(attr(qname = "r:id"))]
@@ -3579,13 +3509,7 @@ pub struct Tag {
 pub struct RestoredLeft {
   /// Normal View Dimension Size
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub size: crate::simple_type::Int32Value,
   /// Auto Adjust Normal View
   #[sdk(attr(qname = ":autoAdjust"))]
@@ -3597,13 +3521,7 @@ pub struct RestoredLeft {
 pub struct RestoredTop {
   /// Normal View Dimension Size
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "100000",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 100000))]
   pub size: crate::simple_type::Int32Value,
   /// Auto Adjust Normal View
   #[sdk(attr(qname = ":autoAdjust"))]
@@ -3628,23 +3546,11 @@ pub struct ScaleFactor {
 pub struct Origin {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Defines the Position Class.
@@ -3653,23 +3559,11 @@ pub struct Origin {
 pub struct Position {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub x: crate::simple_type::Int64Value,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "-27273042329600",
-    max = "27273042316900",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = -27273042329600..= 27273042316900))]
   pub y: crate::simple_type::Int64Value,
 }
 /// Base properties for Notes View.
@@ -3711,7 +3605,7 @@ pub struct OutlineViewSlideList {
 pub struct Guide {
   /// Guide Orientation
   #[sdk(attr(qname = ":orient"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub orientation: Option<DirectionValues>,
   /// Guide Position
   #[sdk(attr(qname = ":pos"))]
@@ -3757,11 +3651,11 @@ pub struct NormalViewProperties {
   pub snap_vertical_splitter: Option<crate::simple_type::BooleanValue>,
   /// State of the Vertical Splitter Bar
   #[sdk(attr(qname = ":vertBarState"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub vertical_bar_state: Option<SplitterBarStateValues>,
   /// State of the Horizontal Splitter Bar
   #[sdk(attr(qname = ":horzBarState"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub horizontal_bar_state: Option<SplitterBarStateValues>,
   /// Prefer Single View
   #[sdk(attr(qname = ":preferSingleView"))]
@@ -3843,23 +3737,11 @@ pub struct NotesViewProperties {
 pub struct GridSpacing {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Defines the NotesSize Class.
@@ -3868,23 +3750,11 @@ pub struct GridSpacing {
 pub struct NotesSize {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cx: crate::simple_type::Int64Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "0",
-    max = "2147483647",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 0..= 2147483647))]
   pub cy: crate::simple_type::Int64Value,
 }
 /// Defines the SlideExtension Class.
@@ -3896,7 +3766,7 @@ pub struct SlideExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "p14:CT_LaserTraceList/p14:laserTraceLst",
@@ -3915,7 +3785,7 @@ pub struct CommonSlideDataExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p14:CT_RandomId/p14:creationId", any))]
   pub common_slide_data_extension_choice: Option<CommonSlideDataExtensionChoice>,
@@ -3929,7 +3799,7 @@ pub struct ShowPropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "p14:CT_BrowseMode/p14:browseMode",
@@ -3965,7 +3835,7 @@ pub struct Picture {
 pub struct OleObjectEmbed {
   /// Color Scheme Properties for OLE Object
   #[sdk(attr(qname = ":followColorScheme"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub follow_color_scheme: Option<OleObjectFollowColorSchemeValues>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -3990,7 +3860,7 @@ pub struct Transition {
   pub xml_other_children: Vec<(usize, String)>,
   /// spd
   #[sdk(attr(qname = ":spd"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub speed: Option<TransitionSpeedValues>,
   /// dur
   #[sdk(attr(office2010, qname = "p14:dur"))]
@@ -4084,7 +3954,7 @@ pub struct SlideExtensionList {
 pub struct Background {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   #[sdk(choice(
@@ -4195,7 +4065,7 @@ pub struct NonVisualGroupShapeProperties {
 pub struct GroupShapeProperties {
   /// Black and White Mode
   #[sdk(attr(qname = ":bwMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub black_white_mode:
     Option<crate::schemas::schemas_openxmlformats_org_drawingml_2006_main::BlackWhiteModeValues>,
   /// 2D Transform for Grouped Objects
@@ -4319,7 +4189,7 @@ pub struct ShapeTarget {
 pub struct InkTarget {
   /// Shape ID
   #[sdk(attr(qname = ":spid"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_id: crate::simple_type::StringValue,
 }
 /// Subshape.
@@ -4328,7 +4198,7 @@ pub struct InkTarget {
 pub struct SubShape {
   /// Shape ID
   #[sdk(attr(qname = ":spid"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub shape_id: crate::simple_type::StringValue,
 }
 /// Defines the CommentAuthorExtension Class.
@@ -4340,7 +4210,7 @@ pub struct CommentAuthorExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_PresenceInfo/p15:presenceInfo", any))]
   pub comment_author_extension_choice: Option<CommentAuthorExtensionChoice>,
@@ -4354,7 +4224,7 @@ pub struct CommentExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_CommentThreading/p15:threadingInfo", any))]
   pub comment_extension_choice: Option<CommentExtensionChoice>,
@@ -4368,7 +4238,7 @@ pub struct SlideLayoutExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub slide_layout_extension_choice: Option<SlideLayoutExtensionChoice>,
@@ -4382,7 +4252,7 @@ pub struct SlideMasterExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub slide_master_extension_choice: Option<SlideMasterExtensionChoice>,
@@ -4396,7 +4266,7 @@ pub struct HandoutMasterExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub handout_master_extension_choice: Option<HandoutMasterExtensionChoice>,
@@ -4410,7 +4280,7 @@ pub struct NotesMasterExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(qname = "p15:CT_ExtendedGuideList/p15:sldGuideLst", any))]
   pub notes_master_extension_choice: Option<NotesMasterExtensionChoice>,
@@ -4421,15 +4291,15 @@ pub struct NotesMasterExtension {
 pub struct PlaceholderShape {
   /// type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<PlaceholderValues>,
   /// orient
   #[sdk(attr(qname = ":orient"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub orientation: Option<DirectionValues>,
   /// sz
   #[sdk(attr(qname = ":sz"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub size: Option<PlaceholderSizeValues>,
   /// idx
   #[sdk(attr(qname = ":idx"))]
@@ -4459,7 +4329,7 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "p14:CT_Media/p14:media",
@@ -4475,7 +4345,7 @@ pub struct ApplicationNonVisualDrawingPropertiesExtension {
 pub struct Iterate {
   /// Iterate Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<IterateValues>,
   /// Backwards
   #[sdk(attr(qname = ":backwards"))]
@@ -4642,27 +4512,15 @@ pub struct SlideIdList {
 pub struct SlideSize {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "914400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 914400..= 51206400))]
   pub cx: crate::simple_type::Int32Value,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
-  #[sdk(number_range(
-    source = 1u32,
-    min = "914400",
-    max = "51206400",
-    min_inclusive = true,
-    max_inclusive = true
-  ))]
+  #[sdk(number_range(range = 914400..= 51206400))]
   pub cy: crate::simple_type::Int32Value,
   /// Type of Size
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: Option<SlideSizeValues>,
 }
 /// Defines the EmbeddedFontList Class.
@@ -4693,11 +4551,11 @@ pub struct PhotoAlbum {
   pub show_captions: Option<crate::simple_type::BooleanValue>,
   /// Photo Album Layout
   #[sdk(attr(qname = ":layout"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub layout: Option<PhotoAlbumLayoutValues>,
   /// Frame Type
   #[sdk(attr(qname = ":frame"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub frame: Option<PhotoAlbumFrameShapeValues>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -4789,7 +4647,7 @@ pub struct PresentationExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "p14:CT_SectionProperties/p14:sectionPr",
@@ -4809,7 +4667,7 @@ pub struct HtmlPublishProperties {
   pub show_speaker_notes: Option<crate::simple_type::BooleanValue>,
   /// Browser Support Target
   #[sdk(attr(qname = ":pubBrowser"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub target_browser: Option<HtmlPublishWebBrowserSupportValues>,
   /// Publish Path
   #[sdk(attr(qname = "r:id"))]
@@ -4848,14 +4706,14 @@ pub struct WebProperties {
   pub use_long_filenames: Option<crate::simple_type::BooleanValue>,
   /// Image size for HTML output
   #[sdk(attr(qname = ":imgSz"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub image_size: Option<WebScreenSizeValues>,
   /// Encoding for HTML output
   #[sdk(attr(qname = ":encoding"))]
   pub encoding: Option<crate::simple_type::StringValue>,
   /// Slide Navigation Colors for HTML output
   #[sdk(attr(qname = ":clr"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub color: Option<WebColorValues>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "p:CT_ExtensionList/p:extLst"))]
@@ -4867,11 +4725,11 @@ pub struct WebProperties {
 pub struct PrintingProperties {
   /// Print Output
   #[sdk(attr(qname = ":prnWhat"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub print_what: Option<PrintOutputValues>,
   /// Print Color Mode
   #[sdk(attr(qname = ":clrMode"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub color_mode: Option<PrintColorModeValues>,
   /// Print Hidden Slides
   #[sdk(attr(qname = ":hiddenSlides"))]
@@ -4956,7 +4814,7 @@ pub struct PresentationPropertiesExtension {
   pub xml_other_children: Vec<(usize, String)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(choice(
     qname = "p14:CT_DiscardImageEditData/p14:discardImageEditData",
@@ -5054,7 +4912,7 @@ pub struct NotesMasterExtensionList {
 pub struct OleChartElement {
   /// Type
   #[sdk(attr(qname = ":type"))]
-  #[sdk(string_format(source = 1u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub r#type: ChartSubElementValues,
   /// Level
   #[sdk(attr(qname = ":lvl"))]
@@ -5083,7 +4941,7 @@ pub struct GraphicElement {
 pub struct BlindsTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<DirectionValues>,
 }
 /// Defines the CheckerTransition Class.
@@ -5092,7 +4950,7 @@ pub struct BlindsTransition {
 pub struct CheckerTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<DirectionValues>,
 }
 /// Defines the CombTransition Class.
@@ -5101,7 +4959,7 @@ pub struct CheckerTransition {
 pub struct CombTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<DirectionValues>,
 }
 /// Defines the RandomBarTransition Class.
@@ -5110,7 +4968,7 @@ pub struct CombTransition {
 pub struct RandomBarTransition {
   /// Transition Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<DirectionValues>,
 }
 /// Defines the CoverTransition Class.
@@ -5155,7 +5013,7 @@ pub struct FadeTransition {
 pub struct PushTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionSlideDirectionValues>,
 }
 /// Defines the WipeTransition Class.
@@ -5164,7 +5022,7 @@ pub struct PushTransition {
 pub struct WipeTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionSlideDirectionValues>,
 }
 /// Defines the SplitTransition Class.
@@ -5173,11 +5031,11 @@ pub struct WipeTransition {
 pub struct SplitTransition {
   /// Orientation
   #[sdk(attr(qname = ":orient"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub orientation: Option<DirectionValues>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionInOutDirectionValues>,
 }
 /// Defines the StripsTransition Class.
@@ -5186,7 +5044,7 @@ pub struct SplitTransition {
 pub struct StripsTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionCornerDirectionValues>,
 }
 /// Defines the WheelTransition Class.
@@ -5203,7 +5061,7 @@ pub struct WheelTransition {
 pub struct ZoomTransition {
   /// Direction
   #[sdk(attr(qname = ":dir"))]
-  #[sdk(string_format(source = 0u32, kind = "token"))]
+  #[sdk(string_format(kind = "token"))]
   pub direction: Option<TransitionInOutDirectionValues>,
 }
 /// Defines the SoundAction Class.

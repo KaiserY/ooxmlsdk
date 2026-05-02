@@ -21,8 +21,14 @@ serde_json = { workspace = true }
 criterion = { workspace = true }
 quick-xml = { workspace = true }
 zip = { workspace = true }
+base64 = { workspace = true }
+walkdir = "2"
+toml = "0.8"
 
 [[bench]]
 name = "perf"
 harness = false
 required-features = ["parts"]
+
+[[example]]
+name = "create_fixtures"

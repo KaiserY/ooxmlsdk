@@ -2,9 +2,43 @@
 
 ## Unreleased
 
+## 0.6.0
+
 ### Breaking Changes
 
 - Removed the `microsoft365` Cargo feature. Newer Office schema modules, generated types, parts, and document sample coverage now compile as part of the normal runtime surface instead of being hidden behind a version-oriented feature gate.
+- Changed the default runtime feature set from `["microsoft365", "parts"]` to `["parts"]`. Consumers that previously named `microsoft365` should remove it; newer Office schema and part support is now part of the checked-in runtime output.
+
+### New Features
+
+- Added the optional `flat-opc` feature for Flat OPC package read/write support, including string and reader entry points plus normal package save/reopen flows.
+- Added the optional `mce` feature for Markup Compatibility and Extensibility processing, including static `mc:AlternateContent` selection and package-level `ProcessAllParts` loading behavior.
+- Added simple-type helper APIs for hex binary validation and byte conversion.
+- Added a compatibility matrix and minimal DOCX/XLSX/PPTX/MCE fixture set for round-trip coverage tracking.
+
+### XML and Package Compatibility
+
+- Improved MCE preservation and processing for ignorable namespaces, `mc:ProcessContent`, `mc:PreserveAttributes`, `mc:MustUnderstand`, nested alternate content, and unknown extension content.
+- Preserved relationship XML headers when loading and saving package relationship parts.
+- Preserved Flat OPC altChunk parts as raw binary data, including XML-ish content types that should not be eagerly parsed as typed root elements.
+- Wrote SVG media parts as Flat OPC XML data while keeping alternative format import parts in binary data.
+- Kept saved XML package parts encoded as UTF-8 without a BOM.
+
+### Generated Runtime
+
+- Simplified generated schema output by routing more parent XML children through choice fields, flattening schema choice wrappers, omitting abstract schema base output, shortening generated schema type paths, and using unit fields for empty schema markers.
+- Regenerated checked-in runtime schemas, parts, serializers, and deserializers from the updated generator shape.
+
+### Testing
+
+- Added broad upstream-derived round-trip and compatibility coverage for document samples, MCE samples, package APIs, Flat OPC flows, simple type comparison behavior, and spreadsheet `CellValue` lexical forms.
+- Expanded `UPSTREAM_TEST_MATRIX.md` coverage tracking from 118 covered upstream tests to 162 covered tests, with clearer not-applicable classifications for .NET wrapper-only behavior.
+- Added release validation lanes for `flat-opc` and `mce` feature combinations.
+
+### Documentation
+
+- Updated repository guidance for the current feature surface and full validation lanes.
+- Added a clean-room MCE implementation note under `docs/specs/mce.md`.
 
 ## 0.5.1
 

@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/ooxmlsdk.svg)](https://crates.io/crates/ooxmlsdk)
 [![docs](https://docs.rs/ooxmlsdk/badge.svg)](https://docs.rs/ooxmlsdk)
 
-`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The public package API is intentionally aligned with the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) container model, while the implementation is code-generated for Rust and organized around generated schema types, namespaces, serializers, deserializers, and strongly typed package parts.
+`ooxmlsdk` is a Rust library for reading, writing, and round-tripping Office Open XML documents such as `.docx`, `.xlsx`, and `.pptx`. The public package API is intentionally aligned with the .NET [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) container model, while the implementation is code-generated for Rust and organized around generated schema types, serializers, deserializers, and strongly typed package parts.
 
 ## Features
 
@@ -11,12 +11,13 @@ The runtime crate exposes a small public feature surface:
 
 - `default`: enables `parts`; this is the recommended configuration for most users
 - `parts`: enables package-level OOXML read/write support such as `WordprocessingDocument`, `SpreadsheetDocument`, and `PresentationDocument`
+- `flat-opc`: enables Flat OPC package read/write helpers and depends on `parts`
+- `mce`: enables Markup Compatibility and Extensibility processing and depends on `parts`
 - `validators`: enables optional validator APIs
 
 The always-available modules in the crate root are:
 
 - `common`
-- `namespaces`
 - `schemas`
 - `sdk`
 - `simple_type`
@@ -31,6 +32,8 @@ Feature-gated modules are:
 This repository treats Office 2007 as the compatibility baseline while always compiling the checked-in generated runtime for newer OOXML namespaces and parts:
 
 - `--no-default-features --features parts`: package APIs without optional validators
+- `--no-default-features --features flat-opc`: package APIs plus Flat OPC helpers
+- `--no-default-features --features mce`: package APIs plus Markup Compatibility and Extensibility processing
 - default build: package APIs plus the full generated schema and part surface
 
 The checked-in generated runtime covers OOXML namespaces and parts associated with:
@@ -50,14 +53,28 @@ Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
-ooxmlsdk = "0.5.1"
+ooxmlsdk = "0.6.0"
 ```
 
 If you want package APIs without optional validators or MCE-specific behavior, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.5.1", default-features = false, features = ["parts"] }
+ooxmlsdk = { version = "0.6.0", default-features = false, features = ["parts"] }
+```
+
+If you need Flat OPC APIs, enable `flat-opc`:
+
+```toml
+[dependencies]
+ooxmlsdk = { version = "0.6.0", default-features = false, features = ["flat-opc"] }
+```
+
+If you want MCE processing during package open/root loading, enable `mce`:
+
+```toml
+[dependencies]
+ooxmlsdk = { version = "0.6.0", default-features = false, features = ["mce"] }
 ```
 
 Read, inspect, and save a package:
@@ -91,7 +108,7 @@ fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error
 
 The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx` files. The intended public surface follows upstream Open XML SDK concepts:
 
-- open and create packages with constructors such as `new`, `new_lazy`, `new_from_file`, and `new_from_file_lazy`
+- open and create packages with constructors such as `new`, `new_with_settings`, `new_from_file`, and `new_from_file_with_settings`
 - save packages with `save`
 - inspect package and part relationships with `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, and relationship-specific helpers
 - access well-known child parts through typed methods such as `main_document_part`, `workbook_part`, `presentation_part`, `worksheet_parts`, `font_table_part`, and chart-related part accessors
@@ -103,9 +120,13 @@ Raw package storage, raw relationship sets, generated factory internals, and unc
 
 The generated XML reader/writer preserves markup compatibility data needed for stable round trips, including common `mc:*` attributes, `mc:AlternateContent`, choice/fallback content, and extension namespace attributes used by newer Office documents.
 
-Current integration coverage includes upstream-derived MCE and extension samples such as `mcdoc.docx`, `mcinleaf.docx`, `MCExecl.xlsx`, `excel14.xlsx`, `extlst.xlsx`, and Office 2016 extended chart packages. These tests focus on public Rust APIs and stable XML/package round trips.
+With the `mce` feature enabled, package/root loading can process known Markup Compatibility and Extensibility constructs such as `mc:AlternateContent` and package-level `ProcessAllParts` behavior. Current integration coverage includes upstream-derived MCE and extension samples such as `mcdoc.docx`, `mcinleaf.docx`, `MCExecl.xlsx`, `excel14.xlsx`, `extlst.xlsx`, and Office 2016 extended chart packages. These tests focus on public Rust APIs and stable XML/package round trips.
 
-Full Open XML SDK-style `OpenSettings` markup compatibility processing, unknown-element DOM editing, and markup compatibility validator behavior are still future work.
+Unknown-element DOM editing and markup compatibility validator behavior are still future work.
+
+## Flat OPC
+
+The `flat-opc` feature exposes Wordprocessing Flat OPC helpers for loading and writing XML package representations. Flat OPC APIs support strings and readers, and written Flat OPC preserves binary package parts such as alternative format import parts while writing XML-safe parts such as SVG media as XML data.
 
 ## Project Structure
 
@@ -128,8 +149,12 @@ cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture
 cargo test --workspace
 cargo test --workspace --no-default-features
 cargo test --workspace --no-default-features --features parts
+cargo test --workspace --no-default-features --features flat-opc
+cargo test --workspace --no-default-features --features mce
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
 ```
@@ -140,7 +165,7 @@ For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` a
 
 - There is no `serde` integration.
 - The validator surface is optional and still narrower than the core read/write path.
-- Open XML SDK-style `OpenSettings`, full markup compatibility processing modes, and unknown-element DOM APIs are not yet exposed.
+- Unknown-element DOM APIs and markup compatibility validator behavior are not yet exposed.
 - Some schema shapes still map to generated enum-based child collections rather than a fully particle-aware hand-modeled API.
 - `to_string()` is just `Display`; prefer the XML-oriented APIs when you care about write performance.
 

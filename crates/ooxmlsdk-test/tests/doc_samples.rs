@@ -300,25 +300,47 @@ fn assert_doc_sample_zip_equivalent(original: &[u8], roundtripped: &[u8], file_n
   let roundtripped = read_zip_entries(roundtripped, file_name);
 
   let original_names: Vec<_> = original.keys().collect();
-  let roundtripped_names: Vec<_> = roundtripped.keys().collect();
-  assert_eq!(
-    original_names, roundtripped_names,
-    "zip entry names differ for {file_name}"
-  );
+  let mut errors = Vec::new();
+
+  for name in original.keys() {
+    if !roundtripped.contains_key(name) {
+      errors.push(format!("missing zip entry: {name}"));
+    }
+  }
+
+  for name in roundtripped.keys() {
+    if !original.contains_key(name) {
+      errors.push(format!("extra zip entry: {name}"));
+    }
+  }
 
   for name in original_names {
     let original_bytes = original.get(name).expect("original entry missing");
-    let roundtripped_bytes = roundtripped.get(name).expect("roundtripped entry missing");
+    let Some(roundtripped_bytes) = roundtripped.get(name) else {
+      continue;
+    };
 
     if is_xml_entry(name) {
-      assert_xml_equivalent(original_bytes, roundtripped_bytes, file_name, name);
-    } else {
-      assert_eq!(
-        original_bytes, roundtripped_bytes,
-        "binary entry mismatch for {file_name}:{name}"
-      );
+      errors.extend(xml_equivalence_errors(
+        original_bytes,
+        roundtripped_bytes,
+        file_name,
+        name,
+      ));
+    } else if original_bytes != roundtripped_bytes {
+      errors.push(format!(
+        "{name}: binary entry mismatch: original {} bytes, roundtripped {} bytes",
+        original_bytes.len(),
+        roundtripped_bytes.len()
+      ));
     }
   }
+
+  assert!(
+    errors.is_empty(),
+    "doc sample round-trip mismatch for {file_name}\n{}",
+    format_doc_sample_errors(&errors)
+  );
 }
 
 fn read_zip_entries(bytes: &[u8], file_name: &str) -> BTreeMap<String, Vec<u8>> {
@@ -354,87 +376,100 @@ fn is_xml_entry(name: &str) -> bool {
   name == "[Content_Types].xml" || name.ends_with(".xml") || name.ends_with(".rels")
 }
 
-fn assert_xml_equivalent(original: &[u8], roundtripped: &[u8], file_name: &str, entry_name: &str) {
+fn format_doc_sample_errors(errors: &[String]) -> String {
+  const MAX_ERRORS: usize = 120;
+
+  let mut out = String::new();
+  for error in errors.iter().take(MAX_ERRORS) {
+    out.push_str("- ");
+    out.push_str(error);
+    out.push('\n');
+  }
+
+  if errors.len() > MAX_ERRORS {
+    out.push_str(&format!(
+      "- ... {} additional mismatches omitted\n",
+      errors.len() - MAX_ERRORS
+    ));
+  }
+
+  out
+}
+
+fn xml_equivalence_errors(
+  original: &[u8],
+  roundtripped: &[u8],
+  file_name: &str,
+  entry_name: &str,
+) -> Vec<String> {
   let strict_options = CanonicalOptions::strict();
   let strict_original = canonicalize_xml(original, strict_options, file_name, entry_name);
   let strict_roundtripped = canonicalize_xml(roundtripped, strict_options, file_name, entry_name);
+  let strict_errors = compare_xml_documents(&strict_original, &strict_roundtripped);
 
-  if strict_original == strict_roundtripped {
-    return;
+  if strict_errors.is_empty() {
+    return Vec::new();
   }
 
   let relaxed_options = CanonicalOptions::relaxed_for_entry(entry_name);
   let relaxed_original = canonicalize_xml(original, relaxed_options, file_name, entry_name);
   let relaxed_roundtripped = canonicalize_xml(roundtripped, relaxed_options, file_name, entry_name);
+  let relaxed_errors = compare_xml_documents(&relaxed_original, &relaxed_roundtripped);
 
-  assert_eq!(
-    relaxed_original,
-    relaxed_roundtripped,
-    "xml mismatch for {file_name}:{entry_name}\n{}",
-    xml_diff_context(&relaxed_original, &relaxed_roundtripped)
-  );
-}
-
-fn xml_diff_context(left: &str, right: &str) -> String {
-  if left == right {
-    return String::new();
+  if relaxed_errors.is_empty() {
+    return Vec::new();
   }
 
-  let mut left_iter = left.char_indices();
-  let mut right_iter = right.char_indices();
-
-  loop {
-    match (left_iter.next(), right_iter.next()) {
-      (Some((li, lc)), Some((ri, rc))) if lc == rc => {
-        let _ = (li, ri);
-      }
-      (Some((li, _)), Some((ri, _))) => {
-        let start = li.saturating_sub(160).min(ri.saturating_sub(160));
-        let end = (li + 160).max(ri + 160).min(left.len().max(right.len()));
-        return format!(
-          "first diff around byte {li}/{ri}\nleft:  {:?}\nright: {:?}",
-          &left[start..left.len().min(end)],
-          &right[start..right.len().min(end)]
-        );
-      }
-      (Some((li, _)), None) => {
-        let start = li.saturating_sub(160);
-        let end = (li + 160).min(left.len());
-        return format!(
-          "right shorter around byte {li}\nleft:  {:?}\nright: {:?}",
-          &left[start..end],
-          &right[right.len().saturating_sub(160)..]
-        );
-      }
-      (None, Some((ri, _))) => {
-        let start = ri.saturating_sub(160);
-        let end = (ri + 160).min(right.len());
-        return format!(
-          "left shorter around byte {ri}\nleft:  {:?}\nright: {:?}",
-          &left[left.len().saturating_sub(160)..],
-          &right[start..end]
-        );
-      }
-      (None, None) => return String::from("xml contents differ but no diff point found"),
-    }
-  }
+  format_xml_equivalence_errors(entry_name, relaxed_options, &strict_errors, &relaxed_errors)
 }
 
-#[derive(Debug)]
+fn format_xml_equivalence_errors(
+  entry_name: &str,
+  relaxed_options: CanonicalOptions,
+  strict_errors: &[String],
+  relaxed_errors: &[String],
+) -> Vec<String> {
+  let mut errors = Vec::new();
+  errors.push(format!(
+    "{entry_name}: xml mismatch after strict and compatible comparison ({})",
+    relaxed_options.describe()
+  ));
+
+  for error in relaxed_errors.iter().take(24) {
+    errors.push(format!("{entry_name}: relaxed: {error}"));
+  }
+
+  if relaxed_errors.len() > 24 {
+    errors.push(format!(
+      "{entry_name}: relaxed: ... {} additional XML mismatches omitted",
+      relaxed_errors.len() - 24
+    ));
+  }
+
+  errors.push(format!(
+    "{entry_name}: strict comparison found {} mismatch(es); first strict mismatch: {}",
+    strict_errors.len(),
+    strict_errors.first().map(String::as_str).unwrap_or("none")
+  ));
+
+  errors
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct XmlElement {
   name: String,
   attrs: Vec<(String, String)>,
   children: Vec<XmlNode>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum XmlNode {
   Declaration(XmlDeclaration),
   Element(XmlElement),
   Text(String),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum XmlDeclaration {
   Plain,
   Standalone,
@@ -477,6 +512,31 @@ impl CanonicalOptions {
       sort_package_properties: matches!(entry_name, "docProps/app.xml" | "docProps/core.xml"),
     }
   }
+
+  fn describe(self) -> String {
+    let mut enabled = Vec::new();
+    if self.normalize_bool_attrs {
+      enabled.push("bool attrs");
+    }
+    if self.normalize_bool_text {
+      enabled.push("bool text");
+    }
+    if self.normalize_numeric {
+      enabled.push("numeric lexemes");
+    }
+    if self.ignore_empty_core_property {
+      enabled.push("empty core properties");
+    }
+    if self.sort_package_properties {
+      enabled.push("package property order");
+    }
+
+    if enabled.is_empty() {
+      "no compatibility relaxations enabled".to_string()
+    } else {
+      format!("compatibility relaxations: {}", enabled.join(", "))
+    }
+  }
 }
 
 fn canonicalize_xml(
@@ -484,7 +544,7 @@ fn canonicalize_xml(
   options: CanonicalOptions,
   file_name: &str,
   entry_name: &str,
-) -> String {
+) -> Vec<XmlNode> {
   let mut reader = Reader::from_reader(Cursor::new(xml));
   reader.config_mut().trim_text(false);
   let mut buf = Vec::new();
@@ -594,7 +654,370 @@ fn canonicalize_xml(
     stack.is_empty(),
     "unterminated xml for {file_name}:{entry_name}"
   );
-  render_xml_nodes_for_entry(&roots, options, entry_name)
+  normalize_xml_nodes_for_entry(roots, options, entry_name)
+}
+
+fn normalize_xml_nodes_for_entry(
+  nodes: Vec<XmlNode>,
+  options: CanonicalOptions,
+  entry_name: &str,
+) -> Vec<XmlNode> {
+  let nodes = nodes
+    .into_iter()
+    .filter_map(|node| normalize_xml_node_for_entry(node, options, entry_name))
+    .collect();
+  collapse_adjacent_xml_text_nodes(nodes)
+}
+
+fn normalize_xml_node_for_entry(
+  node: XmlNode,
+  options: CanonicalOptions,
+  entry_name: &str,
+) -> Option<XmlNode> {
+  match node {
+    XmlNode::Element(mut element) => {
+      element.children = element
+        .children
+        .into_iter()
+        .filter_map(|child| normalize_xml_node_for_entry(child, options, entry_name))
+        .collect();
+      element.children = collapse_adjacent_xml_text_nodes(element.children);
+
+      if options.ignore_empty_core_property
+        && element.children.is_empty()
+        && element.attrs.is_empty()
+      {
+        return None;
+      }
+
+      if options.sort_package_properties
+        && (entry_name == "docProps/core.xml"
+          || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name))
+          || (entry_name == "docProps/app.xml"
+            && split_expanded_name(&element.name).1 == "Properties"))
+      {
+        element.children.sort_by_key(xml_node_structural_sort_key);
+      }
+
+      Some(XmlNode::Element(element))
+    }
+    other => Some(other),
+  }
+}
+
+fn collapse_adjacent_xml_text_nodes(nodes: Vec<XmlNode>) -> Vec<XmlNode> {
+  let mut collapsed = Vec::with_capacity(nodes.len());
+
+  for node in nodes {
+    match (collapsed.last_mut(), node) {
+      (Some(XmlNode::Text(existing)), XmlNode::Text(text)) => existing.push_str(&text),
+      (_, node) => collapsed.push(node),
+    }
+  }
+
+  collapsed
+}
+
+fn compare_xml_documents(original: &[XmlNode], roundtripped: &[XmlNode]) -> Vec<String> {
+  let mut errors = Vec::new();
+  compare_xml_node_lists("$", original, roundtripped, &mut errors);
+  errors
+}
+
+fn compare_xml_node_lists(
+  parent_path: &str,
+  original: &[XmlNode],
+  roundtripped: &[XmlNode],
+  errors: &mut Vec<String>,
+) {
+  let mut original_idx = 0;
+  let mut roundtripped_idx = 0;
+
+  while original_idx < original.len() && roundtripped_idx < roundtripped.len() {
+    match (&original[original_idx], &roundtripped[roundtripped_idx]) {
+      (XmlNode::Declaration(decl), node) if !matches!(node, XmlNode::Declaration(_)) => {
+        errors.push(format!(
+          "{}: missing XML declaration {} before {}",
+          xml_child_path(parent_path, original, original_idx),
+          xml_declaration_summary(*decl),
+          xml_node_summary(node)
+        ));
+        original_idx += 1;
+      }
+      (node, XmlNode::Declaration(decl)) if !matches!(node, XmlNode::Declaration(_)) => {
+        errors.push(format!(
+          "{}: extra XML declaration {} before {}",
+          xml_child_path(parent_path, original, original_idx),
+          xml_declaration_summary(*decl),
+          xml_node_summary(node)
+        ));
+        roundtripped_idx += 1;
+      }
+      _ => {
+        let path = xml_child_path(parent_path, original, original_idx);
+        compare_xml_node(
+          &path,
+          &original[original_idx],
+          &roundtripped[roundtripped_idx],
+          errors,
+        );
+        original_idx += 1;
+        roundtripped_idx += 1;
+      }
+    }
+  }
+
+  for node in &original[original_idx..] {
+    errors.push(format!(
+      "{parent_path}: missing child in roundtripped XML: {}",
+      xml_node_summary(node)
+    ));
+  }
+
+  for node in &roundtripped[roundtripped_idx..] {
+    errors.push(format!(
+      "{parent_path}: extra child in roundtripped XML: {}",
+      xml_node_summary(node)
+    ));
+  }
+}
+
+fn compare_xml_node(
+  path: &str,
+  original: &XmlNode,
+  roundtripped: &XmlNode,
+  errors: &mut Vec<String>,
+) {
+  match (original, roundtripped) {
+    (XmlNode::Declaration(left), XmlNode::Declaration(right)) => {
+      if left != right {
+        errors.push(format!(
+          "{path}: XML declaration mismatch: original {}, roundtripped {}",
+          xml_declaration_summary(*left),
+          xml_declaration_summary(*right)
+        ));
+      }
+    }
+    (XmlNode::Declaration(left), other) => {
+      errors.push(format!(
+        "{path}: missing XML declaration {} before {}",
+        xml_declaration_summary(*left),
+        xml_node_summary(other)
+      ));
+    }
+    (other, XmlNode::Declaration(right)) => {
+      errors.push(format!(
+        "{path}: extra XML declaration {} before {}",
+        xml_declaration_summary(*right),
+        xml_node_summary(other)
+      ));
+    }
+    (XmlNode::Text(left), XmlNode::Text(right)) => {
+      if left != right {
+        errors.push(format!(
+          "{path}: text mismatch: original {:?}, roundtripped {:?}",
+          truncate_for_error(left),
+          truncate_for_error(right)
+        ));
+      }
+    }
+    (XmlNode::Element(left), XmlNode::Element(right)) => {
+      compare_xml_element(path, left, right, errors);
+    }
+    (left, right) => {
+      errors.push(format!(
+        "{path}: node kind mismatch: original {}, roundtripped {}",
+        xml_node_summary(left),
+        xml_node_summary(right)
+      ));
+    }
+  }
+}
+
+fn compare_xml_element(
+  path: &str,
+  original: &XmlElement,
+  roundtripped: &XmlElement,
+  errors: &mut Vec<String>,
+) {
+  if original.name != roundtripped.name {
+    push_xml_name_error(path, "element", &original.name, &roundtripped.name, errors);
+  }
+
+  compare_xml_attrs(path, &original.attrs, &roundtripped.attrs, errors);
+  compare_xml_node_lists(path, &original.children, &roundtripped.children, errors);
+}
+
+fn compare_xml_attrs(
+  path: &str,
+  original: &[(String, String)],
+  roundtripped: &[(String, String)],
+  errors: &mut Vec<String>,
+) {
+  let original = original
+    .iter()
+    .map(|(k, v)| (k.as_str(), v.as_str()))
+    .collect::<BTreeMap<_, _>>();
+  let roundtripped = roundtripped
+    .iter()
+    .map(|(k, v)| (k.as_str(), v.as_str()))
+    .collect::<BTreeMap<_, _>>();
+
+  for (name, value) in &original {
+    match roundtripped.get(name) {
+      Some(roundtripped_value) if roundtripped_value == value => {}
+      Some(roundtripped_value) => errors.push(format!(
+        "{path}: attr value mismatch for {}: original {:?}, roundtripped {:?}",
+        readable_xml_name(name),
+        truncate_for_error(value),
+        truncate_for_error(roundtripped_value)
+      )),
+      None => errors.push(format!(
+        "{path}: missing attr in roundtripped XML: {}={:?}",
+        readable_xml_name(name),
+        truncate_for_error(value)
+      )),
+    }
+  }
+
+  for (name, value) in &roundtripped {
+    if !original.contains_key(name) {
+      errors.push(format!(
+        "{path}: extra attr in roundtripped XML: {}={:?}",
+        readable_xml_name(name),
+        truncate_for_error(value)
+      ));
+    }
+  }
+}
+
+fn push_xml_name_error(
+  path: &str,
+  kind: &str,
+  original: &str,
+  roundtripped: &str,
+  errors: &mut Vec<String>,
+) {
+  let (original_ns, original_local) = split_expanded_name(original);
+  let (roundtripped_ns, roundtripped_local) = split_expanded_name(roundtripped);
+
+  if original_local == roundtripped_local && !original_ns.is_empty() && roundtripped_ns.is_empty() {
+    errors.push(format!(
+      "{path}: missing namespace on {kind}: local name {original_local}, expected namespace {original_ns}"
+    ));
+  } else if original_local == roundtripped_local
+    && original_ns.is_empty()
+    && !roundtripped_ns.is_empty()
+  {
+    errors.push(format!(
+      "{path}: extra namespace on {kind}: local name {original_local}, roundtripped namespace {roundtripped_ns}"
+    ));
+  } else if original_local == roundtripped_local {
+    errors.push(format!(
+      "{path}: {kind} namespace mismatch: original {original_ns}, roundtripped {roundtripped_ns}, local name {original_local}"
+    ));
+  } else {
+    errors.push(format!(
+      "{path}: {kind} name mismatch: original {}, roundtripped {}",
+      readable_xml_name(original),
+      readable_xml_name(roundtripped)
+    ));
+  }
+}
+
+fn xml_child_path(parent_path: &str, siblings: &[XmlNode], idx: usize) -> String {
+  let node = &siblings[idx];
+  let ordinal = xml_child_ordinal(siblings, idx);
+  match node {
+    XmlNode::Declaration(_) => format!("{parent_path}/xml-declaration[{ordinal}]"),
+    XmlNode::Element(element) => {
+      format!(
+        "{parent_path}/{}[{ordinal}]",
+        readable_xml_name(&element.name)
+      )
+    }
+    XmlNode::Text(_) => format!("{parent_path}/text()[{ordinal}]"),
+  }
+}
+
+fn xml_child_ordinal(siblings: &[XmlNode], idx: usize) -> usize {
+  let node = &siblings[idx];
+  siblings[..=idx]
+    .iter()
+    .filter(|candidate| xml_nodes_share_path_name(candidate, node))
+    .count()
+}
+
+fn xml_nodes_share_path_name(left: &XmlNode, right: &XmlNode) -> bool {
+  match (left, right) {
+    (XmlNode::Declaration(_), XmlNode::Declaration(_)) => true,
+    (XmlNode::Text(_), XmlNode::Text(_)) => true,
+    (XmlNode::Element(left), XmlNode::Element(right)) => left.name == right.name,
+    _ => false,
+  }
+}
+
+fn xml_node_summary(node: &XmlNode) -> String {
+  match node {
+    XmlNode::Declaration(decl) => format!("XML declaration {}", xml_declaration_summary(*decl)),
+    XmlNode::Element(element) => format!("element {}", readable_xml_name(&element.name)),
+    XmlNode::Text(text) => format!("text {:?}", truncate_for_error(text)),
+  }
+}
+
+fn xml_node_structural_sort_key(node: &XmlNode) -> String {
+  match node {
+    XmlNode::Declaration(decl) => format!("0:{}", xml_declaration_summary(*decl)),
+    XmlNode::Element(element) => {
+      let (_, local_name) = split_expanded_name(&element.name);
+      let mut key = format!("1:{local_name}");
+      for (name, value) in &element.attrs {
+        let (_, attr_local_name) = split_expanded_name(name);
+        key.push('|');
+        key.push_str(attr_local_name);
+        key.push('=');
+        key.push_str(value);
+      }
+      for child in &element.children {
+        key.push_str(">{");
+        key.push_str(&xml_node_structural_sort_key(child));
+        key.push('}');
+      }
+      key
+    }
+    XmlNode::Text(text) => format!("2:{text}"),
+  }
+}
+
+fn xml_declaration_summary(decl: XmlDeclaration) -> &'static str {
+  match decl {
+    XmlDeclaration::Plain => "<?xml?>",
+    XmlDeclaration::Standalone => "<?xml standalone=\"yes\"?>",
+  }
+}
+
+fn readable_xml_name(name: &str) -> String {
+  let (ns, local) = split_expanded_name(name);
+  if ns.is_empty() {
+    local.to_string()
+  } else {
+    format!("{{{ns}}}{local}")
+  }
+}
+
+fn truncate_for_error(value: &str) -> String {
+  const MAX_CHARS: usize = 160;
+
+  let mut out = String::new();
+  for (idx, ch) in value.chars().enumerate() {
+    if idx == MAX_CHARS {
+      out.push_str("...");
+      return out;
+    }
+    out.push(ch);
+  }
+
+  out
 }
 
 fn parse_xml_node(
@@ -881,13 +1304,16 @@ fn should_normalize_bool_text(stack: &[XmlFrame]) -> bool {
     return false;
   };
   let (element_ns, element_local) = split_expanded_name(&frame.name);
-  element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
-    && matches!(
-      element_local,
-      "HyperlinksChanged" | "LinksUpToDate" | "ScaleCrop" | "SharedDoc"
-    )
-    || element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
-      && element_local == "bool"
+  let is_extended_property_bool = matches!(
+    element_local,
+    "HyperlinksChanged" | "LinksUpToDate" | "ScaleCrop" | "SharedDoc"
+  ) && (element_ns.is_empty()
+    || element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties");
+  let is_vtype_bool = element_local == "bool"
+    && (element_ns.is_empty()
+      || element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes");
+
+  is_extended_property_bool || is_vtype_bool
 }
 
 fn normalize_relationship_type_uri(value: &str) -> String {

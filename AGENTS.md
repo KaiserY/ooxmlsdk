@@ -109,6 +109,40 @@ The parts-only lane should avoid fixtures that require `flat-opc`, validators, o
 
 `crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` as `open_failure`, `open_valid`, or `round_trip`. Promote a sample to `round_trip` only when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid`.
 
+## Compatibility Test Suite
+
+The suite lives in `crates/ooxmlsdk-test`. It generates a fixed set of minimal OOXML fixtures and round-trips each one through open → save → reopen.
+
+**Generating fixtures** (run once, or when a fixture definition changes):
+
+```sh
+cargo run -p ooxmlsdk-test --example create_fixtures
+```
+
+This writes 22 files into `test-data/` (5 DOCX, 5 XLSX, 5 PPTX, 7 MCE-specific). The fixtures are committed; regenerate only when `examples/create_fixtures.rs` changes.
+
+**Running the round-trip test:**
+
+```sh
+cargo test -p ooxmlsdk-test round_trip -- --nocapture
+```
+
+Output key:
+- `KNOWN FAILURE: <path> — <reason> (issue #N)` — listed in `test-data/known_failures.toml`; does not fail the suite.
+- `ROUND-TRIP FAILED: <path>` — unexpected failure; fix the issue or add an entry to `known_failures.toml`.
+- `UNEXPECTED SUCCESS: <path>` — a known failure now passes; remove its `known_failures.toml` entry.
+
+**Maintaining `test-data/known_failures.toml`:**
+
+```toml
+[[failure]]
+file   = "test-data/mce/alternate_content_pptx.pptx"
+reason = "mc:AlternateContent inside run rejected by presentation parser"
+issue  = 11   # 0 if no issue filed yet
+```
+
+**Compatibility matrix:** `COMPATIBILITY.md` at the repo root. Update it alongside `known_failures.toml` when results change.
+
 ## Code Style
 Keep Rust `rustfmt`-clean. Use snake_case for modules/functions, PascalCase for types, and preserve schema-derived module names such as `schemas_openxmlformats_org_wordprocessingml_2006_main.rs`.
 

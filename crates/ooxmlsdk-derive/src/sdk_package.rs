@@ -496,10 +496,12 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn from_flat_opc_str(text: &str) -> Result<Self, crate::common::SdkError> {
         Self::from_flat_opc_str_with_settings(text, crate::sdk::OpenSettings::default())
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn from_flat_opc_str_with_settings(
         text: &str,
         open_settings: crate::sdk::OpenSettings,
@@ -510,12 +512,14 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn from_flat_opc_reader<R: std::io::BufRead>(
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         Self::from_flat_opc_reader_with_settings(reader, crate::sdk::OpenSettings::default())
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn from_flat_opc_reader_with_settings<R: std::io::BufRead>(
         reader: R,
         open_settings: crate::sdk::OpenSettings,
@@ -527,6 +531,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         )
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn to_flat_opc_string(&self) -> Result<String, crate::common::SdkError> {
         let mut bytes = Vec::new();
         self.write_flat_opc_to(&mut bytes)?;
@@ -534,6 +539,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           .map_err(|err| crate::common::SdkError::CommonError(format!("invalid Flat OPC UTF-8: {err}")))
       }
 
+      #[cfg(feature = "flat-opc")]
       pub fn write_flat_opc_to<W: std::io::Write>(
         &self,
         writer: &mut W,
@@ -938,6 +944,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         Self::from_storage(storage, open_mode, open_settings)
       }
 
+      #[cfg(feature = "flat-opc")]
       fn from_flat_opc_reader_inner<R: std::io::BufRead>(
         reader: R,
         open_mode: crate::common::PackageOpenMode,

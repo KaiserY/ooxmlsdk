@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, Read, Seek, Write};
+use std::io::{Read, Seek};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::schemas::opc_content_types::{Types, TypesChoice};
@@ -9,13 +9,17 @@ use crate::schemas::opc_relationships::{
 };
 use crate::sdk::PackageOpenMode;
 
+#[cfg(feature = "flat-opc")]
+use super::unexpected_eof;
 use super::{
   SdkError, part_relationships_path, resolve_relationship_target_path, resolve_zip_file_path,
-  unexpected_eof,
 };
 
+#[cfg(feature = "flat-opc")]
 const FLAT_OPC_PACKAGE_NS: &str = "http://schemas.microsoft.com/office/2006/xmlPackage";
+#[cfg(feature = "flat-opc")]
 const RELATIONSHIP_CONTENT_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
+#[cfg(feature = "flat-opc")]
 const ALT_CHUNK_RELATIONSHIP_TYPE: &str =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
 
@@ -861,7 +865,8 @@ impl SdkPackageStorage {
     })
   }
 
-  pub(crate) fn open_flat_opc<R: BufRead>(
+  #[cfg(feature = "flat-opc")]
+  pub(crate) fn open_flat_opc<R: std::io::BufRead>(
     reader: R,
     open_mode: PackageOpenMode,
   ) -> Result<Self, SdkError> {
@@ -935,13 +940,14 @@ impl SdkPackageStorage {
     })
   }
 
+  #[cfg(feature = "flat-opc")]
   pub(crate) fn write_flat_opc<W, F>(
     &self,
     writer: &mut W,
     mut part_data: F,
   ) -> Result<(), SdkError>
   where
-    W: Write,
+    W: std::io::Write,
     F: FnMut(PartId, &StoredPart) -> Result<Vec<u8>, SdkError>,
   {
     writer.write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
@@ -1823,6 +1829,7 @@ impl SdkPackageStorage {
     unreachable!("usize iteration should always find a free data part path")
   }
 
+  #[cfg(feature = "flat-opc")]
   fn alt_chunk_part_ids(&self) -> HashSet<PartId> {
     self
       .parts
@@ -1842,12 +1849,14 @@ struct RawPart {
   bytes: Vec<u8>,
 }
 
+#[cfg(feature = "flat-opc")]
 struct FlatOpcPart {
   path: String,
   content_type: String,
   bytes: Vec<u8>,
 }
 
+#[cfg(feature = "flat-opc")]
 fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
   Types {
     xmlns: vec![super::XmlNamespaceDecl::new(
@@ -1867,6 +1876,7 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
   }
 }
 
+#[cfg(feature = "flat-opc")]
 fn relationships_from_flat_opc_part(
   bytes: Option<&[u8]>,
   source_path: &str,
@@ -1880,7 +1890,8 @@ fn relationships_from_flat_opc_part(
   ))
 }
 
-fn read_flat_opc_parts<R: BufRead>(reader: R) -> Result<Vec<FlatOpcPart>, SdkError> {
+#[cfg(feature = "flat-opc")]
+fn read_flat_opc_parts<R: std::io::BufRead>(reader: R) -> Result<Vec<FlatOpcPart>, SdkError> {
   let mut xml_reader = super::from_reader_inner(reader)?;
   let mut parts = Vec::new();
 
@@ -1904,7 +1915,8 @@ fn read_flat_opc_parts<R: BufRead>(reader: R) -> Result<Vec<FlatOpcPart>, SdkErr
   Ok(parts)
 }
 
-fn read_flat_opc_part<R: BufRead>(
+#[cfg(feature = "flat-opc")]
+fn read_flat_opc_part<R: std::io::BufRead>(
   xml_reader: &mut super::IoReader<R>,
   start: quick_xml::events::BytesStart<'static>,
 ) -> Result<FlatOpcPart, SdkError> {
@@ -1963,7 +1975,8 @@ fn read_flat_opc_part<R: BufRead>(
   })
 }
 
-fn read_flat_opc_xml_data<R: BufRead>(
+#[cfg(feature = "flat-opc")]
+fn read_flat_opc_xml_data<R: std::io::BufRead>(
   xml_reader: &mut super::IoReader<R>,
   empty_tag: bool,
 ) -> Result<Vec<u8>, SdkError> {
@@ -1990,7 +2003,8 @@ fn read_flat_opc_xml_data<R: BufRead>(
   })
 }
 
-fn read_flat_opc_binary_data<R: BufRead>(
+#[cfg(feature = "flat-opc")]
+fn read_flat_opc_binary_data<R: std::io::BufRead>(
   xml_reader: &mut super::IoReader<R>,
   empty_tag: bool,
 ) -> Result<Vec<u8>, SdkError> {
@@ -2023,7 +2037,8 @@ fn read_flat_opc_binary_data<R: BufRead>(
     .map_err(|err| SdkError::CommonError(format!("invalid Flat OPC binaryData: {err}")))
 }
 
-fn write_flat_opc_xml_part<W: Write>(
+#[cfg(feature = "flat-opc")]
+fn write_flat_opc_xml_part<W: std::io::Write>(
   writer: &mut W,
   name: &str,
   content_type: &str,
@@ -2038,7 +2053,8 @@ fn write_flat_opc_xml_part<W: Write>(
   Ok(())
 }
 
-fn write_flat_opc_binary_part<W: Write>(
+#[cfg(feature = "flat-opc")]
+fn write_flat_opc_binary_part<W: std::io::Write>(
   writer: &mut W,
   name: &str,
   content_type: &str,
@@ -2055,6 +2071,7 @@ fn write_flat_opc_binary_part<W: Write>(
   Ok(())
 }
 
+#[cfg(feature = "flat-opc")]
 fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
   let mut xml_reader = super::from_bytes_inner(bytes)?;
   loop {
@@ -2068,6 +2085,7 @@ fn root_xml_bytes(bytes: &[u8]) -> Result<Vec<u8>, SdkError> {
   }
 }
 
+#[cfg(feature = "flat-opc")]
 fn flat_opc_part_is_xml(
   part: &StoredPart,
   part_id: PartId,
@@ -2076,10 +2094,12 @@ fn flat_opc_part_is_xml(
   part.content_type().ends_with("xml") && !alt_chunk_part_ids.contains(&part_id)
 }
 
+#[cfg(feature = "flat-opc")]
 fn qname_matches(qname: &[u8], local_name: &[u8]) -> bool {
   qname == local_name || qname.rsplit(|byte| *byte == b':').next() == Some(local_name)
 }
 
+#[cfg(feature = "flat-opc")]
 fn normalize_flat_opc_part_name(name: &str) -> String {
   resolve_zip_file_path(name.trim_start_matches('/'))
 }

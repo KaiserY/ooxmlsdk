@@ -174,6 +174,7 @@ fn package_entry_data(bytes: Vec<u8>, path: &str) -> Vec<u8> {
 }
 
 #[test]
+#[cfg(feature = "flat-opc")]
 fn wordprocessing_document_loads_minimal_flat_opc_package() {
   // Source: mirrors Open XML SDK FlatOpcExtensions.FromFlatOpcString coverage.
   let flat_opc = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -212,6 +213,7 @@ fn wordprocessing_document_loads_minimal_flat_opc_package() {
 }
 
 #[test]
+#[cfg(feature = "flat-opc")]
 fn wordprocessing_document_flat_opc_round_trips_xml_and_binary_parts() {
   // Source: aligned with Open XML SDK DocumentTests.FlatOpcTests and SVG/binary Flat OPC coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();

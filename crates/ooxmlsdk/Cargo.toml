@@ -14,7 +14,8 @@ readme.workspace = true
 
 [features]
 default = ["parts"]
-parts = ["dep:base64", "dep:zip"]
+parts = ["dep:zip"]
+flat-opc = ["parts", "dep:base64"]
 validators = ["dep:regex"]
 mce = ["parts"]
 

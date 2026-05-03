@@ -8,6 +8,7 @@ build = "build.rs"
 [features]
 default = ["parts"]
 parts = ["ooxmlsdk/parts"]
+flat-opc = ["parts", "ooxmlsdk/flat-opc"]
 validators = ["ooxmlsdk/validators"]
 mce = ["ooxmlsdk/mce"]
 

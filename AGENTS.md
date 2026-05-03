@@ -12,7 +12,7 @@ This Rust workspace has four crates:
 - `crates/ooxmlsdk-derive`: procedural macros used by generated/runtime schema types.
 - `crates/ooxmlsdk-test`: integration tests, fixtures, doc samples, upstream coverage matrix, and performance benches.
 
-Runtime features are `parts`, `validators`, and `mce`; the default feature is `parts`. There is no Cargo `strict` feature. Strict OOXML is handled as fixture/document behavior.
+Runtime features are `parts`, `flat-opc`, `validators`, and `mce`; the default feature is `parts`. `flat-opc` depends on `parts` and enables Flat OPC string/reader/write APIs. There is no Cargo `strict` feature. Strict OOXML is handled as fixture/document behavior.
 
 ## Upstream Alignment
 This project broadly mirrors the API, package model, schema behavior, validators, fixtures, and tests of upstream `dotnet/Open-XML-SDK`.
@@ -42,11 +42,15 @@ Avoid editing generated runtime files directly unless also changing generator/in
 - `cargo test --workspace`: default full test lane.
 - `cargo test --workspace --no-default-features`: no-default-features lane.
 - `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features flat-opc`: Flat OPC lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features mce`: MCE lane without validators or Flat OPC-specific behavior.
 - `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
 - `cargo fmt --all`: format.
 - `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
 - `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`: Flat OPC clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`: MCE clippy lane.
 - `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
 - `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
 
@@ -55,7 +59,11 @@ Default dev loop after generator work:
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
 - `cargo fmt --all`
 - `cargo test --workspace`
+- `cargo test --workspace --no-default-features --features flat-opc`
+- `cargo test --workspace --no-default-features --features mce`
 - `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
 - `cargo fmt --all`
 
 Full generator/feature validation:
@@ -65,12 +73,16 @@ Full generator/feature validation:
 - `cargo test --workspace`
 - `cargo test --workspace --no-default-features`
 - `cargo test --workspace --no-default-features --features parts`
+- `cargo test --workspace --no-default-features --features flat-opc`
+- `cargo test --workspace --no-default-features --features mce`
 - `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
 - `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo fmt --all`
 
-For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
+For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run `cargo test -p ooxmlsdk-test --features flat-opc flat_opc`. If the change touches MCE behavior, also run `cargo test -p ooxmlsdk-test --features mce`. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
 ## Derive Macro Debugging
 When changing `crates/ooxmlsdk-derive` macro logic, dump at least one representative expansion and inspect the generated code shape before trusting tests. Use the ignored helper from the repository root:
@@ -86,12 +98,14 @@ Place tests near the behavior they protect:
 
 - Schema/simple XML round trips: `wordprocessing.rs`, `presentation.rs`, `spreadsheet.rs`, `properties.rs`, or `simple_types.rs`.
 - Package/parts behavior: `packages.rs`, using public APIs such as `parts`, `get_all_parts`, `get_part_by_id`, `get_parts_of_type`, relationship helpers, paths, content/data helpers, and saved package contents.
+- Flat OPC package behavior: `packages.rs`, behind `flat-opc`.
+- MCE package and markup compatibility behavior: `packages.rs`, `markup_compatibility_calibration.rs`, or targeted MCE-gated assertions in schema round-trip tests, behind `mce`.
 - Validators: `validators.rs` and `file_validators.rs`, behind `validators`.
 - Doc samples: `doc_samples.rs` and `crates/ooxmlsdk-test/build.rs`.
 
 Prefer upstream-derived fixtures and assertions. For package-level validator migrations where upstream reports multiple errors, asserting the first Rust-side validation error is acceptable if the implementation intentionally stops at first failure.
 
-The parts-only lane should avoid fixtures that require validators or MCE-specific behavior. Gate only the smallest affected test/assertion with the relevant active feature such as `validators` or `mce`.
+The parts-only lane should avoid fixtures that require `flat-opc`, validators, or MCE-specific behavior. Gate only the smallest affected test/assertion with the relevant active feature such as `flat-opc`, `validators`, or `mce`.
 
 `crates/ooxmlsdk-test/build.rs` classifies `doc_samples/` as `open_failure`, `open_valid`, or `round_trip`. Promote a sample to `round_trip` only when the file-level XML diff is clean; keep schema-valid but non-round-trip samples in `open_valid`.
 

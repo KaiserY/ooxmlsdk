@@ -1049,6 +1049,7 @@ pub trait SdkPackage: SdkPackageInternal {
     crate::parts::load_all_part_roots(self)
   }
 
+  #[cfg(feature = "flat-opc")]
   #[inline]
   fn write_flat_opc_to<W: std::io::Write>(
     &self,

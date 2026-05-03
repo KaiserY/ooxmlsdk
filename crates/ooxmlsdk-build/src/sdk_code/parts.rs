@@ -533,6 +533,11 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             let Some(part) = storage.part(part_id) else {
               return Ok(None);
             };
+            if part.relationship_type()
+              == Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk")
+            {
+              return Ok(None);
+            }
             #[cfg(not(feature = "mce"))]
             let _ = open_settings;
             $(

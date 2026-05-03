@@ -36,6 +36,17 @@ fn assert_cell_value_xml(serialized: &str, expected_value: &str) {
   );
 }
 
+fn assert_cell_value_text_round_trip(value: &str) {
+  let xml = format!(
+    r#"<x:v xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">{value}</x:v>"#
+  );
+  let (parsed, serialized, reparsed) = assert_stable_roundtrip::<CellValue>(&xml);
+
+  assert_eq!(parsed.xml_content.as_deref(), Some(value));
+  assert_cell_value_xml(&serialized, value);
+  assert_eq!(reparsed.xml_content.as_deref(), Some(value));
+}
+
 fn shared_string_items(
   table: &SharedStringTable,
 ) -> Vec<&ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::SharedStringItem> {
@@ -420,6 +431,40 @@ fn int_feature_property_uses_integer_value_numeric_form() {
   let reparsed = serialized.parse::<IntFeatureProperty>().unwrap();
   assert_eq!(reparsed.k.as_str(), "count");
   assert_eq!(reparsed.xml_content, Some(-42));
+}
+
+#[test]
+fn cell_value_preserves_upstream_numeric_boolean_and_datetime_text_forms() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Spreadsheet/CellValueTests.cs
+  for value in [
+    "2017-11-28T12:25:02.000",
+    "2017-11-28T12:25:02.000+00:00",
+    "2017-11-28T12:25:02.123",
+    "2017-11-28T12:25:02.123+00:00",
+    "-1.5",
+    "-1.0",
+    "0.0",
+    "1.0",
+    "1.5",
+    "987.6E+30",
+    "-12.34E-20",
+    "-2147483648",
+    "-2147483647",
+    "-1",
+    "0",
+    "1",
+    "2147483646",
+    "2147483647",
+    "987E+5",
+    "-79228162514264337593543950335",
+    "987.6E+8",
+    "-12.34E-7",
+    "79228162514264337593543950335",
+    "false",
+    "true",
+  ] {
+    assert_cell_value_text_round_trip(value);
+  }
 }
 
 #[test]

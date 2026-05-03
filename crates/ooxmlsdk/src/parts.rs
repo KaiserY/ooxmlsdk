@@ -3950,11 +3950,13 @@ macro_rules! define_part_root_element {
         => Ok(root.to_xml_bytes() ?),)* } } pub (crate) fn from_part_id(storage : & crate
         ::common::SdkPackageStorage, part_id : crate ::common::PartId, open_settings : &
         crate ::sdk::OpenSettings,) -> Result < Option < Self >, crate ::common::SdkError
-        > { let Some(part) = storage.part(part_id) else { return Ok(None); };
-        #[cfg(not(feature = "mce"))] let _ = open_settings; $($(#[$attrs])* if !
-        matches!($content_type, "" | "application/xml" | "text/xml") && part
-        .content_type() == $content_type { #[cfg(feature = "mce")] let mut root = <
-        $root_ty > ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
+        > { let Some(part) = storage.part(part_id) else { return Ok(None); }; if part
+        .relationship_type() ==
+        Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk")
+        { return Ok(None); } #[cfg(not(feature = "mce"))] let _ = open_settings;
+        $($(#[$attrs])* if ! matches!($content_type, "" | "application/xml" | "text/xml")
+        && part.content_type() == $content_type { #[cfg(feature = "mce")] let mut root =
+        < $root_ty > ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
         ::sdk::SdkMce::process_mce(& mut root, & open_settings
         .markup_compatibility_process_settings,) ?; #[cfg(not(feature = "mce"))] let root
         = < $root_ty > ::from_bytes(part.data().bytes()) ?; return Ok(Some(Self::

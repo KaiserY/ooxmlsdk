@@ -173,6 +173,18 @@ fn package_entry_data(bytes: Vec<u8>, path: &str) -> Vec<u8> {
   data
 }
 
+#[cfg(feature = "flat-opc")]
+fn flat_opc_part_fragment<'a>(flat_opc: &'a str, name: &str) -> &'a str {
+  let name_attr = format!("pkg:name=\"{name}\"");
+  let name_index = flat_opc
+    .find(&name_attr)
+    .unwrap_or_else(|| panic!("missing Flat OPC part: {name}"));
+  let part_start = flat_opc[..name_index].rfind("<pkg:part").unwrap();
+  let part_end =
+    name_index + flat_opc[name_index..].find("</pkg:part>").unwrap() + "</pkg:part>".len();
+  &flat_opc[part_start..part_end]
+}
+
 #[test]
 #[cfg(feature = "flat-opc")]
 fn wordprocessing_document_loads_minimal_flat_opc_package() {
@@ -214,6 +226,47 @@ fn wordprocessing_document_loads_minimal_flat_opc_package() {
 
 #[test]
 #[cfg(feature = "flat-opc")]
+fn wordprocessing_document_flat_opc_reader_and_writer_apis_round_trip() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.FlatOpcTests.cs
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let mut bytes = Vec::new();
+  package.write_flat_opc_to(&mut bytes).unwrap();
+  let flat_opc = String::from_utf8(bytes.clone()).unwrap();
+
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    ..Default::default()
+  };
+  let mut from_reader =
+    WordprocessingDocument::from_flat_opc_reader_with_settings(Cursor::new(bytes), settings)
+      .unwrap();
+  assert_eq!(from_reader.open_settings().open_mode, PackageOpenMode::Lazy);
+  assert!(from_reader.main_document_part().is_ok());
+  assert_eq!(
+    main_document_body_child_count(
+      from_reader
+        .main_document_part()
+        .unwrap()
+        .root_element(&mut from_reader)
+        .unwrap()
+    ),
+    0
+  );
+
+  let from_default_reader =
+    WordprocessingDocument::from_flat_opc_reader(Cursor::new(flat_opc.as_bytes())).unwrap();
+  let saved = from_default_reader.to_package_bytes().unwrap();
+  let reopened = WordprocessingDocument::new(Cursor::new(saved)).unwrap();
+  assert!(reopened.main_document_part().is_ok());
+}
+
+#[test]
+#[cfg(feature = "flat-opc")]
 fn wordprocessing_document_flat_opc_round_trips_xml_and_binary_parts() {
   // Source: aligned with Open XML SDK DocumentTests.FlatOpcTests and SVG/binary Flat OPC coverage.
   let mut package = WordprocessingDocument::new(empty_package()).unwrap();
@@ -244,6 +297,114 @@ fn wordprocessing_document_flat_opc_round_trips_xml_and_binary_parts() {
     reopened_image.data(&reopened).unwrap(),
     [0_u8, 1, 2, 3, 250, 251, 252]
   );
+}
+
+#[test]
+#[cfg(feature = "flat-opc")]
+fn wordprocessing_document_flat_opc_writes_alt_chunks_as_binary_parts() {
+  // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
+  //   CanRoundTripWordprocessingDocumentWithAltChunks
+  //   CanTransformWordprocessingDocumentWithAltChunksToFlatOpc
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let xhtml = b"<html xmlns=\"http://www.w3.org/1999/xhtml\"><body>xhtml</body></html>".to_vec();
+  let xml = b"<root><value>xml</value></root>".to_vec();
+  let docx = [80_u8, 75, 3, 4, 1, 2, 3].to_vec();
+
+  let xhtml_part = main_part
+    .add_alternative_format_import_part_by_type_with_id(
+      &mut package,
+      AlternativeFormatImportPartType::Xhtml,
+      "rIdAltXhtml",
+    )
+    .unwrap();
+  xhtml_part.set_data(&mut package, xhtml.clone()).unwrap();
+  let xml_part = main_part
+    .add_alternative_format_import_part_by_type_with_id(
+      &mut package,
+      AlternativeFormatImportPartType::Xml,
+      "rIdAltXml",
+    )
+    .unwrap();
+  xml_part.set_data(&mut package, xml.clone()).unwrap();
+  let docx_part = main_part
+    .add_alternative_format_import_part_by_type_with_id(
+      &mut package,
+      AlternativeFormatImportPartType::WordprocessingMl,
+      "rIdAltDocx",
+    )
+    .unwrap();
+  docx_part.set_data(&mut package, docx.clone()).unwrap();
+
+  let flat_opc = package.to_flat_opc_string().unwrap();
+  let main_fragment = flat_opc_part_fragment(&flat_opc, "/word/document.xml");
+  assert!(main_fragment.contains("<pkg:xmlData>"));
+
+  for (part, content_type) in [
+    (xhtml_part, "application/xhtml+xml"),
+    (xml_part, "application/xml"),
+    (
+      docx_part,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    ),
+  ] {
+    let name = format!("/{}", part.path(&package).unwrap());
+    let fragment = flat_opc_part_fragment(&flat_opc, &name);
+    assert!(fragment.contains(&format!("pkg:contentType=\"{content_type}\"")));
+    assert!(fragment.contains("<pkg:binaryData>"));
+    assert!(!fragment.contains("<pkg:xmlData>"));
+  }
+
+  let reopened = WordprocessingDocument::from_flat_opc_str(&flat_opc).unwrap();
+  let reopened_main = reopened.main_document_part().unwrap();
+  for (relationship_id, expected) in [
+    ("rIdAltXhtml", xhtml.as_slice()),
+    ("rIdAltXml", xml.as_slice()),
+    ("rIdAltDocx", docx.as_slice()),
+  ] {
+    let part = reopened_main
+      .get_part_by_id(&reopened, relationship_id)
+      .and_then(|part| part_ref_variant!(part, AlternativeFormatImportPart))
+      .unwrap();
+    assert_eq!(part.data(&reopened).unwrap(), expected);
+  }
+}
+
+#[test]
+#[cfg(feature = "flat-opc")]
+fn wordprocessing_document_flat_opc_writes_svg_media_as_xml_part() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Documents/WordprocessingDocumentTests.cs
+  //   CanSaveSvgToFlatOpc
+  let package = WordprocessingDocument::new_from_file(doc_sample("svg.docx")).unwrap();
+  let flat_opc = package.to_flat_opc_string().unwrap();
+  let svg_fragment = flat_opc_part_fragment(&flat_opc, "/word/media/image2.svg");
+
+  assert!(svg_fragment.contains("pkg:contentType=\"image/svg+xml\""));
+  assert!(svg_fragment.contains("<pkg:xmlData>"));
+  assert!(!svg_fragment.contains("<pkg:binaryData>"));
+  assert!(svg_fragment.contains("<svg"));
+  assert!(svg_fragment.contains("http://www.w3.org/2000/svg"));
+}
+
+#[test]
+fn wordprocessing_part_xml_is_written_as_utf8_without_bom() {
+  // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
+  //   PartsShouldBeEncodedWithUTF8WithoutBOM
+  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  let bytes = package.to_package_bytes().unwrap();
+  let document_xml = package_entry_data(bytes, "word/document.xml");
+
+  assert!(!document_xml.is_empty());
+  assert!(!document_xml.starts_with(&[0xEF, 0xBB, 0xBF]));
 }
 
 #[test]

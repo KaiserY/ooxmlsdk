@@ -12,6 +12,14 @@ use ooxmlsdk::simple_type::{
   is_valid_hex_binary,
 };
 use ooxmlsdk_test::trim_xml_declaration;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+fn hash_value<T: Hash>(value: &T) -> u64 {
+  let mut hasher = DefaultHasher::new();
+  value.hash(&mut hasher);
+  hasher.finish()
+}
 
 fn assert_canonical<T>(input: &str, expected: &str)
 where
@@ -36,6 +44,48 @@ where
 fn string_value_round_trip_test() {
   assert_round_trip::<StringValue>("abcdef");
   assert_round_trip::<StringValue>("hello world");
+}
+
+#[test]
+fn comparable_simple_reference_equivalents_use_rust_string_semantics() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SimpleTypes/OpenXmlComparableSimpleReferenceTests.cs
+  let small1: Option<StringValue> = Some("alpha".to_string());
+  let small2: Option<StringValue> = Some("alpha".to_string());
+  let large: Option<StringValue> = Some("omega".to_string());
+  let null1: Option<StringValue> = None;
+  let null2: Option<StringValue> = None;
+
+  assert_eq!(small1, small2);
+  assert_eq!(null1, null2);
+  assert_ne!(small1, large);
+  assert_ne!(small1, null1);
+  assert!(small1 < large);
+  assert!(large > small2);
+  assert!(null1 < small1);
+  assert!(large >= small1);
+  assert_eq!(hash_value(&small1), hash_value(&small2));
+  assert_eq!(hash_value(&null1), hash_value(&null2));
+  assert_ne!(hash_value(&small1), hash_value(&large));
+}
+
+#[test]
+fn comparable_simple_value_equivalents_use_rust_numeric_semantics() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SimpleTypes/OpenXmlComparableSimpleValueTests.cs
+  let small1: Int32Value = 12;
+  let small2: Int32Value = 12;
+  let large: Int32Value = 42;
+
+  assert_eq!(small1, small2);
+  assert_ne!(small1, large);
+  assert!(small1 < large);
+  assert!(small1 <= small2);
+  assert!(large > small1);
+  assert!(large >= small2);
+  assert_eq!(small1.cmp(&small2), std::cmp::Ordering::Equal);
+  assert_eq!(large.cmp(&small1), std::cmp::Ordering::Greater);
+  assert_eq!(small1.cmp(&large), std::cmp::Ordering::Less);
+  assert_eq!(hash_value(&small1), hash_value(&small2));
+  assert_ne!(hash_value(&small1), hash_value(&large));
 }
 
 #[test]

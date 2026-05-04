@@ -49,7 +49,12 @@ structural fidelity, not rendering or layout.
 | Ordered lists (decimal/lowerLetter/lowerRoman, multi-level) | ✅ | `wml/numbering_ordered.docx` |
 | List restart via lvlOverride startOverride | ✅ | `wml/numbering_restart.docx` |
 | Tables (basic) | ✅ | `document/minimal_table.docx` |
-| Tables (merged cells) | 🔲 | |
+| Table borders (tblBorders outer+insideH/V, tcBorders override) | ✅ | `wml/table_borders.docx` |
+| Tables (horizontal merge via gridSpan) | ✅ | `wml/table_merged.docx` |
+| Tables (vertical merge via vMerge restart/continue) | ✅ | `wml/table_merged.docx` |
+| Table row properties (tblHeader, trHeight exact, cantSplit) | ✅ | `wml/table_props.docx` |
+| Table cell vertical alignment (vAlign top/center/bottom) | ✅ | `wml/table_props.docx` |
+| Table cell noWrap, pct table width | ✅ | `wml/table_props.docx` |
 | Inline images | ✅ | `document/minimal_image.docx` |
 | Floating images | 🔲 | |
 | Headers and footers | 🔲 | |

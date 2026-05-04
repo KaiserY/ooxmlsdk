@@ -2476,6 +2476,248 @@ fn main() {
   create_wml_paragraphs_fixtures(&root);
   create_wml_styles_fixtures(&root);
   create_wml_numbering_fixtures(&root);
+  create_wml_tables_fixtures(&root);
+}
+
+fn create_wml_tables_fixtures(root: &Path) {
+  // ── WML-T-01: table_borders ──────────────────────────────────────────────
+  // 3×2 table with full tblBorders (outer + insideH/insideV), one cell with
+  // a tcBorders override (dashed right), and one cell with shd fill.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="8640" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="4472C4"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="4472C4"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>A1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:tcBorders>
+              <w:right w:val="dashed" w:sz="8" w:space="0" w:color="FF0000"/>
+            </w:tcBorders>
+          </w:tcPr>
+          <w:p><w:r><w:t>A2 (dashed right border)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="DEEAF1"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A3 (shaded cell)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B3</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/table_borders.docx", &data);
+  }
+
+  // ── WML-T-02: table_merged ───────────────────────────────────────────────
+  // 3×3 table demonstrating both merge directions:
+  //   Row 0, cells 0-1: horizontal merge via gridSpan=2
+  //   Column 2, rows 0-1: vertical merge via vMerge restart/continue
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblBorders>
+          <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="5760" w:type="dxa"/>
+            <w:gridSpan w:val="2"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A1+A2 (horizontal merge, gridSpan=2)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:vMerge w:val="restart"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A3 top of vertical merge</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:vMerge/>
+          </w:tcPr>
+          <w:p/>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C3 (below vertical merge)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/table_merged.docx", &data);
+  }
+
+  // ── WML-T-03: table_props ────────────────────────────────────────────────
+  // 2×3 table exercising row and cell property features:
+  //   Row 0: tblHeader + trHeight exact 480 twips
+  //   Column 0 cells: vAlign=top/center/bottom across rows
+  //   One cell: noWrap
+  //   Table width: 5000 pct (100%)
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="5000" w:type="pct"/>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="4320"/>
+        <w:gridCol w:w="4320"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:trPr>
+          <w:tblHeader/>
+          <w:trHeight w:val="480" w:hRule="exact"/>
+        </w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Left (center valign)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Right (center valign)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="top"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>Top-aligned cell.</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:noWrap/>
+          </w:tcPr>
+          <w:p><w:r><w:t>No-wrap cell content that stays on one line.</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:trPr><w:cantSplit/></w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="bottom"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>Bottom-aligned cell.</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>CantSplit row.</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/table_props.docx", &data);
+  }
 }
 
 fn create_wml_numbering_fixtures(root: &Path) {

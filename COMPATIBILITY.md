@@ -58,7 +58,10 @@ structural fidelity, not rendering or layout.
 | Inline images | ✅ | `document/minimal_image.docx` |
 | Inline images (distL/distR, altText, cstate, picLocks) | ✅ | `wml/image_inline_props.docx` |
 | Floating images (wp:anchor, wrapSquare, positionH/V) | ✅ | `wml/image_floating.docx` |
-| Headers and footers | 🔲 | |
+| Headers and footers (default header+footer; xmlns:r; sectPr headerReference/footerReference) | ✅ | `wml/header_footer.docx` |
+| Headers and footers (first-page header; titlePg; three part relationships) | ✅ | `wml/header_first_page.docx` |
+| Page size (pgSz: US Letter twips; orient) | ✅ | `wml/header_footer.docx` |
+| Page margins (pgMar: top/right/bottom/left/header/footer/gutter) | ✅ | `wml/header_footer.docx` |
 | Footnotes and endnotes | 🔲 | |
 | Hyperlinks | 🔲 | |
 | Bookmarks | 🔲 | |

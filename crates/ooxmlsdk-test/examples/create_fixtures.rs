@@ -2478,6 +2478,136 @@ fn main() {
   create_wml_numbering_fixtures(&root);
   create_wml_tables_fixtures(&root);
   create_wml_drawing_fixtures(&root, &png);
+  create_wml_headers_fixtures(&root);
+}
+
+fn create_wml_headers_fixtures(root: &Path) {
+  // ── WML-H-01: header_footer ──────────────────────────────────────────────
+  // Default header + default footer; US Letter page size; 1-inch margins;
+  // xmlns:r on document element; sectPr with headerReference/footerReference.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Page Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Page Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Document body text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:footerReference w:type="default" r:id="rId3"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/footer1.xml", footer1),
+    ]);
+    save(root, "test-data/wml/header_footer.docx", &data);
+  }
+
+  // ── WML-H-02: header_first_page ──────────────────────────────────────────
+  // Default header + first-page header + default footer; titlePg; three
+  // part relationships; xmlns:r on document element.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="right"/></w:pPr>
+    <w:r><w:t>Default Header (odd pages)</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let header2 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>First Page Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Default Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>First page body text.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second page body text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:headerReference w:type="first" r:id="rId3"/>
+      <w:footerReference w:type="default" r:id="rId4"/>
+      <w:titlePg/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/header2.xml", header2),
+      ("word/footer1.xml", footer1),
+    ]);
+    save(root, "test-data/wml/header_first_page.docx", &data);
+  }
 }
 
 fn create_wml_tables_fixtures(root: &Path) {

@@ -1565,6 +1565,485 @@ fn create_opc_fixtures(root: &Path, png: &[u8]) {
   }
 }
 
+// ── Minimal theme XML ────────────────────────────────────────────────────────
+
+const THEME1_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test Theme">
+  <a:themeElements>
+    <a:clrScheme name="Test">
+      <a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
+      <a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
+      <a:dk2><a:srgbClr val="1F497D"/></a:dk2>
+      <a:lt2><a:srgbClr val="EEECE1"/></a:lt2>
+      <a:accent1><a:srgbClr val="4F81BD"/></a:accent1>
+      <a:accent2><a:srgbClr val="C0504D"/></a:accent2>
+      <a:accent3><a:srgbClr val="9BBB59"/></a:accent3>
+      <a:accent4><a:srgbClr val="8064A2"/></a:accent4>
+      <a:accent5><a:srgbClr val="4BACC6"/></a:accent5>
+      <a:accent6><a:srgbClr val="F79646"/></a:accent6>
+      <a:hlink><a:srgbClr val="0000FF"/></a:hlink>
+      <a:folHlink><a:srgbClr val="800080"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Test">
+      <a:majorFont>
+        <a:latin typeface="Calibri"/>
+        <a:ea typeface=""/>
+        <a:cs typeface=""/>
+      </a:majorFont>
+      <a:minorFont>
+        <a:latin typeface="Calibri"/>
+        <a:ea typeface=""/>
+        <a:cs typeface=""/>
+      </a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Test">
+      <a:fillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:gradFill rotWithShape="1">
+          <a:gsLst>
+            <a:gs pos="0">
+              <a:schemeClr val="phClr"><a:lumMod val="110000"/><a:satMod val="105000"/></a:schemeClr>
+            </a:gs>
+            <a:gs pos="100000">
+              <a:schemeClr val="phClr"><a:lumMod val="60000"/><a:satMod val="99000"/></a:schemeClr>
+            </a:gs>
+          </a:gsLst>
+          <a:lin ang="5400000" scaled="0"/>
+        </a:gradFill>
+        <a:solidFill><a:schemeClr val="phClr"><a:tint val="20000"/></a:schemeClr></a:solidFill>
+      </a:fillStyleLst>
+      <a:lnStyleLst>
+        <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr">
+          <a:solidFill><a:schemeClr val="phClr"><a:shade val="95000"/></a:schemeClr></a:solidFill>
+          <a:prstDash val="solid"/>
+        </a:ln>
+        <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+          <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+          <a:prstDash val="solid"/>
+        </a:ln>
+        <a:ln w="38100" cap="flat" cmpd="sng" algn="ctr">
+          <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+          <a:prstDash val="solid"/>
+        </a:ln>
+      </a:lnStyleLst>
+      <a:effectStyleLst>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+        <a:effectStyle>
+          <a:effectLst>
+            <a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="38000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </a:effectStyle>
+        <a:effectStyle>
+          <a:effectLst>
+            <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </a:effectStyle>
+      </a:effectStyleLst>
+      <a:bgFillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/><a:satMod val="170000"/></a:schemeClr></a:solidFill>
+        <a:gradFill rotWithShape="1">
+          <a:gsLst>
+            <a:gs pos="0">
+              <a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/><a:shade val="98000"/><a:lumMod val="102000"/></a:schemeClr>
+            </a:gs>
+            <a:gs pos="50000">
+              <a:schemeClr val="phClr"><a:tint val="98000"/><a:satMod val="130000"/><a:shade val="90000"/><a:lumMod val="103000"/></a:schemeClr>
+            </a:gs>
+            <a:gs pos="100000">
+              <a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr>
+            </a:gs>
+          </a:gsLst>
+          <a:lin ang="16200000" scaled="0"/>
+        </a:gradFill>
+      </a:bgFillStyleLst>
+    </a:fmtScheme>
+  </a:themeElements>
+</a:theme>"#;
+
+// ── Shared slide tree boilerplate ─────────────────────────────────────────────
+
+fn slide_with_shapes(shapes: &str) -> Vec<u8> {
+  format!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+{shapes}    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#
+  )
+  .into_bytes()
+}
+
+fn dml_pptx(
+  slide: Vec<u8>,
+  extra_ct: &str,
+  extra_master_rels: &str,
+  extra_parts: Vec<(&'static str, Vec<u8>)>,
+) -> Vec<u8> {
+  let pres = presentation_xml(1);
+  let pres_rels = presentation_rels(1);
+  let master_rels = slide_master_rels(extra_master_rels);
+  let layout_rels = slide_layout_back_rels();
+  let slide_rels = slide_to_layout_rels("../slideLayouts/slideLayout1.xml", "");
+  let ct = pptx_content_types(1, extra_ct);
+  make_pptx(PptxParts {
+    content_types: ct,
+    pres_xml: pres,
+    pres_rels,
+    master_xml: SLIDE_MASTER_XML,
+    master_rels,
+    layout_xml: blank_slide_layout(),
+    layout_rels,
+    slide_xml: slide,
+    slide_rels,
+    extra: extra_parts,
+  })
+}
+
+fn create_drawingml_fixtures(root: &Path) {
+  // ── DML-01: solid_fill ───────────────────────────────────────────────────
+  // Two shapes: one srgbClr solid fill, one schemeClr with lumMod + satMod.
+  // Exercises solidFill, srgbClr, schemeClr, and colour transforms.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="RedRect"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="SchemeRect"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="2057400"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 16667"/></a:avLst></a:prstGeom>
+          <a:solidFill>
+            <a:schemeClr val="accent1"><a:lumMod val="75000"/><a:satMod val="105000"/></a:schemeClr>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/solid_fill.pptx", &data);
+  }
+
+  // ── DML-02: gradient_fill ────────────────────────────────────────────────
+  // Shape with a two-stop linear gradient using schemeClr with transforms.
+  // Exercises gradFill, gsLst, a:gs, a:lin.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="GradShape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm rot="900000">
+            <a:off x="914400" y="914400"/>
+            <a:ext cx="6400800" cy="2286000"/>
+          </a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 20000"/></a:avLst></a:prstGeom>
+          <a:gradFill rotWithShape="1">
+            <a:gsLst>
+              <a:gs pos="0">
+                <a:schemeClr val="accent1"><a:lumMod val="110000"/><a:satMod val="105000"/></a:schemeClr>
+              </a:gs>
+              <a:gs pos="100000">
+                <a:schemeClr val="accent1"><a:lumMod val="60000"/><a:satMod val="99000"/></a:schemeClr>
+              </a:gs>
+            </a:gsLst>
+            <a:lin ang="5400000" scaled="0"/>
+          </a:gradFill>
+          <a:ln w="19050">
+            <a:solidFill><a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr></a:solidFill>
+          </a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="ctr"/>
+            <a:r>
+              <a:rPr lang="en-US" sz="1800" b="1" dirty="0">
+                <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+                <a:latin typeface="+mj-lt"/>
+              </a:rPr>
+              <a:t>Gradient</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/gradient_fill.pptx", &data);
+  }
+
+  // ── DML-03: text_run_props ───────────────────────────────────────────────
+  // Text box with multiple runs exercising the full rPr attribute set:
+  // bold, italic, underline, strikethrough, sz, color fill, typeface,
+  // paragraph alignment, line spacing, space before/after.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="RichText"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="8229600" cy="5486400"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="square" lIns="91440" rIns="91440" tIns="45720" bIns="45720" anchor="t"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="l" marL="0" indent="0">
+              <a:spcBef><a:spcPts val="0"/></a:spcBef>
+              <a:spcAft><a:spcPts val="0"/></a:spcAft>
+            </a:pPr>
+            <a:r>
+              <a:rPr lang="en-US" sz="2800" b="1" dirty="0">
+                <a:solidFill><a:srgbClr val="1F3864"/></a:solidFill>
+                <a:latin typeface="+mj-lt"/>
+              </a:rPr>
+              <a:t>Bold Heading </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr lang="en-US" sz="2800" i="1" dirty="0">
+                <a:solidFill><a:schemeClr val="accent2"/></a:solidFill>
+                <a:latin typeface="+mn-lt"/>
+              </a:rPr>
+              <a:t>Italic Accent</a:t>
+            </a:r>
+          </a:p>
+          <a:p>
+            <a:pPr algn="ctr">
+              <a:lnSpc><a:spcPct val="150000"/></a:lnSpc>
+              <a:spcBef><a:spcPts val="600"/></a:spcBef>
+            </a:pPr>
+            <a:r>
+              <a:rPr lang="en-US" sz="1800" u="sng" dirty="0">
+                <a:solidFill><a:srgbClr val="0000FF"/></a:solidFill>
+              </a:rPr>
+              <a:t>Underlined text</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr lang="en-US" sz="1800" strike="sngStrike" dirty="0">
+                <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+              </a:rPr>
+              <a:t> Strikethrough</a:t>
+            </a:r>
+          </a:p>
+          <a:p>
+            <a:r>
+              <a:rPr lang="en-US" sz="1400" baseline="30000" dirty="0"/>
+              <a:t>Super</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr lang="en-US" sz="1800" dirty="0"/>
+              <a:t>script and </a:t>
+            </a:r>
+            <a:r>
+              <a:rPr lang="en-US" sz="1400" baseline="-25000" dirty="0"/>
+              <a:t>sub</a:t>
+            </a:r>
+            <a:r>
+              <a:rPr lang="en-US" sz="1800" dirty="0"/>
+              <a:t>script</a:t>
+            </a:r>
+            <a:endParaRPr lang="en-US" dirty="0"/>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/text_run_props.pptx", &data);
+  }
+
+  // ── DML-04: shape_line ───────────────────────────────────────────────────
+  // Shape with a custom outline: explicit width, dash pattern, arrowheads.
+  // Also a line connector. Exercises a:ln, prstDash, headEnd, tailEnd.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="DashedBorder"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="4114800" cy="2057400"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:ln w="38100" cap="rnd" cmpd="sng">
+            <a:solidFill><a:srgbClr val="FF6600"/></a:solidFill>
+            <a:prstDash val="lgDash"/>
+          </a:ln>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+      <p:cxnSp>
+        <p:nvCxnSpPr>
+          <p:cNvPr id="3" name="Arrow"/>
+          <p:cNvCxnSpPr/>
+          <p:nvPr/>
+        </p:nvCxnSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="5029200" y="1371600"/>
+            <a:ext cx="2743200" cy="0"/>
+          </a:xfrm>
+          <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+          <a:ln w="25400">
+            <a:solidFill><a:srgbClr val="0070C0"/></a:solidFill>
+            <a:prstDash val="solid"/>
+            <a:headEnd type="oval" w="med" len="med"/>
+            <a:tailEnd type="triangle" w="lg" len="lg"/>
+          </a:ln>
+        </p:spPr>
+      </p:cxnSp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/shape_line.pptx", &data);
+  }
+
+  // ── DML-05: effects ──────────────────────────────────────────────────────
+  // Shape with effectLst containing outerShdw and glow.
+  // Exercises effectLst, outerShdw (blurRad/dist/dir/alpha), glow.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="ShadowShape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 16667"/></a:avLst></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln w="12700">
+            <a:solidFill><a:srgbClr val="2F5496"/></a:solidFill>
+          </a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="57150" dist="38100" dir="5400000" algn="ctr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr>
+            </a:outerShdw>
+            <a:glow rad="127000">
+              <a:srgbClr val="4472C4"><a:alpha val="50000"/></a:srgbClr>
+            </a:glow>
+          </a:effectLst>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="ctr"/>
+            <a:r>
+              <a:rPr lang="en-US" sz="2000" b="1" dirty="0">
+                <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+              </a:rPr>
+              <a:t>Shadow + Glow</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/effects.pptx", &data);
+  }
+
+  // ── DML-06: theme ────────────────────────────────────────────────────────
+  // PPTX with a full theme.xml part referenced from the slide master.
+  // Exercises the theme relationship type and theme XML (clrScheme, fontScheme,
+  // fmtScheme with fills/lines/effects/bgFills).
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="ThemedShape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:schemeClr val="accent1"/></a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="ctr"/>
+            <a:r>
+              <a:rPr lang="en-US" sz="2000" dirty="0">
+                <a:solidFill><a:schemeClr val="lt1"/></a:solidFill>
+                <a:latin typeface="+mj-lt"/>
+              </a:rPr>
+              <a:t>Theme Color</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let theme_ct = "\n  <Override PartName=\"/ppt/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+    let theme_master_rel = r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>"#;
+    let data = dml_pptx(
+      slide,
+      theme_ct,
+      theme_master_rel,
+      vec![("ppt/theme/theme1.xml", THEME1_XML.to_vec())],
+    );
+    save(root, "test-data/drawingml/theme.pptx", &data);
+  }
+}
+
 fn main() {
   let root = workspace_root();
   let png = base64::engine::general_purpose::STANDARD
@@ -1576,4 +2055,5 @@ fn main() {
   create_pptx_fixtures(&root, &png);
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
+  create_drawingml_fixtures(&root);
 }

@@ -84,17 +84,35 @@ structural fidelity, not rendering or layout.
 | Empty presentation | ✅ | `slideshow/minimal_empty.pptx` |
 | Text boxes | ✅ | `slideshow/minimal_text.pptx` |
 | Slide layout / master | ✅ | `slideshow/minimal_layout.pptx` |
-| Themes | 🔲 | |
+| Themes | ✅ | `drawingml/theme.pptx` |
 | Tables | ✅ | `slideshow/minimal_table.pptx` |
 | Inline images | ✅ | `slideshow/minimal_image.pptx` |
 | Shapes (basic) | ✅ | `slideshow/minimal_text.pptx` |
-| Shapes (with fill/border) | 🔲 | |
+| Shapes (with fill/border) | ✅ | `drawingml/solid_fill.pptx`, `drawingml/shape_line.pptx` |
 | Charts | 🔲 | |
 | Slide transitions | 🔲 | |
 | Animations | 🔲 | |
 | Notes | 🔲 | |
 | Embedded videos | 🔲 | |
 | Speaker notes | 🔲 | |
+
+## DrawingML (shared across DOCX/XLSX/PPTX)
+
+| Feature | Status | Notes |
+|---|---|---|
+| Solid fill (srgbClr) | ✅ | `drawingml/solid_fill.pptx` |
+| Solid fill (schemeClr + colour transforms) | ✅ | `drawingml/solid_fill.pptx` |
+| Gradient fill (linear, scheme stops) | ✅ | `drawingml/gradient_fill.pptx` |
+| Shape outline (width, color, dash) | ✅ | `drawingml/shape_line.pptx` |
+| Connector with arrowheads | ✅ | `drawingml/shape_line.pptx` |
+| Effects (outer shadow + glow) | ✅ | `drawingml/effects.pptx` |
+| Text run properties (bold/italic/underline/color/sz/typeface) | ✅ | `drawingml/text_run_props.pptx` |
+| Paragraph properties (alignment/spacing/indent) | ✅ | `drawingml/text_run_props.pptx` |
+| Superscript / subscript (baseline) | ✅ | `drawingml/text_run_props.pptx` |
+| Theme part (clrScheme/fontScheme/fmtScheme) | ✅ | `drawingml/theme.pptx` |
+| Pattern fill | 🔲 | |
+| Custom geometry (custGeom) | 🔲 | |
+| 3D effects (scene3d/sp3d) | 🔲 | |
 
 ## MCE (Markup Compatibility and Extensibility)
 

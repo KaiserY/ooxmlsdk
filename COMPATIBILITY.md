@@ -76,7 +76,7 @@ structural fidelity, not rendering or layout.
 | Comments (commentRangeStart/End as paragraph children; commentReference run child; annotationRef in note) | ✅ | `wml/comments.docx` |
 | Content controls (SDT block: plain text, alias/tag/id/lock) | ✅ | `wml/content_controls.docx` |
 | Content controls (SDT run: date picker with fullDate/dateFormat; dropDownList with listItems) | ✅ | `wml/content_controls.docx` |
-| VBA macros (preserve-only) | 🔲 | |
+| VBA macros preserve-only (.docm; macroEnabled content type; microsoft.com rel type; OLE2 bin round-trip) | ✅ | `wml/vba_preserve.docm` |
 | Custom XML | 🔲 | |
 | Embedded objects | 🔲 | |
 

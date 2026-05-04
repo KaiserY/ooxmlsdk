@@ -2486,6 +2486,7 @@ fn main() {
   create_wml_comments_fixtures(&root);
   create_wml_bookmarks_fixtures(&root);
   create_wml_sdt_fixtures(&root);
+  create_vba_preserve_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2702,6 +2703,65 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_vba_preserve_fixtures(root: &Path) {
+  // ── VBA-01: vba_preserve ──────────────────────────────────────────────────
+  // Macro-enabled Word document (.docm) with a minimal OLE2 placeholder for
+  // vbaProject.bin. Tests that the binary part survives the round-trip
+  // unchanged. Content type uses macroEnabled.main+xml; relationship type
+  // uses microsoft.com domain.
+  {
+    // Minimal OLE2 Compound File: magic header (8 bytes) + enough padding
+    // to reach the 512-byte minimum sector size. The rest is zeroed.
+    let mut vba_bin = vec![0u8; 512];
+    // OLE2 magic bytes
+    vba_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    // Minor version = 0x003E, Major version = 0x0003
+    vba_bin[24] = 0x3E;
+    vba_bin[25] = 0x00;
+    vba_bin[26] = 0x03;
+    vba_bin[27] = 0x00;
+
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Macro-enabled document with VBA project.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+
+    let content_types = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>
+</Types>"#
+    )
+    .into_bytes();
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/vbaProject.bin", &vba_bin),
+    ]);
+    save(root, "test-data/wml/vba_preserve.docm", &data);
   }
 }
 

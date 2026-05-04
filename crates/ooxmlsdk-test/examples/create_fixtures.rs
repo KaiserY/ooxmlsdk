@@ -2484,6 +2484,7 @@ fn main() {
   create_wml_notes_fixtures(&root);
   create_wml_tracked_changes_fixtures(&root);
   create_wml_comments_fixtures(&root);
+  create_wml_bookmarks_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2700,6 +2701,58 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_wml_bookmarks_fixtures(root: &Path) {
+  // ── WML-BM-01: bookmarks ──────────────────────────────────────────────────
+  // Inline bookmark wrapping a text range; heading bookmark wrapping a full
+  // paragraph; zero-width point bookmark; internal anchor hyperlink targeting
+  // the inline bookmark.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+      <w:bookmarkStart w:id="10" w:name="intro"/>
+      <w:r><w:t>Introduction</w:t></w:r>
+      <w:bookmarkEnd w:id="10"/>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">See the </w:t></w:r>
+      <w:bookmarkStart w:id="11" w:name="appendix_a"/>
+      <w:r><w:t>appendix</w:t></w:r>
+      <w:bookmarkEnd w:id="11"/>
+      <w:r><w:t xml:space="preserve"> for details.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:bookmarkStart w:id="12" w:name="target_point"/>
+      <w:bookmarkEnd w:id="12"/>
+      <w:r><w:t>Paragraph after zero-width bookmark.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:hyperlink w:anchor="appendix_a" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Go to appendix</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/bookmarks.docx", &data);
   }
 }
 

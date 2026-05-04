@@ -68,7 +68,8 @@ structural fidelity, not rendering or layout.
 | Fields (simple: fldSimple with DATE instruction) | ✅ | `wml/fields_hyperlink.docx` |
 | Hyperlinks (external via r:id + TargetMode=External) | ✅ | `wml/fields_hyperlink.docx` |
 | Hyperlinks (internal anchor via w:anchor) | ✅ | `wml/fields_hyperlink.docx` |
-| Bookmarks | 🔲 | |
+| Bookmarks (bookmarkStart/End as paragraph children; inline, heading, zero-width point) | ✅ | `wml/bookmarks.docx` |
+| Hyperlinks (internal anchor targeting bookmark via w:anchor) | ✅ | `wml/bookmarks.docx` |
 | Section properties (cols: equal-width multi-column, continuous break) | ✅ | `wml/section_columns.docx` |
 | Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
 | Tracked changes (w:ins inserted run; w:del with w:delText; w:rPrChange; w:pPrChange) | ✅ | `wml/tracked_changes.docx` |

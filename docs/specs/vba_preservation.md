@@ -165,6 +165,13 @@ Binary data is accessed via the `SdkPart` trait methods `data()` /
    subdirectory.** The target path `vbaProject.bin` is relative to the
    document part — typically resolving to `word/vbaProject.bin`.
 
+9. **Macro-enabled templates use distinct content types.** `.dotm` (Word
+   template with macros), `.xltm` (Excel template), and `.potm` (PowerPoint
+   template) each have a separate `template.macroEnabled` content type string
+   rather than the `document`/`sheet`/`presentation` variant. Round-trip code
+   must not canonicalise these to the non-template form, or the file will open
+   as an ordinary document instead of a template.
+
 ---
 
 ## 7. Relationship and Content Type URIs
@@ -185,11 +192,20 @@ application/vnd.ms-word.vbaData+xml
 Macro-enabled document content type (Word):
 application/vnd.ms-word.document.macroEnabled.main+xml
 
+Macro-enabled template content type (Word):
+application/vnd.ms-word.template.macroEnabled.main+xml
+
 Macro-enabled workbook content type (Excel):
 application/vnd.ms-excel.sheet.macroEnabled.main+xml
 
+Macro-enabled template content type (Excel):
+application/vnd.ms-excel.template.macroEnabled.main+xml
+
 Macro-enabled presentation content type (PowerPoint):
 application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml
+
+Macro-enabled template content type (PowerPoint):
+application/vnd.ms-powerpoint.template.macroEnabled.main+xml
 ```
 
 ---

@@ -45,7 +45,9 @@ structural fidelity, not rendering or layout.
 | Styles (paragraph/character) | ✅ | `document/minimal_styles.docx` |
 | Style inheritance (basedOn chain, docDefaults) | ✅ | `wml/style_inheritance.docx` |
 | Linked paragraph+character styles (link/next) | ✅ | `wml/style_linked.docx` |
-| Numbered and bulleted lists | 🔲 | |
+| Bullet lists (numFmt=bullet, hanging indent) | ✅ | `wml/numbering_bullets.docx` |
+| Ordered lists (decimal/lowerLetter/lowerRoman, multi-level) | ✅ | `wml/numbering_ordered.docx` |
+| List restart via lvlOverride startOverride | ✅ | `wml/numbering_restart.docx` |
 | Tables (basic) | ✅ | `document/minimal_table.docx` |
 | Tables (merged cells) | 🔲 | |
 | Inline images | ✅ | `document/minimal_image.docx` |

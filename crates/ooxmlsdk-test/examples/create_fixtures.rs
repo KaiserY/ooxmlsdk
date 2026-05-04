@@ -60,6 +60,16 @@ fn root_rels(office_doc_target: &str) -> Vec<u8> {
     .into_bytes()
 }
 
+fn root_rels_with_extra(office_doc_target: &str, extra: &str) -> Vec<u8> {
+  format!(
+    r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{office_doc_target}"/>{extra}
+</Relationships>"#
+  )
+  .into_bytes()
+}
+
 fn empty_rels() -> &'static [u8] {
   br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#
@@ -1396,6 +1406,165 @@ fn create_mce_fixtures(root: &Path) {
   }
 }
 
+fn create_opc_fixtures(root: &Path, png: &[u8]) {
+  let minimal_doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:sectPr/></w:body>
+</w:document>"#;
+
+  // ── OPC-01: core_properties ──────────────────────────────────────────────
+  // Tests that a core-properties part (Dublin Core + OPC, xsi:type on
+  // dcterms:created/modified) doesn't break open/save/reopen.
+  {
+    let core_xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties
+    xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>OPC Test Document</dc:title>
+  <dc:creator>ooxmlsdk test</dc:creator>
+  <dc:description>Fixture for OPC core-properties round-trip test</dc:description>
+  <dc:language>en-US</dc:language>
+  <dc:subject>OPC conformance</dc:subject>
+  <cp:keywords>opc, test, fixture</cp:keywords>
+  <cp:lastModifiedBy>ooxmlsdk test</cp:lastModifiedBy>
+  <cp:revision>1</cp:revision>
+  <cp:category>Test</cp:category>
+  <cp:contentStatus>Draft</cp:contentStatus>
+  <dcterms:created xsi:type="dcterms:W3CDTF">2026-05-02T00:00:00Z</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">2026-05-02T00:00:00Z</dcterms:modified>
+</cp:coreProperties>"#;
+    let ct = docx_content_types(
+      r#"
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>"#,
+      "",
+    );
+    let root_r = root_rels_with_extra(
+      "word/document.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>"#,
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &ct),
+      ("_rels/.rels", &root_r),
+      ("word/document.xml", minimal_doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+      ("docProps/core.xml", core_xml),
+    ]);
+    save(root, "test-data/opc/core_properties.docx", &data);
+  }
+
+  // ── OPC-02: thumbnail ────────────────────────────────────────────────────
+  // Tests that a binary thumbnail part referenced from /_rels/.rels doesn't
+  // break open/save/reopen. Exercises the OPC thumbnail relationship type.
+  {
+    let ct = docx_content_types(
+      "",
+      "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>",
+    );
+    let root_r = root_rels_with_extra(
+      "word/document.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail" Target="docProps/thumbnail.png"/>"#,
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &ct),
+      ("_rels/.rels", &root_r),
+      ("word/document.xml", minimal_doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+      ("docProps/thumbnail.png", png),
+    ]);
+    save(root, "test-data/opc/thumbnail.docx", &data);
+  }
+
+  // ── OPC-03: multiple_rels ────────────────────────────────────────────────
+  // Tests that a single .rels file with multiple relationships (styles + image)
+  // all resolve correctly. Combines minimal_styles and minimal_image in one doc.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+      <w:r><w:t>Heading</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="9525" cy="9525"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Image 1"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="image1.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId2"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="9525" cy="9525"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+    <w:basedOn w:val="Normal"/>
+    <w:pPr><w:outlineLvl w:val="0"/></w:pPr>
+    <w:rPr><w:b/><w:sz w:val="32"/></w:rPr>
+  </w:style>
+</w:styles>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>"#,
+    );
+    let ct = docx_content_types(
+      r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+      "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &ct),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+      ("word/media/image1.png", png),
+    ]);
+    save(root, "test-data/opc/multiple_rels.docx", &data);
+  }
+}
+
 fn main() {
   let root = workspace_root();
   let png = base64::engine::general_purpose::STANDARD
@@ -1406,4 +1575,5 @@ fn main() {
   create_xlsx_fixtures(&root);
   create_pptx_fixtures(&root, &png);
   create_mce_fixtures(&root);
+  create_opc_fixtures(&root, &png);
 }

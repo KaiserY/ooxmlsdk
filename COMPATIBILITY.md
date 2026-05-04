@@ -17,6 +17,9 @@ structural fidelity, not rendering or layout.
 | ZIP package open/save | ✅ | Core OPC |
 | Content_Types.xml | ✅ | |
 | Relationship parts (.rels) | ✅ | |
+| Multiple relationships per part | ✅ | `opc/multiple_rels.docx` |
+| Core properties part | ✅ | `opc/core_properties.docx` |
+| Thumbnail part | ✅ | `opc/thumbnail.docx` |
 | MCE AlternateContent | ✅ | Fixed by static MCE post-processing |
 
 ## WordprocessingML (DOCX)

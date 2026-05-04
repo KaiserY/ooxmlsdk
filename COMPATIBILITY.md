@@ -63,9 +63,11 @@ structural fidelity, not rendering or layout.
 | Page size (pgSz: US Letter twips; orient) | ✅ | `wml/header_footer.docx` |
 | Page margins (pgMar: top/right/bottom/left/header/footer/gutter) | ✅ | `wml/header_footer.docx` |
 | Footnotes and endnotes | 🔲 | |
-| Hyperlinks | 🔲 | |
+| Fields (complex: PAGE/NUMPAGES with begin/instrText/separate/end; dirty) | ✅ | `wml/fields_complex.docx` |
+| Fields (simple: fldSimple with DATE instruction) | ✅ | `wml/fields_hyperlink.docx` |
+| Hyperlinks (external via r:id + TargetMode=External) | ✅ | `wml/fields_hyperlink.docx` |
+| Hyperlinks (internal anchor via w:anchor) | ✅ | `wml/fields_hyperlink.docx` |
 | Bookmarks | 🔲 | |
-| Fields (PAGE, TOC, REF) | 🔲 | |
 | Section properties (cols: equal-width multi-column, continuous break) | ✅ | `wml/section_columns.docx` |
 | Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
 | Tracked changes | 🔲 | |

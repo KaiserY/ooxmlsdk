@@ -2480,6 +2480,7 @@ fn main() {
   create_wml_drawing_fixtures(&root, &png);
   create_wml_headers_fixtures(&root);
   create_wml_sections_fixtures(&root);
+  create_wml_fields_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2608,6 +2609,94 @@ fn create_wml_headers_fixtures(root: &Path) {
       ("word/footer1.xml", footer1),
     ]);
     save(root, "test-data/wml/header_first_page.docx", &data);
+  }
+}
+
+fn create_wml_fields_fixtures(root: &Path) {
+  // ── WML-FLD-01: fields_complex ────────────────────────────────────────────
+  // Complex PAGE field (begin/instrText/separate/result/end); complex
+  // NUMPAGES field with no cached result and dirty="1".
+  // xmlns:r on document (needed for later hyperlink fixture consistency).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Page </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>1</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t xml:space="preserve"> of </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin" w:dirty="1"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> NUMPAGES </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/fields_complex.docx", &data);
+  }
+
+  // ── WML-FLD-02: fields_hyperlink ─────────────────────────────────────────
+  // External hyperlink with r:id + TargetMode=External; internal anchor
+  // hyperlink (w:anchor only, no relationship); fldSimple DATE field.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:fldSimple w:instr=" DATE \@ &quot;MMMM d, yyyy&quot; " w:dirty="1">
+        <w:r><w:t>May 2, 2026</w:t></w:r>
+      </w:fldSimple>
+    </w:p>
+    <w:p>
+      <w:hyperlink r:id="rId2" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Visit example.com</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:p>
+      <w:hyperlink w:anchor="target_section" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Go to target section</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>"#,
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+    ]);
+    save(root, "test-data/wml/fields_hyperlink.docx", &data);
   }
 }
 

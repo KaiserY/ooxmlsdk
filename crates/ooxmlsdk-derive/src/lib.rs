@@ -1871,6 +1871,10 @@ fn is_hex_binary_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "HexBinaryValue"))
 }
 
+fn is_base64_binary_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Base64BinaryValue"))
+}
+
 fn choice_variant_payload_type(variant: &syn::Variant) -> syn::Result<Type> {
   match &variant.fields {
     Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Ok(fields.unnamed[0].ty.clone()),

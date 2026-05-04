@@ -3262,7 +3262,27 @@ fn expand_named_struct(
       });
     }
 
-    let mut direct_validator_tokens = Vec::new();
+    let mut direct_validator_tokens = if is_hex_binary_type(&parse_ty) {
+      vec![quote! {
+        crate::validator::validate_binary_format(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+          crate::validator::BinaryFormatKind::Hex,
+        )?;
+      }]
+    } else if is_base64_binary_type(&parse_ty) {
+      vec![quote! {
+        crate::validator::validate_binary_format(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+          crate::validator::BinaryFormatKind::Base64,
+        )?;
+      }]
+    } else {
+      Vec::new()
+    };
     let mut union_validator_tokens: std::collections::BTreeMap<u32, Vec<proc_macro2::TokenStream>> =
       std::collections::BTreeMap::new();
     for validator in &field.validators {

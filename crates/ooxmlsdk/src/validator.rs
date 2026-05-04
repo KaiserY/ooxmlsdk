@@ -199,6 +199,12 @@ pub enum StringLengthKind {
   HexBinaryBytes,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum BinaryFormatKind {
+  Hex,
+  Base64,
+}
+
 pub fn validate_pattern<T: Display>(
   ty: &'static str,
   field: &'static str,
@@ -313,6 +319,30 @@ pub fn validate_string_format<T: Display>(
   }
 }
 
+pub fn validate_binary_format<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  kind: BinaryFormatKind,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  let valid = match kind {
+    BinaryFormatKind::Hex => crate::simple_type::is_valid_hex_binary(&value_string),
+    BinaryFormatKind::Base64 => is_base64_binary(&value_string),
+  };
+  if valid {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "binary_format",
+      value_string,
+      format!("value does not satisfy {kind:?} binary format"),
+    ))
+  }
+}
+
 pub fn validate_number_range<T: Display, R: RangeBounds<f64>>(
   ty: &'static str,
   field: &'static str,
@@ -325,6 +355,15 @@ pub fn validate_number_range<T: Display, R: RangeBounds<f64>>(
       "failed to parse numeric validator value for {ty}.{field}: {err}"
     ))
   })?;
+  if parsed_value.is_nan() {
+    return Err(crate::common::validation_error(
+      ty,
+      field,
+      "number_range",
+      value_string,
+      "value must not be NaN".to_string(),
+    ));
+  }
 
   match range.start_bound() {
     Bound::Included(min) if parsed_value < *min => {
@@ -527,4 +566,30 @@ fn is_uri(value: &str) -> bool {
     return false;
   }
   true
+}
+
+fn is_base64_binary(value: &str) -> bool {
+  let mut padding_seen = false;
+  let mut padding_count = 0usize;
+  let mut len = 0usize;
+
+  for ch in value.chars().filter(|ch| !ch.is_ascii_whitespace()) {
+    len += 1;
+    match ch {
+      'A'..='Z' | 'a'..='z' | '0'..='9' | '+' | '/' if !padding_seen => {}
+      '=' => {
+        padding_seen = true;
+        padding_count += 1;
+        if padding_count > 2 {
+          return false;
+        }
+      }
+      _ => return false,
+    }
+  }
+
+  if len == 0 {
+    return true;
+  }
+  len.is_multiple_of(4)
 }

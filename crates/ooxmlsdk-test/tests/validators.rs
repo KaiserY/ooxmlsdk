@@ -4,11 +4,16 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_2006_01_customui::{
   Item, QuickAccessToolbarControlClone,
 };
 use ooxmlsdk::schemas::schemas_microsoft_com_office_word::TopBorder;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart::{
+  BubbleScale, LogBase, MajorUnit,
+};
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_diagram::ColorTransformCategory;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main::ChildExtents;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_bibliography::Sources;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_math::ArgumentSize;
+use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSize;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  ConditionalFormatStyle, DocPartId,
+  ConditionalFormatStyle, DocPartId, DocumentProtection, Panose1Number, UniqueTag,
 };
 use ooxmlsdk::validator::ValidationErrorType;
 use ooxmlsdk::validator::validate_number_type;
@@ -83,6 +88,116 @@ fn integer_attribute_validation_test() {
 }
 
 #[test]
+fn uint32_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs UInt32AttributeValidationTest
+  let mut element = BubbleScale { val: Some(0) };
+  assert!(element.validate().is_empty());
+
+  element.val = Some(100);
+  assert!(element.validate().is_empty());
+
+  element.val = Some(300);
+  assert!(element.validate().is_empty());
+
+  element.val = Some(301);
+  assert!(!element.validate().is_empty());
+
+  element.val = Some(600);
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn int32_attribute_validation_test2() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs Int32AttributeValidationTest2
+  let mut element = SlideSize {
+    cx: 914400,
+    cy: 914400,
+    ..Default::default()
+  };
+  assert!(element.validate().is_empty());
+
+  element.cx = 51206400;
+  assert!(element.validate().is_empty());
+
+  element.cx = -1;
+  assert!(!element.validate().is_empty());
+
+  element.cx = 913999;
+  assert!(!element.validate().is_empty());
+
+  element.cx = 51206401;
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn int64_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs Int64AttributeValidationTest
+  let mut element = ChildExtents {
+    cx: 914400,
+    cy: 914400,
+  };
+  assert!(element.validate().is_empty());
+
+  element.cx = 2_147_483_647;
+  assert!(element.validate().is_empty());
+
+  element.cx = -1;
+  assert!(!element.validate().is_empty());
+
+  element.cx = 2_147_483_648;
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn double_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs DoubleAttributeValidationTest
+  let mut element = MajorUnit { val: 10000.001 };
+  assert!(element.validate().is_empty());
+
+  element.val = 10.23e4;
+  assert!(element.validate().is_empty());
+
+  element.val = f64::MAX;
+  assert!(element.validate().is_empty());
+
+  element.val = f64::EPSILON;
+  assert!(element.validate().is_empty());
+
+  element.val = f64::INFINITY;
+  assert!(element.validate().is_empty());
+
+  element.val = 0.0;
+  assert!(!element.validate().is_empty());
+
+  element.val = 0.0 - f64::EPSILON;
+  assert!(!element.validate().is_empty());
+
+  element.val = f64::NEG_INFINITY;
+  assert!(!element.validate().is_empty());
+
+  element.val = f64::NAN;
+  assert!(!element.validate().is_empty());
+
+  let mut log_base = LogBase { val: 2.0 };
+  assert!(log_base.validate().is_empty());
+
+  log_base.val = 200.0;
+  assert!(log_base.validate().is_empty());
+
+  log_base.val = 1000.0;
+  assert!(log_base.validate().is_empty());
+
+  log_base.val = -1.0;
+  assert!(!log_base.validate().is_empty());
+
+  log_base.val = 1.9;
+  assert!(!log_base.validate().is_empty());
+
+  log_base.val = 1000.1;
+  assert!(!log_base.validate().is_empty());
+}
+
+#[test]
 fn string_attribute_validation_test() {
   let mut element = ConditionalFormatStyle {
     val: "010101010101".to_string(),
@@ -119,6 +234,83 @@ fn string_attribute_validation_test() {
 
   sources.style_name = Some(repeated_a(256));
   assert!(!sources.validate().is_empty());
+}
+
+#[test]
+fn hex_binary_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs HexBinaryAttributeValidationTest
+  let mut element = Panose1Number {
+    val: "1234567890ABCDEFabcd".to_string(),
+  };
+  assert!(element.validate().is_empty());
+
+  element.val = "ABCDEFabcdef12345678".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = String::new();
+  assert!(!element.validate().is_empty());
+
+  element.val = "1234".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "ABCDEFabcdef123456789".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "ABCDEFabcdef1234567890".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "ABCDEFabcdef1234567X".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "ABCDEFabcdefX1234567".to_string();
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn base64_binary_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs Base64BinaryAttributeValidationTest
+  let mut element = DocumentProtection {
+    hash: Some(String::new()),
+    ..Default::default()
+  };
+  assert!(element.validate().is_empty());
+
+  element.hash = Some("fUmpYmCMpTxTA4pfvlhKSAgB848=".to_string());
+  assert!(element.validate().is_empty());
+
+  element.hash = Some("R3k/CLjN768ujxMXkKZOuw==".to_string());
+  assert!(element.validate().is_empty());
+
+  element.hash = Some("0".to_string());
+  assert!(!element.validate().is_empty());
+
+  element.hash = Some("R3k/CLjN768ujxMXkKZOuw==$".to_string());
+  assert!(!element.validate().is_empty());
+
+  element.hash = Some("*R3k/fUmpYmCMpTxTA4pfvlhKSAgB848=".to_string());
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn base64_binary_attribute_validation_test2() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs Base64BinaryAttributeValidationTest2
+  let mut element = UniqueTag { val: String::new() };
+  assert!(element.validate().is_empty());
+
+  element.val = "fUmpYmCMpTxTA4pfvlhKSAgB848=".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = "R3k/CLjN768ujxMXkKZOuw==".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = "0".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "R3k/CLjN768ujxMXkKZOuw==$".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "*R3k/fUmpYmCMpTxTA4pfvlhKSAgB848=".to_string();
+  assert!(!element.validate().is_empty());
 }
 
 #[test]

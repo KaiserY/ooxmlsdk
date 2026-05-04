@@ -74,7 +74,8 @@ structural fidelity, not rendering or layout.
 | Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
 | Tracked changes (w:ins inserted run; w:del with w:delText; w:rPrChange; w:pPrChange) | ✅ | `wml/tracked_changes.docx` |
 | Comments (commentRangeStart/End as paragraph children; commentReference run child; annotationRef in note) | ✅ | `wml/comments.docx` |
-| Content controls (SDT) | 🔲 | |
+| Content controls (SDT block: plain text, alias/tag/id/lock) | ✅ | `wml/content_controls.docx` |
+| Content controls (SDT run: date picker with fullDate/dateFormat; dropDownList with listItems) | ✅ | `wml/content_controls.docx` |
 | VBA macros (preserve-only) | 🔲 | |
 | Custom XML | 🔲 | |
 | Embedded objects | 🔲 | |

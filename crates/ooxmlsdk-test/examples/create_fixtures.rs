@@ -2485,6 +2485,7 @@ fn main() {
   create_wml_tracked_changes_fixtures(&root);
   create_wml_comments_fixtures(&root);
   create_wml_bookmarks_fixtures(&root);
+  create_wml_sdt_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2701,6 +2702,83 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_wml_sdt_fixtures(root: &Path) {
+  // ── WML-SDT-01: content_controls ─────────────────────────────────────────
+  // Block SDT with plain text control (alias, tag, id, lock);
+  // inline run SDT with date picker (fullDate + dateFormat);
+  // inline run SDT with dropDownList (listItems + lastValue).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:sdt>
+      <w:sdtPr>
+        <w:alias w:val="Name Field"/>
+        <w:tag w:val="fullName"/>
+        <w:id w:val="1001"/>
+        <w:lock w:val="sdtContentLocked"/>
+        <w:text/>
+      </w:sdtPr>
+      <w:sdtEndPr/>
+      <w:sdtContent>
+        <w:p>
+          <w:r><w:t>Jane Smith</w:t></w:r>
+        </w:p>
+      </w:sdtContent>
+    </w:sdt>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Date: </w:t></w:r>
+      <w:sdt>
+        <w:sdtPr>
+          <w:tag w:val="eventDate"/>
+          <w:id w:val="1002"/>
+          <w:date w:fullDate="2026-05-02T00:00:00Z">
+            <w:dateFormat w:val="M/d/yyyy"/>
+            <w:lid w:val="en-US"/>
+          </w:date>
+        </w:sdtPr>
+        <w:sdtEndPr/>
+        <w:sdtContent>
+          <w:r><w:t>5/2/2026</w:t></w:r>
+        </w:sdtContent>
+      </w:sdt>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Status: </w:t></w:r>
+      <w:sdt>
+        <w:sdtPr>
+          <w:alias w:val="Status"/>
+          <w:tag w:val="statusField"/>
+          <w:id w:val="1003"/>
+          <w:dropDownList w:lastValue="active">
+            <w:listItem w:displayText="Active" w:value="active"/>
+            <w:listItem w:displayText="Inactive" w:value="inactive"/>
+            <w:listItem w:displayText="Pending" w:value="pending"/>
+          </w:dropDownList>
+        </w:sdtPr>
+        <w:sdtEndPr/>
+        <w:sdtContent>
+          <w:r><w:t>Active</w:t></w:r>
+        </w:sdtContent>
+      </w:sdt>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/content_controls.docx", &data);
   }
 }
 

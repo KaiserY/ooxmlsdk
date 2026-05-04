@@ -345,18 +345,18 @@ fn named_sequence_validate_tokens(field: &NamedSequenceVariantField) -> proc_mac
   if field.repeated {
     quote! {
       for child in #field_ident {
-        crate::validator::SdkValidator::validate(#validate_expr)?;
+        crate::validator::SdkValidator::validate_into(#validate_expr, context);
       }
     }
   } else if field.optional {
     quote! {
       if let Some(child) = #field_ident {
-        crate::validator::SdkValidator::validate(#validate_expr)?;
+        crate::validator::SdkValidator::validate_into(#validate_expr, context);
       }
     }
   } else {
     quote! {
-      crate::validator::SdkValidator::validate(#validate_self_expr)?;
+      crate::validator::SdkValidator::validate_into(#validate_self_expr, context);
     }
   }
 }
@@ -506,7 +506,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           });
           validate_arms.push(quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(_) => Ok(()),
+            Self::#variant_ident(_) => {},
           });
           continue;
         }
@@ -544,12 +544,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let validate_arm = if is_box_type(&payload_ty) {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value.as_ref()),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value.as_ref(), context),
           }
         } else {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value, context),
           }
         };
         validate_arms.push(validate_arm);
@@ -596,12 +596,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let validate_arm = if is_box_type(&payload_ty) {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value.as_ref()),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value.as_ref(), context),
           }
         } else {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value, context),
           }
         };
         validate_arms.push(validate_arm);
@@ -661,7 +661,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident => Ok(()),
+          Self::#variant_ident => {},
         });
         mce_choice_arms.push(quote! {
           #(#cfg_attrs)*
@@ -704,12 +704,12 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let validate_arm = if is_box_type(&payload_ty) {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value.as_ref()),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value.as_ref(), context),
           }
         } else {
           quote! {
             #(#cfg_attrs)*
-            Self::#variant_ident(value) => crate::validator::SdkValidator::validate(value),
+            Self::#variant_ident(value) => crate::validator::SdkValidator::validate_into(value, context),
           }
         };
         validate_arms.push(validate_arm);
@@ -803,7 +803,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident { #( #validate_pattern_fields ),* } => {
             #( #validate_tokens )*
-            Ok(())
           },
         });
         let mce_named_field_tokens = named_fields
@@ -993,7 +992,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         write_arms.push(write_arm);
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(_) => Ok(()),
+          Self::#variant_ident(_) => {},
         });
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::AnyChild { qnames })
@@ -1090,7 +1089,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(_) => Ok(()),
+          Self::#variant_ident(_) => {},
         });
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
@@ -1113,7 +1112,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         write_arms.push(write_arm);
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(_) => Ok(()),
+          Self::#variant_ident(_) => {},
         });
         mce_any_arms.push(quote! {
           #(#cfg_attrs)*
@@ -1182,7 +1181,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         write_arms.push(write_arm);
         validate_arms.push(quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(_) => Ok(()),
+          Self::#variant_ident(_) => {},
         });
         text_from_string_tokens.push(quote! {
           #(#cfg_attrs)*
@@ -1387,7 +1386,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
     #[cfg(feature = "validators")]
     impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate(&self) -> Result<(), crate::common::SdkError> {
+      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
         match self {
           #( #validate_arms )*
         }

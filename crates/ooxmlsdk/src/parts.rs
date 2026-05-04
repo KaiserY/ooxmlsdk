@@ -3961,6 +3961,19 @@ macro_rules! define_part_root_element {
         .markup_compatibility_process_settings,) ?; #[cfg(not(feature = "mce"))] let root
         = < $root_ty > ::from_bytes(part.data().bytes()) ?; return Ok(Some(Self::
         $variant (Box::new(root)))); })* Ok(None) } }
+        #[cfg(feature = "validators")] impl crate::validator::SdkValidator for
+        PartRootElement
+        {
+            fn validate_into(& self, context: & mut crate::validator::ValidationContext)
+            {
+                match self
+                {
+                    $($(#[$attrs])* Self:: $variant (root) =>
+                    crate::validator::SdkValidator::validate_into(root.as_ref(),
+                    context),)*
+                }
+            }
+        }
     };
 }
 define_part_root_element! {

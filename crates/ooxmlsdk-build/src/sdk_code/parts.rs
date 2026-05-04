@@ -561,6 +561,18 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             Ok(None)
           }
         }
+
+        #[cfg(feature = "validators")]
+        impl crate::validator::SdkValidator for PartRootElement {
+          fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
+            match self {
+              $(
+                $(#[$attrs])*
+                Self::$variant(root) => crate::validator::SdkValidator::validate_into(root.as_ref(), context),
+              )*
+            }
+          }
+        }
       }
     }
 

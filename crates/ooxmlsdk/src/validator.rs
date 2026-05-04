@@ -2,12 +2,179 @@ use std::fmt::Display;
 use std::ops::{Bound, RangeBounds};
 
 pub trait SdkValidator {
-  fn validate(&self) -> Result<(), crate::common::SdkError> {
-    Ok(())
+  fn validate(&self) -> Vec<ValidationErrorInfo> {
+    let mut context = ValidationContext::default();
+    self.validate_into(&mut context);
+    context.into_errors()
   }
 
-  fn is_valid(&self) -> bool {
-    self.validate().is_ok()
+  #[doc(hidden)]
+  fn validate_into(&self, _context: &mut ValidationContext) {}
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ValidationErrorType {
+  #[default]
+  Schema,
+  Semantic,
+  #[cfg(feature = "parts")]
+  Package,
+  #[cfg(feature = "mce")]
+  MarkupCompatibility,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidationErrorInfo {
+  pub error_type: ValidationErrorType,
+  pub description: String,
+  pub id: Option<&'static str>,
+  pub type_name: Option<&'static str>,
+  pub field_name: Option<&'static str>,
+  #[cfg(feature = "parts")]
+  pub part_uri: Option<String>,
+}
+
+impl ValidationErrorInfo {
+  #[inline]
+  pub fn from_error(error_type: ValidationErrorType, error: crate::common::SdkError) -> Self {
+    Self {
+      error_type,
+      description: error.to_string(),
+      id: validation_error_id(&error),
+      type_name: validation_error_type_name(&error),
+      field_name: validation_error_field_name(&error),
+      #[cfg(feature = "parts")]
+      part_uri: None,
+    }
+  }
+
+  #[cfg(feature = "parts")]
+  #[inline]
+  pub fn with_part_uri(mut self, part_uri: impl Into<String>) -> Self {
+    self.part_uri = Some(part_uri.into());
+    self
+  }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ValidationSettings {
+  #[cfg(feature = "parts")]
+  pub file_format: crate::sdk::FileFormatVersion,
+  pub max_number_of_errors: usize,
+}
+
+impl Default for ValidationSettings {
+  #[inline]
+  fn default() -> Self {
+    Self {
+      #[cfg(feature = "parts")]
+      file_format: crate::sdk::FileFormatVersion::default(),
+      max_number_of_errors: usize::MAX,
+    }
+  }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidationContext {
+  settings: ValidationSettings,
+  errors: Vec<ValidationErrorInfo>,
+  #[cfg(feature = "parts")]
+  part_uri: Option<String>,
+}
+
+impl ValidationContext {
+  #[inline]
+  pub const fn with_settings(settings: ValidationSettings) -> Self {
+    Self {
+      settings,
+      errors: Vec::new(),
+      #[cfg(feature = "parts")]
+      part_uri: None,
+    }
+  }
+
+  #[inline]
+  pub const fn settings(&self) -> &ValidationSettings {
+    &self.settings
+  }
+
+  #[inline]
+  pub fn should_stop(&self) -> bool {
+    self.errors.len() >= self.settings.max_number_of_errors
+  }
+
+  #[inline]
+  pub fn check(&mut self, validate: impl FnOnce() -> Result<(), crate::common::SdkError>) {
+    if self.should_stop() {
+      return;
+    }
+    if let Err(error) = validate() {
+      self.push_error(error);
+    }
+  }
+
+  #[inline]
+  pub fn push_error(&mut self, error: crate::common::SdkError) {
+    if self.should_stop() {
+      return;
+    }
+    let info = ValidationErrorInfo::from_error(ValidationErrorType::Schema, error);
+    #[cfg(feature = "parts")]
+    let info = if let Some(part_uri) = &self.part_uri {
+      info.with_part_uri(part_uri.clone())
+    } else {
+      info
+    };
+    self.errors.push(info);
+  }
+
+  #[cfg(feature = "parts")]
+  pub fn with_part_uri(&mut self, part_uri: impl Into<String>, validate: impl FnOnce(&mut Self)) {
+    let previous = self.part_uri.replace(part_uri.into());
+    validate(self);
+    self.part_uri = previous;
+  }
+
+  #[inline]
+  pub fn into_errors(self) -> Vec<ValidationErrorInfo> {
+    self.errors
+  }
+}
+
+impl Default for ValidationContext {
+  #[inline]
+  fn default() -> Self {
+    Self::with_settings(ValidationSettings::default())
+  }
+}
+
+fn validation_error_id(error: &crate::common::SdkError) -> Option<&'static str> {
+  match error {
+    crate::common::SdkError::ValidationError { validator, .. } => Some(validator),
+    crate::common::SdkError::MissingField { .. } => Some("required"),
+    crate::common::SdkError::InvalidEnumValue { .. } => Some("enum"),
+    crate::common::SdkError::InvalidFieldValue { .. } => Some("field_value"),
+    _ => None,
+  }
+}
+
+fn validation_error_type_name(error: &crate::common::SdkError) -> Option<&'static str> {
+  match error {
+    crate::common::SdkError::ValidationError { ty, .. }
+    | crate::common::SdkError::MissingField { ty, .. }
+    | crate::common::SdkError::InvalidEnumValue { ty, .. }
+    | crate::common::SdkError::InvalidFieldValue { ty, .. }
+    | crate::common::SdkError::UnexpectedTag { ty, .. } => Some(ty),
+    _ => None,
+  }
+}
+
+fn validation_error_field_name(error: &crate::common::SdkError) -> Option<&'static str> {
+  match error {
+    crate::common::SdkError::ValidationError { field, .. }
+    | crate::common::SdkError::MissingField { field, .. }
+    | crate::common::SdkError::InvalidFieldValue { field, .. } => Some(field),
+    _ => None,
   }
 }
 
@@ -42,6 +209,15 @@ pub fn validate_pattern<T: Display>(
   let regex = regex::Regex::new(&anchored_regex).map_err(|err| {
     crate::common::SdkError::CommonError(format!("invalid validator regex for {ty}.{field}: {err}"))
   })?;
+  validate_pattern_regex(ty, field, value, &regex)
+}
+
+pub fn validate_pattern_regex<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+  regex: &regex::Regex,
+) -> Result<(), crate::common::SdkError> {
   let value_string = value.to_string();
   if regex.is_match(&value_string) {
     Ok(())

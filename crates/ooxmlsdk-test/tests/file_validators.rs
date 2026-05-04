@@ -16,31 +16,37 @@ fn test_file_path(file_name: &str) -> std::path::PathBuf {
 fn assert_presentation_document_validates(file_name: &str) {
   let mut package = PresentationDocument::new_from_file(test_file_path(file_name)).unwrap();
   let presentation_part = package.presentation_part().unwrap();
-  presentation_part
+  let errors = presentation_part
     .root_element(&mut package)
     .unwrap()
-    .validate()
-    .unwrap();
+    .validate();
+  assert!(
+    errors.is_empty(),
+    "unexpected validation errors: {errors:?}"
+  );
 }
 
 fn assert_spreadsheet_document_validates(file_name: &str) {
   let mut package = SpreadsheetDocument::new_from_file(test_file_path(file_name)).unwrap();
   let workbook_part = package.workbook_part().unwrap();
-  workbook_part
-    .root_element(&mut package)
-    .unwrap()
-    .validate()
-    .unwrap();
+  let errors = workbook_part.root_element(&mut package).unwrap().validate();
+  assert!(
+    errors.is_empty(),
+    "unexpected validation errors: {errors:?}"
+  );
 }
 
 fn assert_wordprocessing_document_validates(file_name: &str) {
   let mut package = WordprocessingDocument::new_from_file(test_file_path(file_name)).unwrap();
   let main_document_part = package.main_document_part().unwrap();
-  main_document_part
+  let errors = main_document_part
     .root_element(&mut package)
     .unwrap()
-    .validate()
-    .unwrap();
+    .validate();
+  assert!(
+    errors.is_empty(),
+    "unexpected validation errors: {errors:?}"
+  );
 }
 
 #[test]
@@ -139,4 +145,15 @@ fn newer_presentation_doc_samples_validate() {
   for file_name in ["Algn_tab_TabAlignment.pptx", "Presentation.potx"] {
     assert_presentation_document_validates(file_name);
   }
+}
+
+#[test]
+fn package_validate_validates_loaded_package_roots() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs :: WordprocessingDocumentValidatingTest
+  let mut package = WordprocessingDocument::new_from_file(test_file_path("Plain.docx")).unwrap();
+  let errors = package.validate().unwrap();
+  assert!(
+    errors.is_empty(),
+    "unexpected validation errors: {errors:?}"
+  );
 }

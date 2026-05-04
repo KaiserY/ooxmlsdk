@@ -260,7 +260,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         child_validate_stmts.push(quote! {
           for #child_item_ident in &self.#child_field_ident {
-            crate::validator::SdkValidator::validate(#child_item_ident)?;
+            crate::validator::SdkValidator::validate_into(#child_item_ident, context);
           }
         });
         part_iter_chains.push(quote! {
@@ -312,7 +312,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           )?;
         });
         child_validate_stmts.push(quote! {
-          crate::validator::SdkValidator::validate(self.#child_field_ident.as_ref())?;
+          crate::validator::SdkValidator::validate_into(self.#child_field_ident.as_ref(), context);
         });
         part_iter_chains.push(quote! {
           std::iter::once(crate::parts::IdPartPair::new(
@@ -357,7 +357,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         child_validate_stmts.push(quote! {
           if let Some(#child_item_ident) = &self.#child_field_ident {
-            crate::validator::SdkValidator::validate(#child_item_ident.as_ref())?;
+            crate::validator::SdkValidator::validate_into(#child_item_ident.as_ref(), context);
           }
         });
         part_iter_chains.push(quote! {
@@ -437,7 +437,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         child_validate_stmts.push(quote! {
           for #data_ref_item_ident in &self.#data_ref_field_ident {
-            crate::validator::SdkValidator::validate(#data_ref_item_ident)?;
+            crate::validator::SdkValidator::validate_into(#data_ref_item_ident, context);
           }
         });
         self_field_values.push(quote! { #data_ref_field_ident });
@@ -479,7 +479,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
           )?;
         });
         child_validate_stmts.push(quote! {
-          crate::validator::SdkValidator::validate(self.#data_ref_field_ident.as_ref())?;
+          crate::validator::SdkValidator::validate_into(self.#data_ref_field_ident.as_ref(), context);
         });
         self_field_values.push(quote! { #data_ref_field_ident });
       }
@@ -516,7 +516,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
         });
         child_validate_stmts.push(quote! {
           if let Some(#data_ref_item_ident) = &self.#data_ref_field_ident {
-            crate::validator::SdkValidator::validate(#data_ref_item_ident.as_ref())?;
+            crate::validator::SdkValidator::validate_into(#data_ref_item_ident.as_ref(), context);
           }
         });
         self_field_values.push(quote! { #data_ref_field_ident });
@@ -821,7 +821,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     part_validate_stmts.insert(
       0,
       quote! {
-        crate::validator::SdkValidator::validate(&self.root_element)?;
+        crate::validator::SdkValidator::validate_into(&self.root_element, context);
       },
     );
     part_validate_stmts
@@ -859,20 +859,14 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     }
     #[cfg(feature = "validators")]
     impl crate::validator::SdkValidator for #ident {
-      fn validate(&self) -> Result<(), crate::common::SdkError> {
+      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
         #( #part_validate_stmts )*
-        Ok(())
       }
     }
     impl #ident {
       #[cfg(feature = "validators")]
-      pub fn validate(&self) -> Result<(), crate::common::SdkError> {
+      pub fn validate(&self) -> Vec<crate::validator::ValidationErrorInfo> {
         crate::validator::SdkValidator::validate(self)
-      }
-
-      #[cfg(feature = "validators")]
-      pub fn is_valid(&self) -> bool {
-        self.validate().is_ok()
       }
 
       #parts_methods

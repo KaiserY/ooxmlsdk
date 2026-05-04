@@ -10,6 +10,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_math::Arg
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   ConditionalFormatStyle, DocPartId,
 };
+use ooxmlsdk::validator::ValidationErrorType;
 use ooxmlsdk::validator::validate_number_type;
 use ooxmlsdk::validator::{SdkValidator, StringFormatKind, validate_string_format};
 
@@ -48,37 +49,37 @@ fn positive_integer_attribute_validation_test() {
     width: Some(1),
     ..Default::default()
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.width = Some(2);
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.width = Some(1000);
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.width = Some(0);
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.width = Some(-3);
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 }
 
 #[test]
 fn integer_attribute_validation_test() {
   let mut element = ArgumentSize { val: -2 };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.val = 2;
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.val = 0;
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.val = -3;
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = 3;
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 }
 
 #[test]
@@ -87,37 +88,37 @@ fn string_attribute_validation_test() {
     val: "010101010101".to_string(),
     ..Default::default()
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.val = String::new();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = "0101".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = "0101010101010".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = "010101010102".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = "invalid".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   let mut sources = Sources {
     style_name: Some(String::new()),
     ..Default::default()
   };
-  assert!(sources.validate().is_ok());
+  assert!(sources.validate().is_empty());
 
   sources.style_name = Some("Style1".to_string());
-  assert!(sources.validate().is_ok());
+  assert!(sources.validate().is_empty());
 
   sources.style_name = Some(repeated_a(255));
-  assert!(sources.validate().is_ok());
+  assert!(sources.validate().is_empty());
 
   sources.style_name = Some(repeated_a(256));
-  assert!(sources.validate().is_err());
+  assert!(!sources.validate().is_empty());
 }
 
 #[test]
@@ -125,25 +126,25 @@ fn token_attribute_validation_test() {
   let mut element = DocPartId {
     val: Some("{6A9B8B6F-5BD2-4BC8-9F70-7020E1357FB2}".to_string()),
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.val = Some(String::new());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = Some("{6A9B8B6F-    -4BC8-9F70-7020E1357FB2}".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = Some(" 6A9B8B6F-5BD2-4BC8-9F70-7020E1357FB2}".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = Some("{6A9B8B6F-5BD\t-4BC8-9F70-7020E1357FB2}".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = Some("1234".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.val = Some("{*A9B8B6F-5BD2-4BC8-9F70-7020E1357FB2}".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 }
 
 #[test]
@@ -152,46 +153,46 @@ fn any_uri_attribute_validation_test() {
     r#type: String::new(),
     priority: 1,
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://temp".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://microsoft.com".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://a/b/c/d;p?q".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://a/b/c/g;x?y#s".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "<>".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://a/../../g".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "urn:schemas-microsoft-com:office:office".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = " http://temp ".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "\thttp://microsoft.com\r\n".to_string();
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.r#type = "http://temp##s".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.r#type = "http:///temp".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.r#type = "http://temp /a".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.r#type = "   ".to_string();
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 }
 
 #[test]
@@ -236,34 +237,34 @@ fn id_string_attribute_validation_test() {
     id: Some("A".to_string()),
     ..Default::default()
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some("\u{4E00}".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some("A1".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some("_".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some("ABCD".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some("ABCD_1234-XY.00".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id = Some(String::new());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id = Some("1A".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id = Some(".B".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id = Some("http:///temp".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 }
 
 #[test]
@@ -272,41 +273,57 @@ fn qname_attribute_validation_test() {
     id_q: Some("A".to_string()),
     ..Default::default()
   };
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some("A:b".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some("A1".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some("_".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some("ABCD".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some("ABCD_1234-XY.00".to_string());
-  assert!(element.validate().is_ok());
+  assert!(element.validate().is_empty());
 
   element.id_q = Some(String::new());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some(":".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some(":A".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some("A:".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some("1A".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some(".B".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
 
   element.id_q = Some("http:///temp".to_string());
-  assert!(element.validate().is_err());
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn validate_reports_schema_errors_without_dom_api() {
+  let mut element = TopBorder {
+    width: Some(0),
+    ..Default::default()
+  };
+
+  let errors = element.validate();
+  assert_eq!(errors.len(), 1);
+  assert_eq!(errors[0].error_type, ValidationErrorType::Schema);
+  assert_eq!(errors[0].id, Some("number_sign"));
+
+  element.width = Some(1);
+  assert!(element.validate().is_empty());
 }

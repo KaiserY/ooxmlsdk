@@ -2482,6 +2482,7 @@ fn main() {
   create_wml_sections_fixtures(&root);
   create_wml_fields_fixtures(&root);
   create_wml_notes_fixtures(&root);
+  create_wml_tracked_changes_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2698,6 +2699,66 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_wml_tracked_changes_fixtures(root: &Path) {
+  // ── WML-TC-01: tracked_changes ────────────────────────────────────────────
+  // w:ins wrapping an inserted run; w:del wrapping a deleted run with
+  // w:delText; w:rPrChange storing previous run properties; w:pPrChange
+  // storing previous paragraph properties.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Original text </w:t></w:r>
+      <w:ins w:id="1" w:author="Alice" w:date="2026-05-02T10:00:00Z">
+        <w:r><w:t>inserted words</w:t></w:r>
+      </w:ins>
+      <w:r><w:t xml:space="preserve"> after insertion.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Keep this </w:t></w:r>
+      <w:del w:id="2" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+        <w:r><w:delText>deleted text</w:delText></w:r>
+      </w:del>
+      <w:r><w:t xml:space="preserve"> and this.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:rPrChange w:id="3" w:author="Alice" w:date="2026-05-02T10:00:00Z">
+            <w:rPr/>
+          </w:rPrChange>
+        </w:rPr>
+        <w:t>Bold text (was normal).</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:pPrChange w:id="4" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+          <w:pPr/>
+        </w:pPrChange>
+      </w:pPr>
+      <w:r><w:t>Centered text (was left-aligned).</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/tracked_changes.docx", &data);
   }
 }
 

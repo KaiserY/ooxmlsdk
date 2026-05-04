@@ -2044,6 +2044,173 @@ fn create_drawingml_fixtures(root: &Path) {
   }
 }
 
+fn create_wml_runs_fixtures(root: &Path) {
+  // ── WML-R-01: char_formatting ────────────────────────────────────────────
+  // Paragraph with runs exercising every common rPr toggle and value property:
+  // b, i, combined b+i, u single/double, strike, dstrike, sz, color,
+  // highlight, vertAlign superscript/subscript, caps, smallCaps.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Bold</w:t></w:r>
+      <w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve"> Italic</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:i/></w:rPr><w:t xml:space="preserve"> BoldItalic</w:t></w:r>
+      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t xml:space="preserve"> Underline</w:t></w:r>
+      <w:r><w:rPr><w:u w:val="double"/></w:rPr><w:t xml:space="preserve"> DblUnderline</w:t></w:r>
+      <w:r><w:rPr><w:strike/></w:rPr><w:t xml:space="preserve"> Strike</w:t></w:r>
+      <w:r><w:rPr><w:dstrike/></w:rPr><w:t xml:space="preserve"> DblStrike</w:t></w:r>
+      <w:r><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t xml:space="preserve"> 14pt</w:t></w:r>
+      <w:r><w:rPr><w:color w:val="C00000"/></w:rPr><w:t xml:space="preserve"> Red</w:t></w:r>
+      <w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t xml:space="preserve"> Highlight</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>sup</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>sub</w:t></w:r>
+      <w:r><w:rPr><w:caps/></w:rPr><w:t xml:space="preserve"> Caps</w:t></w:r>
+      <w:r><w:rPr><w:smallCaps/></w:rPr><w:t xml:space="preserve"> SmallCaps</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/char_formatting.docx", &data);
+  }
+
+  // ── WML-R-02: run_fonts ──────────────────────────────────────────────────
+  // Runs exercising rFonts: ascii/hAnsi/eastAsia/cs explicit names,
+  // asciiTheme/hAnsiTheme theme references, hint attribute, and rStyle.
+  // Includes a minimal styles.xml defining the referenced character style.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>
+        <w:t>Arial</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:eastAsia="SimSun"/></w:rPr>
+        <w:t xml:space="preserve"> SimSun</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:cs="Times New Roman"/></w:rPr>
+        <w:t xml:space="preserve"> TimesCS</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:asciiTheme="minorAscii" w:hAnsiTheme="minorAscii"/></w:rPr>
+        <w:t xml:space="preserve"> MinorTheme</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:hint="eastAsia" w:eastAsia="MS Mincho"/></w:rPr>
+        <w:t xml:space="preserve"> Hint</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="Strong"/></w:rPr>
+        <w:t xml:space="preserve"> StrongStyle</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="character" w:styleId="Strong">
+    <w:name w:val="Strong"/>
+    <w:rPr><w:b/><w:bCs/></w:rPr>
+  </w:style>
+</w:styles>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/run_fonts.docx", &data);
+  }
+
+  // ── WML-R-03: whitespace ─────────────────────────────────────────────────
+  // Runs that probe xml:space="preserve" semantics: leading space, trailing
+  // space, space-only run, internal spaces (no preserve needed), no spaces.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve"> leading</w:t></w:r>
+      <w:r><w:t xml:space="preserve">trailing </w:t></w:r>
+      <w:r><w:t xml:space="preserve"> </w:t></w:r>
+      <w:r><w:t>word word</w:t></w:r>
+      <w:r><w:t>nospace</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/whitespace.docx", &data);
+  }
+
+  // ── WML-R-04: breaks ─────────────────────────────────────────────────────
+  // Runs with break elements: soft return (bare br), page break, tab.
+  // The bare <w:br/> must not gain w:type="textWrapping" on round-trip.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Before soft return</w:t></w:r>
+      <w:r><w:br/></w:r>
+      <w:r><w:t>After soft return</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Before tab</w:t></w:r>
+      <w:r><w:tab/></w:r>
+      <w:r><w:t>After tab</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:br w:type="page"/></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>After page break</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/breaks.docx", &data);
+  }
+}
+
 fn main() {
   let root = workspace_root();
   let png = base64::engine::general_purpose::STANDARD
@@ -2056,4 +2223,5 @@ fn main() {
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
   create_drawingml_fixtures(&root);
+  create_wml_runs_fixtures(&root);
 }

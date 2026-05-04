@@ -28,7 +28,12 @@ structural fidelity, not rendering or layout.
 |---|---|---|
 | Empty document | ✅ | `document/minimal_empty.docx` |
 | Plain text paragraphs | ✅ | `document/minimal_text.docx` |
-| Character formatting (bold/italic/underline) | 🔲 | |
+| Character formatting (bold/italic/underline/strike/size/color) | ✅ | `wml/char_formatting.docx` |
+| Character formatting (highlight/vertAlign/caps/smallCaps) | ✅ | `wml/char_formatting.docx` |
+| Run fonts (rFonts: ascii/hAnsi/eastAsia/cs/theme/hint) | ✅ | `wml/run_fonts.docx` |
+| Run character style (rStyle) | ✅ | `wml/run_fonts.docx` |
+| Whitespace preservation (xml:space="preserve") | ✅ | `wml/whitespace.docx` |
+| Run breaks (soft return, page break, tab) | ✅ | `wml/breaks.docx` |
 | Paragraph formatting (alignment/spacing/indent) | 🔲 | |
 | Styles (paragraph/character) | ✅ | `document/minimal_styles.docx` |
 | Numbered and bulleted lists | 🔲 | |

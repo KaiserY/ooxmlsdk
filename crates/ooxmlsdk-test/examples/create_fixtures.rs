@@ -2211,6 +2211,255 @@ fn create_wml_runs_fixtures(root: &Path) {
   }
 }
 
+fn create_wml_paragraphs_fixtures(root: &Path) {
+  // ── WML-P-01: para_alignment ─────────────────────────────────────────────
+  // Five paragraphs covering every common jc value: left, center, right,
+  // both (justified), distribute. Each is self-contained in its own <w:p>.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:jc w:val="left"/></w:pPr>
+      <w:r><w:t>Left aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Center aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="right"/></w:pPr>
+      <w:r><w:t>Right aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="both"/></w:pPr>
+      <w:r><w:t>Justified paragraph with both margins aligned.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="distribute"/></w:pPr>
+      <w:r><w:t>Distribute spacing between all characters.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/para_alignment.docx", &data);
+  }
+
+  // ── WML-P-02: para_spacing ───────────────────────────────────────────────
+  // Paragraphs exercising spacing before/after (twips) and the three
+  // lineRule values: auto (multiple of single line), exact (fixed height),
+  // atLeast (minimum height). A contextualSpacing pair is included.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="240" w:after="120"/>
+      </w:pPr>
+      <w:r><w:t>Before 12pt after 6pt spacing (twips).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="240" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>Single line spacing (auto 240).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="360" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>One-and-a-half line spacing (auto 360).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="480" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>Double line spacing (auto 480).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="320" w:lineRule="exact"/>
+      </w:pPr>
+      <w:r><w:t>Exact 16pt line height.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="280" w:lineRule="atLeast"/>
+      </w:pPr>
+      <w:r><w:t>At-least 14pt line height.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="120" w:after="120"/>
+        <w:contextualSpacing/>
+      </w:pPr>
+      <w:r><w:t>Contextual spacing first paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="120" w:after="120"/>
+        <w:contextualSpacing/>
+      </w:pPr>
+      <w:r><w:t>Contextual spacing second paragraph (gap suppressed).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/para_spacing.docx", &data);
+  }
+
+  // ── WML-P-03: para_indent ────────────────────────────────────────────────
+  // Paragraphs with left/right indentation, firstLine, and hanging indent.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720"/>
+      </w:pPr>
+      <w:r><w:t>Left indent 0.5 inch (720 twips).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="1440" w:right="1440"/>
+      </w:pPr>
+      <w:r><w:t>Left and right indent 1 inch each.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720" w:firstLine="360"/>
+      </w:pPr>
+      <w:r><w:t>First-line indent: body at 0.5 inch, first line at 0.75 inch.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720" w:hanging="360"/>
+      </w:pPr>
+      <w:r><w:t>Hanging indent: first line at 0.25 inch, rest at 0.5 inch.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/para_indent.docx", &data);
+  }
+
+  // ── WML-P-04: para_borders_shading ──────────────────────────────────────
+  // Paragraphs with box borders and two shading styles:
+  //   - single-line box border + clear fill (solid background)
+  //   - no border + pct20 dot-fill shading pattern
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:pBdr>
+          <w:top    w:val="single" w:sz="6" w:space="1" w:color="4472C4"/>
+          <w:left   w:val="single" w:sz="6" w:space="4" w:color="4472C4"/>
+          <w:bottom w:val="single" w:sz="6" w:space="1" w:color="4472C4"/>
+          <w:right  w:val="single" w:sz="6" w:space="4" w:color="4472C4"/>
+        </w:pBdr>
+        <w:shd w:val="clear" w:color="auto" w:fill="DEEAF1"/>
+      </w:pPr>
+      <w:r><w:t>Box border with solid light-blue fill.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:shd w:val="pct20" w:color="FF0000" w:fill="FFFF00"/>
+      </w:pPr>
+      <w:r><w:t>20-percent dot pattern: red on yellow.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:pBdr>
+          <w:top    w:val="double" w:sz="4" w:space="1" w:color="000000"/>
+          <w:bottom w:val="double" w:sz="4" w:space="1" w:color="000000"/>
+        </w:pBdr>
+      </w:pPr>
+      <w:r><w:t>Top and bottom double-line borders only.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/para_borders_shading.docx", &data);
+  }
+
+  // ── WML-P-05: para_keep ──────────────────────────────────────────────────
+  // Keep/break control properties and outline level.
+  // Covers keepNext, keepLines, pageBreakBefore, widowControl w:val="0",
+  // and outlineLvl values 0 (H1) and 1 (H2).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:keepNext/>
+        <w:outlineLvl w:val="0"/>
+      </w:pPr>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Heading 1 with keepNext.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Body paragraph stays with the heading above.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:keepLines/>
+        <w:outlineLvl w:val="1"/>
+      </w:pPr>
+      <w:r><w:t>Heading 2 with keepLines.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:pageBreakBefore/>
+      </w:pPr>
+      <w:r><w:t>This paragraph forces a page break before it.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:widowControl w:val="0"/>
+      </w:pPr>
+      <w:r><w:t>Widow control explicitly disabled.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", empty_rels()),
+    ]);
+    save(root, "test-data/wml/para_keep.docx", &data);
+  }
+}
+
 fn main() {
   let root = workspace_root();
   let png = base64::engine::general_purpose::STANDARD
@@ -2224,4 +2473,5 @@ fn main() {
   create_opc_fixtures(&root, &png);
   create_drawingml_fixtures(&root);
   create_wml_runs_fixtures(&root);
+  create_wml_paragraphs_fixtures(&root);
 }

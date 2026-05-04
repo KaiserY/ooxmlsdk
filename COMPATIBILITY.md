@@ -34,7 +34,14 @@ structural fidelity, not rendering or layout.
 | Run character style (rStyle) | ✅ | `wml/run_fonts.docx` |
 | Whitespace preservation (xml:space="preserve") | ✅ | `wml/whitespace.docx` |
 | Run breaks (soft return, page break, tab) | ✅ | `wml/breaks.docx` |
-| Paragraph formatting (alignment/spacing/indent) | 🔲 | |
+| Paragraph alignment (jc: left/center/right/both/distribute) | ✅ | `wml/para_alignment.docx` |
+| Paragraph spacing (before/after twips; lineRule auto/exact/atLeast) | ✅ | `wml/para_spacing.docx` |
+| Contextual spacing | ✅ | `wml/para_spacing.docx` |
+| Paragraph indentation (left/right/firstLine/hanging) | ✅ | `wml/para_indent.docx` |
+| Paragraph borders (pBdr: single/double, top/left/bottom/right) | ✅ | `wml/para_borders_shading.docx` |
+| Paragraph shading (shd: clear fill, pct pattern) | ✅ | `wml/para_borders_shading.docx` |
+| Keep properties (keepNext/keepLines/pageBreakBefore/widowControl) | ✅ | `wml/para_keep.docx` |
+| Outline level (outlineLvl) | ✅ | `wml/para_keep.docx` |
 | Styles (paragraph/character) | ✅ | `document/minimal_styles.docx` |
 | Numbered and bulleted lists | 🔲 | |
 | Tables (basic) | ✅ | `document/minimal_table.docx` |

@@ -2477,6 +2477,7 @@ fn main() {
   create_wml_styles_fixtures(&root);
   create_wml_numbering_fixtures(&root);
   create_wml_tables_fixtures(&root);
+  create_wml_drawing_fixtures(&root, &png);
 }
 
 fn create_wml_tables_fixtures(root: &Path) {
@@ -2717,6 +2718,147 @@ fn create_wml_tables_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/table_props.docx", &data);
+  }
+}
+
+fn create_wml_drawing_fixtures(root: &Path, png: &[u8]) {
+  let img_ct = "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>";
+  let img_rel = r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>"#;
+
+  // ── WML-I-01: image_inline_props ─────────────────────────────────────────
+  // Inline image at 1 inch × 1 inch (914400 × 914400 EMU).
+  // Exercises: non-zero distL/distR (114300 EMU = 0.125 in), altText on
+  // docPr and cNvPr, cstate="print" on a:blip, picLocks noChangeAspect.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="114300" distR="114300">
+            <wp:extent cx="914400" cy="914400"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Image 1" descr="Alt text for accessibility"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="image1.png" descr="Alt text for accessibility"/>
+                    <pic:cNvPicPr>
+                      <a:picLocks noChangeAspect="1"/>
+                    </pic:cNvPicPr>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId1" cstate="print"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="914400" cy="914400"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", img_ct)),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(img_rel)),
+      ("word/media/image1.png", png),
+    ]);
+    save(root, "test-data/wml/image_inline_props.docx", &data);
+  }
+
+  // ── WML-I-02: image_floating ─────────────────────────────────────────────
+  // Floating anchor at 1 inch × 1 inch.
+  // Exercises: wp:anchor with wrapSquare (bothSides), column-relative
+  // horizontal alignment (left), paragraph-relative vertical posOffset=0,
+  // explicit distT/distB/distL/distR on both anchor and wrapSquare.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:anchor relativeHeight="251658240" behindDoc="0" locked="0"
+                     layoutInCell="1" allowOverlap="1"
+                     distT="114300" distB="114300" distL="114300" distR="114300">
+            <wp:simplePos x="0" y="0"/>
+            <wp:positionH relativeFrom="column">
+              <wp:align>left</wp:align>
+            </wp:positionH>
+            <wp:positionV relativeFrom="paragraph">
+              <wp:posOffset>0</wp:posOffset>
+            </wp:positionV>
+            <wp:extent cx="914400" cy="914400"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:wrapSquare wrapText="bothSides" distT="114300" distB="114300"
+                           distL="114300" distR="114300"/>
+            <wp:docPr id="2" name="Image 2"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="image1.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId1"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="914400" cy="914400"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:anchor>
+        </w:drawing>
+      </w:r>
+      <w:r><w:t xml:space="preserve">Text beside the floating image.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", img_ct)),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(img_rel)),
+      ("word/media/image1.png", png),
+    ]);
+    save(root, "test-data/wml/image_floating.docx", &data);
   }
 }
 

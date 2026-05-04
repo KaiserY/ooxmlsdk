@@ -56,7 +56,8 @@ structural fidelity, not rendering or layout.
 | Table cell vertical alignment (vAlign top/center/bottom) | ✅ | `wml/table_props.docx` |
 | Table cell noWrap, pct table width | ✅ | `wml/table_props.docx` |
 | Inline images | ✅ | `document/minimal_image.docx` |
-| Floating images | 🔲 | |
+| Inline images (distL/distR, altText, cstate, picLocks) | ✅ | `wml/image_inline_props.docx` |
+| Floating images (wp:anchor, wrapSquare, positionH/V) | ✅ | `wml/image_floating.docx` |
 | Headers and footers | 🔲 | |
 | Footnotes and endnotes | 🔲 | |
 | Hyperlinks | 🔲 | |

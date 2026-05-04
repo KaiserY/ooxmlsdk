@@ -62,7 +62,8 @@ structural fidelity, not rendering or layout.
 | Headers and footers (first-page header; titlePg; three part relationships) | ✅ | `wml/header_first_page.docx` |
 | Page size (pgSz: US Letter twips; orient) | ✅ | `wml/header_footer.docx` |
 | Page margins (pgMar: top/right/bottom/left/header/footer/gutter) | ✅ | `wml/header_footer.docx` |
-| Footnotes and endnotes | 🔲 | |
+| Footnotes (separator/continuationSeparator special notes; footnoteRef mark; footnoteReference in body) | ✅ | `wml/footnotes.docx` |
+| Endnotes (same structure as footnotes; endnoteRef; endnoteReference in body) | ✅ | `wml/endnotes.docx` |
 | Fields (complex: PAGE/NUMPAGES with begin/instrText/separate/end; dirty) | ✅ | `wml/fields_complex.docx` |
 | Fields (simple: fldSimple with DATE instruction) | ✅ | `wml/fields_hyperlink.docx` |
 | Hyperlinks (external via r:id + TargetMode=External) | ✅ | `wml/fields_hyperlink.docx` |

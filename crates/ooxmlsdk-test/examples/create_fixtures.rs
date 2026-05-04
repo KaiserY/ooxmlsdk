@@ -2481,6 +2481,7 @@ fn main() {
   create_wml_headers_fixtures(&root);
   create_wml_sections_fixtures(&root);
   create_wml_fields_fixtures(&root);
+  create_wml_notes_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2697,6 +2698,143 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_wml_notes_fixtures(root: &Path) {
+  // ── WML-N-01: footnotes ───────────────────────────────────────────────────
+  // footnotes.xml with special separator notes (id=-1, id=0) and two normal
+  // footnotes. Body has footnoteReference marks inside runs.
+  {
+    let footnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:footnote w:type="separator" w:id="-1">
+    <w:p><w:r><w:separator/></w:r></w:p>
+  </w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0">
+    <w:p><w:r><w:continuationSeparator/></w:r></w:p>
+  </w:footnote>
+  <w:footnote w:id="1">
+    <w:p>
+      <w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> First footnote content.</w:t></w:r>
+    </w:p>
+  </w:footnote>
+  <w:footnote w:id="2">
+    <w:p>
+      <w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Second footnote content.</w:t></w:r>
+    </w:p>
+  </w:footnote>
+</w:footnotes>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text with first footnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteReference w:id="1"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> and second footnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteReference w:id="2"/>
+      </w:r>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/footnotes.xml", footnotes),
+    ]);
+    save(root, "test-data/wml/footnotes.docx", &data);
+  }
+
+  // ── WML-N-02: endnotes ────────────────────────────────────────────────────
+  // endnotes.xml with special separator notes and one normal endnote.
+  // Body has an endnoteReference mark inside a run.
+  {
+    let endnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:endnote w:type="separator" w:id="-1">
+    <w:p><w:r><w:separator/></w:r></w:p>
+  </w:endnote>
+  <w:endnote w:type="continuationSeparator" w:id="0">
+    <w:p><w:r><w:continuationSeparator/></w:r></w:p>
+  </w:endnote>
+  <w:endnote w:id="1">
+    <w:p>
+      <w:pPr><w:pStyle w:val="EndnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr>
+        <w:endnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Endnote content.</w:t></w:r>
+    </w:p>
+  </w:endnote>
+</w:endnotes>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text with an endnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr>
+        <w:endnoteReference w:id="1"/>
+      </w:r>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/endnotes.xml", endnotes),
+    ]);
+    save(root, "test-data/wml/endnotes.docx", &data);
   }
 }
 

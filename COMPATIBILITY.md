@@ -66,7 +66,8 @@ structural fidelity, not rendering or layout.
 | Hyperlinks | 🔲 | |
 | Bookmarks | 🔲 | |
 | Fields (PAGE, TOC, REF) | 🔲 | |
-| Section properties | 🔲 | |
+| Section properties (cols: equal-width multi-column, continuous break) | ✅ | `wml/section_columns.docx` |
+| Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
 | Tracked changes | 🔲 | |
 | Comments | 🔲 | |
 | Content controls (SDT) | 🔲 | |

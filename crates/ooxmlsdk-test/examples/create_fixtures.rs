@@ -2479,6 +2479,7 @@ fn main() {
   create_wml_tables_fixtures(&root);
   create_wml_drawing_fixtures(&root, &png);
   create_wml_headers_fixtures(&root);
+  create_wml_sections_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2607,6 +2608,94 @@ fn create_wml_headers_fixtures(root: &Path) {
       ("word/footer1.xml", footer1),
     ]);
     save(root, "test-data/wml/header_first_page.docx", &data);
+  }
+}
+
+fn create_wml_sections_fixtures(root: &Path) {
+  // ── WML-S-01: section_columns ─────────────────────────────────────────────
+  // A document with two sections on the same page: first section is
+  // single-column, second is two equal columns (continuous break).
+  // The final sectPr (body-level) defines a single-column layout.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Full-width introductory paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:sectPr>
+          <w:type w:val="continuous"/>
+          <w:pgSz w:w="12240" w:h="15840"/>
+          <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+                   w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+          <w:cols w:num="1" w:space="720"/>
+        </w:sectPr>
+      </w:pPr>
+    </w:p>
+    <w:p>
+      <w:r><w:t>First column text.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second column text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:cols w:num="2" w:space="720"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/section_columns.docx", &data);
+  }
+
+  // ── WML-S-02: section_props ───────────────────────────────────────────────
+  // Single section with vAlign=center, docGrid type=lines linePitch=360,
+  // and lnNumType countBy=5 restart=newPage.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Line one - numbered.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line two.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line three.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line four.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line five - shows number 5.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1800" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:lnNumType w:countBy="5" w:start="1" w:restart="newPage"/>
+      <w:vAlign w:val="center"/>
+      <w:docGrid w:type="lines" w:linePitch="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
+    ]);
+    save(root, "test-data/wml/section_props.docx", &data);
   }
 }
 

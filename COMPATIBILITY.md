@@ -72,7 +72,7 @@ structural fidelity, not rendering or layout.
 | Section properties (cols: equal-width multi-column, continuous break) | ✅ | `wml/section_columns.docx` |
 | Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
 | Tracked changes (w:ins inserted run; w:del with w:delText; w:rPrChange; w:pPrChange) | ✅ | `wml/tracked_changes.docx` |
-| Comments | 🔲 | |
+| Comments (commentRangeStart/End as paragraph children; commentReference run child; annotationRef in note) | ✅ | `wml/comments.docx` |
 | Content controls (SDT) | 🔲 | |
 | VBA macros (preserve-only) | 🔲 | |
 | Custom XML | 🔲 | |

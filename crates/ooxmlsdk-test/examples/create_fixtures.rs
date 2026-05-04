@@ -2483,6 +2483,7 @@ fn main() {
   create_wml_fields_fixtures(&root);
   create_wml_notes_fixtures(&root);
   create_wml_tracked_changes_fixtures(&root);
+  create_wml_comments_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -2699,6 +2700,84 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("word/_rels/document.xml.rels", &doc_rels),
     ]);
     save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_wml_comments_fixtures(root: &Path) {
+  // ── WML-C-01: comments ────────────────────────────────────────────────────
+  // Two comments: id=1 (author, date, initials) and id=2 (author, date only).
+  // Body has commentRangeStart/End as paragraph children; commentReference
+  // as run child. annotationRef inside comment content paragraphs.
+  {
+    let comments = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:comment w:id="1" w:author="Alice" w:date="2026-05-02T10:00:00Z" w:initials="A">
+    <w:p>
+      <w:pPr><w:pStyle w:val="CommentText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:annotationRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> First comment by Alice.</w:t></w:r>
+    </w:p>
+  </w:comment>
+  <w:comment w:id="2" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+    <w:p>
+      <w:pPr><w:pStyle w:val="CommentText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:annotationRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Second comment by Bob.</w:t></w:r>
+    </w:p>
+  </w:comment>
+</w:comments>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text before. </w:t></w:r>
+      <w:commentRangeStart w:id="1"/>
+      <w:r><w:t>First commented text.</w:t></w:r>
+      <w:commentRangeEnd w:id="1"/>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:commentReference w:id="1"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Text between. </w:t></w:r>
+      <w:commentRangeStart w:id="2"/>
+      <w:r><w:t>Second commented text.</w:t></w:r>
+      <w:commentRangeEnd w:id="2"/>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:commentReference w:id="2"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Text after.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/comments.xml", comments),
+    ]);
+    save(root, "test-data/wml/comments.docx", &data);
   }
 }
 

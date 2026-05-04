@@ -43,6 +43,8 @@ structural fidelity, not rendering or layout.
 | Keep properties (keepNext/keepLines/pageBreakBefore/widowControl) | ✅ | `wml/para_keep.docx` |
 | Outline level (outlineLvl) | ✅ | `wml/para_keep.docx` |
 | Styles (paragraph/character) | ✅ | `document/minimal_styles.docx` |
+| Style inheritance (basedOn chain, docDefaults) | ✅ | `wml/style_inheritance.docx` |
+| Linked paragraph+character styles (link/next) | ✅ | `wml/style_linked.docx` |
 | Numbered and bulleted lists | 🔲 | |
 | Tables (basic) | ✅ | `document/minimal_table.docx` |
 | Tables (merged cells) | 🔲 | |

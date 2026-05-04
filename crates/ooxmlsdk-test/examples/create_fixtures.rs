@@ -2474,4 +2474,159 @@ fn main() {
   create_drawingml_fixtures(&root);
   create_wml_runs_fixtures(&root);
   create_wml_paragraphs_fixtures(&root);
+  create_wml_styles_fixtures(&root);
+}
+
+fn create_wml_styles_fixtures(root: &Path) {
+  // ── WML-S-01: style_inheritance ──────────────────────────────────────────
+  // Three-level basedOn chain: Normal (default) → BodyText → BodyIndent.
+  // The document uses all three styles plus docDefaults (Calibri 11pt,
+  // spacing after 160 twips). Verifies that the inheritance chain and
+  // docDefaults round-trip without dropping or reordering elements.
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr>
+        <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+      </w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="BodyText">
+    <w:name w:val="Body Text"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="BodyIndent">
+    <w:name w:val="Body Indent"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:pPr><w:ind w:left="720"/></w:pPr>
+  </w:style>
+</w:styles>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>No explicit style (Normal via default).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="BodyText"/></w:pPr>
+      <w:r><w:t>Body Text style (basedOn Normal).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="BodyIndent"/></w:pPr>
+      <w:r><w:t>Body Indent style (basedOn BodyText, which basedOn Normal).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/style_inheritance.docx", &data);
+  }
+
+  // ── WML-S-02: style_linked ───────────────────────────────────────────────
+  // Linked paragraph + character style pair (Quote ↔ QuoteChar).
+  // The Quote paragraph style has a `next` pointing back to Normal.
+  // The document uses Quote via pStyle and QuoteChar via rStyle.
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="character" w:styleId="DefaultParagraphFont">
+    <w:name w:val="Default Paragraph Font"/>
+    <w:uiPriority w:val="1"/>
+    <w:semiHidden/>
+    <w:unhideWhenUsed/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Quote">
+    <w:name w:val="Quote"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:link w:val="QuoteChar"/>
+    <w:uiPriority w:val="29"/>
+    <w:qFormat/>
+    <w:pPr><w:jc w:val="center"/><w:ind w:left="720" w:right="720"/></w:pPr>
+    <w:rPr><w:i/><w:iCs/></w:rPr>
+  </w:style>
+  <w:style w:type="character" w:styleId="QuoteChar">
+    <w:name w:val="Quote Char"/>
+    <w:basedOn w:val="DefaultParagraphFont"/>
+    <w:link w:val="Quote"/>
+    <w:uiPriority w:val="29"/>
+    <w:semiHidden/>
+    <w:rPr><w:i/><w:iCs/></w:rPr>
+  </w:style>
+</w:styles>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Normal paragraph before the quote.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Quote"/></w:pPr>
+      <w:r><w:t>Full paragraph styled with Quote (pStyle).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Inline </w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="QuoteChar"/></w:rPr>
+        <w:t>character-styled word</w:t>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> in a normal paragraph.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/style_linked.docx", &data);
+  }
 }

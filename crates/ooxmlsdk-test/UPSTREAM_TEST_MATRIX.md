@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 137
-- `covered`: 191
+- `covered`: 194
 - `covered_by_doc_samples`: 38
 - `missing`: 0
 - `not_applicable`: 130
-- `partial`: 490
+- `partial`: 487
 
 ## Tests
 
@@ -942,11 +942,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:929` `UInt64ValueValidationTest` | Fact | `partial` | `validator` | Numeric type helper coverage exists; generated text-node value validator coverage is not complete |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:988` `FloatAttributeValidationTest` | Fact | `partial` | `validator` | Float parsing/serialization is covered in simple type/schema tests; direct validator raw lexical coverage is not ported |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1060` `DoubleAttributeValidationTest` | Fact | `partial` | `validator` | Typed double range cases, infinities, and NaN rejection are covered by `validators.rs::double_attribute_validation_test`; raw lexical/overflow text remains blocked by typed Rust fields |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1208` `DecimalAttributeValidationTest` | Fact | `partial` | `validator` | Decimal-like numeric range helpers exist; direct upstream decimal attribute matrix is not ported |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1208` `DecimalAttributeValidationTest` | Fact | `partial` | `validator` | Decimal lexical cases are covered by `validators.rs::decimal_attribute_validation_test`; upstream .NET decimal overflow cases are not equivalent to Rust string-backed decimal values |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1283` `IntegerAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::integer_attribute_validation_test` for valid and invalid generated integer attribute ranges |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1336` `NonNegativeIntegerValueValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::non_negative_integer_number_type_rejects_negative_values` |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1383` `PositiveIntegerAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::positive_integer_attribute_validation_test` |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1433` `DateTimeAttributeValidationTest` | Fact | `partial` | `validator` | Date/time lexical round-trip is covered by simple type tests; generated validator-specific date/time coverage is not ported |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1433` `DateTimeAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::date_time_attribute_validation_test` and generated DateTimeValue lexical validation |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1496` `EnumAttributeValidationTest` | Fact | `partial` | `validator` | Rust generated enums reject invalid enum variants at parse/construction time; upstream raw invalid enum validation is only partially applicable |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1569` `EnumValueValidationTest` | Fact | `partial` | `validator` | Rust generated enums reject invalid enum values at parse/construction time; upstream raw invalid enum validation is only partially applicable |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:1631` `StringAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::string_attribute_validation_test` for length and string-set constraints |
@@ -960,8 +960,8 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2187` `IdStringAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::id_string_attribute_validation_test` |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2268` `QNameAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::qname_attribute_validation_test` |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2374` `ListAttributeValidationTest` | Fact | `partial` | `validator` | Generated string/format validators are covered, but upstream list attribute validation matrix is not ported |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2498` `UnionAttributeValidationTest` | Fact | `partial` | `validator` | Generated union validator branches are implemented, but upstream union attribute matrix is not fully ported |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2570` `UnionAttributeValidationTest2` | Fact | `partial` | `validator` | Generated union validator branches are implemented, but upstream union attribute matrix is not fully ported |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2498` `UnionAttributeValidationTest` | Fact | `covered` | `validator` | Covered by `validators.rs::union_attribute_validation_test` for string-set plus hex-color union branches |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2570` `UnionAttributeValidationTest2` | Fact | `covered` | `validator` | Covered by `validators.rs::union_attribute_validation_test2` for positive/negative nonzero decimal-number union branches |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2642` `OnOffValueValidationTest2` | Fact | `partial` | `validator` | OnOff lexical handling is covered by schema/simple type tests; direct validator raw lexical coverage is not ported |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2724` `TrueFalseBlankValueValidationTest2` | Fact | `partial` | `validator` | TrueFalseBlank lexical handling is covered by schema/simple type tests; direct validator raw lexical coverage is not ported |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs:2813` `SpreadsheetDocumentValidatingTest` | Fact | `covered` | `validator` | Covered by `file_validators.rs::basicspreadsheet_xlsx_validation_from_openxml_validator_test` plus additional XLSX samples |

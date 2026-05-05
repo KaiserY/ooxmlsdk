@@ -490,7 +490,27 @@ fn validator_token(
       } else {
         quote! { crate::validator::StringLengthKind::Characters }
       };
+      let format_tokens = if is_hex_binary_type(parse_ty)
+        || matches!(
+          validator,
+          SdkFieldValidator::StringLength {
+            type_name: Some(type_name),
+            ..
+          } if type_name == "w:ST_HexColorRGB"
+        ) {
+        quote! {
+          crate::validator::validate_binary_format(
+            stringify!(#ident),
+            stringify!(#field_ident),
+            value,
+            crate::validator::BinaryFormatKind::Hex,
+          )?;
+        }
+      } else {
+        quote! {}
+      };
       quote! {
+        #format_tokens
         crate::validator::validate_string_length_with_kind(
           stringify!(#ident),
           stringify!(#field_ident),
@@ -3278,6 +3298,22 @@ fn expand_named_struct(
           stringify!(#field_ident),
           value,
           crate::validator::BinaryFormatKind::Base64,
+        )?;
+      }]
+    } else if is_decimal_value_type(&parse_ty) {
+      vec![quote! {
+        crate::validator::validate_decimal_format(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
+        )?;
+      }]
+    } else if is_datetime_value_type(&parse_ty) {
+      vec![quote! {
+        crate::validator::validate_datetime_format(
+          stringify!(#ident),
+          stringify!(#field_ident),
+          value,
         )?;
       }]
     } else {

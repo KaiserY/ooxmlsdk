@@ -4,6 +4,7 @@ use ooxmlsdk::schemas::schemas_microsoft_com_office_2006_01_customui::{
   Item, QuickAccessToolbarControlClone,
 };
 use ooxmlsdk::schemas::schemas_microsoft_com_office_word::TopBorder;
+use ooxmlsdk::schemas::schemas_microsoft_com_vml::Arc;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_chart::{
   BubbleScale, LogBase, MajorUnit,
 };
@@ -13,7 +14,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_bibliogra
 use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_math::ArgumentSize;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::SlideSize;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  ConditionalFormatStyle, DocPartId, DocumentProtection, Panose1Number, UniqueTag,
+  Color, ConditionalFormatStyle, DivId, DocPartId, DocumentProtection, Panose1Number,
+  SdtContentDate, UniqueTag,
 };
 use ooxmlsdk::validator::ValidationErrorType;
 use ooxmlsdk::validator::validate_number_type;
@@ -198,6 +200,71 @@ fn double_attribute_validation_test() {
 }
 
 #[test]
+fn decimal_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs DecimalAttributeValidationTest
+  let mut element = Arc {
+    start_angle: Some("79228162514264337593543950335".to_string()),
+    ..Default::default()
+  };
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("100000.002".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("+100000.002".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("-100000.002".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("-1".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("-79228162514264337593543950335".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("1".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("0".to_string());
+  assert!(element.validate().is_empty());
+
+  element.start_angle = Some("abc".to_string());
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn date_time_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs DateTimeAttributeValidationTest
+  let mut element = SdtContentDate {
+    full_date: Some("0001-01-01T00:00:00".to_string()),
+    ..Default::default()
+  };
+  assert!(element.validate().is_empty());
+
+  element.full_date = Some("9999-12-31T23:59:59.9999999".to_string());
+  assert!(element.validate().is_empty());
+
+  element.full_date = Some("2024-02-29T10:20:30".to_string());
+  assert!(element.validate().is_empty());
+
+  element.full_date = Some("2024-02-29T10:20:30Z".to_string());
+  assert!(element.validate().is_empty());
+
+  element.full_date = Some("2024-02-29T10:20:30+08:00".to_string());
+  assert!(element.validate().is_empty());
+
+  element.full_date = Some("abc".to_string());
+  assert!(!element.validate().is_empty());
+
+  element.full_date = Some("123".to_string());
+  assert!(!element.validate().is_empty());
+
+  element.full_date = Some("2023-02-29T10:20:30".to_string());
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
 fn string_attribute_validation_test() {
   let mut element = ConditionalFormatStyle {
     val: "010101010101".to_string(),
@@ -310,6 +377,64 @@ fn base64_binary_attribute_validation_test2() {
   assert!(!element.validate().is_empty());
 
   element.val = "*R3k/fUmpYmCMpTxTA4pfvlhKSAgB848=".to_string();
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn union_attribute_validation_test() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs UnionAttributeValidationTest
+  let mut element = Color {
+    val: "auto".to_string(),
+    ..Default::default()
+  };
+  assert!(element.validate().is_empty());
+
+  element.val = "123456".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = "FF12AB".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = String::new();
+  assert!(!element.validate().is_empty());
+
+  element.val = "auto1".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "1234567".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "1234".to_string();
+  assert!(!element.validate().is_empty());
+}
+
+#[test]
+fn union_attribute_validation_test2() {
+  // Source: DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlValidatorTest.cs UnionAttributeValidationTest2
+  let mut element = DivId {
+    val: "1".to_string(),
+  };
+  assert!(element.validate().is_empty());
+
+  element.val = i32::MAX.to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = i32::MIN.to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = "-1".to_string();
+  assert!(element.validate().is_empty());
+
+  element.val = String::new();
+  assert!(!element.validate().is_empty());
+
+  element.val = "0".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "-0".to_string();
+  assert!(!element.validate().is_empty());
+
+  element.val = "ABC".to_string();
   assert!(!element.validate().is_empty());
 }
 

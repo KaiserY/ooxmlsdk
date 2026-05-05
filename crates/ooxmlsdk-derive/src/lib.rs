@@ -1875,6 +1875,14 @@ fn is_base64_binary_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Base64BinaryValue"))
 }
 
+fn is_decimal_value_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "DecimalValue"))
+}
+
+fn is_datetime_value_type(ty: &Type) -> bool {
+  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "DateTimeValue"))
+}
+
 fn choice_variant_payload_type(variant: &syn::Variant) -> syn::Result<Type> {
   match &variant.fields {
     Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Ok(fields.unnamed[0].ty.clone()),

@@ -343,6 +343,44 @@ pub fn validate_binary_format<T: Display>(
   }
 }
 
+pub fn validate_decimal_format<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  if is_decimal(&value_string) {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "decimal_format",
+      value_string,
+      "value does not satisfy decimal format".to_string(),
+    ))
+  }
+}
+
+pub fn validate_datetime_format<T: Display>(
+  ty: &'static str,
+  field: &'static str,
+  value: &T,
+) -> Result<(), crate::common::SdkError> {
+  let value_string = value.to_string();
+  if is_datetime(&value_string) {
+    Ok(())
+  } else {
+    Err(crate::common::validation_error(
+      ty,
+      field,
+      "datetime_format",
+      value_string,
+      "value does not satisfy dateTime format".to_string(),
+    ))
+  }
+}
+
 pub fn validate_number_range<T: Display, R: RangeBounds<f64>>(
   ty: &'static str,
   field: &'static str,
@@ -592,4 +630,145 @@ fn is_base64_binary(value: &str) -> bool {
     return true;
   }
   len.is_multiple_of(4)
+}
+
+fn is_decimal(value: &str) -> bool {
+  let value = value.strip_prefix(['+', '-']).unwrap_or(value);
+  if value.is_empty() || value.chars().any(char::is_whitespace) {
+    return false;
+  }
+
+  let mut dot_seen = false;
+  let mut digit_seen = false;
+  for ch in value.chars() {
+    match ch {
+      '0'..='9' => digit_seen = true,
+      '.' if !dot_seen => dot_seen = true,
+      _ => return false,
+    }
+  }
+  digit_seen
+}
+
+fn is_datetime(value: &str) -> bool {
+  let Some((date, time)) = value.split_once('T') else {
+    return false;
+  };
+  is_date(date) && is_time(time)
+}
+
+fn is_date(value: &str) -> bool {
+  let mut parts = value.split('-');
+  let (Some(year), Some(month), Some(day), None) =
+    (parts.next(), parts.next(), parts.next(), parts.next())
+  else {
+    return false;
+  };
+  if year.len() != 4 || month.len() != 2 || day.len() != 2 {
+    return false;
+  }
+  let Ok(year) = year.parse::<u32>() else {
+    return false;
+  };
+  let Ok(month) = month.parse::<u32>() else {
+    return false;
+  };
+  let Ok(day) = day.parse::<u32>() else {
+    return false;
+  };
+  if year == 0 || !(1..=12).contains(&month) {
+    return false;
+  }
+  (1..=days_in_month(year, month)).contains(&day)
+}
+
+fn is_time(value: &str) -> bool {
+  let (time, zone) = split_timezone(value);
+  if let Some(zone) = zone
+    && !is_timezone(zone)
+  {
+    return false;
+  }
+
+  let mut parts = time.split(':');
+  let (Some(hour), Some(minute), Some(second), None) =
+    (parts.next(), parts.next(), parts.next(), parts.next())
+  else {
+    return false;
+  };
+  if hour.len() != 2 || minute.len() != 2 || second.len() < 2 {
+    return false;
+  }
+  let Ok(hour) = hour.parse::<u32>() else {
+    return false;
+  };
+  let Ok(minute) = minute.parse::<u32>() else {
+    return false;
+  };
+  let Some((second, fraction)) = second
+    .split_once('.')
+    .map_or(Some((second, None)), |(s, f)| {
+      if f.is_empty() {
+        None
+      } else {
+        Some((s, Some(f)))
+      }
+    })
+  else {
+    return false;
+  };
+  let Ok(second) = second.parse::<u32>() else {
+    return false;
+  };
+  hour <= 23
+    && minute <= 59
+    && second <= 59
+    && fraction.is_none_or(|fraction| fraction.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+fn split_timezone(value: &str) -> (&str, Option<&str>) {
+  if let Some(time) = value.strip_suffix('Z') {
+    return (time, Some("Z"));
+  }
+  if value.len() > 6 {
+    let zone_start = value.len() - 6;
+    let zone = &value[zone_start..];
+    if matches!(zone.as_bytes().first(), Some(b'+' | b'-')) {
+      return (&value[..zone_start], Some(zone));
+    }
+  }
+  (value, None)
+}
+
+fn is_timezone(value: &str) -> bool {
+  if value == "Z" {
+    return true;
+  }
+  let Some((hour, minute)) = value[1..].split_once(':') else {
+    return false;
+  };
+  if hour.len() != 2 || minute.len() != 2 {
+    return false;
+  }
+  let Ok(hour) = hour.parse::<u32>() else {
+    return false;
+  };
+  let Ok(minute) = minute.parse::<u32>() else {
+    return false;
+  };
+  (hour < 14 && minute <= 59) || (hour == 14 && minute == 0)
+}
+
+fn days_in_month(year: u32, month: u32) -> u32 {
+  match month {
+    1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+    4 | 6 | 9 | 11 => 30,
+    2 if is_leap_year(year) => 29,
+    2 => 28,
+    _ => 0,
+  }
+}
+
+fn is_leap_year(year: u32) -> bool {
+  year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }

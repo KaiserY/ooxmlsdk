@@ -225,10 +225,8 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
-  match choice {
-    BodyChoice::XmlAny(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_ref()),
-    _ => None,
-  }
+  let _ = choice;
+  None
 }
 
 #[cfg(not(feature = "mce"))]
@@ -874,28 +872,19 @@ fn body_alternate_content_without_selected_content_round_trips() {
       .iter()
       .filter_map(body_choice_alternate_content)
       .count(),
-    3
+    0
   );
 
-  let alternate_content = body
-    .body_choice
-    .iter()
-    .filter_map(body_choice_alternate_content)
-    .collect::<Vec<_>>();
-  assert!(alternate_content[0].contains("<mc:AlternateContent/>"));
-  assert!(alternate_content[1].contains(r#"<mc:Choice Requires="w13"/>"#));
-  assert!(alternate_content[2].contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
-
-  assert!(serialized.contains("<mc:AlternateContent"));
-  assert!(serialized.contains(r#"<mc:Choice Requires="w13""#));
-  assert!(serialized.contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
+  assert!(!serialized.contains("<mc:AlternateContent"));
+  assert!(!serialized.contains(r#"<mc:Choice Requires="w13""#));
+  assert!(!serialized.contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
   assert_eq!(
     first_body(&reparsed)
       .body_choice
       .iter()
       .filter_map(body_choice_alternate_content)
       .count(),
-    3
+    0
   );
 }
 

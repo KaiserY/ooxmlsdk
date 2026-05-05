@@ -1757,78 +1757,6 @@ fn gen_choice_type_decl(
   };
   let mut variants = Vec::new();
 
-  if choice_enum_is_pure_choice_wrapper(type_decl, module) {
-    let wrapper_payloads = pure_choice_wrapper_payload_types(type_decl, module);
-    let reserved_variant_names = HashSet::new();
-    let helper_variants_are_unique = wrapper_payloads.iter().all(|helper_type_decl| {
-      choice_helper_names_are_inline_safe(helper_type_decl, module, &reserved_variant_names)
-    });
-
-    if helper_variants_are_unique {
-      let mut variants = Vec::new();
-      let mut reserved_variant_names = HashSet::new();
-
-      for member in &type_decl.members {
-        let MemberDecl::Variant(variant) = member else {
-          continue;
-        };
-        let Some(helper_type_decl) = pure_choice_wrapper_helper_type_decl(variant, module) else {
-          continue;
-        };
-
-        let helper_type_version = helper_type_decl.version.as_deref().unwrap_or_default();
-        let helper_variant_versions: Vec<&str> = helper_type_decl
-          .members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Variant(variant) => Some(variant.version.as_str()),
-            _ => None,
-          })
-          .collect();
-        let helper_enum_version =
-          common_choice_version(helper_type_version, &helper_variant_versions);
-        let helper_enum_attrs = module_version_cfg_attrs(helper_enum_version, variant_cfg);
-        let wrapper_variant_attrs = module_version_cfg_attrs(&variant.version, variant_cfg);
-        let inline_prefix_attrs = quote! {
-          #( #wrapper_variant_attrs )*
-          #( #helper_enum_attrs )*
-        };
-
-        for helper_variant in helper_type_decl
-          .members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Variant(variant) => Some(variant),
-            _ => None,
-          })
-        {
-          variants.extend(gen_choice_variant_tokens(
-            helper_variant,
-            &render_context,
-            true,
-            inline_prefix_attrs.clone(),
-            &mut reserved_variant_names,
-          )?);
-          for helper_variant_name in choice_variant_rendered_names(helper_variant, module)
-            .expect("pure choice wrapper variant rendered names")
-          {
-            reserved_variant_names.insert(helper_variant_name);
-          }
-        }
-      }
-
-      return Ok(quote! {
-        #( #enum_attrs )*
-        #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-        pub enum #enum_ident {
-          #( #variants )*
-        }
-      });
-    }
-  }
-
-  let mut reserved_variant_names = inline_choice_helper_reserved_variant_names(type_decl, module);
-
   for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
       continue;
@@ -1836,9 +1764,7 @@ fn gen_choice_type_decl(
     variants.extend(gen_choice_variant_tokens(
       variant,
       &render_context,
-      true,
       quote! {},
-      &mut reserved_variant_names,
     )?);
   }
 
@@ -2025,8 +1951,6 @@ fn helper_struct_is_inline_sequence_clippy_safe(
   })
 }
 
-const MAX_NAMED_CHOICE_INLINE_VARIANTS_THROUGH_ANONYMOUS_WRAPPER: usize = 12;
-
 fn inline_single_field_sequence_variant_tokens(
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
@@ -2084,9 +2008,7 @@ struct ChoiceVariantRenderContext<'a> {
 fn gen_choice_variant_tokens(
   variant: &VariantDecl,
   render_context: &ChoiceVariantRenderContext<'_>,
-  flatten_anonymous_choice_wrappers: bool,
   prefix_attrs: TokenStream,
-  reserved_variant_names: &mut HashSet<String>,
 ) -> Result<Vec<TokenStream>> {
   let rendered_variant_name = render_context
     .rendered_variant_name_map
@@ -2207,133 +2129,68 @@ fn gen_choice_variant_tokens(
       }])
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Child { qnames } => {
-      if flatten_anonymous_choice_wrappers
-        && let Some(helper_type_decl) =
-          anonymous_choice_wrapper_helper_type_decl(variant, render_context.module)
-      {
-        let helper_type_version = helper_type_decl.version.as_deref().unwrap_or_default();
-        let helper_variant_versions: Vec<&str> = helper_type_decl
-          .members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Variant(variant) => Some(variant.version.as_str()),
-            _ => None,
-          })
-          .collect();
-        let helper_enum_version =
-          common_choice_version(helper_type_version, &helper_variant_versions);
-        let helper_enum_attrs =
-          module_version_cfg_attrs(helper_enum_version, render_context.variant_cfg);
-        if choice_helper_names_are_inline_safe(
-          helper_type_decl,
-          render_context.module,
-          reserved_variant_names,
-        ) {
-          let helper_variants: Vec<&VariantDecl> = helper_type_decl
-            .members
-            .iter()
-            .filter_map(|member| match member {
-              MemberDecl::Variant(variant) => Some(variant),
-              _ => None,
-            })
-            .collect();
-
-          let helper_prefix_attrs = quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #( #helper_enum_attrs )*
-          };
-          let mut tokens = Vec::new();
-          for helper_variant in &helper_variants {
-            tokens.extend(gen_choice_variant_tokens(
-              helper_variant,
-              render_context,
-              true,
-              helper_prefix_attrs.clone(),
-              reserved_variant_names,
-            )?);
-            for helper_variant_name in
-              choice_variant_rendered_names(helper_variant, render_context.module)
-                .expect("choice helper variant rendered names")
-            {
-              reserved_variant_names.insert(helper_variant_name);
-            }
-          }
-          Ok(tokens)
-        } else {
-          let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-          Ok(vec![quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #variant_doc_attrs
-            #[sdk(choice)]
-            #variant_ident(std::boxed::Box<#payload_type>),
-          }])
-        }
+      let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
+      let is_nested_choice = render_context
+        .module
+        .types
+        .iter()
+        .any(|ty| ty.rust_name == variant.payload.rust_type && ty.kind == TypeKind::ChoiceEnum);
+      if is_nested_choice {
+        Ok(vec![quote! {
+          #prefix_attrs
+          #( #variant_attrs )*
+          #variant_doc_attrs
+          #[sdk(choice)]
+          #variant_ident(std::boxed::Box<#payload_type>),
+        }])
       } else {
-        let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-        let is_nested_choice = render_context
-          .module
-          .types
-          .iter()
-          .any(|ty| ty.rust_name == variant.payload.rust_type && ty.kind == TypeKind::ChoiceEnum);
-        if is_nested_choice {
+        if qnames.is_empty() {
+          return Err(variant.rust_name.clone().into());
+        }
+        if is_empty_leaf_marker_ref_with_graph(
+          render_context.module,
+          &variant.payload,
+          render_context.type_graph,
+        ) {
+          let qname_attrs = qnames
+            .iter()
+            .map(|qname| quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] })
+            .collect::<Vec<_>>();
           Ok(vec![quote! {
             #prefix_attrs
             #( #variant_attrs )*
-            #variant_doc_attrs
-            #[sdk(choice)]
-            #variant_ident(std::boxed::Box<#payload_type>),
+            #empty_leaf_variant_doc_attrs
+            #( #qname_attrs )*
+            #variant_ident,
           }])
         } else {
-          if qnames.is_empty() {
-            return Err(variant.rust_name.clone().into());
-          }
-          if is_empty_leaf_marker_ref_with_graph(
+          let is_any_children_alias = is_any_children_alias_type_ref(
             render_context.module,
             &variant.payload,
             render_context.type_graph,
-          ) {
-            let qname_attrs = qnames
-              .iter()
-              .map(|qname| quote! { #[sdk(empty_child(#(#variant_sdk_version_markers,)* qname = #qname))] })
-              .collect::<Vec<_>>();
-            Ok(vec![quote! {
-              #prefix_attrs
-              #( #variant_attrs )*
-              #empty_leaf_variant_doc_attrs
-              #( #qname_attrs )*
-              #variant_ident,
-            }])
+          );
+          let qname_attrs = qnames
+            .iter()
+            .map(|qname| {
+              if is_any_children_alias {
+                quote! { #[sdk(any_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
+              } else {
+                quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] }
+              }
+            })
+            .collect::<Vec<_>>();
+          let payload_tokens = if is_any_children_alias {
+            quote! { #payload_type }
           } else {
-            let is_any_children_alias = is_any_children_alias_type_ref(
-              render_context.module,
-              &variant.payload,
-              render_context.type_graph,
-            );
-            let qname_attrs = qnames
-              .iter()
-              .map(|qname| {
-                if is_any_children_alias {
-                  quote! { #[sdk(any_child(#(#variant_sdk_version_markers,)* qname = #qname))] }
-                } else {
-                  quote! { #[sdk(child(#(#variant_sdk_version_markers,)* qname = #qname))] }
-                }
-              })
-              .collect::<Vec<_>>();
-            let payload_tokens = if is_any_children_alias {
-              quote! { #payload_type }
-            } else {
-              quote! { std::boxed::Box<#payload_type> }
-            };
-            Ok(vec![quote! {
-              #prefix_attrs
-              #( #variant_attrs )*
-              #variant_doc_attrs
-              #( #qname_attrs )*
-              #variant_ident(#payload_tokens),
-            }])
-          }
+            quote! { std::boxed::Box<#payload_type> }
+          };
+          Ok(vec![quote! {
+            #prefix_attrs
+            #( #variant_attrs )*
+            #variant_doc_attrs
+            #( #qname_attrs )*
+            #variant_ident(#payload_tokens),
+          }])
         }
       }
     }
@@ -2372,128 +2229,17 @@ fn inline_sequence_helper_type_decl<'a>(
     .filter(|type_decl| helper_struct_is_inline_sequence_candidate(type_decl))
 }
 
-fn choice_enum_is_inline_candidate(type_decl: &TypeDecl, module: &SchemaModuleDecl) -> bool {
-  type_decl.kind == TypeKind::ChoiceEnum
-    && type_decl.members.iter().all(|member| match member {
-      MemberDecl::Variant(VariantDecl {
-        wire:
-          crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-          | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. },
-        payload,
-        ..
-      }) => !module.types.iter().any(|type_decl| {
-        type_decl.rust_name == payload.rust_type && type_decl.kind == TypeKind::ChoiceEnum
-      }),
-      _ => false,
-    })
-}
-
-fn choice_enum_effective_flattened_variant_names(
-  type_decl: &TypeDecl,
-  module: &SchemaModuleDecl,
-) -> Option<Vec<String>> {
-  fn collect(
-    type_decl: &TypeDecl,
-    module: &SchemaModuleDecl,
-    visiting: &mut HashSet<String>,
-    names: &mut Vec<String>,
-  ) -> Option<()> {
-    if !visiting.insert(type_decl.rust_name.clone()) {
-      return None;
-    }
-
-    for member in &type_decl.members {
-      let MemberDecl::Variant(variant) = member else {
-        visiting.remove(&type_decl.rust_name);
-        return None;
-      };
-
-      match &variant.wire {
-        crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-        | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. } => {
-          let nested_choice = module.types.iter().find(|nested_type_decl| {
-            nested_type_decl.rust_name == variant.payload.rust_type
-              && nested_type_decl.kind == TypeKind::ChoiceEnum
-          });
-
-          if let Some(nested_choice) = nested_choice {
-            if !is_generated_anonymous_type_name(&variant.rust_name) {
-              visiting.remove(&type_decl.rust_name);
-              return None;
-            }
-            collect(nested_choice, module, visiting, names)?;
-          } else {
-            names.push(variant.rust_name.clone());
-          }
-        }
-        _ => {
-          visiting.remove(&type_decl.rust_name);
-          return None;
-        }
-      }
-    }
-
-    visiting.remove(&type_decl.rust_name);
-    Some(())
-  }
-
-  let mut visiting = HashSet::new();
-  let mut names = Vec::new();
-  collect(type_decl, module, &mut visiting, &mut names)?;
-  Some(names)
-}
-
-fn local_choice_payload_type_decl<'a>(
-  variant: &VariantDecl,
-  module: &'a SchemaModuleDecl,
-) -> Option<&'a TypeDecl> {
-  if variant.payload.module_path.is_some() {
-    return None;
-  }
-
-  module.types.iter().find(|type_decl| {
-    type_decl.rust_name == variant.payload.rust_type && type_decl.kind == TypeKind::ChoiceEnum
-  })
-}
-
-fn should_flatten_nested_choice_variant(
-  variant: &VariantDecl,
-  nested_choice: &TypeDecl,
-  module: &SchemaModuleDecl,
-) -> bool {
-  if is_generated_anonymous_type_name(&variant.rust_name) {
-    if is_generated_anonymous_type_name(&nested_choice.rust_name) {
-      true
-    } else {
-      choice_enum_effective_flattened_variant_names(nested_choice, module).is_some_and(|names| {
-        names.len() <= MAX_NAMED_CHOICE_INLINE_VARIANTS_THROUGH_ANONYMOUS_WRAPPER
-          && names.iter().collect::<HashSet<_>>().len() == names.len()
-      })
-    }
-  } else {
-    choice_enum_is_inline_candidate(nested_choice, module)
-  }
-}
-
 fn choice_variant_rendered_names(
   variant: &VariantDecl,
-  module: &SchemaModuleDecl,
+  _module: &SchemaModuleDecl,
 ) -> Option<Vec<String>> {
   match &variant.wire {
     crate::sdk_code::codegen_ir::VariantWireDecl::Any
     | crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
     | crate::sdk_code::codegen_ir::VariantWireDecl::Text
-    | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. } => {
+    | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. }
+    | crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. } => {
       Some(vec![variant.rust_name.clone()])
-    }
-    crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. } => {
-      if let Some(nested_choice) = local_choice_payload_type_decl(variant, module)
-        && should_flatten_nested_choice_variant(variant, nested_choice, module)
-      {
-        choice_enum_rendered_variant_names(nested_choice, module)
-      } else {
-        Some(vec![variant.rust_name.clone()])
-      }
     }
   }
 }
@@ -2592,148 +2338,6 @@ fn choice_enum_rendered_variant_names(
   let mut names = Vec::new();
   collect(type_decl, module, &mut visiting, &mut names)?;
   Some(names)
-}
-
-fn choice_enum_is_small_named_inline_candidate(
-  type_decl: &TypeDecl,
-  module: &SchemaModuleDecl,
-) -> bool {
-  !is_generated_anonymous_type_name(&type_decl.rust_name)
-    && choice_enum_effective_flattened_variant_names(type_decl, module).is_some_and(|names| {
-      names.len() <= MAX_NAMED_CHOICE_INLINE_VARIANTS_THROUGH_ANONYMOUS_WRAPPER
-        && names.iter().collect::<HashSet<_>>().len() == names.len()
-    })
-}
-
-fn inline_choice_helper_type_decl<'a>(
-  variant: &VariantDecl,
-  module: &'a SchemaModuleDecl,
-) -> Option<&'a TypeDecl> {
-  if !matches!(
-    variant.wire,
-    crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-  ) {
-    return None;
-  }
-
-  if variant.payload.module_path.is_some() {
-    return None;
-  }
-
-  module
-    .types
-    .iter()
-    .find(|type_decl| type_decl.rust_name == variant.payload.rust_type)
-    .filter(|type_decl| choice_enum_is_inline_candidate(type_decl, module))
-}
-
-fn anonymous_choice_wrapper_helper_type_decl<'a>(
-  variant: &VariantDecl,
-  module: &'a SchemaModuleDecl,
-) -> Option<&'a TypeDecl> {
-  if !is_generated_anonymous_type_name(&variant.rust_name) {
-    return inline_choice_helper_type_decl(variant, module);
-  }
-
-  if !matches!(
-    variant.wire,
-    crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-  ) {
-    return None;
-  }
-
-  if variant.payload.module_path.is_some() {
-    return None;
-  }
-
-  module
-    .types
-    .iter()
-    .find(|type_decl| type_decl.rust_name == variant.payload.rust_type)
-    .filter(|type_decl| {
-      type_decl.kind == TypeKind::ChoiceEnum
-        && (is_generated_anonymous_type_name(&type_decl.rust_name)
-          || choice_enum_is_small_named_inline_candidate(type_decl, module))
-    })
-}
-
-fn pure_choice_wrapper_helper_type_decl<'a>(
-  variant: &VariantDecl,
-  module: &'a SchemaModuleDecl,
-) -> Option<&'a TypeDecl> {
-  if !matches!(
-    variant.wire,
-    crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-  ) {
-    return None;
-  }
-
-  if variant.payload.module_path.is_some() {
-    return None;
-  }
-
-  module
-    .types
-    .iter()
-    .find(|type_decl| type_decl.rust_name == variant.payload.rust_type)
-    .filter(|type_decl| type_decl.kind == TypeKind::ChoiceEnum)
-}
-
-fn choice_enum_is_pure_choice_wrapper(type_decl: &TypeDecl, module: &SchemaModuleDecl) -> bool {
-  type_decl.kind == TypeKind::ChoiceEnum
-    && !type_decl.members.is_empty()
-    && type_decl.members.iter().all(|member| match member {
-      MemberDecl::Variant(variant) => {
-        pure_choice_wrapper_helper_type_decl(variant, module).is_some()
-      }
-      _ => false,
-    })
-}
-
-fn pure_choice_wrapper_payload_types<'a>(
-  type_decl: &'a TypeDecl,
-  module: &'a SchemaModuleDecl,
-) -> Vec<&'a TypeDecl> {
-  type_decl
-    .members
-    .iter()
-    .filter_map(|member| match member {
-      MemberDecl::Variant(variant) => pure_choice_wrapper_helper_type_decl(variant, module),
-      _ => None,
-    })
-    .collect()
-}
-
-fn inline_choice_helper_reserved_variant_names(
-  type_decl: &TypeDecl,
-  module: &SchemaModuleDecl,
-) -> HashSet<String> {
-  let mut reserved = HashSet::new();
-
-  for member in &type_decl.members {
-    let MemberDecl::Variant(variant) = member else {
-      continue;
-    };
-
-    if anonymous_choice_wrapper_helper_type_decl(variant, module).is_none() {
-      reserved.insert(variant.rust_name.clone());
-    }
-  }
-
-  reserved
-}
-
-fn choice_helper_names_are_inline_safe(
-  helper_type_decl: &TypeDecl,
-  module: &SchemaModuleDecl,
-  reserved_variant_names: &HashSet<String>,
-) -> bool {
-  choice_enum_rendered_variant_names(helper_type_decl, module).is_some_and(|helper_names| {
-    helper_names
-      .iter()
-      .all(|helper_name| !reserved_variant_names.contains(helper_name))
-      && helper_names.iter().collect::<HashSet<_>>().len() == helper_names.len()
-  })
 }
 
 fn is_generated_anonymous_type_name(name: &str) -> bool {
@@ -4707,12 +4311,12 @@ mod tests {
 
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("pub enum HolderChoice2"));
-    assert!(generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
+    assert!(generated.contains("pub enum HolderChoice"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
   }
 
   #[test]
-  fn flattens_pure_choice_wrapper_variants() {
+  fn keeps_pure_choice_wrapper_variants_nested() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -4845,21 +4449,104 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence (std :: boxed :: Box < Second >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Third/t:third\"))] TThird (std :: boxed :: Box < Third >)"
-    ));
-    assert!(!generated.contains("# [sdk (choice)] Choice1"));
-    assert!(!generated.contains("# [sdk (choice)] Choice2"));
+    assert!(generated.contains("# [sdk (choice)] Choice1"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
   }
 
   #[test]
-  fn drops_pure_choice_wrapper_payload_helpers_after_render_flattening() {
+  fn keeps_pure_choice_wrapper_when_helper_variants_collide() {
+    let schema = SchemaModuleDecl {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        TypeDecl {
+          rust_name: "First".to_string(),
+          xml_qname: Some("t:CT_First/t:first".to_string()),
+          kind: TypeKind::ElementStruct,
+          element_kind: Some(ElementKind::Leaf),
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Choice1".to_string(),
+              docs: " Wrapper 1".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["wrapper1".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoice1".to_string(),
+                module_path: None,
+              },
+            }),
+            MemberDecl::Variant(VariantDecl {
+              rust_name: "Choice2".to_string(),
+              docs: " Wrapper 2".to_string(),
+              version: String::new(),
+              wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+                qnames: vec!["wrapper2".to_string()],
+              },
+              payload: TypeRefDecl {
+                rust_type: "HolderChoice2".to_string(),
+                module_path: None,
+              },
+            }),
+          ],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice1".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(VariantDecl {
+            rust_name: "TFirst".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+              qnames: vec!["t:CT_First/t:first".to_string()],
+            },
+            payload: TypeRefDecl {
+              rust_type: "First".to_string(),
+              module_path: None,
+            },
+          })],
+          ..Default::default()
+        },
+        TypeDecl {
+          rust_name: "HolderChoice2".to_string(),
+          kind: TypeKind::ChoiceEnum,
+          members: vec![MemberDecl::Variant(VariantDecl {
+            rust_name: "TFirst".to_string(),
+            docs: " _".to_string(),
+            version: String::new(),
+            wire: crate::sdk_code::codegen_ir::VariantWireDecl::Child {
+              qnames: vec!["t:CT_First/t:first".to_string()],
+            },
+            payload: TypeRefDecl {
+              rust_type: "First".to_string(),
+              module_path: None,
+            },
+          })],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+
+    assert!(generated.contains("pub enum HolderChoice2"));
+    assert!(generated.contains("pub enum HolderChoice3"));
+    assert!(generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < HolderChoice2 >)"));
+    assert!(generated.contains("# [sdk (choice)] Choice2 (std :: boxed :: Box < HolderChoice3 >)"));
+  }
+
+  #[test]
+  fn keeps_pure_choice_wrapper_payload_helpers_without_render_flattening() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -4952,12 +4639,12 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum HolderChoice"));
-    assert!(!generated.contains("pub enum HolderChoice1"));
-    assert!(!generated.contains("pub enum HolderChoice2"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
   }
 
   #[test]
-  fn flattens_anonymous_choice_wrapper_even_when_parent_variant_name_matches_nested_choice() {
+  fn keeps_anonymous_choice_wrapper_even_when_parent_variant_name_matches_nested_choice() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -5071,15 +4758,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(!generated.contains("# [sdk (choice)] Choice2 (std :: boxed :: Box < RootChoice1 >)"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_ProofErr/t:proofErr\"))] WProofErr (std :: boxed :: Box < ProofErr >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_PermStart/t:permStart\"))] Choice (std :: boxed :: Box < PermStart >)"
-    ));
-    assert!(!generated.contains("pub enum RootChoice1"));
-    assert!(!generated.contains("pub enum RootChoice2"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
   }
 
   #[test]
@@ -5247,7 +4926,7 @@ mod tests {
   }
 
   #[test]
-  fn flattens_multi_step_anonymous_choice_wrappers_inside_mixed_parent() {
+  fn keeps_multi_step_anonymous_choice_wrappers_inside_mixed_parent() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -5362,21 +5041,13 @@ mod tests {
 
     assert!(generated.contains("pub enum RootChoice"));
     assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
-    ));
-    assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_Third/t:third\"))] TThird (std :: boxed :: Box < Third >)"
     ));
-    assert!(!generated.contains("pub enum RootChoice1"));
-    assert!(!generated.contains("pub enum RootChoice2"));
-    assert!(!generated.contains("# [sdk (choice)] Choice1 (std :: boxed :: Box < RootChoice1 >)"));
+    assert!(generated.contains("# [sdk (choice)] Choice"));
   }
 
   #[test]
-  fn flattens_anonymous_wrapper_around_small_named_choice_helper() {
+  fn keeps_anonymous_wrapper_around_small_named_choice_helper() {
     let schema = SchemaModuleDecl {
       module_name: "test_module".to_string(),
       target_namespace: "urn:test".to_string(),
@@ -5473,15 +5144,7 @@ mod tests {
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
     assert!(generated.contains("pub enum RootChoice"));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_First/t:first\"))] TFirst (std :: boxed :: Box < First >)"
-    ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] TSecond (std :: boxed :: Box < Second >)"
-    ));
-    assert!(
-      !generated.contains("# [sdk (choice)] Choice (std :: boxed :: Box < RangeMarkupChoice >)")
-    );
+    assert!(generated.contains("# [sdk (choice)] Choice"));
     assert!(generated.contains("pub enum RangeMarkupChoice"));
   }
 

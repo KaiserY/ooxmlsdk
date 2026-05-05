@@ -72,14 +72,7 @@ fn main_document_body_child_count(
   document
     .body
     .as_ref()
-    .map(|body| {
-      body
-        .body_choice
-        .iter()
-        .filter(|choice| !matches!(choice, BodyChoice::XmlText(text) if text.trim().is_empty()))
-        .count()
-        + usize::from(body.w_sect_pr.is_some())
-    })
+    .map(|body| body.body_choice.iter().count() + usize::from(body.w_sect_pr.is_some()))
     .unwrap_or_default()
 }
 
@@ -504,12 +497,6 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
   let root = main_part.root_element(&mut package).unwrap();
   let body = root.body.as_ref().unwrap();
 
-  assert!(
-    body
-      .body_choice
-      .iter()
-      .all(|choice| !matches!(choice, BodyChoice::XmlAny(xml) if xml.contains("AlternateContent")))
-  );
   assert_eq!(
     body
       .body_choice

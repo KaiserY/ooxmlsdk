@@ -176,6 +176,7 @@ struct SdkChoiceField {
 #[derive(Clone)]
 struct SdkAnyField {
   ident: Ident,
+  ty: Type,
   optional: bool,
   repeated: bool,
 }
@@ -1593,6 +1594,12 @@ fn is_box_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Box"))
 }
 
+fn is_box_str_type(ty: &Type) -> bool {
+  box_inner_type(ty)
+    .as_ref()
+    .is_some_and(|inner_ty| is_terminal_type(inner_ty, "str"))
+}
+
 fn contains_vec_type(ty: &Type) -> bool {
   if is_vec_type(ty) {
     return true;
@@ -1684,7 +1691,8 @@ fn is_string_like_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
     matches!(
       segment.ident.to_string().as_str(),
-      "String"
+      "str"
+        | "String"
         | "StringValue"
         | "DateTimeValue"
         | "DecimalValue"

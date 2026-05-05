@@ -10,7 +10,7 @@
 pub struct ClassificationLabelList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ClassificationLabel Class.
   #[sdk(child(office2021, qname = "clbl:CT_ClassificationLabel/clbl:label"))]
   pub clbl_label: Vec<ClassificationLabel>,
@@ -28,7 +28,7 @@ pub struct ClassificationExtension {
   #[sdk(string_format(kind = "token"))]
   pub uri: crate::simple_type::StringValue,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the ClassificationLabel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

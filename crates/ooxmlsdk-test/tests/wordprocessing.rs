@@ -9,6 +9,17 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
+#[allow(dead_code)]
+fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
+where
+  N: AsRef<str>,
+  V: AsRef<str>,
+{
+  attrs
+    .iter()
+    .find_map(|(attr_name, value)| (attr_name.as_ref() == name).then_some(value.as_ref()))
+}
+
 fn first_body(document: &Document) -> &Body {
   document.body.as_ref().expect("expected document body")
 }
@@ -215,7 +226,7 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 #[cfg(not(feature = "mce"))]
 fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
   match choice {
-    BodyChoice::XmlOther(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_str()),
+    BodyChoice::XmlAny(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_ref()),
     _ => None,
   }
 }
@@ -683,7 +694,7 @@ fn document_round_trip_preserves_mce_attributes_and_alternate_content() {
     .run_choice
     .iter()
     .find_map(|choice| match choice {
-      RunChoice::XmlOther(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_str()),
+      RunChoice::XmlAny(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_ref()),
       _ => None,
     })
     .expect("expected alternate content in run");

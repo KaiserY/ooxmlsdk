@@ -50,7 +50,7 @@ pub struct RichValueBlock {
 pub struct RichValueData {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,
@@ -67,7 +67,7 @@ pub struct RichValueData {
 pub struct RichValueStructures {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
   #[sdk(attr(office2019, qname = ":count"))]
   pub count: crate::simple_type::UInt32Value,

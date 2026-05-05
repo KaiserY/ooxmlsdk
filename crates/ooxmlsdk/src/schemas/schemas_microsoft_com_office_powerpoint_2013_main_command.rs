@@ -34,7 +34,7 @@ pub struct SlideMonikerList {
   pub slide_moniker: std::boxed::Box<SlideMoniker>,
   /// _
   #[sdk(any)]
-  pub unknown_xml: Vec<String>,
+  pub unknown_xml: Vec<std::boxed::Box<str>>,
 }
 /// Defines the SlidePosMonikerList Class.
 pub type SlidePosMonikerList = Vec<String>;

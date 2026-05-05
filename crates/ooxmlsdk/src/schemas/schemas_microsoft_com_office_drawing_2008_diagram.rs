@@ -10,7 +10,7 @@
 pub struct Drawing {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the ShapeTree Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:spTree"))]
   pub shape_tree: std::boxed::Box<ShapeTree>,

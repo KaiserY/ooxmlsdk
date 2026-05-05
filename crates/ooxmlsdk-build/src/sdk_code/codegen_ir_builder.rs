@@ -708,11 +708,11 @@ fn add_xml_other_variant_to_single_repeated_choice(
 
   add_choice_variant_if_missing(
     choice_type,
-    "XmlOther",
+    "XmlAny",
     "Unknown XML child.",
     VariantWireDecl::Any,
     TypeRefDecl {
-      rust_type: "String".to_string(),
+      rust_type: "std::boxed::Box<str>".to_string(),
       module_path: None,
     },
   );
@@ -750,12 +750,12 @@ fn promote_single_repeated_child_to_xml_other_choice(
       payload: field.type_ref.clone(),
     }),
     MemberDecl::Variant(VariantDecl {
-      rust_name: "XmlOther".to_string(),
+      rust_name: "XmlAny".to_string(),
       docs: "Unknown XML child.".to_string(),
       version: String::new(),
       wire: VariantWireDecl::Any,
       payload: TypeRefDecl {
-        rust_type: "String".to_string(),
+        rust_type: "std::boxed::Box<str>".to_string(),
         module_path: None,
       },
     }),
@@ -2021,7 +2021,7 @@ fn build_simple_one_choice_members(
       let type_ref = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any
       {
         TypeRefDecl {
-          rust_type: "String".to_string(),
+          rust_type: "std::boxed::Box<str>".to_string(),
           module_path: None,
         }
       } else if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
@@ -2126,7 +2126,7 @@ fn build_simple_one_choice_variant_decl(
 
   let payload = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
     TypeRefDecl {
-      rust_type: "String".to_string(),
+      rust_type: "std::boxed::Box<str>".to_string(),
       module_path: None,
     }
   } else if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
@@ -2141,7 +2141,7 @@ fn build_simple_one_choice_variant_decl(
   };
 
   let rust_name = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
-    "XmlOther".to_string()
+    "XmlAny".to_string()
   } else if variant.name.is_empty() {
     variant.field_name.to_upper_camel_case()
   } else {
@@ -2208,7 +2208,7 @@ fn build_flatten_one_sequence_members(
           },
           type_ref: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
             TypeRefDecl {
-              rust_type: "String".to_string(),
+              rust_type: "std::boxed::Box<str>".to_string(),
               module_path: None,
             }
           } else {
@@ -2326,7 +2326,7 @@ fn build_one_sequence_choice_variant_decl(
 
   let payload = if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
     TypeRefDecl {
-      rust_type: "String".to_string(),
+      rust_type: "std::boxed::Box<str>".to_string(),
       module_path: None,
     }
   } else if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
@@ -2342,7 +2342,7 @@ fn build_one_sequence_choice_variant_decl(
 
   Ok(MemberDecl::Variant(VariantDecl {
     rust_name: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
-      "XmlOther".to_string()
+      "XmlAny".to_string()
     } else if variant.name.is_empty() {
       variant.field_name.to_upper_camel_case()
     } else {
@@ -2624,7 +2624,7 @@ fn build_one_sequence_leaf_field_decl(
     },
     type_ref: if effective_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
       TypeRefDecl {
-        rust_type: "String".to_string(),
+        rust_type: "std::boxed::Box<str>".to_string(),
         module_path: None,
       }
     } else {
@@ -3203,7 +3203,7 @@ fn build_generic_children_members(
       wire: FieldWireDecl::Any,
       cardinality: Cardinality::Many,
       type_ref: TypeRefDecl {
-        rust_type: "String".to_string(),
+        rust_type: "std::boxed::Box<str>".to_string(),
         module_path: None,
       },
       validators: Vec::new(),
@@ -6405,7 +6405,7 @@ mod tests {
     assert_eq!(field.cardinality, Cardinality::Many);
     assert_eq!(field.rust_name, "xml_children");
     assert!(matches!(field.wire, FieldWireDecl::Any));
-    assert_eq!(field.type_ref.rust_type, "String");
+    assert_eq!(field.type_ref.rust_type, "std::boxed::Box<str>");
     assert!(
       ir.types.iter().all(|ty| ty.rust_name != "AnyHolderChoice"),
       "single-any holders should not emit wrapper choice enums"

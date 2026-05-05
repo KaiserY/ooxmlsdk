@@ -258,8 +258,8 @@ pub enum PageOrientation {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// version
   #[sdk(attr(office2016, qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,
@@ -316,7 +316,7 @@ pub struct Extension2 {
   #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the MinColorSolidColorFillProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -10,7 +10,7 @@
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Name of Document Template
   #[sdk(text_child(qname = "xsd:string/ap:Template"))]
   pub template: Option<crate::simple_type::StringValue>,

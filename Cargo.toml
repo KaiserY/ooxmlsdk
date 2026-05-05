@@ -4,7 +4,7 @@ members = [
   "crates/ooxmlsdk",
   "crates/ooxmlsdk-build",
   "crates/ooxmlsdk-derive",
-  "crates/ooxmlsdk-test"
+  "crates/ooxmlsdk-test",
 ]
 
 [workspace.package]
@@ -26,7 +26,7 @@ ooxmlsdk-build = { version = "0.6.1", path = "crates/ooxmlsdk-build" }
 ooxmlsdk-derive = { version = "0.6.1", path = "crates/ooxmlsdk-derive" }
 ooxmlsdk-test = { version = "0.6.1", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
-quick-xml = "0.39.2"
+quick-xml = "0.39.3"
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_derive = "1.0.228"
@@ -40,6 +40,8 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 thiserror = "2.0.18"
 criterion = "0.8.2"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
+walkdir = "2.5.0"
+toml = "1.1"
 
 [profile.dev]
 incremental = false

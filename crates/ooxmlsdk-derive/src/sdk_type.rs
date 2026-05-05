@@ -365,11 +365,11 @@ fn mce_xml_other_children_process_tokens(
     let mut xml_other_children = Vec::with_capacity(self.xml_other_children.len());
     for (slot, xml) in std::mem::take(&mut self.xml_other_children) {
       if let Some(children) = crate::common::mce_choice_replacement_children(
-        xml.as_str(),
+        xml.as_ref(),
         settings,
         context,
       )? {
-        xml_other_children.extend(children.into_iter().map(|child| (slot, child)));
+        xml_other_children.extend(children.into_iter().map(|child| (slot, child.into_boxed_str())));
       } else {
         xml_other_children.push((slot, xml));
       }
@@ -990,16 +990,22 @@ fn build_any_child_write_tokens(
 
 fn build_any_child_parse_tokens(
   field_ident: &Ident,
+  field_ty: &Type,
   repeated: bool,
   mode: DeserializeMode,
   as_result: bool,
   xml_child_slot_assign: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   let read_outer_xml = mode.read_outer_xml_fn();
-  let assign = if repeated {
-    quote! { #field_ident.push(xml); }
+  let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
+    quote! { xml.into_boxed_str() }
   } else {
-    quote! { #field_ident = Some(xml); }
+    quote! { xml }
+  };
+  let assign = if repeated {
+    quote! { #field_ident.push(#value_expr); }
+  } else {
+    quote! { #field_ident = Some(#value_expr); }
   };
   let tail = if as_result {
     quote! { return Ok(true); }
@@ -1019,14 +1025,20 @@ fn build_any_child_parse_tokens(
 
 fn build_pure_any_child_parse_tokens(
   field_ident: &Ident,
+  field_ty: &Type,
   repeated: bool,
   mode: DeserializeMode,
 ) -> proc_macro2::TokenStream {
   let read_outer_xml = mode.read_outer_xml_fn();
-  let assign = if repeated {
-    quote! { #field_ident.push(xml); }
+  let value_expr = if is_box_str_type(&unwrap_option_vec_type(field_ty)) {
+    quote! { xml.into_boxed_str() }
   } else {
-    quote! { #field_ident = Some(xml); }
+    quote! { xml }
+  };
+  let assign = if repeated {
+    quote! { #field_ident.push(#value_expr); }
+  } else {
+    quote! { #field_ident = Some(#value_expr); }
   };
 
   quote! {
@@ -1046,7 +1058,7 @@ fn build_unmatched_child_tokens(
     let read_outer_xml = mode.read_outer_xml_fn();
     return quote! {
       let xml = #read_outer_xml(xml_reader, e, next_empty)?;
-      xml_other_children.push((__xml_child_slot, xml));
+      xml_other_children.push((__xml_child_slot, xml.into_boxed_str()));
       continue;
     };
   }
@@ -3134,6 +3146,7 @@ fn expand_named_struct(
       }),
       SdkTypeFieldKind::Any => any_fields.push(SdkAnyField {
         ident: field_ident.clone(),
+        ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
@@ -3425,8 +3438,8 @@ fn expand_named_struct(
       key if key.starts_with(b"xmlns:") => {}
       key => {
         xml_other_attrs.push((
-          String::from_utf8_lossy(key).into_owned(),
-          crate::common::decode_attr_value(&attr, decoder)?,
+          String::from_utf8_lossy(key).into_owned().into_boxed_str(),
+          crate::common::decode_attr_value(&attr, decoder)?.into_boxed_str(),
         ));
       }
     }
@@ -3440,7 +3453,8 @@ fn expand_named_struct(
       match (has_xmlns_fields, has_xml_other_attrs_field) {
         (true, true) => quote! {
           let mut xmlns = Vec::<crate::common::XmlNamespaceDecl>::new();
-          let mut xml_other_attrs = Vec::<(String, String)>::new();
+          let mut xml_other_attrs =
+            Vec::<(std::boxed::Box<str>, std::boxed::Box<str>)>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -3464,7 +3478,8 @@ fn expand_named_struct(
           }
         },
         (false, true) => quote! {
-          let mut xml_other_attrs = Vec::<(String, String)>::new();
+          let mut xml_other_attrs =
+            Vec::<(std::boxed::Box<str>, std::boxed::Box<str>)>::new();
           let decoder = xml_reader.decoder();
           for attr in e.attributes().with_checks(false) {
             let attr = attr?;
@@ -4543,6 +4558,7 @@ fn expand_named_struct(
       any_init_tokens.push(quote! { #field_ident });
       any_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         true,
         DeserializeMode::Borrowed,
         false,
@@ -4550,6 +4566,7 @@ fn expand_named_struct(
       ));
       any_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         true,
         DeserializeMode::Io,
         false,
@@ -4557,6 +4574,7 @@ fn expand_named_struct(
       ));
       any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         true,
         DeserializeMode::Borrowed,
         true,
@@ -4564,6 +4582,7 @@ fn expand_named_struct(
       ));
       any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         true,
         DeserializeMode::Io,
         true,
@@ -4583,6 +4602,7 @@ fn expand_named_struct(
       }
       any_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         false,
         DeserializeMode::Borrowed,
         false,
@@ -4590,6 +4610,7 @@ fn expand_named_struct(
       ));
       any_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         false,
         DeserializeMode::Io,
         false,
@@ -4597,6 +4618,7 @@ fn expand_named_struct(
       ));
       any_visit_parse_tokens_borrowed.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         false,
         DeserializeMode::Borrowed,
         true,
@@ -4604,6 +4626,7 @@ fn expand_named_struct(
       ));
       any_visit_parse_tokens_io.push(build_any_child_parse_tokens(
         field_ident,
+        &field.ty,
         false,
         DeserializeMode::Io,
         true,
@@ -4613,13 +4636,18 @@ fn expand_named_struct(
   }
   let pure_any_parse_tokens_borrowed = if let Some(field) = any_fields.first() {
     let field_ident = &field.ident;
-    build_pure_any_child_parse_tokens(field_ident, field.repeated, DeserializeMode::Borrowed)
+    build_pure_any_child_parse_tokens(
+      field_ident,
+      &field.ty,
+      field.repeated,
+      DeserializeMode::Borrowed,
+    )
   } else {
     quote! {}
   };
   let pure_any_parse_tokens_io = if let Some(field) = any_fields.first() {
     let field_ident = &field.ident;
-    build_pure_any_child_parse_tokens(field_ident, field.repeated, DeserializeMode::Io)
+    build_pure_any_child_parse_tokens(field_ident, &field.ty, field.repeated, DeserializeMode::Io)
   } else {
     quote! {}
   };
@@ -5906,9 +5934,9 @@ fn expand_named_struct(
         let prefix = if declaration.is_default() {
           None
         } else {
-          Some(declaration.prefix.as_str())
+          Some(declaration.prefix.as_ref())
         };
-        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_str())?;
+        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_ref())?;
       }
     }
   } else {
@@ -5917,7 +5945,7 @@ fn expand_named_struct(
   let xml_other_attrs_write_tokens = if has_xml_other_attrs_field {
     quote! {
       for (name, value) in &self.xml_other_attrs {
-        crate::common::write_attr_value_str(writer, name.as_str(), value.as_str())?;
+        crate::common::write_attr_value_str(writer, name.as_ref(), value.as_ref())?;
       }
     }
   } else {
@@ -5939,7 +5967,7 @@ fn expand_named_struct(
   };
   let xml_other_children_decl_tokens = if has_xml_other_children_field {
     quote! {
-      let mut xml_other_children = Vec::<(usize, String)>::new();
+      let mut xml_other_children = Vec::<(usize, std::boxed::Box<str>)>::new();
       let mut __xml_child_slot = 0usize;
     }
   } else {

@@ -3181,7 +3181,7 @@ pub struct MenuRoot {
 pub struct CustomUi {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// onLoad
   #[sdk(attr(qname = ":onLoad"))]
   #[sdk(string_length(min = 1u32, max = 1024u32))]

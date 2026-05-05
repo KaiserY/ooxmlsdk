@@ -69,7 +69,7 @@ pub struct Info {
   #[sdk(string_format(kind = "id"))]
   pub id: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the Lattice Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -475,7 +475,7 @@ pub struct GroupInfo {
   #[sdk(string_format(kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the Derivation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -519,7 +519,7 @@ pub struct Model {
   #[sdk(string_format(kind = "uri"))]
   pub reference: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the EndPointInfo Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -576,7 +576,7 @@ pub struct EndPoint {
   #[sdk(attr(qname = "emma:mode"))]
   pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Defines the Node Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

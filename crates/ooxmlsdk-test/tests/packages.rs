@@ -34,10 +34,14 @@ use ooxmlsdk::sdk::{
 };
 use ooxmlsdk_test::fixtures;
 
-fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
+where
+  N: AsRef<str>,
+  V: AsRef<str>,
+{
   attrs
     .iter()
-    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+    .find_map(|(attr_name, value)| (attr_name.as_ref() == name).then_some(value.as_ref()))
 }
 
 macro_rules! part_ref_variant {
@@ -500,9 +504,12 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
   let root = main_part.root_element(&mut package).unwrap();
   let body = root.body.as_ref().unwrap();
 
-  assert!(body.body_choice.iter().all(
-    |choice| !matches!(choice, BodyChoice::XmlOther(xml) if xml.contains("AlternateContent"))
-  ));
+  assert!(
+    body
+      .body_choice
+      .iter()
+      .all(|choice| !matches!(choice, BodyChoice::XmlAny(xml) if xml.contains("AlternateContent")))
+  );
   assert_eq!(
     body
       .body_choice

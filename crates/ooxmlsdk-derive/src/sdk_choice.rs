@@ -1095,12 +1095,16 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         has_any_variant = true;
-        let any_xml_expr = if is_box_type(&payload_ty) {
+        let any_xml_expr = if is_box_str_type(&payload_ty) {
+          quote! { xml.as_ref() }
+        } else if is_box_type(&payload_ty) {
           quote! { xml.as_ref().as_str() }
         } else {
           quote! { xml.as_str() }
         };
-        let constructor = if is_box_type(&payload_ty) {
+        let constructor = if is_box_str_type(&payload_ty) {
+          quote! { Self::#variant_ident(xml.into_boxed_str()) }
+        } else if is_box_type(&payload_ty) {
           quote! { Self::#variant_ident(std::boxed::Box::new(xml)) }
         } else {
           quote! { Self::#variant_ident(xml) }

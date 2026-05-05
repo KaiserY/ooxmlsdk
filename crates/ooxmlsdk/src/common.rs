@@ -50,13 +50,13 @@ pub enum XmlHeaderType {
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct XmlNamespaceDecl {
-  pub prefix: String,
-  pub uri: String,
+  pub prefix: Box<str>,
+  pub uri: Box<str>,
 }
 
 impl XmlNamespaceDecl {
   #[inline]
-  pub fn new(prefix: impl Into<String>, uri: impl Into<String>) -> Self {
+  pub fn new(prefix: impl Into<Box<str>>, uri: impl Into<Box<str>>) -> Self {
     Self {
       prefix: prefix.into(),
       uri: uri.into(),
@@ -73,8 +73,8 @@ impl XmlNamespaceDecl {
 pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) -> Option<&'a str> {
   declarations
     .iter()
-    .find(|declaration| declaration.prefix == prefix)
-    .map(|declaration| declaration.uri.as_str())
+    .find(|declaration| declaration.prefix.as_ref() == prefix)
+    .map(|declaration| declaration.uri.as_ref())
 }
 
 #[inline(always)]

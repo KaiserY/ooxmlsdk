@@ -2735,7 +2735,7 @@ pub enum TextBoxChoice {
   #[sdk(child(qname = "w:CT_TxbxContent/w:txbxContent"))]
   WTxbxContent(std::boxed::Box<crate::schemas::w::TextBoxContent>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeChoice {

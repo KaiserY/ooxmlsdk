@@ -1380,8 +1380,8 @@ pub struct MinAxisValue {
 pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Version number of the file, as determined by the features used by this chart
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,
@@ -1439,7 +1439,7 @@ pub struct ChartSpace {
 pub struct UserShapes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor",
     qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor"
@@ -1480,7 +1480,7 @@ pub struct Extension {
   #[sdk(string_format(kind = "token"))]
   pub uri: Option<crate::simple_type::StringValue>,
   #[sdk(any)]
-  pub xml_children: Vec<String>,
+  pub xml_children: Vec<std::boxed::Box<str>>,
 }
 /// Numeric Value.
 pub type NumericValue = crate::simple_type::StringValue;
@@ -3026,8 +3026,8 @@ pub struct Thickness {
 #[sdk(qname = "c:CT_StockChartExtension/c:ext")]
 pub struct StockChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3040,8 +3040,8 @@ pub struct StockChartExtension {
 #[sdk(qname = "c:CT_PieChartExtension/c:ext")]
 pub struct PieChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3054,8 +3054,8 @@ pub struct PieChartExtension {
 #[sdk(qname = "c:CT_Pie3DChartExtension/c:ext")]
 pub struct Pie3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3068,8 +3068,8 @@ pub struct Pie3DChartExtension {
 #[sdk(qname = "c:CT_NumRefExtension/c:ext")]
 pub struct NumRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3087,8 +3087,8 @@ pub struct NumRefExtension {
 #[sdk(qname = "c:CT_StrDataExtension/c:ext")]
 pub struct StrDataExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3101,8 +3101,8 @@ pub struct StrDataExtension {
 #[sdk(qname = "c:CT_StrRefExtension/c:ext")]
 pub struct StrRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3120,8 +3120,8 @@ pub struct StrRefExtension {
 #[sdk(qname = "c:CT_MultiLvlStrRefExtension/c:ext")]
 pub struct MultiLvlStrRefExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3139,8 +3139,8 @@ pub struct MultiLvlStrRefExtension {
 #[sdk(qname = "c:CT_DLblsExtension/c:ext")]
 pub struct DLblsExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3162,8 +3162,8 @@ pub struct DLblsExtension {
 #[sdk(qname = "c:CT_LineChartExtension/c:ext")]
 pub struct LineChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3176,8 +3176,8 @@ pub struct LineChartExtension {
 #[sdk(qname = "c:CT_Line3DChartExtension/c:ext")]
 pub struct Line3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3190,8 +3190,8 @@ pub struct Line3DChartExtension {
 #[sdk(qname = "c:CT_ScatterChartExtension/c:ext")]
 pub struct ScatterChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3204,8 +3204,8 @@ pub struct ScatterChartExtension {
 #[sdk(qname = "c:CT_RadarChartExtension/c:ext")]
 pub struct RadarChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3218,8 +3218,8 @@ pub struct RadarChartExtension {
 #[sdk(qname = "c:CT_BarChartExtension/c:ext")]
 pub struct BarChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3232,8 +3232,8 @@ pub struct BarChartExtension {
 #[sdk(qname = "c:CT_Bar3DChartExtension/c:ext")]
 pub struct Bar3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3246,8 +3246,8 @@ pub struct Bar3DChartExtension {
 #[sdk(qname = "c:CT_AreaChartExtension/c:ext")]
 pub struct AreaChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3260,8 +3260,8 @@ pub struct AreaChartExtension {
 #[sdk(qname = "c:CT_Area3DChartExtension/c:ext")]
 pub struct Area3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3274,8 +3274,8 @@ pub struct Area3DChartExtension {
 #[sdk(qname = "c:CT_BubbleChartExtension/c:ext")]
 pub struct BubbleChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3288,8 +3288,8 @@ pub struct BubbleChartExtension {
 #[sdk(qname = "c:CT_SurfaceChartExtension/c:ext")]
 pub struct SurfaceChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3302,8 +3302,8 @@ pub struct SurfaceChartExtension {
 #[sdk(qname = "c:CT_Surface3DChartExtension/c:ext")]
 pub struct Surface3DChartExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3316,8 +3316,8 @@ pub struct Surface3DChartExtension {
 #[sdk(qname = "c:CT_CatAxExtension/c:ext")]
 pub struct CatAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3330,8 +3330,8 @@ pub struct CatAxExtension {
 #[sdk(qname = "c:CT_DateAxExtension/c:ext")]
 pub struct DateAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3344,8 +3344,8 @@ pub struct DateAxExtension {
 #[sdk(qname = "c:CT_SerAxExtension/c:ext")]
 pub struct SerAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3358,8 +3358,8 @@ pub struct SerAxExtension {
 #[sdk(qname = "c:CT_ValAxExtension/c:ext")]
 pub struct ValAxExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -3903,8 +3903,8 @@ pub struct DLblExtensionList {
 #[sdk(qname = "c:CT_DLblExtension/c:ext")]
 pub struct DLblExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4062,8 +4062,8 @@ pub struct LineSerExtensionList {
 #[sdk(qname = "c:CT_LineSerExtension/c:ext")]
 pub struct LineSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4094,8 +4094,8 @@ pub struct ScatterSerExtensionList {
 #[sdk(qname = "c:CT_ScatterSerExtension/c:ext")]
 pub struct ScatterSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4126,8 +4126,8 @@ pub struct RadarSerExtensionList {
 #[sdk(qname = "c:CT_RadarSerExtension/c:ext")]
 pub struct RadarSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4158,8 +4158,8 @@ pub struct BarSerExtensionList {
 #[sdk(qname = "c:CT_BarSerExtension/c:ext")]
 pub struct BarSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4191,8 +4191,8 @@ pub struct AreaSerExtensionList {
 #[sdk(qname = "c:CT_AreaSerExtension/c:ext")]
 pub struct AreaSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4223,8 +4223,8 @@ pub struct PieSerExtensionList {
 #[sdk(qname = "c:CT_PieSerExtension/c:ext")]
 pub struct PieSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4255,8 +4255,8 @@ pub struct BubbleSerExtensionList {
 #[sdk(qname = "c:CT_BubbleSerExtension/c:ext")]
 pub struct BubbleSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4287,8 +4287,8 @@ pub struct SurfaceSerExtensionList {
 #[sdk(qname = "c:CT_SurfaceSerExtension/c:ext")]
 pub struct SurfaceSerExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4479,8 +4479,8 @@ pub struct DisplayBlanksAs {
 #[sdk(qname = "c:CT_ChartExtensionList/c:extLst")]
 pub struct ChartExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the DataDisplayOptions16 Class.
   #[sdk(child(office2019, qname = "c16r3:CT_DataDisplayOptions16/c:ext"))]
   pub c_ext: Vec<DataDisplayOptions16>,
@@ -4678,8 +4678,8 @@ pub struct ChartSpaceExtensionList {
 #[sdk(qname = "c:CT_ChartSpaceExtension/c:ext")]
 pub struct ChartSpaceExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -4990,7 +4990,7 @@ pub enum StockChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieChartExtensionChoice {
@@ -4998,7 +4998,7 @@ pub enum PieChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Pie3DChartExtensionChoice {
@@ -5006,7 +5006,7 @@ pub enum Pie3DChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredPieSer/c15:filteredPieSeries"))]
   C15FilteredPieSeries(std::boxed::Box<crate::schemas::c15::FilteredPieSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumRefExtensionChoice {
@@ -5020,7 +5020,7 @@ pub enum NumRefExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrDataExtensionChoice {
@@ -5028,7 +5028,7 @@ pub enum StrDataExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_Boolean/c15:autoCat"))]
   C15AutoCat(std::boxed::Box<crate::schemas::c15::AutoGeneneratedCategories>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum StrRefExtensionChoice {
@@ -5042,7 +5042,7 @@ pub enum StrRefExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MultiLvlStrRefExtensionChoice {
@@ -5056,7 +5056,7 @@ pub enum MultiLvlStrRefExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FormulaRef/c15:formulaRef"))]
   C15FormulaRef(std::boxed::Box<crate::schemas::c15::FormulaReference>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblsExtensionChoice {
@@ -5082,7 +5082,7 @@ pub enum DLblsExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_ChartLines/c15:leaderLines"))]
   C15LeaderLines(std::boxed::Box<crate::schemas::c15::LeaderLines>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineChartExtensionChoice {
@@ -5090,7 +5090,7 @@ pub enum LineChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Line3DChartExtensionChoice {
@@ -5098,7 +5098,7 @@ pub enum Line3DChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredLineSer/c15:filteredLineSeries"))]
   C15FilteredLineSeries(std::boxed::Box<crate::schemas::c15::FilteredLineSeriesExtension>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterChartExtensionChoice {
@@ -5109,7 +5109,7 @@ pub enum ScatterChartExtensionChoice {
   ))]
   C15FilteredScatterSeries(std::boxed::Box<crate::schemas::c15::FilteredScatterSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarChartExtensionChoice {
@@ -5117,7 +5117,7 @@ pub enum RadarChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredRadarSer/c15:filteredRadarSeries"))]
   C15FilteredRadarSeries(std::boxed::Box<crate::schemas::c15::FilteredRadarSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarChartExtensionChoice {
@@ -5125,7 +5125,7 @@ pub enum BarChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Bar3DChartExtensionChoice {
@@ -5133,7 +5133,7 @@ pub enum Bar3DChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredBarSer/c15:filteredBarSeries"))]
   C15FilteredBarSeries(std::boxed::Box<crate::schemas::c15::FilteredBarSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaChartExtensionChoice {
@@ -5141,7 +5141,7 @@ pub enum AreaChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Area3DChartExtensionChoice {
@@ -5149,7 +5149,7 @@ pub enum Area3DChartExtensionChoice {
   #[sdk(child(office2013, qname = "c15:CT_FilteredAreaSer/c15:filteredAreaSeries"))]
   C15FilteredAreaSeries(std::boxed::Box<crate::schemas::c15::FilteredAreaSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleChartExtensionChoice {
@@ -5160,7 +5160,7 @@ pub enum BubbleChartExtensionChoice {
   ))]
   C15FilteredBubbleSeries(std::boxed::Box<crate::schemas::c15::FilteredBubbleSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceChartExtensionChoice {
@@ -5171,7 +5171,7 @@ pub enum SurfaceChartExtensionChoice {
   ))]
   C15FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Surface3DChartExtensionChoice {
@@ -5182,7 +5182,7 @@ pub enum Surface3DChartExtensionChoice {
   ))]
   C15FilteredSurfaceSeries(std::boxed::Box<crate::schemas::c15::FilteredSurfaceSeries>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CatAxExtensionChoice {
@@ -5190,7 +5190,7 @@ pub enum CatAxExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxExtensionChoice {
@@ -5198,7 +5198,7 @@ pub enum DateAxExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SerAxExtensionChoice {
@@ -5206,7 +5206,7 @@ pub enum SerAxExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValAxExtensionChoice {
@@ -5214,7 +5214,7 @@ pub enum ValAxExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_NumFmt/c15:numFmt"))]
   C15NumFmt(std::boxed::Box<crate::schemas::c15::NumberingFormat>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DisplayUnitsChoice {
@@ -5244,7 +5244,7 @@ pub enum DLblExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CategoryAxisDataChoice {
@@ -5321,7 +5321,7 @@ pub enum LineSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ScatterSerExtensionChoice {
@@ -5362,7 +5362,7 @@ pub enum ScatterSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RadarSerExtensionChoice {
@@ -5403,7 +5403,7 @@ pub enum RadarSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BarSerExtensionChoice {
@@ -5447,7 +5447,7 @@ pub enum BarSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AreaSerExtensionChoice {
@@ -5488,7 +5488,7 @@ pub enum AreaSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PieSerExtensionChoice {
@@ -5529,7 +5529,7 @@ pub enum PieSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BubbleSerExtensionChoice {
@@ -5567,7 +5567,7 @@ pub enum BubbleSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SurfaceSerExtensionChoice {
@@ -5605,7 +5605,7 @@ pub enum SurfaceSerExtensionChoice {
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueId"))]
   C16UniqueId(std::boxed::Box<crate::schemas::c16::UniqueIdChartUniqueId>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PlotAreaChoice {
@@ -5685,5 +5685,5 @@ pub enum ChartSpaceExtensionChoice {
   #[sdk(child(office2013, qname = "c:CT_PivotSource/c15:pivotSource"))]
   C15PivotSource(std::boxed::Box<crate::schemas::c15::PivotSource>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }

@@ -419,22 +419,27 @@ pub struct MceContextCheckpoint {
 
 #[cfg(feature = "mce")]
 impl MceContext {
-  pub(crate) fn push(
+  pub(crate) fn push<N, V>(
     &mut self,
     namespaces: &[crate::common::XmlNamespaceDecl],
-    attrs: &[(String, String)],
-  ) -> MceContextCheckpoint {
+    attrs: &[(N, V)],
+  ) -> MceContextCheckpoint
+  where
+    N: AsRef<str>,
+    V: AsRef<str>,
+  {
     let checkpoint = MceContextCheckpoint {
       namespaces: self.namespaces.len(),
       ignorable_namespaces: self.ignorable_namespaces.len(),
       process_content: self.process_content.len(),
     };
 
-    self.namespaces.extend(
-      namespaces
-        .iter()
-        .map(|decl| (decl.prefix.clone(), decl.uri.clone())),
-    );
+    self.namespaces.extend(namespaces.iter().map(|decl| {
+      (
+        decl.prefix.as_ref().to_owned(),
+        decl.uri.as_ref().to_owned(),
+      )
+    }));
 
     if let Some(value) = mce_attr(attrs, "Ignorable") {
       for prefix in value.split_whitespace() {
@@ -493,9 +498,15 @@ impl MceContext {
 }
 
 #[cfg(feature = "mce")]
-fn mce_attr<'a>(attrs: &'a [(String, String)], local_name: &str) -> Option<&'a str> {
+fn mce_attr<'a, N, V>(attrs: &'a [(N, V)], local_name: &str) -> Option<&'a str>
+where
+  N: AsRef<str>,
+  V: AsRef<str>,
+{
+  let prefixed_name = format!("mc:{local_name}");
   attrs.iter().find_map(|(name, value)| {
-    (name == &format!("mc:{local_name}") || name == local_name).then_some(value.as_str())
+    let name = name.as_ref();
+    (name == prefixed_name || name == local_name).then_some(value.as_ref())
   })
 }
 

@@ -678,7 +678,7 @@ pub enum Model3DExtensionChoice {
   #[sdk(child(office2019, qname = "a3danim:CT_PosterFrame/a3danim:posterFrame"))]
   A3danimPosterFrame(std::boxed::Box<crate::schemas::a3danim::PosterFrame>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

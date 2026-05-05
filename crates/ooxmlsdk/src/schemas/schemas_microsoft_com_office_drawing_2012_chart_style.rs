@@ -144,7 +144,7 @@ pub enum TitlePosition {
 pub struct ColorStyle {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// meth
   #[sdk(attr(office2013, qname = ":meth"))]
   #[sdk(
@@ -185,7 +185,7 @@ pub struct ColorStyle {
 pub struct ChartStyle {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// id
   #[sdk(attr(office2013, qname = ":id"))]
   pub id: Option<crate::simple_type::UInt32Value>,

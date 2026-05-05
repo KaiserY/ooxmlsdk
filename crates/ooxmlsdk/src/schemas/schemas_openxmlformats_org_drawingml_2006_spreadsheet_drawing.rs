@@ -18,8 +18,8 @@ pub enum EditAsValues {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")]
 pub struct TwoCellAnchor {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Positioning and Resizing Behaviors
   #[sdk(attr(qname = ":editAs"))]
   #[sdk(string_format(kind = "token"))]
@@ -47,8 +47,8 @@ pub struct TwoCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor")]
 pub struct OneCellAnchor {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
   pub from_marker: Option<FromMarker>,
@@ -72,8 +72,8 @@ pub struct OneCellAnchor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor")]
 pub struct AbsoluteAnchor {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Position
   #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
   pub position: Option<Position>,
@@ -127,7 +127,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "xdr:CT_GroupShape/xdr:grpSp")]
 pub struct GroupShape {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
@@ -247,7 +247,7 @@ pub struct ContentPart {
 pub struct WorksheetDrawing {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
     qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",
@@ -333,7 +333,7 @@ pub struct ShapeStyle {
 #[sdk(qname = "a:CT_TextBody/xdr:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -706,7 +706,7 @@ pub enum GroupShapeChoice {
   Xdr14ContentPart(std::boxed::Box<crate::schemas::xdr14::ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),

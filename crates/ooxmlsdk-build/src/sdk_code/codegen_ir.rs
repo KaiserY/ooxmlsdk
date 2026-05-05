@@ -381,7 +381,7 @@ mod tests {
             version: "Office2007".to_string(),
             wire: VariantWireDecl::Any,
             payload: TypeRefDecl {
-              rust_type: "String".to_string(),
+              rust_type: "std::boxed::Box<str>".to_string(),
               module_path: None,
             },
           }),

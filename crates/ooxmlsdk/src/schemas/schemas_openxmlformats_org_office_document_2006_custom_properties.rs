@@ -10,7 +10,7 @@
 pub struct Properties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Custom File Property.
   #[sdk(child(qname = "op:CT_Property/op:property"))]
   pub op_property: Vec<CustomDocumentProperty>,

@@ -13,7 +13,7 @@
 pub struct FeaturePropertyBags {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// count
   #[sdk(attr(microsoft365, qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,

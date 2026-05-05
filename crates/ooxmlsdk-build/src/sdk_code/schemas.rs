@@ -1219,7 +1219,9 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           let field_type = any_field
             .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
             .transpose()?
-            .unwrap_or_else(|| parse_str("String").expect("String type"));
+            .unwrap_or_else(|| {
+              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type")
+            });
           let field_attrs = module_version_cfg_attrs(
             any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,
@@ -1562,7 +1564,9 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
           let field_type = any_field
             .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
             .transpose()?
-            .unwrap_or_else(|| parse_str("String").expect("String type"));
+            .unwrap_or_else(|| {
+              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type")
+            });
           let field_attrs = module_version_cfg_attrs(
             any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,
@@ -3395,13 +3399,13 @@ fn gen_support_fields(support: &SystemSupportDecl) -> Vec<TokenStream> {
 
   if support.have_xml_other_attrs {
     fields.push(quote! {
-      pub xml_other_attrs: Vec<(String, String)>,
+      pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
     });
   }
 
   if support.have_xml_other_children {
     fields.push(quote! {
-      pub xml_other_children: Vec<(usize, String)>,
+      pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
     });
   }
 
@@ -3914,7 +3918,7 @@ fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&Fie
   matches!(field.wire, FieldWireDecl::Any)
     && field.cardinality == Cardinality::Many
     && field.type_ref.module_path.is_none()
-    && field.type_ref.rust_type == "String"
+    && field.type_ref.rust_type == "std::boxed::Box<str>"
 }
 
 fn is_any_children_alias_type_ref(
@@ -4132,8 +4136,12 @@ mod tests {
     assert!(!generated.contains("pub struct StyleMatrixReferenceType"));
     assert!(!generated.contains("pub enum StyleMatrixReferenceTypeChoice"));
     assert!(generated.contains("pub struct FillReference"));
-    assert!(generated.contains("pub xml_other_attrs : Vec < (String , String) >"));
-    assert!(generated.contains("pub xml_other_children : Vec < (usize , String) >"));
+    assert!(generated.contains(
+      "pub xml_other_attrs : Vec < (std :: boxed :: Box < str > , std :: boxed :: Box < str >) >"
+    ));
+    assert!(
+      generated.contains("pub xml_other_children : Vec < (usize , std :: boxed :: Box < str >) >")
+    );
   }
 
   fn read_codegen_ir_schema_json(path: &str) -> SchemaModuleDecl {
@@ -4238,7 +4246,7 @@ mod tests {
               wire: FieldWireDecl::Any,
               cardinality: Cardinality::Many,
               type_ref: TypeRefDecl {
-                rust_type: "String".to_string(),
+                rust_type: "std::boxed::Box<str>".to_string(),
                 module_path: None,
               },
               validators: vec![],
@@ -4262,7 +4270,7 @@ mod tests {
     );
     assert!(generated.contains("pub c_sld_moniker :"));
     assert!(generated.contains("pub sld_moniker :"));
-    assert!(generated.contains("pub unknown_xml : Vec < String >"));
+    assert!(generated.contains("pub unknown_xml : Vec < std :: boxed :: Box < str > >"));
   }
 
   #[test]
@@ -4272,7 +4280,9 @@ mod tests {
     );
     let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
 
-    assert!(generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
+    assert!(
+      generated.contains("# [sdk (any)] pub xml_children : Vec < std :: boxed :: Box < str > >")
+    );
     assert!(!generated.contains("pub enum ContentTypeSchemaChoice"));
     assert!(!generated.contains("UnknownXml (String)"));
     assert!(!generated.contains("UnknownXml (std :: boxed :: Box < String >)"));
@@ -6283,7 +6293,7 @@ mod tests {
 
     assert!(generated.contains("pub leaf_child : std :: boxed :: Box < Leaf >"));
     assert!(generated.contains("pub text_child : Option < crate :: simple_type :: StringValue >"));
-    assert!(generated.contains("pub unknown_xml : Vec < String >"));
+    assert!(generated.contains("pub unknown_xml : Vec < std :: boxed :: Box < str > >"));
     assert!(!generated.contains("pub enum SequenceHolderChoice"));
   }
 
@@ -6760,7 +6770,9 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("pub type AnyHolder = Vec < String >"));
-    assert!(!generated.contains("# [sdk (any)] pub xml_children : Vec < String >"));
+    assert!(
+      !generated.contains("# [sdk (any)] pub xml_children : Vec < std :: boxed :: Box < str > >")
+    );
     assert!(!generated.contains("pub enum AnyHolderChoice"));
     assert!(!generated.contains("UnknownXml (String)"));
   }

@@ -890,8 +890,8 @@ pub enum VerticalAlignmentValues {
 pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Unique ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -954,7 +954,7 @@ pub struct ColorsDefinitionHeaderList {
 pub struct DataModelRoot {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Point List
   #[sdk(child(qname = "dgm:CT_PtList/dgm:ptLst"))]
   pub point_list: std::boxed::Box<PointList>,
@@ -977,8 +977,8 @@ pub struct DataModelRoot {
 pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1073,8 +1073,8 @@ pub struct RelationshipIds {
 pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Unique Style ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1150,7 +1150,7 @@ pub struct ColorTransformCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1175,7 +1175,7 @@ pub struct FillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1200,7 +1200,7 @@ pub struct LineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1225,7 +1225,7 @@ pub struct EffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1250,7 +1250,7 @@ pub struct TextLineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -1275,7 +1275,7 @@ pub struct TextFillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
   #[sdk(string_format(kind = "token"))]
@@ -2728,7 +2728,7 @@ pub struct ShapeProperties {
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -2753,8 +2753,8 @@ pub struct PtExtensionList {
 #[sdk(qname = "dgm:CT_DiagramDefinitionExtension/dgm:ext")]
 pub struct DiagramDefinitionExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -2830,7 +2830,7 @@ pub enum FillColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -2857,7 +2857,7 @@ pub enum LineColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -2884,7 +2884,7 @@ pub enum EffectColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -2911,7 +2911,7 @@ pub enum TextLineColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -2938,7 +2938,7 @@ pub enum TextFillColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -2965,7 +2965,7 @@ pub enum TextEffectColorListChoice {
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),
@@ -3190,5 +3190,5 @@ pub enum DiagramDefinitionExtensionChoice {
   #[sdk(child(office2019, qname = "a:CT_TextListStyle/dgm1612:lstStyle"))]
   Dgm1612LstStyle(std::boxed::Box<crate::schemas::dgm1612::TextListStyleType>),
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
 }

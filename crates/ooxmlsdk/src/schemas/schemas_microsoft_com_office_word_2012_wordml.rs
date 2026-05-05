@@ -71,7 +71,7 @@ pub struct Appearance {
 pub struct CommentsEx {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the CommentEx Class.
   #[sdk(child(office2013, qname = "w15:CT_CommentEx/w15:commentEx"))]
   pub w15_comment_ex: Vec<CommentEx>,
@@ -82,7 +82,7 @@ pub struct CommentsEx {
 pub struct People {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Person Class.
   #[sdk(child(office2013, qname = "w15:CT_Person/w15:person"))]
   pub w15_person: Vec<Person>,

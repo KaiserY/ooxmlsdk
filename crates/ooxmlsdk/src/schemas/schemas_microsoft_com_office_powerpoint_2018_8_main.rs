@@ -47,7 +47,7 @@ pub struct CommentPropertiesExtensionList {
 pub struct AuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Author Class.
   #[sdk(child(office2021, qname = "p188:CT_Author/p188:author"))]
   pub p188_author: Vec<Author>,
@@ -58,7 +58,7 @@ pub struct AuthorList {
 pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Comment Class.
   #[sdk(child(office2021, qname = "p188:CT_Comment/p188:cm"))]
   pub p188_cm: Vec<Comment>,

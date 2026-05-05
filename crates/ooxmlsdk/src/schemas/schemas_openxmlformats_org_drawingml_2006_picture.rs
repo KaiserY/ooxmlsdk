@@ -8,8 +8,8 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]
   pub non_visual_picture_properties: std::boxed::Box<NonVisualPictureProperties>,

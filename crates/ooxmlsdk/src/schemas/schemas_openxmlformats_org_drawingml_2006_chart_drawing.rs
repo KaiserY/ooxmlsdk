@@ -9,8 +9,8 @@
 #[sdk(qname = "cdr:CT_RelSizeAnchor/cdr:relSizeAnchor")]
 pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: Option<FromAnchor>,
@@ -31,8 +31,8 @@ pub struct RelativeAnchorSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
-  pub xml_other_attrs: Vec<(String, String)>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: Option<FromAnchor>,
@@ -83,7 +83,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShape/cdr:grpSp")]
 pub struct GroupShape {
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]
   pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
@@ -290,7 +290,7 @@ pub struct Style {
 #[sdk(qname = "a:CT_TextBody/cdr:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, String)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -564,7 +564,7 @@ pub enum GroupShapeChoice {
   Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
-  XmlOther(String),
+  XmlAny(std::boxed::Box<str>),
   /// Unknown XML text.
   #[sdk(text)]
   XmlText(crate::simple_type::StringValue),

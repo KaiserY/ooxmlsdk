@@ -10,7 +10,7 @@
 pub struct Taskpanes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the WebExtensionTaskpane Class.
   #[sdk(child(office2013, qname = "wetp:CT_OsfTaskpane/wetp:taskpane"))]
   pub wetp_taskpane: Vec<WebExtensionTaskpane>,

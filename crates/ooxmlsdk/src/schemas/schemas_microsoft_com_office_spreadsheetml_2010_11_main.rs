@@ -510,7 +510,7 @@ pub struct Survey {
 pub struct Timelines {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the Timeline Class.
   #[sdk(child(office2013, qname = "x15:CT_Timeline/x15:timeline"))]
   pub x15_timeline: Vec<Timeline>,
@@ -524,7 +524,7 @@ pub struct Timelines {
 pub struct TimelineCacheDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
-  pub xml_other_attrs: Vec<(String, String)>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// name
   #[sdk(attr(office2013, qname = ":name"))]
   pub name: crate::simple_type::StringValue,

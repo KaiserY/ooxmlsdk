@@ -8,10 +8,14 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures};
 
-fn xml_other_attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
+where
+  N: AsRef<str>,
+  V: AsRef<str>,
+{
   attrs
     .iter()
-    .find_map(|(attr_name, value)| (attr_name == name).then_some(value.as_str()))
+    .find_map(|(attr_name, value)| (attr_name.as_ref() == name).then_some(value.as_ref()))
 }
 
 fn doc_sample_part(file_name: &str, part_name: &str) -> String {

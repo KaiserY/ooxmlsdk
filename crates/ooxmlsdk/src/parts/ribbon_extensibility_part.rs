@@ -16,17 +16,8 @@ pub struct RibbonExtensibilityPart {
   pub(crate) id: crate::common::PartId,
 }
 impl RibbonExtensibilityPart {
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
+  crate::sdk_part_child_methods! {
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
   }
 }

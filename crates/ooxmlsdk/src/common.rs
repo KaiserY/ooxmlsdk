@@ -90,84 +90,31 @@ where
   xml::parse_attr_value(attr, decoder, ty, field)
 }
 
-#[inline(always)]
-pub(crate) fn parse_u8_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<u8, SdkError> {
-  xml::parse_u8_attr(attr, decoder, ty, field)
+macro_rules! define_attr_parser_forwarders {
+  ($($name:ident -> $ty:ty),* $(,)?) => {
+    $(
+      #[inline(always)]
+      pub(crate) fn $name(
+        attr: &Attribute<'_>,
+        decoder: Decoder,
+        ty: &'static str,
+        field: &'static str,
+      ) -> Result<$ty, SdkError> {
+        xml::$name(attr, decoder, ty, field)
+      }
+    )*
+  };
 }
 
-#[inline(always)]
-pub(crate) fn parse_i8_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i8, SdkError> {
-  xml::parse_i8_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_u16_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<u16, SdkError> {
-  xml::parse_u16_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_i16_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i16, SdkError> {
-  xml::parse_i16_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_u32_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<u32, SdkError> {
-  xml::parse_u32_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_i32_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i32, SdkError> {
-  xml::parse_i32_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_u64_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<u64, SdkError> {
-  xml::parse_u64_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_i64_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<i64, SdkError> {
-  xml::parse_i64_attr(attr, decoder, ty, field)
+define_attr_parser_forwarders! {
+  parse_u8_attr -> u8,
+  parse_i8_attr -> i8,
+  parse_u16_attr -> u16,
+  parse_i16_attr -> i16,
+  parse_u32_attr -> u32,
+  parse_i32_attr -> i32,
+  parse_u64_attr -> u64,
+  parse_i64_attr -> i64,
 }
 
 #[inline(always)]
@@ -275,59 +222,26 @@ fn package_main_part_path_matches(
     return false;
   }
 
-  let expected_stem = if descriptor_path_prefix.is_empty() || descriptor_path_prefix == "." {
-    descriptor_target_name.to_string()
-  } else {
-    format!(
-      "{}/{}",
-      descriptor_path_prefix.trim_matches('/'),
-      descriptor_target_name
-    )
+  let Some(actual_stem) = actual_path.strip_suffix(".xml") else {
+    return false;
   };
 
-  actual_path
-    .strip_suffix(".xml")
-    .is_some_and(|actual_stem| actual_stem == expected_stem)
+  if descriptor_path_prefix.is_empty() || descriptor_path_prefix == "." {
+    return actual_stem == descriptor_target_name;
+  }
+
+  let descriptor_path_prefix = descriptor_path_prefix.trim_matches('/');
+  actual_stem.len() == descriptor_path_prefix.len() + descriptor_target_name.len() + 1
+    && actual_stem.starts_with(descriptor_path_prefix)
+    && actual_stem.as_bytes()[descriptor_path_prefix.len()] == b'/'
+    && &actual_stem[descriptor_path_prefix.len() + 1..] == descriptor_target_name
 }
 
-#[inline(always)]
-pub(crate) fn parse_boolean_value_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_boolean_value_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_on_off_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_on_off_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_true_false_blank_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_true_false_blank_attr(attr, decoder, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_true_false_attr(
-  attr: &Attribute<'_>,
-  decoder: Decoder,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_true_false_attr(attr, decoder, ty, field)
+define_attr_parser_forwarders! {
+  parse_boolean_value_attr -> bool,
+  parse_on_off_attr -> bool,
+  parse_true_false_blank_attr -> bool,
+  parse_true_false_attr -> bool,
 }
 
 #[inline(always)]

@@ -23,30 +23,11 @@ impl DocumentSettingsPart {
     as_document_settings_part,
     as_document_settings_part_mut
   );
-  pub fn mail_merge_recipient_data_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData",
-    )
-  }
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
+  crate::sdk_part_child_methods! {
+      optional mail_merge_recipient_data_part => crate
+      ::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData";
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
   }
 }

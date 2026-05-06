@@ -23,17 +23,8 @@ impl TableDefinitionPart {
     as_table_definition_part,
     as_table_definition_part_mut
   );
-  pub fn query_table_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::query_table_part::QueryTablePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::query_table_part::QueryTablePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable",
-    )
+  crate::sdk_part_child_methods! {
+      repeated query_table_parts => crate ::parts::query_table_part::QueryTablePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
   }
 }

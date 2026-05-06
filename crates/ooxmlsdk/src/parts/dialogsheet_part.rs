@@ -23,58 +23,16 @@ impl DialogsheetPart {
     as_dialogsheet_part,
     as_dialogsheet_part_mut
   );
-  pub fn spreadsheet_printer_settings_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<
-    Item = crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-  > + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    )
-  }
-  pub fn drawings_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::drawings_part::DrawingsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::drawings_part::DrawingsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    )
-  }
-  pub fn vml_drawing_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::vml_drawing_part::VmlDrawingPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::vml_drawing_part::VmlDrawingPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    )
-  }
-  pub fn embedded_object_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::embedded_object_part::EmbeddedObjectPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::embedded_object_part::EmbeddedObjectPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    )
+  crate::sdk_part_child_methods! {
+      repeated spreadsheet_printer_settings_parts => crate
+      ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
+      optional drawings_part => crate ::parts::drawings_part::DrawingsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
+      repeated vml_drawing_parts => crate ::parts::vml_drawing_part::VmlDrawingPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
+      repeated embedded_object_parts => crate
+      ::parts::embedded_object_part::EmbeddedObjectPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
   }
 }

@@ -14,51 +14,6 @@ struct PartChildMarkerInfo {
   kind: PartChildKind,
 }
 
-fn build_conditional_chain(
-  branches: &[(proc_macro2::TokenStream, proc_macro2::TokenStream)],
-  fallback: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  if branches.is_empty() {
-    return fallback;
-  }
-
-  let mut chain = proc_macro2::TokenStream::new();
-
-  for (index, (condition, body)) in branches.iter().enumerate() {
-    if index == 0 {
-      chain.extend(quote! {
-        if #condition {
-          #body
-        }
-      });
-    } else {
-      chain.extend(quote! {
-        else if #condition {
-          #body
-        }
-      });
-    }
-  }
-
-  chain.extend(quote! {
-    else {
-      #fallback
-    }
-  });
-
-  chain
-}
-
-fn explicit_relationship_type_may_have_alias(value: &str) -> bool {
-  value.starts_with("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
-    || value == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
-    || value == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects"
-}
-
-fn is_relationship_model_field(ident: &Ident) -> bool {
-  ident == "fallback_parts" || ident == "relationship_order" || ident == "modeled_relationships"
-}
-
 fn package_child_init_tokens(
   child: &PackageChildInfo,
   field_index: usize,

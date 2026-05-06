@@ -16,17 +16,9 @@ pub struct DigitalSignatureOriginPart {
   pub(crate) id: crate::common::PartId,
 }
 impl DigitalSignatureOriginPart {
-  pub fn xml_signature_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::xml_signature_part::XmlSignaturePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::xml_signature_part::XmlSignaturePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
-    )
+  crate::sdk_part_child_methods! {
+      repeated xml_signature_parts => crate
+      ::parts::xml_signature_part::XmlSignaturePart,
+      "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature";
   }
 }

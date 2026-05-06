@@ -22,17 +22,8 @@ impl CustomDataPropertiesPart {
     as_custom_data_properties_part,
     as_custom_data_properties_part_mut
   );
-  pub fn custom_data_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::custom_data_part::CustomDataPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::custom_data_part::CustomDataPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/customData",
-    )
+  crate::sdk_part_child_methods! {
+      optional custom_data_part => crate ::parts::custom_data_part::CustomDataPart,
+      "http://schemas.microsoft.com/office/2007/relationships/customData";
   }
 }

@@ -23,17 +23,9 @@ impl PivotTableCacheDefinitionPart {
     as_pivot_table_cache_definition_part,
     as_pivot_table_cache_definition_part_mut
   );
-  pub fn pivot_table_cache_records_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords",
-    )
+  crate::sdk_part_child_methods! {
+      optional pivot_table_cache_records_part => crate
+      ::parts::pivot_table_cache_records_part::PivotTableCacheRecordsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
   }
 }

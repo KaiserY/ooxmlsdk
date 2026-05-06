@@ -23,17 +23,8 @@ impl FontTablePart {
     as_font_table_part,
     as_font_table_part_mut
   );
-  pub fn font_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::font_part::FontPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::font_part::FontPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
-    )
+  crate::sdk_part_child_methods! {
+      repeated font_parts => crate ::parts::font_part::FontPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font";
   }
 }

@@ -23,180 +23,41 @@ impl HeaderPart {
     as_header_part,
     as_header_part_mut
   );
-  pub fn alternative_format_import_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::alternative_format_import_part::AlternativeFormatImportPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk",
-    )
-  }
-  pub fn chart_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::chart_part::ChartPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::chart_part::ChartPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart",
-    )
-  }
-  pub fn extended_chart_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::extended_chart_part::ExtendedChartPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::extended_chart_part::ExtendedChartPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2014/relationships/chartEx",
-    )
-  }
-  pub fn diagram_colors_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::diagram_colors_part::DiagramColorsPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::diagram_colors_part::DiagramColorsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors",
-    )
-  }
-  pub fn diagram_data_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::diagram_data_part::DiagramDataPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::diagram_data_part::DiagramDataPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData",
-    )
-  }
-  pub fn diagram_persist_layout_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing",
-    )
-  }
-  pub fn diagram_layout_definition_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout",
-    )
-  }
-  pub fn diagram_style_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::diagram_style_part::DiagramStylePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::diagram_style_part::DiagramStylePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle",
-    )
-  }
-  pub fn embedded_control_persistence_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<
-    Item = crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
-  > + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control",
-    )
-  }
-  pub fn embedded_object_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::embedded_object_part::EmbeddedObjectPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::embedded_object_part::EmbeddedObjectPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-    )
-  }
-  pub fn embedded_package_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::embedded_package_part::EmbeddedPackagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::embedded_package_part::EmbeddedPackagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package",
-    )
-  }
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
-  pub fn model3_d_reference_relationship_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<
-    Item = crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
-  > + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
-    )
+  crate::sdk_part_child_methods! {
+      repeated alternative_format_import_parts => crate
+      ::parts::alternative_format_import_part::AlternativeFormatImportPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
+      repeated chart_parts => crate ::parts::chart_part::ChartPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+      repeated extended_chart_parts => crate
+      ::parts::extended_chart_part::ExtendedChartPart,
+      "http://schemas.microsoft.com/office/2014/relationships/chartEx"; repeated
+      diagram_colors_parts => crate ::parts::diagram_colors_part::DiagramColorsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramColors";
+      repeated diagram_data_parts => crate ::parts::diagram_data_part::DiagramDataPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramData";
+      repeated diagram_persist_layout_parts => crate
+      ::parts::diagram_persist_layout_part::DiagramPersistLayoutPart,
+      "http://schemas.microsoft.com/office/2007/relationships/diagramDrawing"; repeated
+      diagram_layout_definition_parts => crate
+      ::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramLayout";
+      repeated diagram_style_parts => crate
+      ::parts::diagram_style_part::DiagramStylePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle";
+      repeated embedded_control_persistence_parts => crate
+      ::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control";
+      repeated embedded_object_parts => crate
+      ::parts::embedded_object_part::EmbeddedObjectPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
+      repeated embedded_package_parts => crate
+      ::parts::embedded_package_part::EmbeddedPackagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+      repeated model3_d_reference_relationship_parts => crate
+      ::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/model3d";
   }
 }

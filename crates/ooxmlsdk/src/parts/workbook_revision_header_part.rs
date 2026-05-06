@@ -23,18 +23,9 @@ impl WorkbookRevisionHeaderPart {
     as_workbook_revision_header_part,
     as_workbook_revision_header_part_mut
   );
-  pub fn workbook_revision_log_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog",
-    )
+  crate::sdk_part_child_methods! {
+      repeated workbook_revision_log_parts => crate
+      ::parts::workbook_revision_log_part::WorkbookRevisionLogPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionLog";
   }
 }

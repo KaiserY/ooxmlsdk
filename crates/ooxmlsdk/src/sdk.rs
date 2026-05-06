@@ -2173,6 +2173,45 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   }
 
   #[inline]
+  fn missing_part_storage_error(&self) -> crate::common::SdkError {
+    crate::common::SdkError::CommonError(format!(
+      "part id {:?} is not present in package storage",
+      self.part_id()
+    ))
+  }
+
+  #[inline]
+  fn next_relationship_id<P: SdkPackage>(
+    &self,
+    package: &P,
+  ) -> Result<String, crate::common::SdkError> {
+    Ok(
+      self
+        .relationships(package)
+        .ok_or_else(|| self.missing_part_storage_error())?
+        .next_relationship_id(),
+    )
+  }
+
+  #[inline]
+  fn added_relationship_ref<'a, P: SdkPackage>(
+    &self,
+    package: &'a P,
+    relationship_id: &str,
+  ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
+    crate::sdk::SdkPackageInternal::storage(package)
+      .relationships(self.part_id())
+      .and_then(|relationships| relationships.get(relationship_id))
+      .map(Into::into)
+      .ok_or_else(|| {
+        crate::common::SdkError::CommonError(format!(
+          "relationship id {relationship_id} is not present on part id {:?}",
+          self.part_id()
+        ))
+      })
+  }
+
+  #[inline]
   fn child_part_by_relationship_type<P, T>(&self, package: &P, relationship_type: &str) -> Option<T>
   where
     P: SdkPackage,
@@ -2227,21 +2266,10 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     let relationship_id = relationship_id.into();
     self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .add_external_relationship(relationship_id.clone(), relationship_type, target)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
-    Ok(
-      crate::sdk::SdkPackageInternal::storage(package)
-        .relationships(self.part_id())
-        .and_then(|relationships| relationships.get(&relationship_id))
-        .expect("relationship was just added")
-        .into(),
-    )
+    self.added_relationship_ref(package, &relationship_id)
   }
 
   #[inline]
@@ -2251,15 +2279,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     relationship_type: impl Into<String>,
     target: impl Into<String>,
   ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_external_relationship(package, relationship_id, relationship_type, target)
   }
 
@@ -2273,21 +2293,10 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     let relationship_id = relationship_id.into();
     self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .add_hyperlink_relationship(relationship_id.clone(), target)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
-    Ok(
-      crate::sdk::SdkPackageInternal::storage(package)
-        .relationships(self.part_id())
-        .and_then(|relationships| relationships.get(&relationship_id))
-        .expect("relationship was just added")
-        .into(),
-    )
+    self.added_relationship_ref(package, &relationship_id)
   }
 
   #[inline]
@@ -2301,21 +2310,10 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     let relationship_id = relationship_id.into();
     self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .add_hyperlink_relationship_with_mode(relationship_id.clone(), target, target_mode)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
-    Ok(
-      crate::sdk::SdkPackageInternal::storage(package)
-        .relationships(self.part_id())
-        .and_then(|relationships| relationships.get(&relationship_id))
-        .expect("relationship was just added")
-        .into(),
-    )
+    self.added_relationship_ref(package, &relationship_id)
   }
 
   #[inline]
@@ -2325,15 +2323,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     target: impl Into<String>,
     target_mode: crate::schemas::opc_relationships::TargetMode,
   ) -> Result<crate::common::RelationshipRef<'a>, crate::common::SdkError> {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_hyperlink_relationship_with_mode(package, relationship_id, target, target_mode)
   }
 
@@ -2343,15 +2333,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     package: &mut P,
     media_data_part: &crate::common::MediaDataPart,
   ) -> Result<String, crate::common::SdkError> {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_audio_reference_relationship_with_id(package, media_data_part, relationship_id)
   }
 
@@ -2376,15 +2358,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     package: &mut P,
     media_data_part: &crate::common::MediaDataPart,
   ) -> Result<String, crate::common::SdkError> {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_media_reference_relationship_with_id(package, media_data_part, relationship_id)
   }
 
@@ -2409,15 +2383,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     package: &mut P,
     media_data_part: &crate::common::MediaDataPart,
   ) -> Result<String, crate::common::SdkError> {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_video_reference_relationship_with_id(package, media_data_part, relationship_id)
   }
 
@@ -2553,15 +2519,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_new_part::<P, T>(package, relationship_id)
   }
 
@@ -2575,15 +2533,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_new_part_with_content_type::<P, T>(package, relationship_id, content_type)
   }
 
@@ -2627,15 +2577,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_new_part_with_content_type_and_extension::<P, T>(
       package,
       relationship_id,
@@ -2655,15 +2597,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_extended_part_with_id(
       package,
       relationship_type,
@@ -3417,12 +3351,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   ) -> Result<crate::common::Relationship, crate::common::SdkError> {
     let relationship = self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .remove_reference_relationship(relationship_id)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
     Ok(relationship.into())
@@ -3436,12 +3365,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   ) -> Result<crate::common::Relationship, crate::common::SdkError> {
     let relationship = self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .remove_external_relationship(relationship_id)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
     Ok(relationship.into())
@@ -3456,12 +3380,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
   ) -> Result<(), crate::common::SdkError> {
     self
       .relationships_mut(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
+      .ok_or_else(|| self.missing_part_storage_error())?
       .change_relationship_id(relationship_id, new_relationship_id)?;
     crate::sdk::SdkPackageInternal::refresh_relationship_model_from_storage(package);
     Ok(())
@@ -3777,15 +3696,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     if self.get_id_of_part(package, &part).is_some() {
       return Ok(part);
     }
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.add_part_with_id(package, part, relationship_id)
   }
 
@@ -3875,15 +3786,7 @@ pub trait SdkPart: SdkPartInternal + Clone + Sized + 'static {
     if let Some(relationship_id) = self.get_id_of_part(package, &part) {
       return Ok(relationship_id.to_string());
     }
-    let relationship_id = self
-      .relationships(package)
-      .ok_or_else(|| {
-        crate::common::SdkError::CommonError(format!(
-          "part id {:?} is not present in package storage",
-          self.part_id()
-        ))
-      })?
-      .next_relationship_id();
+    let relationship_id = self.next_relationship_id(package)?;
     self.create_relationship_to_part_with_id(package, part, relationship_id)
   }
 
@@ -4079,6 +3982,54 @@ macro_rules! sdk_part_root_methods {
       )));
 
       Ok(())
+    }
+  };
+}
+
+#[cfg(feature = "parts")]
+#[macro_export]
+macro_rules! sdk_part_child_methods {
+  () => {};
+  (
+    $(#[$attrs:meta])*
+    optional $method:ident => $part_ty:ty, $relationship_type:expr;
+    $($rest:tt)*
+  ) => {
+    $(#[$attrs])*
+    pub fn $method<P: $crate::sdk::SdkPackage>(
+      &self,
+      package: &P,
+    ) -> Option<$part_ty> {
+      <Self as $crate::sdk::SdkPart>::child_part_by_relationship_type::<P, $part_ty>(
+        self,
+        package,
+        $relationship_type,
+      )
+    }
+
+    $crate::sdk_part_child_methods! {
+      $($rest)*
+    }
+  };
+  (
+    $(#[$attrs:meta])*
+    repeated $method:ident => $part_ty:ty, $relationship_type:expr;
+    $($rest:tt)*
+  ) => {
+    $(#[$attrs])*
+    pub fn $method<'a, P: $crate::sdk::SdkPackage>(
+      &'a self,
+      package: &'a P,
+    ) -> impl Iterator<Item = $part_ty> + 'a {
+      <Self as $crate::sdk::SdkPart>::child_parts_by_relationship_type::<P, $part_ty>(
+        self,
+        package,
+        $relationship_type,
+      )
+    }
+
+    $crate::sdk_part_child_methods! {
+      $($rest)*
     }
   };
 }

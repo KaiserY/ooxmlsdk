@@ -23,17 +23,8 @@ impl ViewPropertiesPart {
     as_view_properties_part,
     as_view_properties_part_mut
   );
-  pub fn slide_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::slide_part::SlidePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::slide_part::SlidePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-    )
+  crate::sdk_part_child_methods! {
+      repeated slide_parts => crate ::parts::slide_part::SlidePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
   }
 }

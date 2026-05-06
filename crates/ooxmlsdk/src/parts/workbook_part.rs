@@ -22,454 +22,93 @@ impl WorkbookPart {
     as_workbook_part,
     as_workbook_part_mut
   );
-  pub fn custom_xml_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::custom_xml_part::CustomXmlPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::custom_xml_part::CustomXmlPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
-    )
-  }
-  pub fn calculation_chain_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::calculation_chain_part::CalculationChainPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::calculation_chain_part::CalculationChainPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
-    )
-  }
-  pub fn cell_metadata_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::cell_metadata_part::CellMetadataPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::cell_metadata_part::CellMetadataPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
-    )
-  }
-  pub fn connections_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::connections_part::ConnectionsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::connections_part::ConnectionsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections",
-    )
-  }
-  pub fn custom_xml_mappings_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::custom_xml_mappings_part::CustomXmlMappingsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps",
-    )
-  }
-  pub fn shared_string_table_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::shared_string_table_part::SharedStringTablePart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::shared_string_table_part::SharedStringTablePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
-    )
-  }
-  pub fn workbook_revision_header_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders",
-    )
-  }
-  pub fn workbook_user_data_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::workbook_user_data_part::WorkbookUserDataPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::workbook_user_data_part::WorkbookUserDataPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames",
-    )
-  }
-  pub fn workbook_styles_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::workbook_styles_part::WorkbookStylesPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::workbook_styles_part::WorkbookStylesPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
-    )
-  }
-  pub fn theme_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::theme_part::ThemePart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::theme_part::ThemePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
-    )
-  }
-  pub fn thumbnail_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::thumbnail_part::ThumbnailPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::thumbnail_part::ThumbnailPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-    )
-  }
-  pub fn volatile_dependencies_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::volatile_dependencies_part::VolatileDependenciesPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::volatile_dependencies_part::VolatileDependenciesPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies",
-    )
-  }
-  pub fn chartsheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::chartsheet_part::ChartsheetPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::chartsheet_part::ChartsheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
-    )
-  }
-  pub fn dialogsheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::dialogsheet_part::DialogsheetPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::dialogsheet_part::DialogsheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
-    )
-  }
-  pub fn external_workbook_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::external_workbook_part::ExternalWorkbookPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::external_workbook_part::ExternalWorkbookPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink",
-    )
-  }
-  pub fn pivot_table_cache_definition_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<
-    Item = crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
-  > + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition",
-    )
-  }
-  pub fn worksheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::worksheet_part::WorksheetPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::worksheet_part::WorksheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
-    )
-  }
-  pub fn excel_attached_toolbars_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-    )
-  }
-  pub fn vba_project_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::vba_project_part::VbaProjectPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::vba_project_part::VbaProjectPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
-    )
-  }
-  pub fn macro_sheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::macro_sheet_part::MacroSheetPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::macro_sheet_part::MacroSheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
-    )
-  }
-  pub fn international_macro_sheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::international_macro_sheet_part::InternationalMacroSheetPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::international_macro_sheet_part::InternationalMacroSheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
-    )
-  }
-  pub fn custom_data_properties_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::custom_data_properties_part::CustomDataPropertiesPart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::custom_data_properties_part::CustomDataPropertiesPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/customDataProps",
-    )
-  }
-  pub fn slicer_cache_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::slicer_cache_part::SlicerCachePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::slicer_cache_part::SlicerCachePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2007/relationships/slicerCache",
-    )
-  }
-  pub fn time_line_cache_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::time_line_cache_part::TimeLineCachePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::time_line_cache_part::TimeLineCachePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/timelineCache",
-    )
-  }
-  pub fn workbook_person_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::workbook_person_part::WorkbookPersonPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::workbook_person_part::WorkbookPersonPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/10/relationships/person",
-    )
-  }
-  pub fn rd_rich_value_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rd_rich_value_part::RdRichValuePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_rich_value_part::RdRichValuePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue",
-    )
-  }
-  pub fn ct_rd_rich_value_structure_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart> + 'a
-  {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_rich_value_structure_part::RdRichValueStructurePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure",
-    )
-  }
-  pub fn rd_array_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rd_array_part::RdArrayPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_array_part::RdArrayPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdArray",
-    )
-  }
-  pub fn rich_styles_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rich_styles_part::RichStylesPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rich_styles_part::RichStylesPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/richStyles",
-    )
-  }
-  pub fn rd_supporting_property_bag_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>
-  + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag",
-    )
-  }
-    pub fn rd_supporting_property_bag_structure_parts<'a, P: crate::sdk::SdkPackage>(
-        &'a self,
-        package: &'a P,
-    ) -> impl Iterator<
-        Item = crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart,
-  > + 'a{
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure",
-    )
-  }
-  pub fn rd_rich_value_types_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::rd_rich_value_types_part::RdRichValueTypesPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::rd_rich_value_types_part::RdRichValueTypesPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes",
-    )
-  }
-  pub fn rd_rich_value_web_image_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage",
-    )
-  }
-  pub fn feature_property_bags_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::feature_property_bags_part::FeaturePropertyBagsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::feature_property_bags_part::FeaturePropertyBagsPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag",
-    )
+  crate::sdk_part_child_methods! {
+      repeated custom_xml_parts => crate ::parts::custom_xml_part::CustomXmlPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
+      optional calculation_chain_part => crate
+      ::parts::calculation_chain_part::CalculationChainPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain";
+      optional cell_metadata_part => crate
+      ::parts::cell_metadata_part::CellMetadataPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata";
+      optional connections_part => crate ::parts::connections_part::ConnectionsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
+      optional custom_xml_mappings_part => crate
+      ::parts::custom_xml_mappings_part::CustomXmlMappingsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps";
+      optional shared_string_table_part => crate
+      ::parts::shared_string_table_part::SharedStringTablePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
+      optional workbook_revision_header_part => crate
+      ::parts::workbook_revision_header_part::WorkbookRevisionHeaderPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/revisionHeaders";
+      optional workbook_user_data_part => crate
+      ::parts::workbook_user_data_part::WorkbookUserDataPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/usernames";
+      optional workbook_styles_part => crate
+      ::parts::workbook_styles_part::WorkbookStylesPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+      optional theme_part => crate ::parts::theme_part::ThemePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
+      optional thumbnail_part => crate ::parts::thumbnail_part::ThumbnailPart,
+      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail";
+      optional volatile_dependencies_part => crate
+      ::parts::volatile_dependencies_part::VolatileDependenciesPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/volatileDependencies";
+      repeated chartsheet_parts => crate ::parts::chartsheet_part::ChartsheetPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+      repeated dialogsheet_parts => crate ::parts::dialogsheet_part::DialogsheetPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
+      repeated external_workbook_parts => crate
+      ::parts::external_workbook_part::ExternalWorkbookPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink";
+      repeated pivot_table_cache_definition_parts => crate
+      ::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
+      repeated worksheet_parts => crate ::parts::worksheet_part::WorksheetPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
+      optional excel_attached_toolbars_part => crate
+      ::parts::excel_attached_toolbars_part::ExcelAttachedToolbarsPart,
+      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars";
+      optional vba_project_part => crate ::parts::vba_project_part::VbaProjectPart,
+      "http://schemas.microsoft.com/office/2006/relationships/vbaProject"; repeated
+      macro_sheet_parts => crate ::parts::macro_sheet_part::MacroSheetPart,
+      "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet"; repeated
+      international_macro_sheet_parts => crate
+      ::parts::international_macro_sheet_part::InternationalMacroSheetPart,
+      "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
+      repeated custom_data_properties_parts => crate
+      ::parts::custom_data_properties_part::CustomDataPropertiesPart,
+      "http://schemas.microsoft.com/office/2007/relationships/customDataProps";
+      repeated slicer_cache_parts => crate ::parts::slicer_cache_part::SlicerCachePart,
+      "http://schemas.microsoft.com/office/2007/relationships/slicerCache"; repeated
+      time_line_cache_parts => crate ::parts::time_line_cache_part::TimeLineCachePart,
+      "http://schemas.microsoft.com/office/2011/relationships/timelineCache"; repeated
+      workbook_person_parts => crate ::parts::workbook_person_part::WorkbookPersonPart,
+      "http://schemas.microsoft.com/office/2017/10/relationships/person"; repeated
+      rd_rich_value_parts => crate ::parts::rd_rich_value_part::RdRichValuePart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue"; repeated
+      ct_rd_rich_value_structure_parts => crate
+      ::parts::rd_rich_value_structure_part::RdRichValueStructurePart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure";
+      repeated rd_array_parts => crate ::parts::rd_array_part::RdArrayPart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdArray"; repeated
+      rich_styles_parts => crate ::parts::rich_styles_part::RichStylesPart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/richStyles"; repeated
+      rd_supporting_property_bag_parts => crate
+      ::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBag";
+      repeated rd_supporting_property_bag_structure_parts => crate
+      ::parts::rd_supporting_property_bag_structure_part::RdSupportingPropertyBagStructurePart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure";
+      repeated rd_rich_value_types_parts => crate
+      ::parts::rd_rich_value_types_part::RdRichValueTypesPart,
+      "http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes";
+      optional rd_rich_value_web_image_part => crate
+      ::parts::rd_rich_value_web_image_part::RdRichValueWebImagePart,
+      "http://schemas.microsoft.com/office/2020/07/relationships/rdRichValueWebImage";
+      optional feature_property_bags_part => crate
+      ::parts::feature_property_bags_part::FeaturePropertyBagsPart,
+      "http://schemas.microsoft.com/office/2022/11/relationships/FeaturePropertyBag";
   }
 }

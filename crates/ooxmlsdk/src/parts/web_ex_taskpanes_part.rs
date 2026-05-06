@@ -22,17 +22,9 @@ impl WebExTaskpanesPart {
     as_web_ex_taskpanes_part,
     as_web_ex_taskpanes_part_mut
   );
-  pub fn web_extension_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::web_extension_part::WebExtensionPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::web_extension_part::WebExtensionPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2011/relationships/webextension",
-    )
+  crate::sdk_part_child_methods! {
+      repeated web_extension_parts => crate
+      ::parts::web_extension_part::WebExtensionPart,
+      "http://schemas.microsoft.com/office/2011/relationships/webextension";
   }
 }

@@ -23,43 +23,12 @@ impl DiagramDataPart {
     as_diagram_data_part,
     as_diagram_data_part_mut
   );
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
-  pub fn slide_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::slide_part::SlidePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::slide_part::SlidePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide",
-    )
-  }
-  pub fn worksheet_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::worksheet_part::WorksheetPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::worksheet_part::WorksheetPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
-    )
+  crate::sdk_part_child_methods! {
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+      repeated slide_parts => crate ::parts::slide_part::SlidePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
+      repeated worksheet_parts => crate ::parts::worksheet_part::WorksheetPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
   }
 }

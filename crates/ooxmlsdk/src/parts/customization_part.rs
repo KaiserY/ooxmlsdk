@@ -22,17 +22,9 @@ impl CustomizationPart {
     as_customization_part,
     as_customization_part_mut
   );
-  pub fn word_attached_toolbars_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::word_attached_toolbars_part::WordAttachedToolbarsPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars",
-    )
+  crate::sdk_part_child_methods! {
+      optional word_attached_toolbars_part => crate
+      ::parts::word_attached_toolbars_part::WordAttachedToolbarsPart,
+      "http://schemas.microsoft.com/office/2006/relationships/attachedToolbars";
   }
 }

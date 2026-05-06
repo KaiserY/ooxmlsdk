@@ -23,58 +23,15 @@ impl ChartsheetPart {
     as_chartsheet_part,
     as_chartsheet_part_mut
   );
-  pub fn spreadsheet_printer_settings_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<
-    Item = crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-  > + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings",
-    )
-  }
-  pub fn drawings_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::drawings_part::DrawingsPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::drawings_part::DrawingsPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
-    )
-  }
-  pub fn vml_drawing_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::vml_drawing_part::VmlDrawingPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::vml_drawing_part::VmlDrawingPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
-    )
-  }
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
+  crate::sdk_part_child_methods! {
+      repeated spreadsheet_printer_settings_parts => crate
+      ::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings";
+      optional drawings_part => crate ::parts::drawings_part::DrawingsPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
+      repeated vml_drawing_parts => crate ::parts::vml_drawing_part::VmlDrawingPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
   }
 }

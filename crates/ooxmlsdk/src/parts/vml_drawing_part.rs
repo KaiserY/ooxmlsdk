@@ -16,30 +16,11 @@ pub struct VmlDrawingPart {
   pub(crate) id: crate::common::PartId,
 }
 impl VmlDrawingPart {
-  pub fn image_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::image_part::ImagePart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::image_part::ImagePart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-    )
-  }
-  pub fn legacy_diagram_text_parts<'a, P: crate::sdk::SdkPackage>(
-    &'a self,
-    package: &'a P,
-  ) -> impl Iterator<Item = crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart> + 'a {
-    <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<
-      P,
-      crate::parts::legacy_diagram_text_part::LegacyDiagramTextPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText",
-    )
+  crate::sdk_part_child_methods! {
+      repeated image_parts => crate ::parts::image_part::ImagePart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+      repeated legacy_diagram_text_parts => crate
+      ::parts::legacy_diagram_text_part::LegacyDiagramTextPart,
+      "http://schemas.microsoft.com/office/2006/relationships/legacyDiagramText";
   }
 }

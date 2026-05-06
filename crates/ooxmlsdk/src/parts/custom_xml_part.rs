@@ -16,17 +16,9 @@ pub struct CustomXmlPart {
   pub(crate) id: crate::common::PartId,
 }
 impl CustomXmlPart {
-  pub fn custom_xml_properties_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::custom_xml_properties_part::CustomXmlPropertiesPart,
-    >(
-      self,
-      package,
-      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps",
-    )
+  crate::sdk_part_child_methods! {
+      optional custom_xml_properties_part => crate
+      ::parts::custom_xml_properties_part::CustomXmlPropertiesPart,
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps";
   }
 }

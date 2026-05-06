@@ -16,17 +16,8 @@ pub struct VbaProjectPart {
   pub(crate) id: crate::common::PartId,
 }
 impl VbaProjectPart {
-  pub fn vba_data_part<P: crate::sdk::SdkPackage>(
-    &self,
-    package: &P,
-  ) -> Option<crate::parts::vba_data_part::VbaDataPart> {
-    <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<
-      P,
-      crate::parts::vba_data_part::VbaDataPart,
-    >(
-      self,
-      package,
-      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
-    )
+  crate::sdk_part_child_methods! {
+      optional vba_data_part => crate ::parts::vba_data_part::VbaDataPart,
+      "http://schemas.microsoft.com/office/2006/relationships/wordVbaData";
   }
 }

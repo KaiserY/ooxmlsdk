@@ -217,34 +217,24 @@ fn part_child_methods(part: &PartModuleDecl) -> Result<TokenStream> {
     methods.push(match cardinality {
       PartChildCardinality::Repeated | PartChildCardinality::RequiredRepeated => quote! {
         #( #attrs )*
-        pub fn #method_ident<'a, P: crate::sdk::SdkPackage>(
-          &'a self,
-          package: &'a P,
-        ) -> impl Iterator<Item = #part_ty> + 'a {
-          <Self as crate::sdk::SdkPart>::child_parts_by_relationship_type::<P, #part_ty>(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
+        repeated #method_ident => #part_ty, #relationship_type;
       },
       PartChildCardinality::Optional | PartChildCardinality::Required => quote! {
         #( #attrs )*
-        pub fn #method_ident<P: crate::sdk::SdkPackage>(
-          &self,
-          package: &P,
-        ) -> Option<#part_ty> {
-          <Self as crate::sdk::SdkPart>::child_part_by_relationship_type::<P, #part_ty>(
-            self,
-            package,
-            #relationship_type,
-          )
-        }
+        optional #method_ident => #part_ty, #relationship_type;
       },
     });
   }
 
-  Ok(quote! { #( #methods )* })
+  if methods.is_empty() {
+    return Ok(quote! {});
+  }
+
+  Ok(quote! {
+    crate::sdk_part_child_methods! {
+      #( #methods )*
+    }
+  })
 }
 
 fn part_child_field_type(cardinality: PartChildCardinality, part_ty: &Type) -> TokenStream {
@@ -905,6 +895,51 @@ mod tests {
     assert!(rendered.contains("sdk_part_root_methods"));
     assert!(rendered.contains("MainDocumentPart"));
     assert!(rendered.contains("as_main_document_part"));
+  }
+
+  #[test]
+  fn generates_child_part_accessors_with_macro() {
+    let part = PartModuleDecl {
+      module_name: "main_document_part".to_string(),
+      struct_name: "MainDocumentPart".to_string(),
+      relationship_type: "rel".to_string(),
+      fields: vec![
+        PartFieldDecl {
+          rust_name: "theme_part".to_string(),
+          rust_type: "crate::parts::theme_part::ThemePart".to_string(),
+          kind: PartFieldKind::ChildPart {
+            relationship_type:
+              "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+                .to_string(),
+            cardinality: PartChildCardinality::Optional,
+          },
+          ..Default::default()
+        },
+        PartFieldDecl {
+          rust_name: "custom_xml_parts".to_string(),
+          rust_type: "crate::parts::custom_xml_part::CustomXmlPart".to_string(),
+          kind: PartFieldKind::ChildPart {
+            relationship_type:
+              "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml"
+                .to_string(),
+            cardinality: PartChildCardinality::Repeated,
+          },
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+
+    let rendered = gen_part_module(&part).unwrap().to_string();
+    assert!(rendered.contains("sdk_part_child_methods"));
+    assert!(rendered.contains("optional theme_part => crate :: parts :: theme_part :: ThemePart"));
+    assert!(
+      rendered.contains(
+        "repeated custom_xml_parts => crate :: parts :: custom_xml_part :: CustomXmlPart"
+      )
+    );
+    assert!(!rendered.contains("child_part_by_relationship_type"));
+    assert!(!rendered.contains("child_parts_by_relationship_type"));
   }
 
   #[test]

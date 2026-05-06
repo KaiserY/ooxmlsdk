@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## 0.6.1
+
+### Package API
+
+- Kept the public package and part API stable while splitting public SDK traits from internal package/part state hooks.
+- Reduced generated part accessor and relationship-dispatch boilerplate by moving repeated child-part lookup patterns into shared macros and generated compile-time dispatch tables.
+- Preserved typed package/part relationship behavior while hiding more implementation-only state behind crate-internal traits and opaque runtime helpers.
+
+### Performance
+
+- Avoided cloning whole part handles when adding a part from the same package; same-package copy helpers now link by `PartId` directly.
+- Reduced MCE context string storage overhead by storing read-mostly namespace and QName metadata as boxed string slices.
+- Moved more fixed part relationship matching work out of repeated runtime code paths and into generated code.
+
+### Testing
+
+- Added broader SpreadsheetML compatibility fixtures for cell types, defined names, formatting, formulas, freeze panes, merged cells, number formats, row/column dimensions, sheet visibility, and rich shared strings.
+- Added SpreadsheetML spec notes and fixture generation coverage for cells, formatting, formulas, layout, and names.
+- Updated the compatibility matrix for the expanded committed fixture set.
+
+### Maintenance
+
+- Regenerated checked-in `parts` output after consolidating generated child accessor and relationship dispatch logic.
+- Removed lint suppressions around the package trait split and feature-gated helper code.
+- Kept the default workspace, MCE feature, clippy, formatting, and round-trip validation lanes green for the release.
+
 ## 0.6.0
 
 ### Breaking Changes

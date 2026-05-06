@@ -53,28 +53,28 @@ Most users should keep the default features enabled:
 
 ```toml
 [dependencies]
-ooxmlsdk = "0.6.0"
+ooxmlsdk = "0.6.1"
 ```
 
 If you want package APIs without optional validators or MCE-specific behavior, disable default features and enable only `parts`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.6.0", default-features = false, features = ["parts"] }
+ooxmlsdk = { version = "0.6.1", default-features = false, features = ["parts"] }
 ```
 
 If you need Flat OPC APIs, enable `flat-opc`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.6.0", default-features = false, features = ["flat-opc"] }
+ooxmlsdk = { version = "0.6.1", default-features = false, features = ["flat-opc"] }
 ```
 
 If you want MCE processing during package open/root loading, enable `mce`:
 
 ```toml
 [dependencies]
-ooxmlsdk = { version = "0.6.0", default-features = false, features = ["mce"] }
+ooxmlsdk = { version = "0.6.1", default-features = false, features = ["mce"] }
 ```
 
 Read, inspect, and save a package:
@@ -115,6 +115,8 @@ The `parts` feature exposes package-level APIs for `.docx`, `.xlsx`, and `.pptx`
 - read, replace, or unload parsed part payloads through public data helpers and root-element helpers
 
 Raw package storage, raw relationship sets, generated factory internals, and unchecked dynamic part plumbing are not part of the public API. Prefer the package and part methods above when writing code that should survive generator updates.
+
+The 0.6.1 runtime keeps that public API stable while reducing generated package/part boilerplate internally. Typed child accessors and relationship helpers remain visible as normal Rust API surface, but repeated relationship lookup and dispatch code is now shared through generated macros and fixed dispatch tables.
 
 ## XML And MCE Compatibility
 
@@ -160,6 +162,14 @@ cargo fmt --all
 ```
 
 For runtime performance work, prefer evaluating `cargo bench -p ooxmlsdk-test` as a whole. The `packages` and `xml` suites have shown a persistent disagreement on `wordprocessing_document/write/parsed`, so treat that one case as an anomaly rather than as the sole performance signal.
+
+The compatibility round-trip lane is:
+
+```bash
+cargo test -p ooxmlsdk-test round_trip -- --nocapture
+```
+
+The committed fixture set includes document, presentation, MCE, OPC, DrawingML, WML, and SpreadsheetML coverage, including spreadsheet cell types, defined names, formatting, formulas, freeze panes, merged cells, number formats, row/column dimensions, sheet visibility, and rich shared strings.
 
 ## Known Limitations
 

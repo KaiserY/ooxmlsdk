@@ -130,17 +130,7 @@ fn is_supported_document_path(path: &Path) -> bool {
 }
 
 fn is_invalid(file_name: &str) -> bool {
-  matches!(
-    file_name,
-    "5Errors.docx"
-      | "complex0.docx"
-      | "complex2010.docx"
-      | "mcdoc.docx"
-      | "Of16-09-UnknownElement.docx"
-      | "Strict01.docx"
-      | "UnknownElement.docx"
-      | "encrypted_pptx.pptx"
-  )
+  matches!(file_name, "Strict01.docx" | "encrypted_pptx.pptx")
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
@@ -179,6 +169,7 @@ fn is_round_trip_supported(file_name: &str) -> bool {
       | "Of16-08.docx"
       | "Of16-09-UnknownElement.docx"
       | "Of16-10-SymEx.docx"
+      | "UnknownElement.docx"
       | "simpleSdt.docx"
       | "slide_altcontent.pptx"
       | "Spreadsheet.xlsx"

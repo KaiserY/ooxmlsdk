@@ -2044,6 +2044,414 @@ fn create_drawingml_fixtures(root: &Path) {
   }
 }
 
+fn create_wml_runs_fixtures(root: &Path) {
+  // ── WML-R-01: char_formatting ────────────────────────────────────────────
+  // Paragraph with runs exercising every common rPr toggle and value property:
+  // b, i, combined b+i, u single/double, strike, dstrike, sz, color,
+  // highlight, vertAlign superscript/subscript, caps, smallCaps.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Bold</w:t></w:r>
+      <w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve"> Italic</w:t></w:r>
+      <w:r><w:rPr><w:b/><w:i/></w:rPr><w:t xml:space="preserve"> BoldItalic</w:t></w:r>
+      <w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t xml:space="preserve"> Underline</w:t></w:r>
+      <w:r><w:rPr><w:u w:val="double"/></w:rPr><w:t xml:space="preserve"> DblUnderline</w:t></w:r>
+      <w:r><w:rPr><w:strike/></w:rPr><w:t xml:space="preserve"> Strike</w:t></w:r>
+      <w:r><w:rPr><w:dstrike/></w:rPr><w:t xml:space="preserve"> DblStrike</w:t></w:r>
+      <w:r><w:rPr><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t xml:space="preserve"> 14pt</w:t></w:r>
+      <w:r><w:rPr><w:color w:val="C00000"/></w:rPr><w:t xml:space="preserve"> Red</w:t></w:r>
+      <w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t xml:space="preserve"> Highlight</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>sup</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>sub</w:t></w:r>
+      <w:r><w:rPr><w:caps/></w:rPr><w:t xml:space="preserve"> Caps</w:t></w:r>
+      <w:r><w:rPr><w:smallCaps/></w:rPr><w:t xml:space="preserve"> SmallCaps</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/char_formatting.docx", &data);
+  }
+
+  // ── WML-R-02: run_fonts ──────────────────────────────────────────────────
+  // Runs exercising rFonts: ascii/hAnsi/eastAsia/cs explicit names,
+  // asciiTheme/hAnsiTheme theme references, hint attribute, and rStyle.
+  // Includes a minimal styles.xml defining the referenced character style.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr>
+        <w:t>Arial</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:eastAsia="SimSun"/></w:rPr>
+        <w:t xml:space="preserve"> SimSun</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:cs="Times New Roman"/></w:rPr>
+        <w:t xml:space="preserve"> TimesCS</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:asciiTheme="minorAscii" w:hAnsiTheme="minorAscii"/></w:rPr>
+        <w:t xml:space="preserve"> MinorTheme</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rFonts w:hint="eastAsia" w:eastAsia="MS Mincho"/></w:rPr>
+        <w:t xml:space="preserve"> Hint</w:t>
+      </w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="Strong"/></w:rPr>
+        <w:t xml:space="preserve"> StrongStyle</w:t>
+      </w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="character" w:styleId="Strong">
+    <w:name w:val="Strong"/>
+    <w:rPr><w:b/><w:bCs/></w:rPr>
+  </w:style>
+</w:styles>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/run_fonts.docx", &data);
+  }
+
+  // ── WML-R-03: whitespace ─────────────────────────────────────────────────
+  // Runs that probe xml:space="preserve" semantics: leading space, trailing
+  // space, space-only run, internal spaces (no preserve needed), no spaces.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve"> leading</w:t></w:r>
+      <w:r><w:t xml:space="preserve">trailing </w:t></w:r>
+      <w:r><w:t xml:space="preserve"> </w:t></w:r>
+      <w:r><w:t>word word</w:t></w:r>
+      <w:r><w:t>nospace</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/whitespace.docx", &data);
+  }
+
+  // ── WML-R-04: breaks ─────────────────────────────────────────────────────
+  // Runs with break elements: soft return (bare br), page break, tab.
+  // The bare <w:br/> must not gain w:type="textWrapping" on round-trip.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Before soft return</w:t></w:r>
+      <w:r><w:br/></w:r>
+      <w:r><w:t>After soft return</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Before tab</w:t></w:r>
+      <w:r><w:tab/></w:r>
+      <w:r><w:t>After tab</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:br w:type="page"/></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>After page break</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/breaks.docx", &data);
+  }
+}
+
+fn create_wml_paragraphs_fixtures(root: &Path) {
+  // ── WML-P-01: para_alignment ─────────────────────────────────────────────
+  // Five paragraphs covering every common jc value: left, center, right,
+  // both (justified), distribute. Each is self-contained in its own <w:p>.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:jc w:val="left"/></w:pPr>
+      <w:r><w:t>Left aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Center aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="right"/></w:pPr>
+      <w:r><w:t>Right aligned paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="both"/></w:pPr>
+      <w:r><w:t>Justified paragraph with both margins aligned.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:jc w:val="distribute"/></w:pPr>
+      <w:r><w:t>Distribute spacing between all characters.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_alignment.docx", &data);
+  }
+
+  // ── WML-P-02: para_spacing ───────────────────────────────────────────────
+  // Paragraphs exercising spacing before/after (twips) and the three
+  // lineRule values: auto (multiple of single line), exact (fixed height),
+  // atLeast (minimum height). A contextualSpacing pair is included.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="240" w:after="120"/>
+      </w:pPr>
+      <w:r><w:t>Before 12pt after 6pt spacing (twips).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="240" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>Single line spacing (auto 240).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="360" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>One-and-a-half line spacing (auto 360).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="480" w:lineRule="auto"/>
+      </w:pPr>
+      <w:r><w:t>Double line spacing (auto 480).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="320" w:lineRule="exact"/>
+      </w:pPr>
+      <w:r><w:t>Exact 16pt line height.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:line="280" w:lineRule="atLeast"/>
+      </w:pPr>
+      <w:r><w:t>At-least 14pt line height.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="120" w:after="120"/>
+        <w:contextualSpacing/>
+      </w:pPr>
+      <w:r><w:t>Contextual spacing first paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="120" w:after="120"/>
+        <w:contextualSpacing/>
+      </w:pPr>
+      <w:r><w:t>Contextual spacing second paragraph (gap suppressed).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_spacing.docx", &data);
+  }
+
+  // ── WML-P-03: para_indent ────────────────────────────────────────────────
+  // Paragraphs with left/right indentation, firstLine, and hanging indent.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720"/>
+      </w:pPr>
+      <w:r><w:t>Left indent 0.5 inch (720 twips).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="1440" w:right="1440"/>
+      </w:pPr>
+      <w:r><w:t>Left and right indent 1 inch each.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720" w:firstLine="360"/>
+      </w:pPr>
+      <w:r><w:t>First-line indent: body at 0.5 inch, first line at 0.75 inch.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:ind w:left="720" w:hanging="360"/>
+      </w:pPr>
+      <w:r><w:t>Hanging indent: first line at 0.25 inch, rest at 0.5 inch.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_indent.docx", &data);
+  }
+
+  // ── WML-P-04: para_borders_shading ──────────────────────────────────────
+  // Paragraphs with box borders and two shading styles:
+  //   - single-line box border + clear fill (solid background)
+  //   - no border + pct20 dot-fill shading pattern
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:pBdr>
+          <w:top    w:val="single" w:sz="6" w:space="1" w:color="4472C4"/>
+          <w:left   w:val="single" w:sz="6" w:space="4" w:color="4472C4"/>
+          <w:bottom w:val="single" w:sz="6" w:space="1" w:color="4472C4"/>
+          <w:right  w:val="single" w:sz="6" w:space="4" w:color="4472C4"/>
+        </w:pBdr>
+        <w:shd w:val="clear" w:color="auto" w:fill="DEEAF1"/>
+      </w:pPr>
+      <w:r><w:t>Box border with solid light-blue fill.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:shd w:val="pct20" w:color="FF0000" w:fill="FFFF00"/>
+      </w:pPr>
+      <w:r><w:t>20-percent dot pattern: red on yellow.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:pBdr>
+          <w:top    w:val="double" w:sz="4" w:space="1" w:color="000000"/>
+          <w:bottom w:val="double" w:sz="4" w:space="1" w:color="000000"/>
+        </w:pBdr>
+      </w:pPr>
+      <w:r><w:t>Top and bottom double-line borders only.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_borders_shading.docx", &data);
+  }
+
+  // ── WML-P-05: para_keep ──────────────────────────────────────────────────
+  // Keep/break control properties and outline level.
+  // Covers keepNext, keepLines, pageBreakBefore, widowControl w:val="0",
+  // and outlineLvl values 0 (H1) and 1 (H2).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:keepNext/>
+        <w:outlineLvl w:val="0"/>
+      </w:pPr>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Heading 1 with keepNext.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Body paragraph stays with the heading above.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:keepLines/>
+        <w:outlineLvl w:val="1"/>
+      </w:pPr>
+      <w:r><w:t>Heading 2 with keepLines.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:pageBreakBefore/>
+      </w:pPr>
+      <w:r><w:t>This paragraph forces a page break before it.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:widowControl w:val="0"/>
+      </w:pPr>
+      <w:r><w:t>Widow control explicitly disabled.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_keep.docx", &data);
+  }
+}
+
 fn main() {
   let root = workspace_root();
   let png = base64::engine::general_purpose::STANDARD
@@ -2056,4 +2464,1524 @@ fn main() {
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
   create_drawingml_fixtures(&root);
+  create_wml_runs_fixtures(&root);
+  create_wml_paragraphs_fixtures(&root);
+  create_wml_styles_fixtures(&root);
+  create_wml_numbering_fixtures(&root);
+  create_wml_tables_fixtures(&root);
+  create_wml_drawing_fixtures(&root, &png);
+  create_wml_headers_fixtures(&root);
+  create_wml_sections_fixtures(&root);
+  create_wml_fields_fixtures(&root);
+  create_wml_notes_fixtures(&root);
+  create_wml_tracked_changes_fixtures(&root);
+  create_wml_comments_fixtures(&root);
+  create_wml_bookmarks_fixtures(&root);
+  create_wml_sdt_fixtures(&root);
+  create_vba_preserve_fixtures(&root);
+}
+
+fn create_wml_headers_fixtures(root: &Path) {
+  // ── WML-H-01: header_footer ──────────────────────────────────────────────
+  // Default header + default footer; US Letter page size; 1-inch margins;
+  // xmlns:r on document element; sectPr with headerReference/footerReference.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Page Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Page Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Document body text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:footerReference w:type="default" r:id="rId3"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/footer1.xml", footer1),
+    ]);
+    save(root, "test-data/wml/header_footer.docx", &data);
+  }
+
+  // ── WML-H-02: header_first_page ──────────────────────────────────────────
+  // Default header + first-page header + default footer; titlePg; three
+  // part relationships; xmlns:r on document element.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="right"/></w:pPr>
+    <w:r><w:t>Default Header (odd pages)</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let header2 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>First Page Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Default Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>First page body text.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second page body text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId2"/>
+      <w:headerReference w:type="first" r:id="rId3"/>
+      <w:footerReference w:type="default" r:id="rId4"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:titlePg/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/header2.xml", header2),
+      ("word/footer1.xml", footer1),
+    ]);
+    save(root, "test-data/wml/header_first_page.docx", &data);
+  }
+}
+
+fn create_wml_fields_fixtures(root: &Path) {
+  // ── WML-FLD-01: fields_complex ────────────────────────────────────────────
+  // Complex PAGE field (begin/instrText/separate/result/end); complex
+  // NUMPAGES field with no cached result and dirty="1".
+  // xmlns:r on document (needed for later hyperlink fixture consistency).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Page </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>1</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t xml:space="preserve"> of </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin" w:dirty="1"/></w:r>
+      <w:r><w:instrText xml:space="preserve"> NUMPAGES </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/fields_complex.docx", &data);
+  }
+
+  // ── WML-FLD-02: fields_hyperlink ─────────────────────────────────────────
+  // External hyperlink with r:id + TargetMode=External; internal anchor
+  // hyperlink (w:anchor only, no relationship); fldSimple DATE field.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:fldSimple w:instr=" DATE \@ &quot;MMMM d, yyyy&quot; " w:dirty="1">
+        <w:r><w:t>May 2, 2026</w:t></w:r>
+      </w:fldSimple>
+    </w:p>
+    <w:p>
+      <w:hyperlink r:id="rId2" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Visit example.com</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:p>
+      <w:hyperlink w:anchor="target_section" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Go to target section</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>"#,
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+    ]);
+    save(root, "test-data/wml/fields_hyperlink.docx", &data);
+  }
+}
+
+fn create_vba_preserve_fixtures(root: &Path) {
+  // ── VBA-01: vba_preserve ──────────────────────────────────────────────────
+  // Macro-enabled Word document (.docm) with a minimal OLE2 placeholder for
+  // vbaProject.bin. Tests that the binary part survives the round-trip
+  // unchanged. Content type uses macroEnabled.main+xml; relationship type
+  // uses microsoft.com domain.
+  {
+    // Minimal OLE2 Compound File: magic header (8 bytes) + enough padding
+    // to reach the 512-byte minimum sector size. The rest is zeroed.
+    let mut vba_bin = vec![0u8; 512];
+    // OLE2 magic bytes
+    vba_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    // Minor version = 0x003E, Major version = 0x0003
+    vba_bin[24] = 0x3E;
+    vba_bin[25] = 0x00;
+    vba_bin[26] = 0x03;
+    vba_bin[27] = 0x00;
+
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Macro-enabled document with VBA project.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+
+    let content_types = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>
+</Types>"#
+    )
+    .into_bytes();
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/vbaProject.bin", &vba_bin),
+    ]);
+    save(root, "test-data/wml/vba_preserve.docm", &data);
+  }
+}
+
+fn create_wml_sdt_fixtures(root: &Path) {
+  // ── WML-SDT-01: content_controls ─────────────────────────────────────────
+  // Block SDT with plain text control (alias, tag, id, lock);
+  // inline run SDT with date picker (fullDate + dateFormat);
+  // inline run SDT with dropDownList (listItems + lastValue).
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:sdt>
+      <w:sdtPr>
+        <w:alias w:val="Name Field"/>
+        <w:tag w:val="fullName"/>
+        <w:id w:val="1001"/>
+        <w:lock w:val="sdtContentLocked"/>
+        <w:text/>
+      </w:sdtPr>
+      <w:sdtEndPr/>
+      <w:sdtContent>
+        <w:p>
+          <w:r><w:t>Jane Smith</w:t></w:r>
+        </w:p>
+      </w:sdtContent>
+    </w:sdt>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Date: </w:t></w:r>
+      <w:sdt>
+        <w:sdtPr>
+          <w:tag w:val="eventDate"/>
+          <w:id w:val="1002"/>
+          <w:date w:fullDate="2026-05-02T00:00:00Z">
+            <w:dateFormat w:val="M/d/yyyy"/>
+            <w:lid w:val="en-US"/>
+          </w:date>
+        </w:sdtPr>
+        <w:sdtEndPr/>
+        <w:sdtContent>
+          <w:r><w:t>5/2/2026</w:t></w:r>
+        </w:sdtContent>
+      </w:sdt>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Status: </w:t></w:r>
+      <w:sdt>
+        <w:sdtPr>
+          <w:alias w:val="Status"/>
+          <w:tag w:val="statusField"/>
+          <w:id w:val="1003"/>
+          <w:dropDownList w:lastValue="active">
+            <w:listItem w:displayText="Active" w:value="active"/>
+            <w:listItem w:displayText="Inactive" w:value="inactive"/>
+            <w:listItem w:displayText="Pending" w:value="pending"/>
+          </w:dropDownList>
+        </w:sdtPr>
+        <w:sdtEndPr/>
+        <w:sdtContent>
+          <w:r><w:t>Active</w:t></w:r>
+        </w:sdtContent>
+      </w:sdt>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/content_controls.docx", &data);
+  }
+}
+
+fn create_wml_bookmarks_fixtures(root: &Path) {
+  // ── WML-BM-01: bookmarks ──────────────────────────────────────────────────
+  // Inline bookmark wrapping a text range; heading bookmark wrapping a full
+  // paragraph; zero-width point bookmark; internal anchor hyperlink targeting
+  // the inline bookmark.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+      <w:bookmarkStart w:id="10" w:name="intro"/>
+      <w:r><w:t>Introduction</w:t></w:r>
+      <w:bookmarkEnd w:id="10"/>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">See the </w:t></w:r>
+      <w:bookmarkStart w:id="11" w:name="appendix_a"/>
+      <w:r><w:t>appendix</w:t></w:r>
+      <w:bookmarkEnd w:id="11"/>
+      <w:r><w:t xml:space="preserve"> for details.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:bookmarkStart w:id="12" w:name="target_point"/>
+      <w:bookmarkEnd w:id="12"/>
+      <w:r><w:t>Paragraph after zero-width bookmark.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:hyperlink w:anchor="appendix_a" w:history="1">
+        <w:r>
+          <w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>
+          <w:t>Go to appendix</w:t>
+        </w:r>
+      </w:hyperlink>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/bookmarks.docx", &data);
+  }
+}
+
+fn create_wml_comments_fixtures(root: &Path) {
+  // ── WML-C-01: comments ────────────────────────────────────────────────────
+  // Two comments: id=1 (author, date, initials) and id=2 (author, date only).
+  // Body has commentRangeStart/End as paragraph children; commentReference
+  // as run child. annotationRef inside comment content paragraphs.
+  {
+    let comments = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:comment w:id="1" w:author="Alice" w:date="2026-05-02T10:00:00Z" w:initials="A">
+    <w:p>
+      <w:pPr><w:pStyle w:val="CommentText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:annotationRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> First comment by Alice.</w:t></w:r>
+    </w:p>
+  </w:comment>
+  <w:comment w:id="2" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+    <w:p>
+      <w:pPr><w:pStyle w:val="CommentText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:annotationRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Second comment by Bob.</w:t></w:r>
+    </w:p>
+  </w:comment>
+</w:comments>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text before. </w:t></w:r>
+      <w:commentRangeStart w:id="1"/>
+      <w:r><w:t>First commented text.</w:t></w:r>
+      <w:commentRangeEnd w:id="1"/>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:commentReference w:id="1"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Text between. </w:t></w:r>
+      <w:commentRangeStart w:id="2"/>
+      <w:r><w:t>Second commented text.</w:t></w:r>
+      <w:commentRangeEnd w:id="2"/>
+      <w:r>
+        <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
+        <w:commentReference w:id="2"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Text after.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/comments.xml", comments),
+    ]);
+    save(root, "test-data/wml/comments.docx", &data);
+  }
+}
+
+fn create_wml_tracked_changes_fixtures(root: &Path) {
+  // ── WML-TC-01: tracked_changes ────────────────────────────────────────────
+  // w:ins wrapping an inserted run; w:del wrapping a deleted run with
+  // w:delText; w:rPrChange storing previous run properties; w:pPrChange
+  // storing previous paragraph properties.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Original text </w:t></w:r>
+      <w:ins w:id="1" w:author="Alice" w:date="2026-05-02T10:00:00Z">
+        <w:r><w:t>inserted words</w:t></w:r>
+      </w:ins>
+      <w:r><w:t xml:space="preserve"> after insertion.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Keep this </w:t></w:r>
+      <w:del w:id="2" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+        <w:r><w:delText>deleted text</w:delText></w:r>
+      </w:del>
+      <w:r><w:t xml:space="preserve"> and this.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:rPrChange w:id="3" w:author="Alice" w:date="2026-05-02T10:00:00Z">
+            <w:rPr/>
+          </w:rPrChange>
+        </w:rPr>
+        <w:t>Bold text (was normal).</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:pPrChange w:id="4" w:author="Bob" w:date="2026-05-02T11:00:00Z">
+          <w:pPr/>
+        </w:pPrChange>
+      </w:pPr>
+      <w:r><w:t>Centered text (was left-aligned).</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/tracked_changes.docx", &data);
+  }
+}
+
+fn create_wml_notes_fixtures(root: &Path) {
+  // ── WML-N-01: footnotes ───────────────────────────────────────────────────
+  // footnotes.xml with special separator notes (id=-1, id=0) and two normal
+  // footnotes. Body has footnoteReference marks inside runs.
+  {
+    let footnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:footnote w:type="separator" w:id="-1">
+    <w:p><w:r><w:separator/></w:r></w:p>
+  </w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0">
+    <w:p><w:r><w:continuationSeparator/></w:r></w:p>
+  </w:footnote>
+  <w:footnote w:id="1">
+    <w:p>
+      <w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> First footnote content.</w:t></w:r>
+    </w:p>
+  </w:footnote>
+  <w:footnote w:id="2">
+    <w:p>
+      <w:pPr><w:pStyle w:val="FootnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Second footnote content.</w:t></w:r>
+    </w:p>
+  </w:footnote>
+</w:footnotes>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text with first footnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteReference w:id="1"/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> and second footnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr>
+        <w:footnoteReference w:id="2"/>
+      </w:r>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/footnotes.xml", footnotes),
+    ]);
+    save(root, "test-data/wml/footnotes.docx", &data);
+  }
+
+  // ── WML-N-02: endnotes ────────────────────────────────────────────────────
+  // endnotes.xml with special separator notes and one normal endnote.
+  // Body has an endnoteReference mark inside a run.
+  {
+    let endnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:endnote w:type="separator" w:id="-1">
+    <w:p><w:r><w:separator/></w:r></w:p>
+  </w:endnote>
+  <w:endnote w:type="continuationSeparator" w:id="0">
+    <w:p><w:r><w:continuationSeparator/></w:r></w:p>
+  </w:endnote>
+  <w:endnote w:id="1">
+    <w:p>
+      <w:pPr><w:pStyle w:val="EndnoteText"/></w:pPr>
+      <w:r>
+        <w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr>
+        <w:endnoteRef/>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> Endnote content.</w:t></w:r>
+    </w:p>
+  </w:endnote>
+</w:endnotes>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Text with an endnote</w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="EndnoteReference"/></w:rPr>
+        <w:endnoteReference w:id="1"/>
+      </w:r>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/endnotes.xml", endnotes),
+    ]);
+    save(root, "test-data/wml/endnotes.docx", &data);
+  }
+}
+
+fn create_wml_sections_fixtures(root: &Path) {
+  // ── WML-S-01: section_columns ─────────────────────────────────────────────
+  // A document with two sections on the same page: first section is
+  // single-column, second is two equal columns (continuous break).
+  // The final sectPr (body-level) defines a single-column layout.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Full-width introductory paragraph.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:sectPr>
+          <w:type w:val="continuous"/>
+          <w:pgSz w:w="12240" w:h="15840"/>
+          <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+                   w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+          <w:cols w:num="1" w:space="720"/>
+        </w:sectPr>
+      </w:pPr>
+    </w:p>
+    <w:p>
+      <w:r><w:t>First column text.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second column text.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:cols w:num="2" w:space="720"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/section_columns.docx", &data);
+  }
+
+  // ── WML-S-02: section_props ───────────────────────────────────────────────
+  // Single section with vAlign=center, docGrid type=lines linePitch=360,
+  // and lnNumType countBy=5 restart=newPage.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Line one - numbered.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line two.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line three.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line four.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Line five - shows number 5.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1800" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:lnNumType w:countBy="5" w:start="1" w:restart="newPage"/>
+      <w:vAlign w:val="center"/>
+      <w:docGrid w:type="lines" w:linePitch="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/section_props.docx", &data);
+  }
+}
+
+fn create_wml_tables_fixtures(root: &Path) {
+  // ── WML-T-01: table_borders ──────────────────────────────────────────────
+  // 3×2 table with full tblBorders (outer + insideH/insideV), one cell with
+  // a tcBorders override (dashed right), and one cell with shd fill.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="8640" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="4472C4"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="4472C4"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>A1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:tcBorders>
+              <w:right w:val="dashed" w:sz="8" w:space="0" w:color="FF0000"/>
+            </w:tcBorders>
+          </w:tcPr>
+          <w:p><w:r><w:t>A2 (dashed right border)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="DEEAF1"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A3 (shaded cell)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B3</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/table_borders.docx", &data);
+  }
+
+  // ── WML-T-02: table_merged ───────────────────────────────────────────────
+  // 3×3 table demonstrating both merge directions:
+  //   Row 0, cells 0-1: horizontal merge via gridSpan=2
+  //   Column 2, rows 0-1: vertical merge via vMerge restart/continue
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:tblBorders>
+          <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+        <w:gridCol w:w="2880"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="5760" w:type="dxa"/>
+            <w:gridSpan w:val="2"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A1+A2 (horizontal merge, gridSpan=2)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:vMerge w:val="restart"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>A3 top of vertical merge</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>B2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="2880" w:type="dxa"/>
+            <w:vMerge/>
+          </w:tcPr>
+          <w:p/>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C1</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C2</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>C3 (below vertical merge)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/table_merged.docx", &data);
+  }
+
+  // ── WML-T-03: table_props ────────────────────────────────────────────────
+  // 2×3 table exercising row and cell property features:
+  //   Row 0: tblHeader + trHeight exact 480 twips
+  //   Column 0 cells: vAlign=top/center/bottom across rows
+  //   One cell: noWrap
+  //   Table width: 5000 pct (100%)
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="5000" w:type="pct"/>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="4320"/>
+        <w:gridCol w:w="4320"/>
+      </w:tblGrid>
+      <w:tr>
+        <w:trPr>
+          <w:tblHeader/>
+          <w:trHeight w:val="480" w:hRule="exact"/>
+        </w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Left (center valign)</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+          </w:tcPr>
+          <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Right (center valign)</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="top"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>Top-aligned cell.</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:noWrap/>
+          </w:tcPr>
+          <w:p><w:r><w:t>No-wrap cell content that stays on one line.</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      <w:tr>
+        <w:trPr><w:cantSplit/></w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="4320" w:type="dxa"/>
+            <w:vAlign w:val="bottom"/>
+          </w:tcPr>
+          <w:p><w:r><w:t>Bottom-aligned cell.</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="4320" w:type="dxa"/></w:tcPr>
+          <w:p><w:r><w:t>CantSplit row.</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/table_props.docx", &data);
+  }
+}
+
+fn create_wml_drawing_fixtures(root: &Path, png: &[u8]) {
+  let img_ct = "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>";
+  let img_rel = r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>"#;
+
+  // ── WML-I-01: image_inline_props ─────────────────────────────────────────
+  // Inline image at 1 inch × 1 inch (914400 × 914400 EMU).
+  // Exercises: non-zero distL/distR (114300 EMU = 0.125 in), altText on
+  // docPr and cNvPr, cstate="print" on a:blip, picLocks noChangeAspect.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="114300" distR="114300">
+            <wp:extent cx="914400" cy="914400"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Image 1" descr="Alt text for accessibility"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="image1.png" descr="Alt text for accessibility"/>
+                    <pic:cNvPicPr>
+                      <a:picLocks noChangeAspect="1"/>
+                    </pic:cNvPicPr>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId1" cstate="print"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="914400" cy="914400"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", img_ct)),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(img_rel)),
+      ("word/media/image1.png", png),
+    ]);
+    save(root, "test-data/wml/image_inline_props.docx", &data);
+  }
+
+  // ── WML-I-02: image_floating ─────────────────────────────────────────────
+  // Floating anchor at 1 inch × 1 inch.
+  // Exercises: wp:anchor with wrapSquare (bothSides), column-relative
+  // horizontal alignment (left), paragraph-relative vertical posOffset=0,
+  // explicit distT/distB/distL/distR on both anchor and wrapSquare.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:anchor relativeHeight="251658240" behindDoc="0" locked="0"
+                     layoutInCell="1" allowOverlap="1"
+                     distT="114300" distB="114300" distL="114300" distR="114300">
+            <wp:simplePos x="0" y="0"/>
+            <wp:positionH relativeFrom="column">
+              <wp:align>left</wp:align>
+            </wp:positionH>
+            <wp:positionV relativeFrom="paragraph">
+              <wp:posOffset>0</wp:posOffset>
+            </wp:positionV>
+            <wp:extent cx="914400" cy="914400"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:wrapSquare wrapText="bothSides" distT="114300" distB="114300"
+                           distL="114300" distR="114300"/>
+            <wp:docPr id="2" name="Image 2"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="image1.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId1"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="914400" cy="914400"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:anchor>
+        </w:drawing>
+      </w:r>
+      <w:r><w:t xml:space="preserve">Text beside the floating image.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", img_ct)),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(img_rel)),
+      ("word/media/image1.png", png),
+    ]);
+    save(root, "test-data/wml/image_floating.docx", &data);
+  }
+}
+
+fn create_wml_numbering_fixtures(root: &Path) {
+  let num_ct = r#"
+  <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>"#;
+  let num_rel = r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>"#;
+
+  // ── WML-N-01: numbering_bullets ──────────────────────────────────────────
+  // Single-level bullet list using numFmt=bullet with the Unicode bullet
+  // character (U+2022). Hanging indent 360 twips creates the standard
+  // 0.25-inch label space. Five items at level 0.
+  {
+    let numbering = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
+<w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n\
+  <w:abstractNum w:abstractNumId=\"0\">\n\
+    <w:multiLevelType w:val=\"singleLevel\"/>\n\
+    <w:lvl w:ilvl=\"0\">\n\
+      <w:start w:val=\"1\"/>\n\
+      <w:numFmt w:val=\"bullet\"/>\n\
+      <w:lvlText w:val=\"\u{2022}\"/>\n\
+      <w:lvlJc w:val=\"left\"/>\n\
+      <w:pPr><w:ind w:left=\"720\" w:hanging=\"360\"/></w:pPr>\n\
+      <w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/></w:rPr>\n\
+    </w:lvl>\n\
+  </w:abstractNum>\n\
+  <w:num w:numId=\"1\">\n\
+    <w:abstractNumId w:val=\"0\"/>\n\
+  </w:num>\n\
+</w:numbering>";
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>First bullet item.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Second bullet item.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Third bullet item.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Fourth bullet item.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Fifth bullet item.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types(num_ct, "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(num_rel)),
+      ("word/numbering.xml", numbering.as_bytes()),
+    ]);
+    save(root, "test-data/wml/numbering_bullets.docx", &data);
+  }
+
+  // ── WML-N-02: numbering_ordered ──────────────────────────────────────────
+  // Three-level multilevel list: decimal L0 ("%1."), lowerLetter L1 ("%2."),
+  // lowerRoman L2 ("%3."). Document has top-level items with nested sub-items
+  // demonstrating all three levels.
+  {
+    let numbering = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="0">
+    <w:multiLevelType w:val="multilevel"/>
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="decimal"/>
+      <w:lvlText w:val="%1."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="1">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="lowerLetter"/>
+      <w:lvlText w:val="%2."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="2">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="lowerRoman"/>
+      <w:lvlText w:val="%3."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr>
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1">
+    <w:abstractNumId w:val="0"/>
+  </w:num>
+</w:numbering>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>First top-level item (1.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Sub-item under first (a.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Sub-sub-item (i.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Second sub-item (b.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Second top-level item (2.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Third top-level item (3.).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types(num_ct, "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(num_rel)),
+      ("word/numbering.xml", numbering),
+    ]);
+    save(root, "test-data/wml/numbering_ordered.docx", &data);
+  }
+
+  // ── WML-N-03: numbering_restart ──────────────────────────────────────────
+  // Two independent decimal lists sharing the same abstractNum (id=0).
+  // numId=1 is the first list (counts 1, 2, 3).
+  // numId=2 references the same abstractNum but has a lvlOverride with
+  // startOverride val="1" so it restarts independently at 1.
+  {
+    let numbering = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:abstractNum w:abstractNumId="0">
+    <w:multiLevelType w:val="singleLevel"/>
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="decimal"/>
+      <w:lvlText w:val="%1."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr>
+    </w:lvl>
+  </w:abstractNum>
+  <w:num w:numId="1">
+    <w:abstractNumId w:val="0"/>
+  </w:num>
+  <w:num w:numId="2">
+    <w:abstractNumId w:val="0"/>
+    <w:lvlOverride w:ilvl="0">
+      <w:startOverride w:val="1"/>
+    </w:lvlOverride>
+  </w:num>
+</w:numbering>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>First list:</w:t></w:r></w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Item one (1.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Item two (2.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+      <w:r><w:t>Item three (3.).</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:t>Second list (restarts at 1 via lvlOverride):</w:t></w:r></w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>
+      <w:r><w:t>Item one (1.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>
+      <w:r><w:t>Item two (2.).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>
+      <w:r><w:t>Item three (3.).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types(num_ct, "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(num_rel)),
+      ("word/numbering.xml", numbering),
+    ]);
+    save(root, "test-data/wml/numbering_restart.docx", &data);
+  }
+}
+
+fn create_wml_styles_fixtures(root: &Path) {
+  // ── WML-S-01: style_inheritance ──────────────────────────────────────────
+  // Three-level basedOn chain: Normal (default) → BodyText → BodyIndent.
+  // The document uses all three styles plus docDefaults (Calibri 11pt,
+  // spacing after 160 twips). Verifies that the inheritance chain and
+  // docDefaults round-trip without dropping or reordering elements.
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr>
+        <w:spacing w:after="160" w:line="259" w:lineRule="auto"/>
+      </w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="BodyText">
+    <w:name w:val="Body Text"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:rPr><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="BodyIndent">
+    <w:name w:val="Body Indent"/>
+    <w:basedOn w:val="BodyText"/>
+    <w:pPr><w:ind w:left="720"/></w:pPr>
+  </w:style>
+</w:styles>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>No explicit style (Normal via default).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="BodyText"/></w:pPr>
+      <w:r><w:t>Body Text style (basedOn Normal).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="BodyIndent"/></w:pPr>
+      <w:r><w:t>Body Indent style (basedOn BodyText, which basedOn Normal).</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/style_inheritance.docx", &data);
+  }
+
+  // ── WML-S-02: style_linked ───────────────────────────────────────────────
+  // Linked paragraph + character style pair (Quote ↔ QuoteChar).
+  // The Quote paragraph style has a `next` pointing back to Normal.
+  // The document uses Quote via pStyle and QuoteChar via rStyle.
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+  <w:style w:type="character" w:styleId="DefaultParagraphFont">
+    <w:name w:val="Default Paragraph Font"/>
+    <w:uiPriority w:val="1"/>
+    <w:semiHidden/>
+    <w:unhideWhenUsed/>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Quote">
+    <w:name w:val="Quote"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:link w:val="QuoteChar"/>
+    <w:uiPriority w:val="29"/>
+    <w:qFormat/>
+    <w:pPr><w:ind w:left="720" w:right="720"/><w:jc w:val="center"/></w:pPr>
+    <w:rPr><w:i/><w:iCs/></w:rPr>
+  </w:style>
+  <w:style w:type="character" w:styleId="QuoteChar">
+    <w:name w:val="Quote Char"/>
+    <w:basedOn w:val="DefaultParagraphFont"/>
+    <w:link w:val="Quote"/>
+    <w:uiPriority w:val="29"/>
+    <w:semiHidden/>
+    <w:rPr><w:i/><w:iCs/></w:rPr>
+  </w:style>
+</w:styles>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Normal paragraph before the quote.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pStyle w:val="Quote"/></w:pPr>
+      <w:r><w:t>Full paragraph styled with Quote (pStyle).</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t xml:space="preserve">Inline </w:t></w:r>
+      <w:r>
+        <w:rPr><w:rStyle w:val="QuoteChar"/></w:rPr>
+        <w:t>character-styled word</w:t>
+      </w:r>
+      <w:r><w:t xml:space="preserve"> in a normal paragraph.</w:t></w:r>
+    </w:p>
+    <w:sectPr/>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &docx_content_types(
+          r#"
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>"#,
+          "",
+        ),
+      ),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/styles.xml", styles),
+    ]);
+    save(root, "test-data/wml/style_linked.docx", &data);
+  }
 }

@@ -60,9 +60,9 @@ enum DocKind {
 
 fn doc_kind(path: &Path) -> Option<DocKind> {
   match path.extension().and_then(|e| e.to_str()) {
-    Some("docx") | Some("dotx") => Some(DocKind::Wordprocessing),
-    Some("xlsx") | Some("xltx") => Some(DocKind::Spreadsheet),
-    Some("pptx") | Some("potx") => Some(DocKind::Presentation),
+    Some("docx") | Some("dotx") | Some("docm") | Some("dotm") => Some(DocKind::Wordprocessing),
+    Some("xlsx") | Some("xltx") | Some("xlsm") | Some("xltm") => Some(DocKind::Spreadsheet),
+    Some("pptx") | Some("potx") | Some("pptm") | Some("potm") => Some(DocKind::Presentation),
     _ => None,
   }
 }

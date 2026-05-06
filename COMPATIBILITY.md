@@ -28,24 +28,55 @@ structural fidelity, not rendering or layout.
 |---|---|---|
 | Empty document | ✅ | `document/minimal_empty.docx` |
 | Plain text paragraphs | ✅ | `document/minimal_text.docx` |
-| Character formatting (bold/italic/underline) | 🔲 | |
-| Paragraph formatting (alignment/spacing/indent) | 🔲 | |
+| Character formatting (bold/italic/underline/strike/size/color) | ✅ | `wml/char_formatting.docx` |
+| Character formatting (highlight/vertAlign/caps/smallCaps) | ✅ | `wml/char_formatting.docx` |
+| Run fonts (rFonts: ascii/hAnsi/eastAsia/cs/theme/hint) | ✅ | `wml/run_fonts.docx` |
+| Run character style (rStyle) | ✅ | `wml/run_fonts.docx` |
+| Whitespace preservation (xml:space="preserve") | ✅ | `wml/whitespace.docx` |
+| Run breaks (soft return, page break, tab) | ✅ | `wml/breaks.docx` |
+| Paragraph alignment (jc: left/center/right/both/distribute) | ✅ | `wml/para_alignment.docx` |
+| Paragraph spacing (before/after twips; lineRule auto/exact/atLeast) | ✅ | `wml/para_spacing.docx` |
+| Contextual spacing | ✅ | `wml/para_spacing.docx` |
+| Paragraph indentation (left/right/firstLine/hanging) | ✅ | `wml/para_indent.docx` |
+| Paragraph borders (pBdr: single/double, top/left/bottom/right) | ✅ | `wml/para_borders_shading.docx` |
+| Paragraph shading (shd: clear fill, pct pattern) | ✅ | `wml/para_borders_shading.docx` |
+| Keep properties (keepNext/keepLines/pageBreakBefore/widowControl) | ✅ | `wml/para_keep.docx` |
+| Outline level (outlineLvl) | ✅ | `wml/para_keep.docx` |
 | Styles (paragraph/character) | ✅ | `document/minimal_styles.docx` |
-| Numbered and bulleted lists | 🔲 | |
+| Style inheritance (basedOn chain, docDefaults) | ✅ | `wml/style_inheritance.docx` |
+| Linked paragraph+character styles (link/next) | ✅ | `wml/style_linked.docx` |
+| Bullet lists (numFmt=bullet, hanging indent) | ✅ | `wml/numbering_bullets.docx` |
+| Ordered lists (decimal/lowerLetter/lowerRoman, multi-level) | ✅ | `wml/numbering_ordered.docx` |
+| List restart via lvlOverride startOverride | ✅ | `wml/numbering_restart.docx` |
 | Tables (basic) | ✅ | `document/minimal_table.docx` |
-| Tables (merged cells) | 🔲 | |
+| Table borders (tblBorders outer+insideH/V, tcBorders override) | ✅ | `wml/table_borders.docx` |
+| Tables (horizontal merge via gridSpan) | ✅ | `wml/table_merged.docx` |
+| Tables (vertical merge via vMerge restart/continue) | ✅ | `wml/table_merged.docx` |
+| Table row properties (tblHeader, trHeight exact, cantSplit) | ✅ | `wml/table_props.docx` |
+| Table cell vertical alignment (vAlign top/center/bottom) | ✅ | `wml/table_props.docx` |
+| Table cell noWrap, pct table width | ✅ | `wml/table_props.docx` |
 | Inline images | ✅ | `document/minimal_image.docx` |
-| Floating images | 🔲 | |
-| Headers and footers | 🔲 | |
-| Footnotes and endnotes | 🔲 | |
-| Hyperlinks | 🔲 | |
-| Bookmarks | 🔲 | |
-| Fields (PAGE, TOC, REF) | 🔲 | |
-| Section properties | 🔲 | |
-| Tracked changes | 🔲 | |
-| Comments | 🔲 | |
-| Content controls (SDT) | 🔲 | |
-| VBA macros (preserve-only) | 🔲 | |
+| Inline images (distL/distR, altText, cstate, picLocks) | ✅ | `wml/image_inline_props.docx` |
+| Floating images (wp:anchor, wrapSquare, positionH/V) | ✅ | `wml/image_floating.docx` |
+| Headers and footers (default header+footer; xmlns:r; sectPr headerReference/footerReference) | ✅ | `wml/header_footer.docx` |
+| Headers and footers (first-page header; titlePg; three part relationships) | ✅ | `wml/header_first_page.docx` |
+| Page size (pgSz: US Letter twips; orient) | ✅ | `wml/header_footer.docx` |
+| Page margins (pgMar: top/right/bottom/left/header/footer/gutter) | ✅ | `wml/header_footer.docx` |
+| Footnotes (separator/continuationSeparator special notes; footnoteRef mark; footnoteReference in body) | ✅ | `wml/footnotes.docx` |
+| Endnotes (same structure as footnotes; endnoteRef; endnoteReference in body) | ✅ | `wml/endnotes.docx` |
+| Fields (complex: PAGE/NUMPAGES with begin/instrText/separate/end; dirty) | ✅ | `wml/fields_complex.docx` |
+| Fields (simple: fldSimple with DATE instruction) | ✅ | `wml/fields_hyperlink.docx` |
+| Hyperlinks (external via r:id + TargetMode=External) | ✅ | `wml/fields_hyperlink.docx` |
+| Hyperlinks (internal anchor via w:anchor) | ✅ | `wml/fields_hyperlink.docx` |
+| Bookmarks (bookmarkStart/End as paragraph children; inline, heading, zero-width point) | ✅ | `wml/bookmarks.docx` |
+| Hyperlinks (internal anchor targeting bookmark via w:anchor) | ✅ | `wml/bookmarks.docx` |
+| Section properties (cols: equal-width multi-column, continuous break) | ✅ | `wml/section_columns.docx` |
+| Section properties (vAlign, docGrid, lnNumType) | ✅ | `wml/section_props.docx` |
+| Tracked changes (w:ins inserted run; w:del with w:delText; w:rPrChange; w:pPrChange) | ✅ | `wml/tracked_changes.docx` |
+| Comments (commentRangeStart/End as paragraph children; commentReference run child; annotationRef in note) | ✅ | `wml/comments.docx` |
+| Content controls (SDT block: plain text, alias/tag/id/lock) | ✅ | `wml/content_controls.docx` |
+| Content controls (SDT run: date picker with fullDate/dateFormat; dropDownList with listItems) | ✅ | `wml/content_controls.docx` |
+| VBA macros preserve-only (.docm; macroEnabled content type; microsoft.com rel type; OLE2 bin round-trip) | ✅ | `wml/vba_preserve.docm` |
 | Custom XML | 🔲 | |
 | Embedded objects | 🔲 | |
 

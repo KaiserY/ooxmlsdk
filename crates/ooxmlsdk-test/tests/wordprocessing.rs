@@ -1,7 +1,9 @@
 use ooxmlsdk::common::XmlHeaderType;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, Document, Hyperlink,
-  HyperlinkChoice, Paragraph, ParagraphChoice, Run, RunChoice, Text,
+  Body, BodyChoice, BodyChoice2, BodyChoice3, BodyChoice4, CommentChoice, CommentChoice2, Comments,
+  DeletedRun, DeletedRunChoice, DeletedRunChoice2, DeletedRunChoice3, DeletedRunChoice5, Document,
+  Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice, ParagraphChoice2, ParagraphChoice3,
+  ParagraphChoice4, ParagraphChoice5, Run, RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -209,48 +211,68 @@ fn body_paragraph_count(body: &Body) -> usize {
 }
 
 fn body_choice_paragraph(choice: &BodyChoice) -> Option<&Paragraph> {
-  match choice {
-    BodyChoice::WP(paragraph) => Some(paragraph.as_ref()),
-    _ => None,
+  if let BodyChoice::Choice1(c) = choice {
+    if let BodyChoice2::WP(paragraph) = c.as_ref() {
+      return Some(paragraph.as_ref());
+    }
   }
-}
-
-#[cfg(not(feature = "mce"))]
-fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
-  match choice {
-    BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
-    _ => None,
-  }
-}
-
-#[cfg(not(feature = "mce"))]
-fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
-  let _ = choice;
   None
 }
 
 #[cfg(not(feature = "mce"))]
+fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
+  if let BodyChoice::Choice1(c) = choice {
+    if let BodyChoice2::WSdt(sdt) = c.as_ref() {
+      return Some(sdt.as_ref());
+    }
+  }
+  None
+}
+
+#[cfg(not(feature = "mce"))]
+fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
+  match choice {
+    BodyChoice::XmlAny(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_ref()),
+    _ => None,
+  }
+}
+
+#[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkStart(_))
+  if let BodyChoice::Choice2(c4) = choice {
+    if let BodyChoice4::Choice(c3) = c4.as_ref() {
+      return matches!(c3.as_ref(), BodyChoice3::WBookmarkStart(_));
+    }
+  }
+  false
 }
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkEnd(_))
+  if let BodyChoice::Choice2(c4) = choice {
+    if let BodyChoice4::Choice(c3) = c4.as_ref() {
+      return matches!(c3.as_ref(), BodyChoice3::WBookmarkEnd(_));
+    }
+  }
+  false
 }
 
 fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
-  match choice {
-    CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
-    _ => None,
+  if let CommentChoice::Choice1(c) = choice {
+    if let CommentChoice2::WP(paragraph) = c.as_ref() {
+      return Some(paragraph.as_ref());
+    }
   }
+  None
 }
 
 fn paragraph_choice_run(choice: &ParagraphChoice) -> Option<&Run> {
-  match choice {
-    ParagraphChoice::WR(run) => Some(run.as_ref()),
-    _ => None,
+  if let ParagraphChoice::Choice(c5) = choice {
+    if let ParagraphChoice5::WR(run) = c5.as_ref() {
+      return Some(run.as_ref());
+    }
   }
+  None
 }
 
 fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
@@ -261,23 +283,62 @@ fn paragraph_choice_hyperlink(choice: &ParagraphChoice) -> Option<&Hyperlink> {
 }
 
 fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WSdt(_))
+  matches!(
+    choice,
+    ParagraphChoice::Choice(c) if matches!(c.as_ref(), ParagraphChoice5::WSdt(_))
+  )
 }
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkStart(_))
+  if let ParagraphChoice::Choice(c5) = choice {
+    if let ParagraphChoice5::Choice(c4) = c5.as_ref() {
+      if let ParagraphChoice4::Choice(c3) = c4.as_ref() {
+        if let ParagraphChoice3::Choice(c2) = c3.as_ref() {
+          return matches!(c2.as_ref(), ParagraphChoice2::WBookmarkStart(_));
+        }
+      }
+    }
+  }
+  false
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkEnd(_))
+  if let ParagraphChoice::Choice(c5) = choice {
+    if let ParagraphChoice5::Choice(c4) = c5.as_ref() {
+      if let ParagraphChoice4::Choice(c3) = c4.as_ref() {
+        if let ParagraphChoice3::Choice(c2) = c3.as_ref() {
+          return matches!(c2.as_ref(), ParagraphChoice2::WBookmarkEnd(_));
+        }
+      }
+    }
+  }
+  false
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeStart(_))
+  if let ParagraphChoice::Choice(c5) = choice {
+    if let ParagraphChoice5::Choice(c4) = c5.as_ref() {
+      if let ParagraphChoice4::Choice(c3) = c4.as_ref() {
+        if let ParagraphChoice3::Choice(c2) = c3.as_ref() {
+          return matches!(c2.as_ref(), ParagraphChoice2::WCommentRangeStart(_));
+        }
+      }
+    }
+  }
+  false
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeEnd(_))
+  if let ParagraphChoice::Choice(c5) = choice {
+    if let ParagraphChoice5::Choice(c4) = c5.as_ref() {
+      if let ParagraphChoice4::Choice(c3) = c4.as_ref() {
+        if let ParagraphChoice3::Choice(c2) = c3.as_ref() {
+          return matches!(c2.as_ref(), ParagraphChoice2::WCommentRangeEnd(_));
+        }
+      }
+    }
+  }
+  false
 }
 
 #[test]
@@ -290,19 +351,26 @@ fn deleted_run_flat_choice_parses_upstream_particle_shape() {
 
   assert_eq!(deleted_run.deleted_run_choice.len(), 4);
   assert!(matches!(
-    deleted_run.deleted_run_choice[0],
-    DeletedRunChoice::WProofErr(_)
+    &deleted_run.deleted_run_choice[0],
+    DeletedRunChoice::Choice(c)
+      if matches!(c.as_ref(), DeletedRunChoice5::Choice1(c2)
+        if matches!(c2.as_ref(), DeletedRunChoice3::WProofErr(_)))
   ));
   assert!(matches!(
-    deleted_run.deleted_run_choice[1],
-    DeletedRunChoice::WBookmarkStart(_)
+    &deleted_run.deleted_run_choice[1],
+    DeletedRunChoice::Choice(c)
+      if matches!(c.as_ref(), DeletedRunChoice5::Choice1(c2)
+        if matches!(c2.as_ref(), DeletedRunChoice3::Choice(c3)
+          if matches!(c3.as_ref(), DeletedRunChoice2::WBookmarkStart(_))))
   ));
   assert!(matches!(
-    deleted_run.deleted_run_choice[2],
-    DeletedRunChoice::Sequence {
-      run_conflict_insertion: Some(_),
-      run_conflict_deletion: Some(_)
-    }
+    &deleted_run.deleted_run_choice[2],
+    DeletedRunChoice::Choice(c)
+      if matches!(c.as_ref(), DeletedRunChoice5::Choice1(c2)
+        if matches!(c2.as_ref(), DeletedRunChoice3::Sequence {
+          run_conflict_insertion: Some(_),
+          run_conflict_deletion: Some(_)
+        }))
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[3],
@@ -872,19 +940,28 @@ fn body_alternate_content_without_selected_content_round_trips() {
       .iter()
       .filter_map(body_choice_alternate_content)
       .count(),
-    0
+    3
   );
 
-  assert!(!serialized.contains("<mc:AlternateContent"));
-  assert!(!serialized.contains(r#"<mc:Choice Requires="w13""#));
-  assert!(!serialized.contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
+  let alternate_content = body
+    .body_choice
+    .iter()
+    .filter_map(body_choice_alternate_content)
+    .collect::<Vec<_>>();
+  assert!(alternate_content[0].contains("<mc:AlternateContent"));
+  assert!(alternate_content[1].contains(r#"<mc:Choice Requires="w13"/>"#));
+  assert!(alternate_content[2].contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
+
+  assert!(serialized.contains("<mc:AlternateContent"));
+  assert!(serialized.contains(r#"<mc:Choice Requires="w13""#));
+  assert!(serialized.contains(r#"<mc:Choice Requires="w15" mc:MustUnderstand="w15">"#));
   assert_eq!(
     first_body(&reparsed)
       .body_choice
       .iter()
       .filter_map(body_choice_alternate_content)
       .count(),
-    0
+    3
   );
 }
 

@@ -2076,7 +2076,6 @@ fn create_wml_runs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/char_formatting.docx", &data);
   }
@@ -2170,7 +2169,6 @@ fn create_wml_runs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/whitespace.docx", &data);
   }
@@ -2205,7 +2203,6 @@ fn create_wml_runs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/breaks.docx", &data);
   }
@@ -2246,7 +2243,6 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/para_alignment.docx", &data);
   }
@@ -2316,7 +2312,6 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/para_spacing.docx", &data);
   }
@@ -2358,7 +2353,6 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/para_indent.docx", &data);
   }
@@ -2405,7 +2399,6 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/para_borders_shading.docx", &data);
   }
@@ -2454,7 +2447,6 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/para_keep.docx", &data);
   }
@@ -2585,10 +2577,10 @@ fn create_wml_headers_fixtures(root: &Path) {
       <w:headerReference w:type="default" r:id="rId2"/>
       <w:headerReference w:type="first" r:id="rId3"/>
       <w:footerReference w:type="default" r:id="rId4"/>
-      <w:titlePg/>
       <w:pgSz w:w="12240" w:h="15840"/>
       <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
                w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:titlePg/>
     </w:sectPr>
   </w:body>
 </w:document>"#;
@@ -2651,7 +2643,6 @@ fn create_wml_fields_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/fields_complex.docx", &data);
   }
@@ -2836,7 +2827,6 @@ fn create_wml_sdt_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/content_controls.docx", &data);
   }
@@ -2888,7 +2878,6 @@ fn create_wml_bookmarks_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/bookmarks.docx", &data);
   }
@@ -3026,7 +3015,6 @@ fn create_wml_tracked_changes_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/tracked_changes.docx", &data);
   }
@@ -3210,7 +3198,6 @@ fn create_wml_sections_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/section_columns.docx", &data);
   }
@@ -3251,7 +3238,6 @@ fn create_wml_sections_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", &docx_doc_rels("")),
     ]);
     save(root, "test-data/wml/section_props.docx", &data);
   }
@@ -3326,7 +3312,6 @@ fn create_wml_tables_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/table_borders.docx", &data);
   }
@@ -3411,7 +3396,6 @@ fn create_wml_tables_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/table_merged.docx", &data);
   }
@@ -3492,7 +3476,6 @@ fn create_wml_tables_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/wml/table_props.docx", &data);
   }
@@ -3948,7 +3931,7 @@ fn create_wml_styles_fixtures(root: &Path) {
     <w:link w:val="QuoteChar"/>
     <w:uiPriority w:val="29"/>
     <w:qFormat/>
-    <w:pPr><w:jc w:val="center"/><w:ind w:left="720" w:right="720"/></w:pPr>
+    <w:pPr><w:ind w:left="720" w:right="720"/><w:jc w:val="center"/></w:pPr>
     <w:rPr><w:i/><w:iCs/></w:rPr>
   </w:style>
   <w:style w:type="character" w:styleId="QuoteChar">

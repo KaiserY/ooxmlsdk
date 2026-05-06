@@ -1902,6 +1902,7 @@ fn add_data_part_reference_relationship_from_existing_reuses_id_type_and_target(
 #[test]
 fn wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: HyperlinkRelationshipTest
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs :: W010_HyperlinkRelationships
   let package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
   let main_part = package.main_document_part().unwrap();
 
@@ -2409,6 +2410,9 @@ fn package_add_new_part_creates_package_relationship() {
 
 #[test]
 fn image_part_feed_data_is_saved() {
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs
+  //   W0057_AddImageToDocxWithMimeType
+  //   W0058_AddImageToDocxWithMimeType
   // Source: upstream AddNewPart<ImagePart>(mime).FeedData(...) coverage.
   let mut package = WordprocessingDocument::new_from_file_with_settings(
     doc_sample("Hyperlink.docx"),
@@ -2517,6 +2521,7 @@ fn part_data_helpers_read_text_and_write_bytes() {
 
 #[test]
 fn add_image_part_with_id_feeds_data_and_saves() {
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs :: W0056_AddImageToDocxWithMimeType
   // Source: upstream MainDocumentPart.AddImagePart(mime, id).FeedData(...) coverage.
   let mut package = WordprocessingDocument::new_from_file_with_settings(
     doc_sample("Hyperlink.docx"),
@@ -2556,6 +2561,9 @@ fn add_image_part_with_id_feeds_data_and_saves() {
 
 #[test]
 fn add_image_part_auto_id_uses_next_relationship_id() {
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs
+  //   W008_AddImageToDocx
+  //   W0059_AddImageToDocxWithMimeType
   // Source: upstream MainDocumentPart.AddImagePart(mime).FeedData(...) coverage.
   let mut package = WordprocessingDocument::new_from_file_with_settings(
     doc_sample("Hyperlink.docx"),
@@ -4793,6 +4801,41 @@ fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
   let reopened_clone = WordprocessingDocument::new(Cursor::new(clone_bytes)).unwrap();
   assert!(reopened_source.main_document_part().is_ok());
   assert!(reopened_clone.main_document_part().is_ok());
+}
+
+#[test]
+fn spreadsheet_save_writes_current_state_without_later_mutations() {
+  // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs :: SaveWithoutClosing
+  let mut package = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+  let workbook_part = package.add_workbook_part().unwrap();
+  workbook_part
+    .set_root_element(
+      &mut package,
+      SpreadsheetWorkbook {
+        sheets: Box::new(Sheets::default()),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+
+  let saved = package.to_package_bytes().unwrap();
+
+  let root = workbook_part.root_element_mut(&mut package).unwrap();
+  root.sheets.x_sheet.push(Sheet {
+    name: "after-save".to_string(),
+    sheet_id: 1,
+    id: "rIdAfterSave".to_string(),
+    ..Default::default()
+  });
+  assert_eq!(root.sheets.x_sheet.len(), 1);
+
+  let saved_workbook_xml = package_entry_data(saved.clone(), "xl/workbook.xml");
+  assert!(!String::from_utf8_lossy(&saved_workbook_xml).contains("after-save"));
+
+  let mut reopened = SpreadsheetDocument::new(Cursor::new(saved)).unwrap();
+  let reopened_workbook_part = reopened.workbook_part().unwrap();
+  let reopened_root = reopened_workbook_part.root_element(&mut reopened).unwrap();
+  assert!(reopened_root.sheets.x_sheet.is_empty());
 }
 
 #[test]

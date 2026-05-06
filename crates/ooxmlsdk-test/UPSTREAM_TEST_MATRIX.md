@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 120
-- `covered`: 227
+- `covered`: 236
 - `covered_by_doc_samples`: 38
 - `missing`: 0
 - `not_applicable`: 132
-- `partial`: 469
+- `partial`: 460
 
 ## Tests
 
@@ -289,13 +289,13 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:841` `W013_MarkupCompat_ProcessLoadedPartsOnly` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:861` `W012_MarkupCompat_ProcessAllParts` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:879` `W011_MarkupCompat_InvalidValidation` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:906` `W010_HyperlinkRelationships` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:906` `W010_HyperlinkRelationships` | Fact | `covered` | `wordprocessing` | `packages.rs::wordprocessing_hyperlink_relationships_are_preserved_from_openxml_part_test` covers hyperlink relationships through public part helpers |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:922` `W009_DeleteAllParts` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:934` `W008_AddImageToDocx` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:957` `W0056_AddImageToDocxWithMimeType` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:980` `W0057_AddImageToDocxWithMimeType` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1003` `W0058_AddImageToDocxWithMimeType` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1026` `W0059_AddImageToDocxWithMimeType` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:934` `W008_AddImageToDocx` | Fact | `covered` | `wordprocessing` | `packages.rs::add_image_part_auto_id_uses_next_relationship_id` covers adding image parts by MIME with generated relationship IDs |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:957` `W0056_AddImageToDocxWithMimeType` | Fact | `covered` | `wordprocessing` | `packages.rs::add_image_part_with_id_feeds_data_and_saves` covers adding image parts by MIME and explicit relationship ID |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:980` `W0057_AddImageToDocxWithMimeType` | Fact | `covered` | `wordprocessing` | `packages.rs::image_part_feed_data_is_saved` covers adding typed image parts by MIME and persisted bytes |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1003` `W0058_AddImageToDocxWithMimeType` | Fact | `covered` | `wordprocessing` | `packages.rs::image_part_feed_data_is_saved` covers adding typed image parts by MIME and persisted bytes |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1026` `W0059_AddImageToDocxWithMimeType` | Fact | `covered` | `wordprocessing` | `packages.rs::add_image_part_auto_id_uses_next_relationship_id` covers adding image parts by MIME with generated relationship IDs |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1113` `W007_GetPartById_DeleteParts` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1129` `W006_RemoveCommentsPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:1145` `W005_AddCommentsPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
@@ -641,8 +641,8 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/OpenXmlElementFunctionalExtensionsTests.cs:169` `With_NullOpenXmlElement_ArgumentNullExceptionThrown` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlElementFunctionalExtensionsTests.cs:177` `With_WildMix_Success` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
 | `DocumentFormat.OpenXml.Tests/OpenXmlElementParsingTests.cs:12` `ParseXmlWithEmbeddedXml` | Fact | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |
-| `DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs:17` `GetStreamWrite` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs:47` `GetStreamWriteNoUpdates` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs; static empty element slash spacing now matches upstream ` />`, while runtime-empty complex elements remain XML-equivalent start/end output for write-path performance |
+| `DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs:17` `GetStreamWrite` | Theory | `covered` | `package_parts` | `packages.rs::part_data_helpers_read_text_and_write_bytes`, `packages.rs::set_data_replaces_existing_part_bytes`, and `spreadsheet.rs::empty_shared_string_table_serialization_matches_get_stream_write_no_updates_test` cover public part stream/data write semantics |
+| `DocumentFormat.OpenXml.Tests/OpenXmlPartTests.cs:47` `GetStreamWriteNoUpdates` | Theory | `covered` | `package_parts` | `spreadsheet.rs::empty_shared_string_table_serialization_matches_get_stream_write_no_updates_test` covers empty shared string table serialization without additional writes |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:21` `P007_PptxCreation_Package_Settings` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:41` `P006_PresentationDocument_Open` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:58` `P005_PptxCreation_Package_Settings` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
@@ -664,7 +664,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:289` `CanSave` | Fact | `covered` | `package_parts` | `packages.rs::wordprocessing_clone_mutation_is_saved_without_changing_source_package` covers root mutation serialization into the saved package |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:322` `CanSaveAsWord` | Fact | `covered` | `package_parts` | `packages.rs::package_save_as_file_round_trips_office_document_types` covers Word save-as-file and reopenable package shape |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:342` `CanSaveProperty` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:358` `SaveWithoutClosing` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
+| `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:358` `SaveWithoutClosing` | Fact | `covered` | `package_parts` | `packages.rs::spreadsheet_save_writes_current_state_without_later_mutations` covers save output isolation from later in-memory root mutations |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:389` `CanSaveAsExcel` | Fact | `covered` | `package_parts` | `packages.rs::package_save_as_file_round_trips_office_document_types` covers Spreadsheet save-as-file and reopenable package shape |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:407` `CanSaveAsPowerpoint` | Fact | `covered` | `package_parts` | `packages.rs::package_save_as_file_round_trips_office_document_types` covers Presentation save-as-file and reopenable package shape |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:425` `CanDoStreamBasedCloningWord` | Fact | `covered` | `package_parts` | `packages.rs::wordprocessing_clone_mutation_is_saved_without_changing_source_package` covers Word stream/bytes clone and reopen through public Rust copy helpers |

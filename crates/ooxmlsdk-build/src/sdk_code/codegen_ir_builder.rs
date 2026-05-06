@@ -111,6 +111,7 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
   }
 
   dedupe_helper_struct_types(&mut types)?;
+  inline_safe_pure_child_choice_payloads(&mut types);
   populate_content_structures(&mut types, schema, context)?;
 
   Ok(SchemaModuleDecl {
@@ -150,6 +151,274 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
       .collect(),
     types,
   })
+}
+
+fn inline_safe_pure_child_choice_payloads(types: &mut [TypeDecl]) {
+  loop {
+    let choice_members_by_name = types
+      .iter()
+      .filter(|ty| ty.kind == TypeKind::ChoiceEnum)
+      .map(|ty| (ty.rust_name.clone(), ty.members.clone()))
+      .collect::<std::collections::HashMap<_, _>>();
+
+    let mut changed = false;
+    for ty in types.iter_mut() {
+      if ty.kind != TypeKind::ChoiceEnum {
+        continue;
+      }
+
+      let members =
+        inline_safe_pure_child_choice_members(&ty.rust_name, &ty.members, &choice_members_by_name);
+      changed |= members != ty.members;
+      ty.members = members;
+    }
+
+    if !changed {
+      break;
+    }
+  }
+}
+
+fn inline_safe_pure_child_choice_members(
+  parent_name: &str,
+  members: &[MemberDecl],
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> Vec<MemberDecl> {
+  let mut inlined = Vec::with_capacity(members.len());
+  let mut used_variant_names = std::collections::HashSet::new();
+  let mut used_child_qnames = std::collections::HashSet::new();
+
+  for (index, member) in members.iter().enumerate() {
+    if let Some(candidate) = safe_pure_child_choice_inline_candidate(
+      parent_name,
+      member,
+      members,
+      index,
+      choice_members_by_name,
+    ) && candidate.iter().all(|variant| {
+      let MemberDecl::Variant(variant) = variant else {
+        return false;
+      };
+      let Some(qnames) = variant_child_qnames(variant) else {
+        return false;
+      };
+      !used_variant_names.contains(variant.rust_name.as_str())
+        && qnames
+          .iter()
+          .all(|qname| !used_child_qnames.contains(qname.as_str()))
+    }) {
+      for variant in candidate {
+        if let MemberDecl::Variant(ref variant_decl) = variant {
+          used_variant_names.insert(variant_decl.rust_name.clone());
+          for qname in variant_child_qnames(variant_decl).into_iter().flatten() {
+            used_child_qnames.insert(qname.clone());
+          }
+        }
+        inlined.push(variant);
+      }
+    } else {
+      track_member_variant_name_and_child_qnames(
+        member,
+        &mut used_variant_names,
+        &mut used_child_qnames,
+      );
+      inlined.push(member.clone());
+    }
+  }
+
+  inlined
+}
+
+fn safe_pure_child_choice_inline_candidate(
+  parent_name: &str,
+  member: &MemberDecl,
+  parent_members: &[MemberDecl],
+  member_index: usize,
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> Option<Vec<MemberDecl>> {
+  let MemberDecl::Variant(parent_variant) = member else {
+    return None;
+  };
+  let VariantWireDecl::Child {
+    qnames: parent_qnames,
+  } = &parent_variant.wire
+  else {
+    return None;
+  };
+  if parent_variant.payload.module_path.is_some() || parent_variant.payload.rust_type == parent_name
+  {
+    return None;
+  }
+
+  let payload_members = choice_members_by_name.get(parent_variant.payload.rust_type.as_str())?;
+  let payload_variants =
+    inlineable_choice_payload_variants(payload_members, choice_members_by_name)?;
+  let payload_qnames = payload_variants
+    .iter()
+    .flat_map(|variant| variant_child_qnames(variant).into_iter().flatten())
+    .cloned()
+    .collect::<Vec<_>>();
+  if !choice_payload_qnames_match_parent(
+    &payload_qnames,
+    parent_qnames,
+    &payload_variants,
+    choice_members_by_name,
+  ) {
+    return None;
+  }
+
+  let other_variant_names = parent_members
+    .iter()
+    .enumerate()
+    .filter_map(|(index, member)| {
+      (index != member_index)
+        .then_some(member)
+        .and_then(member_variant_name)
+    })
+    .collect::<std::collections::HashSet<_>>();
+  let other_child_qnames = parent_members
+    .iter()
+    .enumerate()
+    .filter(|(index, _)| *index != member_index)
+    .flat_map(|(_, member)| {
+      member_child_qnames(member)
+        .into_iter()
+        .flatten()
+        .map(String::as_str)
+    })
+    .collect::<std::collections::HashSet<_>>();
+
+  let mut candidate_variant_names = std::collections::HashSet::new();
+  let mut candidate_child_qnames = std::collections::HashSet::new();
+  for variant in &payload_variants {
+    if other_variant_names.contains(variant.rust_name.as_str())
+      || !candidate_variant_names.insert(variant.rust_name.as_str())
+    {
+      return None;
+    }
+
+    for qname in variant_child_qnames(variant)? {
+      if other_child_qnames.contains(qname.as_str())
+        || !candidate_child_qnames.insert(qname.as_str())
+      {
+        return None;
+      }
+    }
+  }
+
+  Some(
+    payload_variants
+      .into_iter()
+      .map(|variant| {
+        let mut variant = variant.clone();
+        variant.version =
+          effective_version(parent_variant.version.as_str(), variant.version.as_str()).to_string();
+        MemberDecl::Variant(variant)
+      })
+      .collect(),
+  )
+}
+
+fn is_math_child_choice_payload(qnames: &[String]) -> bool {
+  !qnames.is_empty()
+    && qnames.iter().all(|qname| {
+      qname
+        .split('/')
+        .nth(1)
+        .is_some_and(|element| element.starts_with("m:"))
+    })
+}
+
+fn choice_payload_qnames_match_parent(
+  payload_qnames: &[String],
+  parent_qnames: &[String],
+  payload_variants: &[&VariantDecl],
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> bool {
+  if payload_qnames == parent_qnames {
+    return true;
+  }
+  if !is_math_child_choice_payload(payload_qnames) {
+    return false;
+  }
+
+  payload_variants.iter().all(|variant| {
+    variant.payload.module_path.is_none()
+      && !choice_members_by_name.contains_key(&variant.payload.rust_type)
+  })
+}
+
+fn inlineable_choice_payload_variants<'a>(
+  members: &'a [MemberDecl],
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> Option<Vec<&'a VariantDecl>> {
+  let mut variants = Vec::with_capacity(members.len());
+  let mut child_count = 0usize;
+  let mut choice_count = 0usize;
+
+  for member in members {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
+    let is_nested_choice_payload = variant.payload.module_path.is_none()
+      && choice_members_by_name.contains_key(&variant.payload.rust_type);
+
+    match &variant.wire {
+      VariantWireDecl::Child { .. } => {
+        if is_nested_choice_payload {
+          choice_count += 1;
+        } else {
+          child_count += 1;
+        }
+      }
+      VariantWireDecl::Sequence { .. }
+      | VariantWireDecl::TextChild { .. }
+      | VariantWireDecl::Any
+      | VariantWireDecl::Text => return None,
+    }
+    variants.push(variant);
+  }
+
+  (!variants.is_empty() && (choice_count == 0 || child_count + choice_count == variants.len()))
+    .then_some(variants)
+}
+
+fn member_variant_name(member: &MemberDecl) -> Option<&str> {
+  match member {
+    MemberDecl::Variant(variant) => Some(variant.rust_name.as_str()),
+    MemberDecl::Field(_) => None,
+  }
+}
+
+fn member_child_qnames(member: &MemberDecl) -> Option<&Vec<String>> {
+  match member {
+    MemberDecl::Variant(variant) => variant_child_qnames(variant),
+    MemberDecl::Field(_) => None,
+  }
+}
+
+fn variant_child_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
+  match &variant.wire {
+    VariantWireDecl::Child { qnames } => Some(qnames),
+    VariantWireDecl::Sequence { .. }
+    | VariantWireDecl::TextChild { .. }
+    | VariantWireDecl::Any
+    | VariantWireDecl::Text => None,
+  }
+}
+
+fn track_member_variant_name_and_child_qnames(
+  member: &MemberDecl,
+  used_variant_names: &mut std::collections::HashSet<String>,
+  used_child_qnames: &mut std::collections::HashSet<String>,
+) {
+  let MemberDecl::Variant(variant) = member else {
+    return;
+  };
+  used_variant_names.insert(variant.rust_name.clone());
+  if let Some(qnames) = variant_child_qnames(variant) {
+    used_child_qnames.extend(qnames.iter().cloned());
+  }
 }
 
 fn populate_content_structures(
@@ -1016,17 +1285,36 @@ fn build_recursive_choice_enum_decl(
   name_allocator: &mut RecursiveChoiceNameAllocator,
 ) -> Result<TypeDecl> {
   let mut members = Vec::new();
+  let mut used_leaf_names = std::collections::HashSet::new();
+  let mut used_variant_names = std::collections::HashSet::new();
 
   for (index, child) in choice_child.children.iter().enumerate() {
-    members.push(build_recursive_choice_member_decl(
-      schema_type,
-      schema,
-      context,
-      child,
-      index,
-      extra_types,
-      name_allocator,
-    )?);
+    let mut candidate_leafs = Vec::new();
+    if collect_flattenable_recursive_choice_leafs(child, &mut candidate_leafs)
+      && recursive_choice_leaf_names_are_unique(&candidate_leafs, &used_leaf_names)
+      && recursive_choice_variant_names_are_unique(&candidate_leafs, &used_variant_names)
+    {
+      for leaf in candidate_leafs {
+        track_recursive_choice_leaf(leaf, &mut used_leaf_names, &mut used_variant_names);
+        members.push(build_recursive_choice_leaf_variant_decl(
+          schema_type,
+          schema,
+          context,
+          leaf,
+        )?);
+      }
+    } else {
+      track_recursive_choice_leaf(child, &mut used_leaf_names, &mut used_variant_names);
+      members.push(build_recursive_choice_member_decl(
+        schema_type,
+        schema,
+        context,
+        child,
+        index,
+        extra_types,
+        name_allocator,
+      )?);
+    }
   }
 
   disambiguate_choice_variant_names(&mut members);
@@ -1046,6 +1334,72 @@ fn build_recursive_choice_enum_decl(
     content_structure: None,
     members,
   })
+}
+
+fn collect_flattenable_recursive_choice_leafs<'a>(
+  child: &'a SchemaTypeChild,
+  leafs: &mut Vec<&'a SchemaTypeChild>,
+) -> bool {
+  if !is_flattenable_recursive_choice_wrapper(child) {
+    return false;
+  }
+
+  let original_len = leafs.len();
+  for nested in &child.children {
+    if is_required_recursive_choice_leaf(nested) {
+      leafs.push(nested);
+    } else if !collect_flattenable_recursive_choice_leafs(nested, leafs) {
+      leafs.truncate(original_len);
+      return false;
+    }
+  }
+
+  !child.children.is_empty()
+}
+
+fn is_flattenable_recursive_choice_wrapper(child: &SchemaTypeChild) -> bool {
+  child.kind == SchemaTypeChildKind::Choice
+    && child.name.is_empty()
+    && is_generic_choice_wrapper_name(child.property_name.as_str())
+    && !child.optional
+    && !child.repeated
+}
+
+fn is_required_recursive_choice_leaf(child: &SchemaTypeChild) -> bool {
+  child.kind == SchemaTypeChildKind::Child
+    && !child.name.is_empty()
+    && !child.optional
+    && !child.repeated
+    && child.children.is_empty()
+}
+
+fn recursive_choice_leaf_names_are_unique(
+  leafs: &[&SchemaTypeChild],
+  used_leaf_names: &std::collections::HashSet<String>,
+) -> bool {
+  let mut names = used_leaf_names.clone();
+  leafs.iter().all(|child| names.insert(child.name.clone()))
+}
+
+fn recursive_choice_variant_names_are_unique(
+  leafs: &[&SchemaTypeChild],
+  used_variant_names: &std::collections::HashSet<String>,
+) -> bool {
+  let mut names = used_variant_names.clone();
+  leafs
+    .iter()
+    .all(|child| names.insert(child_variant_rust_name(child.name.as_str())))
+}
+
+fn track_recursive_choice_leaf(
+  child: &SchemaTypeChild,
+  used_leaf_names: &mut std::collections::HashSet<String>,
+  used_variant_names: &mut std::collections::HashSet<String>,
+) {
+  if is_required_recursive_choice_leaf(child) {
+    used_leaf_names.insert(child.name.clone());
+    used_variant_names.insert(child_variant_rust_name(child.name.as_str()));
+  }
 }
 
 fn build_recursive_choice_member_decl(
@@ -4713,11 +5067,17 @@ mod tests {
       .iter()
       .find(|ty| ty.rust_name == "ParagraphChoice")
       .unwrap();
-    assert!(paragraph_choice.members.iter().any(|member| matches!(
+    assert!(!paragraph_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgContentRunContent"
           && variant.payload.rust_type == "ParagraphChoice1"
+    )));
+    assert!(paragraph_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "EgRunLevelElts"
+          && variant.payload.rust_type == "ParagraphChoice2"
     )));
 
     let content_run_choice = ir
@@ -4737,11 +5097,16 @@ mod tests {
       .iter()
       .find(|ty| ty.rust_name == "ParagraphChoice2")
       .unwrap();
-    assert!(run_level_choice.members.iter().any(|member| matches!(
+    assert!(!run_level_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgRangeMarkupElements"
           && variant.payload.rust_type == "ParagraphChoice3"
+    )));
+    assert!(run_level_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "WProofErr"
     )));
     assert!(run_level_choice.members.iter().any(|member| matches!(
       member,
@@ -4770,11 +5135,17 @@ mod tests {
         .all(|field| field.cardinality == Cardinality::One)
     );
 
-    assert!(run_level_choice.members.iter().any(|member| matches!(
+    assert!(!run_level_choice.members.iter().any(|member| matches!(
       member,
       MemberDecl::Variant(variant)
         if variant.rust_name == "EgMathContent"
           && variant.payload.rust_type == "ParagraphChoice4"
+    )));
+    assert!(run_level_choice.members.iter().any(|member| matches!(
+      member,
+      MemberDecl::Variant(variant)
+        if variant.rust_name == "MR"
+          && variant.payload.rust_type == "MathRun"
     )));
 
     let omath_math_elements_choice = ir

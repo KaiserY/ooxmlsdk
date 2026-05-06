@@ -1829,10 +1829,7 @@ pub struct OfficeArtExtensionList {
   pub a_ext: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice {
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+pub enum RunConflictInsertionChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -1933,6 +1930,15 @@ pub enum RunConflictInsertionChoice {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
   },
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictInsertionChoice {
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
+  #[sdk(choice)]
+  Choice(std::boxed::Box<RunConflictInsertionChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -2010,10 +2016,7 @@ pub enum RunConflictInsertionChoice {
   WDir(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice {
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+pub enum RunConflictDeletionChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -2114,6 +2117,15 @@ pub enum RunConflictDeletionChoice {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
   },
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum RunConflictDeletionChoice {
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
+  #[sdk(choice)]
+  Choice(std::boxed::Box<RunConflictDeletionChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),

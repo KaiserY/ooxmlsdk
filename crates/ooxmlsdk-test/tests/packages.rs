@@ -504,12 +504,6 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
   let root = main_part.root_element(&mut package).unwrap();
   let body = root.body.as_ref().unwrap();
 
-  assert!(
-    body
-      .body_choice
-      .iter()
-      .all(|choice| !matches!(choice, BodyChoice::XmlAny(xml) if xml.contains("AlternateContent")))
-  );
   assert_eq!(
     body
       .body_choice

@@ -1,7 +1,10 @@
 use ooxmlsdk::common::XmlHeaderType;
+#[cfg(not(feature = "mce"))]
+use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BodyChoice2;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, Document, Hyperlink,
-  HyperlinkChoice, Paragraph, ParagraphChoice, Run, RunChoice, Text,
+  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, DeletedRunChoice2,
+  Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice, ParagraphChoice2, Run,
+  RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
@@ -233,12 +236,18 @@ fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_start(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkStart(_))
+  matches!(
+    choice,
+    BodyChoice::Choice(inner) if matches!(inner.as_ref(), BodyChoice2::WBookmarkStart(_))
+  )
 }
 
 #[cfg(not(feature = "mce"))]
 fn body_choice_has_bookmark_end(choice: &BodyChoice) -> bool {
-  matches!(choice, BodyChoice::WBookmarkEnd(_))
+  matches!(
+    choice,
+    BodyChoice::Choice(inner) if matches!(inner.as_ref(), BodyChoice2::WBookmarkEnd(_))
+  )
 }
 
 fn comment_choice_paragraph(choice: &CommentChoice) -> Option<&Paragraph> {
@@ -267,19 +276,32 @@ fn paragraph_choice_is_sdt(choice: &ParagraphChoice) -> bool {
 }
 
 fn paragraph_choice_has_bookmark_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkStart(_))
+  matches!(
+    choice,
+    ParagraphChoice::Choice(inner) if matches!(inner.as_ref(), ParagraphChoice2::WBookmarkStart(_))
+  )
 }
 
 fn paragraph_choice_has_bookmark_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WBookmarkEnd(_))
+  matches!(
+    choice,
+    ParagraphChoice::Choice(inner) if matches!(inner.as_ref(), ParagraphChoice2::WBookmarkEnd(_))
+  )
 }
 
 fn paragraph_choice_has_comment_range_start(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeStart(_))
+  matches!(
+    choice,
+    ParagraphChoice::Choice(inner)
+      if matches!(inner.as_ref(), ParagraphChoice2::WCommentRangeStart(_))
+  )
 }
 
 fn paragraph_choice_has_comment_range_end(choice: &ParagraphChoice) -> bool {
-  matches!(choice, ParagraphChoice::WCommentRangeEnd(_))
+  matches!(
+    choice,
+    ParagraphChoice::Choice(inner) if matches!(inner.as_ref(), ParagraphChoice2::WCommentRangeEnd(_))
+  )
 }
 
 #[test]
@@ -293,18 +315,24 @@ fn deleted_run_flat_choice_parses_upstream_particle_shape() {
   assert_eq!(deleted_run.deleted_run_choice.len(), 4);
   assert!(matches!(
     deleted_run.deleted_run_choice[0],
-    DeletedRunChoice::WProofErr(_)
+    DeletedRunChoice::Choice(ref inner)
+      if matches!(inner.as_ref(), DeletedRunChoice2::WProofErr(_))
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[1],
-    DeletedRunChoice::WBookmarkStart(_)
+    DeletedRunChoice::Choice(ref inner)
+      if matches!(inner.as_ref(), DeletedRunChoice2::WBookmarkStart(_))
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[2],
-    DeletedRunChoice::Sequence {
-      run_conflict_insertion: Some(_),
-      run_conflict_deletion: Some(_)
-    }
+    DeletedRunChoice::Choice(ref inner)
+      if matches!(
+        inner.as_ref(),
+        DeletedRunChoice2::Sequence {
+          run_conflict_insertion: Some(_),
+          run_conflict_deletion: Some(_)
+        }
+      )
   ));
   assert!(matches!(
     deleted_run.deleted_run_choice[3],

@@ -1,10 +1,8 @@
 use ooxmlsdk::common::XmlHeaderType;
-#[cfg(not(feature = "mce"))]
-use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::BodyChoice2;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, DeletedRunChoice2,
-  Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice, ParagraphChoice2, Run,
-  RunChoice, Text,
+  Body, BodyChoice, BodyChoice2, CommentChoice, Comments, DeletedRun, DeletedRunChoice,
+  DeletedRunChoice2, Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice,
+  ParagraphChoice2, Run, RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{

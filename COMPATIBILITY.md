@@ -120,12 +120,16 @@ structural fidelity, not rendering or layout.
 | Inline images | ✅ | `slideshow/minimal_image.pptx` |
 | Shapes (basic) | ✅ | `slideshow/minimal_text.pptx` |
 | Shapes (with fill/border) | ✅ | `drawingml/solid_fill.pptx`, `drawingml/shape_line.pptx` |
+| Placeholder layout (title+body, multilevel bullets) | ✅ | `pml/placeholder_body.pptx` |
+| Shape rotation and flip (rot/flipH/flipV) | ✅ | `pml/shape_rotation.pptx` |
+| Group shapes (grpSp with chOff/chExt) | ✅ | `pml/group_shape.pptx` |
+| Text body properties (autofit, anchor, vert) | ✅ | `pml/text_body_props.pptx` |
+| Hyperlinks in runs (hlinkClick) | ✅ | `pml/slide_hyperlink.pptx` |
+| Slide transitions (fade, spd, advClick) | ✅ | `pml/slide_transition.pptx` |
+| Speaker notes (NotesSlidePart, body placeholder) | ✅ | `pml/notes_slide.pptx` |
 | Charts | 🔲 | |
-| Slide transitions | 🔲 | |
 | Animations | 🔲 | |
-| Notes | 🔲 | |
 | Embedded videos | 🔲 | |
-| Speaker notes | 🔲 | |
 
 ## DrawingML (shared across DOCX/XLSX/PPTX)
 

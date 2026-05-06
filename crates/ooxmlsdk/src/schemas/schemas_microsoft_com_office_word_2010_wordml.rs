@@ -1829,7 +1829,19 @@ pub struct OfficeArtExtensionList {
   pub a_ext: Vec<crate::schemas::a::Extension>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice2 {
+pub enum RunConflictInsertionChoice {
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
   /// Defines the BookmarkStart Class.
   #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
   WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
@@ -1896,21 +1908,6 @@ pub enum RunConflictInsertionChoice2 {
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
   #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
   W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice3 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
-  /// Choice of choice1, choice2, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd
-  #[sdk(choice)]
-  Choice(std::boxed::Box<RunConflictInsertionChoice2>),
   /// Inserted Run Content.
   #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
   WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
@@ -1936,9 +1933,6 @@ pub enum RunConflictInsertionChoice3 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice4 {
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -2005,24 +1999,6 @@ pub enum RunConflictInsertionChoice4 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<crate::schemas::m::Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice5 {
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<RunConflictInsertionChoice3>),
-  /// Choice of m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<RunConflictInsertionChoice4>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictInsertionChoice {
-  /// Choice of w:sdt, choice2
-  #[sdk(choice)]
-  Choice(std::boxed::Box<RunConflictInsertionChoice5>),
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::w::Run>),
@@ -2034,7 +2010,19 @@ pub enum RunConflictInsertionChoice {
   WDir(std::boxed::Box<crate::schemas::w::BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice2 {
+pub enum RunConflictDeletionChoice {
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
   /// Defines the BookmarkStart Class.
   #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
   WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
@@ -2101,21 +2089,6 @@ pub enum RunConflictDeletionChoice2 {
   /// Defines the CustomXmlConflictDeletionRangeEnd Class.
   #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
   W14CustomXmlConflictDelRangeEnd(std::boxed::Box<CustomXmlConflictDeletionRangeEnd>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice3 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
-  /// Choice of choice1, choice2, w14:customXmlConflictInsRangeStart, w14:customXmlConflictInsRangeEnd, w14:customXmlConflictDelRangeStart, w14:customXmlConflictDelRangeEnd
-  #[sdk(choice)]
-  Choice(std::boxed::Box<RunConflictDeletionChoice2>),
   /// Inserted Run Content.
   #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
   WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
@@ -2141,9 +2114,6 @@ pub enum RunConflictDeletionChoice3 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice4 {
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -2210,24 +2180,6 @@ pub enum RunConflictDeletionChoice4 {
   /// Defines the Run Class.
   #[sdk(child(qname = "m:CT_R/m:r"))]
   MR(std::boxed::Box<crate::schemas::m::Run>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice5 {
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice1(std::boxed::Box<RunConflictDeletionChoice3>),
-  /// Choice of m:oMathPara, m:oMath, m:acc, m:bar, m:box, m:borderBox, m:d, m:eqArr, m:f, m:func, m:groupChr, m:limLow, m:limUpp, m:m, m:nary, m:phant, m:rad, m:sPre, m:sSub, m:sSubSup, m:sSup, m:r
-  #[sdk(choice)]
-  Choice2(std::boxed::Box<RunConflictDeletionChoice4>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunConflictDeletionChoice {
-  /// Choice of w:sdt, choice2
-  #[sdk(choice)]
-  Choice(std::boxed::Box<RunConflictDeletionChoice5>),
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::w::Run>),

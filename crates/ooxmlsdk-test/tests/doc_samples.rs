@@ -25,20 +25,13 @@ enum DocSampleKind {
 }
 
 fn assert_doc_sample_round_trip(file_name: &str) {
-  assert_package_file_round_trip(&test_file_path(file_name), file_name);
-}
-
-fn assert_test_data_round_trip(file_name: &str) {
-  assert_package_file_round_trip(&workspace_file_path(file_name), file_name);
-}
-
-fn assert_package_file_round_trip(path: &Path, file_name: &str) {
   let kind = doc_sample_kind(file_name);
+  let path = test_file_path(file_name);
   let original_bytes = fs::read(&path).unwrap();
 
   match kind {
     DocSampleKind::Wordprocessing => {
-      let original = WordprocessingDocument::new_from_file(path).unwrap();
+      let original = WordprocessingDocument::new_from_file(&path).unwrap();
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -47,7 +40,7 @@ fn assert_package_file_round_trip(path: &Path, file_name: &str) {
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Spreadsheet => {
-      let original = SpreadsheetDocument::new_from_file(path).unwrap();
+      let original = SpreadsheetDocument::new_from_file(&path).unwrap();
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -56,7 +49,7 @@ fn assert_package_file_round_trip(path: &Path, file_name: &str) {
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Presentation => {
-      let original = PresentationDocument::new_from_file(path).unwrap();
+      let original = PresentationDocument::new_from_file(&path).unwrap();
       let mut buffer = Cursor::new(Vec::new());
       original.save(&mut buffer).unwrap();
       let roundtripped_bytes = buffer.into_inner();
@@ -105,29 +98,22 @@ fn assert_doc_sample_invalid(file_name: &str) {
 }
 
 fn assert_doc_sample_opens(file_name: &str) {
-  assert_package_file_opens(&test_file_path(file_name), file_name);
-}
-
-fn assert_test_data_opens(file_name: &str) {
-  assert_package_file_opens(&workspace_file_path(file_name), file_name);
-}
-
-fn assert_package_file_opens(path: &Path, file_name: &str) {
   let kind = doc_sample_kind(file_name);
+  let path = test_file_path(file_name);
 
   match kind {
     DocSampleKind::Wordprocessing => {
-      let package = WordprocessingDocument::new_from_file(path).unwrap();
+      let package = WordprocessingDocument::new_from_file(&path).unwrap();
       let main_part = package.main_document_part().unwrap();
       assert_eq!(part_path(&package, &main_part), "word/document.xml");
     }
     DocSampleKind::Spreadsheet => {
-      let package = SpreadsheetDocument::new_from_file(path).unwrap();
+      let package = SpreadsheetDocument::new_from_file(&path).unwrap();
       let workbook_part = package.workbook_part().unwrap();
       assert_eq!(part_path(&package, &workbook_part), "xl/workbook.xml");
     }
     DocSampleKind::Presentation => {
-      let package = PresentationDocument::new_from_file(path).unwrap();
+      let package = PresentationDocument::new_from_file(&path).unwrap();
       let presentation_part = package.presentation_part().unwrap();
       assert_eq!(
         part_path(&package, &presentation_part),
@@ -306,17 +292,6 @@ fn doc_sample_kind(file_name: &str) -> DocSampleKind {
 fn test_file_path(file_name: &str) -> std::path::PathBuf {
   let path = doc_sample_path(file_name);
   assert!(path.is_file(), "missing doc sample: {}", path.display());
-  path
-}
-
-fn workspace_file_path(file_name: &str) -> std::path::PathBuf {
-  let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-    .parent()
-    .expect("ooxmlsdk-test should be under a crates dir")
-    .parent()
-    .expect("crates dir should be under workspace root")
-    .join(file_name);
-  assert!(path.is_file(), "missing workspace file: {}", path.display());
   path
 }
 

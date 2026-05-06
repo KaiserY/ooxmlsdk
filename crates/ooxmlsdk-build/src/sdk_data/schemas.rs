@@ -9,7 +9,7 @@ use crate::sdk_data::{
 
 use crate::sdk_code::versioning::effective_version;
 use heck::ToUpperCamelCase;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn gen_namespaces(gen_context: &Context) -> Vec<Namespace> {
   let mut namespaces: Vec<Namespace> = gen_context
@@ -594,114 +594,29 @@ fn normalize_choice_wrappers(child: &mut SchemaTypeChild, flatten_anonymous_choi
 
 fn flatten_anonymous_choice_children(children: &mut Vec<SchemaTypeChild>) {
   let mut flattened = Vec::with_capacity(children.len());
-  let mut used_leaf_names = HashSet::new();
-  let mut used_variant_names = HashSet::new();
 
-  for child in children.drain(..) {
-    let mut candidate_leafs = Vec::new();
-    if collect_flattenable_choice_leafs(&child, &mut candidate_leafs)
-      && choice_leaf_names_are_unique(&candidate_leafs, &used_leaf_names)
-      && choice_variant_names_are_unique(&candidate_leafs, &used_variant_names)
-    {
-      for leaf in candidate_leafs {
-        track_choice_leaf(&leaf, &mut used_leaf_names, &mut used_variant_names);
-        flattened.push(leaf);
+  for mut child in children.drain(..) {
+    if is_anonymous_wrapper(&child, SchemaTypeChildKind::Choice) {
+      let wrapper_optional = child.optional;
+      let wrapper_repeated = child.repeated;
+      let wrapper_initial_version = child.initial_version.clone();
+
+      for mut nested in child.children.drain(..) {
+        nested.optional |= wrapper_optional;
+        nested.repeated |= wrapper_repeated;
+        nested.initial_version = effective_version(
+          wrapper_initial_version.as_str(),
+          nested.initial_version.as_str(),
+        )
+        .to_string();
+        flattened.push(nested);
       }
     } else {
-      track_choice_leaf(&child, &mut used_leaf_names, &mut used_variant_names);
       flattened.push(child);
     }
   }
 
   *children = flattened;
-}
-
-fn collect_flattenable_choice_leafs(
-  child: &SchemaTypeChild,
-  leafs: &mut Vec<SchemaTypeChild>,
-) -> bool {
-  if !is_flattenable_choice_wrapper(child) {
-    return false;
-  }
-
-  let original_len = leafs.len();
-  for nested in &child.children {
-    if is_required_element_child(nested) {
-      leafs.push(nested.clone());
-    } else if !collect_flattenable_choice_leafs(nested, leafs) {
-      leafs.truncate(original_len);
-      return false;
-    }
-  }
-
-  !child.children.is_empty()
-}
-
-fn is_flattenable_choice_wrapper(child: &SchemaTypeChild) -> bool {
-  child.kind == SchemaTypeChildKind::Choice
-    && child.name.is_empty()
-    && child.property_name.is_empty()
-    && !child.optional
-    && !child.repeated
-}
-
-fn is_required_element_child(child: &SchemaTypeChild) -> bool {
-  child.kind == SchemaTypeChildKind::Child
-    && !child.name.is_empty()
-    && !child.optional
-    && !child.repeated
-    && child.children.is_empty()
-}
-
-fn choice_leaf_names_are_unique(
-  children: &[SchemaTypeChild],
-  used_leaf_names: &HashSet<String>,
-) -> bool {
-  let mut names = used_leaf_names.clone();
-  children
-    .iter()
-    .all(|child| names.insert(child.name.clone()))
-}
-
-fn choice_variant_names_are_unique(
-  children: &[SchemaTypeChild],
-  used_variant_names: &HashSet<String>,
-) -> bool {
-  let mut names = used_variant_names.clone();
-  children
-    .iter()
-    .all(|child| names.insert(choice_child_variant_name(child)))
-}
-
-fn track_choice_leaf(
-  child: &SchemaTypeChild,
-  used_leaf_names: &mut HashSet<String>,
-  used_variant_names: &mut HashSet<String>,
-) {
-  if is_required_element_child(child) {
-    used_leaf_names.insert(child.name.clone());
-    used_variant_names.insert(choice_child_variant_name(child));
-  }
-}
-
-fn choice_child_variant_name(child: &SchemaTypeChild) -> String {
-  if child.name.is_empty() {
-    child.property_name.to_upper_camel_case()
-  } else {
-    let element_qname = child.name.split('/').nth(1).unwrap_or(child.name.as_str());
-    let mut parts = element_qname.split(':');
-    match (parts.next(), parts.next()) {
-      (Some(prefix), Some(local)) => {
-        format!(
-          "{}{}",
-          prefix.to_upper_camel_case(),
-          local.to_upper_camel_case()
-        )
-      }
-      (Some(local), None) => local.to_upper_camel_case(),
-      _ => element_qname.to_upper_camel_case(),
-    }
-  }
 }
 
 fn collapse_single_anonymous_sequence_child(child: &mut SchemaTypeChild) {

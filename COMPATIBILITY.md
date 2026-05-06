@@ -89,23 +89,33 @@ structural fidelity, not rendering or layout.
 | Numeric cell values | ✅ | `spreadsheet/minimal_values.xlsx` |
 | Boolean cell values | ✅ | `spreadsheet/minimal_values.xlsx` |
 | Date cell values | ✅ | `spreadsheet/minimal_values.xlsx` |
+| Error cell values | ✅ | `spreadsheet/cell_types.xlsx` |
+| Formula string result cell | ✅ | `spreadsheet/cell_types.xlsx` |
+| Blank cells | ✅ | `spreadsheet/cell_types.xlsx` |
 | Shared strings table | ✅ | `spreadsheet/minimal_values.xlsx` |
+| Shared strings (rich text runs) | ✅ | `spreadsheet/sst_rich_text.xlsx` |
 | Inline strings | ✅ | `spreadsheet/minimal_multisheet.xlsx` |
 | Formulas (arithmetic) | ✅ | `spreadsheet/minimal_formula.xlsx` |
 | Formulas (cached values) | ✅ | `spreadsheet/minimal_formula.xlsx` |
-| Named ranges | 🔲 | |
+| Formulas (shared) | ✅ | `spreadsheet/formula_shared.xlsx` |
+| Formulas (array) | ✅ | `spreadsheet/formula_array.xlsx` |
+| Named ranges | ✅ | `spreadsheet/defined_names.xlsx` |
+| Defined names (built-in) | ✅ | `spreadsheet/defined_names.xlsx` |
 | Multiple worksheets | ✅ | `spreadsheet/minimal_multisheet.xlsx` |
-| Merged cells | 🔲 | |
+| Sheet visibility (hidden/veryHidden) | ✅ | `spreadsheet/sheet_visibility.xlsx` |
+| Merged cells | ✅ | `spreadsheet/merged_cells.xlsx` |
 | Cell formatting (font) | ✅ | `spreadsheet/minimal_styles.xlsx` |
 | Cell formatting (fill/color) | ✅ | `spreadsheet/minimal_styles.xlsx` |
-| Cell formatting (borders) | ✅ | `spreadsheet/minimal_styles.xlsx` |
+| Cell formatting (borders) | ✅ | `spreadsheet/formatting_borders.xlsx` |
 | Cell formatting (number format) | ✅ | `spreadsheet/minimal_styles.xlsx` |
-| Column/row dimensions | 🔲 | |
+| Cell formatting (alignment) | ✅ | `spreadsheet/formatting_alignment.xlsx` |
+| Custom number formats | ✅ | `spreadsheet/number_formats.xlsx` |
+| Column/row dimensions | ✅ | `spreadsheet/row_col_dims.xlsx` |
+| Freeze panes | ✅ | `spreadsheet/freeze_panes.xlsx` |
 | Conditional formatting | 🔲 | |
 | Data validation | 🔲 | |
 | Charts | 🔲 | |
 | Pivot tables | 🔲 | |
-| Defined names | 🔲 | |
 | VBA macros (preserve-only) | 🔲 | |
 
 ## PresentationML (PPTX)

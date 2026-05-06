@@ -229,14 +229,191 @@ pub fn default_main_part_content_type<T: SdkPart>() -> Option<&'static str> {
 }
 
 #[cfg(feature = "parts")]
-#[inline]
-fn default_new_package_part_content_type<T: SdkPart>() -> std::borrow::Cow<'static, str> {
+pub(crate) fn typed_main_part_content_type<T: SdkPart>(
+  storage: &crate::common::SdkPackageStorage,
+) -> std::borrow::Cow<'static, str> {
   if T::CONTENT_TYPE.is_empty() {
-    default_main_part_content_type::<T>()
-      .map(std::borrow::Cow::Borrowed)
-      .unwrap_or_else(|| std::borrow::Cow::Borrowed(T::CONTENT_TYPE))
+    storage
+      .preferred_main_part_content_type()
+      .map(|content_type| std::borrow::Cow::Owned(content_type.to_string()))
+      .or_else(|| default_main_part_content_type::<T>().map(std::borrow::Cow::Borrowed))
+      .unwrap_or(std::borrow::Cow::Borrowed(T::CONTENT_TYPE))
   } else {
     std::borrow::Cow::Borrowed(T::CONTENT_TYPE)
+  }
+}
+
+#[cfg(feature = "parts")]
+#[inline]
+pub(crate) fn part_root_content_type_matches(
+  root_content_type: &str,
+  part_content_type: &str,
+) -> bool {
+  if matches!(root_content_type, "" | "application/xml" | "text/xml") {
+    return false;
+  }
+  root_content_type == part_content_type
+    || match root_content_type {
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
+        WordprocessingDocumentType::from_content_type(part_content_type).is_some()
+      }
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
+        SpreadsheetDocumentType::from_content_type(part_content_type).is_some()
+      }
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
+        PresentationDocumentType::from_content_type(part_content_type).is_some()
+      }
+      _ => false,
+    }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum WordprocessingDocumentType {
+  #[default]
+  Document,
+  Template,
+  MacroEnabledDocument,
+  MacroEnabledTemplate,
+}
+
+#[cfg(feature = "parts")]
+impl WordprocessingDocumentType {
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Document => {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+      }
+      Self::Template => {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
+      }
+      Self::MacroEnabledDocument => "application/vnd.ms-word.document.macroEnabled.main+xml",
+      Self::MacroEnabledTemplate => {
+        "application/vnd.ms-word.template.macroEnabledTemplate.main+xml"
+      }
+    }
+  }
+
+  pub fn from_content_type(content_type: &str) -> Option<Self> {
+    match content_type {
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml" => {
+        Some(Self::Document)
+      }
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml" => {
+        Some(Self::Template)
+      }
+      "application/vnd.ms-word.document.macroEnabled.main+xml" => Some(Self::MacroEnabledDocument),
+      "application/vnd.ms-word.template.macroEnabledTemplate.main+xml" => {
+        Some(Self::MacroEnabledTemplate)
+      }
+      _ => None,
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SpreadsheetDocumentType {
+  #[default]
+  Workbook,
+  Template,
+  MacroEnabledWorkbook,
+  MacroEnabledTemplate,
+  AddIn,
+}
+
+#[cfg(feature = "parts")]
+impl SpreadsheetDocumentType {
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Workbook => {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+      }
+      Self::Template => {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml"
+      }
+      Self::MacroEnabledWorkbook => "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+      Self::MacroEnabledTemplate => "application/vnd.ms-excel.template.macroEnabled.main+xml",
+      Self::AddIn => "application/vnd.ms-excel.addin.macroEnabled.main+xml",
+    }
+  }
+
+  pub fn from_content_type(content_type: &str) -> Option<Self> {
+    match content_type {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" => {
+        Some(Self::Workbook)
+      }
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml" => {
+        Some(Self::Template)
+      }
+      "application/vnd.ms-excel.sheet.macroEnabled.main+xml" => Some(Self::MacroEnabledWorkbook),
+      "application/vnd.ms-excel.template.macroEnabled.main+xml" => Some(Self::MacroEnabledTemplate),
+      "application/vnd.ms-excel.addin.macroEnabled.main+xml" => Some(Self::AddIn),
+      _ => None,
+    }
+  }
+}
+
+#[cfg(feature = "parts")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PresentationDocumentType {
+  #[default]
+  Presentation,
+  Template,
+  Slideshow,
+  MacroEnabledPresentation,
+  MacroEnabledTemplate,
+  MacroEnabledSlideshow,
+  AddIn,
+}
+
+#[cfg(feature = "parts")]
+impl PresentationDocumentType {
+  pub const fn content_type(self) -> &'static str {
+    match self {
+      Self::Presentation => {
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+      }
+      Self::Template => {
+        "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml"
+      }
+      Self::Slideshow => {
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml"
+      }
+      Self::MacroEnabledPresentation => {
+        "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml"
+      }
+      Self::MacroEnabledTemplate => "application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
+      Self::MacroEnabledSlideshow => {
+        "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml"
+      }
+      Self::AddIn => "application/vnd.ms-powerpoint.addin.macroEnabled.main+xml",
+    }
+  }
+
+  pub fn from_content_type(content_type: &str) -> Option<Self> {
+    match content_type {
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml" => {
+        Some(Self::Presentation)
+      }
+      "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml" => {
+        Some(Self::Template)
+      }
+      "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml" => {
+        Some(Self::Slideshow)
+      }
+      "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml" => {
+        Some(Self::MacroEnabledPresentation)
+      }
+      "application/vnd.ms-powerpoint.template.macroEnabled.main+xml" => {
+        Some(Self::MacroEnabledTemplate)
+      }
+      "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml" => {
+        Some(Self::MacroEnabledSlideshow)
+      }
+      "application/vnd.ms-powerpoint.addin.macroEnabled.main+xml" => Some(Self::AddIn),
+      _ => None,
+    }
   }
 }
 
@@ -1698,11 +1875,13 @@ pub trait SdkPackage: SdkPackageInternal {
     T: SdkPart,
   {
     let relationship_id = relationship_id.into();
+    let content_type =
+      typed_main_part_content_type::<T>(crate::sdk::SdkPackageInternal::storage(self));
     let part_id = crate::sdk::SdkPackageInternal::storage_mut(self).add_package_part(
       relationship_id.clone(),
       crate::common::NewPartDescriptor {
         relationship_type: std::borrow::Cow::Borrowed(T::RELATIONSHIP_TYPE),
-        content_type: default_new_package_part_content_type::<T>(),
+        content_type,
         path_prefix: T::PATH_PREFIX,
         target_name: T::TARGET_NAME,
         extension: std::borrow::Cow::Borrowed(T::EXTENSION),

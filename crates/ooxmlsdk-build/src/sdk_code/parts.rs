@@ -542,8 +542,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             let _ = open_settings;
             $(
               $(#[$attrs])*
-              if !matches!($content_type, "" | "application/xml" | "text/xml")
-                && part.content_type() == $content_type
+              if crate::sdk::part_root_content_type_matches($content_type, part.content_type())
               {
                 #[cfg(feature = "mce")]
                 let mut root = <$root_ty>::from_bytes(part.data().bytes())?;

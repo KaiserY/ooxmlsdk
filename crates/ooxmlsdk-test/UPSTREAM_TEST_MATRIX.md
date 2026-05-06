@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 136
-- `covered`: 197
+- `covered`: 207
 - `covered_by_doc_samples`: 38
 - `missing`: 0
 - `not_applicable`: 130
-- `partial`: 485
+- `partial`: 475
 
 ## Tests
 
@@ -218,9 +218,9 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ConformanceTest/WebExtension/WebExtensionTest.cs:50` `WebExtensionFullyFledgedValidation` | Fact | `partial` | `validator` | Generated validator coverage exists, but this exact upstream scenario is not ported yet |
 | `DocumentFormat.OpenXml.Tests/ConformanceTest/WorkbookPr/WorkBookPrTest.cs:18` `WorkBookPr01EditElement` | Fact | `partial` | `validator` | Generated validator coverage exists, but this exact upstream scenario is not ported yet |
 | `DocumentFormat.OpenXml.Tests/ConformanceTest/WorkbookPr/WorkBookPrTest.cs:32` `WorkBookPr03DeleteElement` | Fact | `partial` | `validator` | Generated validator coverage exists, but this exact upstream scenario is not ported yet |
-| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:15` `CanCreatePresentationFromTemplate` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:31` `CanCreateSpreadsheetFromTemplate` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:47` `CanCreateWordprocessingDocumentFromTemplate` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
+| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:15` `CanCreatePresentationFromTemplate` | Fact | `covered` | `package_parts` | `packages.rs::create_from_template_returns_editable_regular_document_packages` covers template clone/open, main part root access, document type conversion, save, and reopen through public Rust APIs |
+| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:31` `CanCreateSpreadsheetFromTemplate` | Fact | `covered` | `package_parts` | `packages.rs::create_from_template_returns_editable_regular_document_packages` covers template clone/open, main part root access, document type conversion, save, and reopen through public Rust APIs |
+| `DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs:47` `CanCreateWordprocessingDocumentFromTemplate` | Fact | `covered` | `package_parts` | `packages.rs::create_from_template_returns_editable_regular_document_packages` covers template clone/open, main part root access, document type conversion, save, and reopen through public Rust APIs; Rust does not attach the source template path by default |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:21` `CreateWithAutoSaveTest` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:51` `DefaultStreamReadWriteAutosave` | Theory | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs:78` `CreateWithNoAutoSaveTest` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
@@ -260,13 +260,13 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:294` `W042_AddNewPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:309` `W041_AddAlternativeFormatImportPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:324` `W040_AddExternalRelationship` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:350` `W039_ChangeDocumentType` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:350` `W039_ChangeDocumentType` | Fact | `covered` | `wordprocessing` | `packages.rs::change_document_type_updates_main_part_content_type` covers public document type change, content type override update, save, and reopen |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:365` `W038_DocxCreation_Package` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:379` `W037_DocxCreation_Package_Settings` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:402` `W036_DocxCreation_File` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:422` `W035_DocxCreation_Package` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:445` `W034_DocxCreation` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:467` `W033_DocxCreation` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:422` `W035_DocxCreation_Package` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:445` `W034_DocxCreation` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:467` `W033_DocxCreation` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:489` `W032_AnnotationsOnElements` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:514` `W031_AnnotationsOnParts` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:537` `W030_DeleteReferenceRelationship2` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
@@ -647,7 +647,7 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:41` `P006_PresentationDocument_Open` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:58` `P005_PptxCreation_Package_Settings` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:78` `P004_SpreadsheetDocument_Open` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/PptxTests01.cs:95` `P003_PptxCreation_Stream` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/PptxTests01.cs:95` `P003_PptxCreation_Stream` | Fact | `covered` | `presentation` | `packages.rs::create_apis_create_office_document_packages` covers presentation package creation, slide part relationship wiring, save, and reopen through public Rust APIs |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:384` `P002_Pptx_DeleteAdd_CoreExtendedProperties` | Fact | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/PptxTests01.cs:508` `PptxValidation` | Theory | `partial` | `presentation` | Presentation package/schema behavior partially covered by presentation.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs:26` `CanCloneDocument` | Fact | `covered` | `package_parts` | `packages.rs::wordprocessing_clone_mutation_is_saved_without_changing_source_package` covers clone mutation isolation and saved clone XML through public Rust copy helpers |
@@ -755,8 +755,8 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:61` `X006_Xlsx_DeleteAdd_CoreExtendedProperties` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:157` `X005_XlsxCreation_Package_Settings` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:177` `X004_SpreadsheetDocument_Open` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:196` `X003_XlsxCreation_Stream` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:225` `X002_XlsxCreation` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:196` `X003_XlsxCreation_Stream` | Fact | `covered` | `spreadsheet` | `packages.rs::create_apis_create_office_document_packages` covers spreadsheet package creation, workbook/worksheet relationship wiring, save, and reopen through public Rust APIs |
+| `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:225` `X002_XlsxCreation` | Fact | `covered` | `spreadsheet` | `packages.rs::create_apis_create_office_document_packages` covers spreadsheet package creation, workbook/worksheet relationship wiring, save, and reopen through public Rust APIs |
 | `DocumentFormat.OpenXml.Tests/XlsxTests01.cs:257` `X001_XlsxValidation` | Fact | `partial` | `spreadsheet` | Spreadsheet schema/package behavior partially covered by spreadsheet.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/XmlConvertingReaderTests.cs:21` `ThrowsOnNullReader` | Fact | `blocked_by_api` | `reader_writer` | Requires public streaming reader/writer API, or explicit decision to cover via parse/write only |
 | `DocumentFormat.OpenXml.Tests/XmlConvertingReaderTests.cs:30` `SetsProperties` | Theory | `partial` | `schema_dom` | Schema parse/serialize coverage exists; .NET DOM mutation/equality details only partially applicable |

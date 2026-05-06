@@ -3954,9 +3954,9 @@ macro_rules! define_part_root_element {
         .relationship_type() ==
         Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk")
         { return Ok(None); } #[cfg(not(feature = "mce"))] let _ = open_settings;
-        $($(#[$attrs])* if ! matches!($content_type, "" | "application/xml" | "text/xml")
-        && part.content_type() == $content_type { #[cfg(feature = "mce")] let mut root =
-        < $root_ty > ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
+        $($(#[$attrs])* if crate ::sdk::part_root_content_type_matches($content_type,
+        part.content_type()) { #[cfg(feature = "mce")] let mut root = < $root_ty >
+        ::from_bytes(part.data().bytes()) ?; #[cfg(feature = "mce")] crate
         ::sdk::SdkMce::process_mce(& mut root, & open_settings
         .markup_compatibility_process_settings,) ?; #[cfg(not(feature = "mce"))] let root
         = < $root_ty > ::from_bytes(part.data().bytes()) ?; return Ok(Some(Self::

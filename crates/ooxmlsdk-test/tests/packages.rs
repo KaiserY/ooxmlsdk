@@ -1,7 +1,9 @@
 #![cfg(feature = "parts")]
 
 use std::collections::HashSet;
-use std::io::{Cursor, Read, Write};
+#[cfg(feature = "mce")]
+use std::io::Write;
+use std::io::{Cursor, Read};
 
 use ooxmlsdk::common::{
   MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipRef, RelationshipTargetKind,
@@ -13,11 +15,15 @@ use ooxmlsdk::parts::{
   presentation_part::PresentationPart, ribbon_extensibility_part::RibbonExtensibilityPart,
   slide_part::SlidePart, spreadsheet_document::SpreadsheetDocument,
   style_definitions_part::StyleDefinitionsPart, thumbnail_part::ThumbnailPart,
-  wordprocessing_document::WordprocessingDocument,
+  wordprocessing_document::WordprocessingDocument, workbook_part::WorkbookPart,
+  worksheet_part::WorksheetPart,
 };
 use ooxmlsdk::schemas::opc_relationships::TargetMode;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
-  Presentation as PmlPresentation, Slide,
+  Presentation as PmlPresentation, Slide, SlideId, SlideIdList,
+};
+use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
+  Sheet, SheetData, Sheets, Workbook as SpreadsheetWorkbook, Worksheet,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChoice, Document, Header, Paragraph, ParagraphChoice, Run, RunChoice,
@@ -27,7 +33,8 @@ use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
-  MediaDataPartType, OpenSettings, PackageOpenMode, SdkPackage, SdkPart, ThumbnailPartType,
+  MediaDataPartType, OpenSettings, PackageOpenMode, PresentationDocumentType, SdkPackage, SdkPart,
+  SpreadsheetDocumentType, ThumbnailPartType, WordprocessingDocumentType,
 };
 use ooxmlsdk::sdk::{
   FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
@@ -81,24 +88,6 @@ fn empty_body_document() -> Document {
     body: Some(Box::new(Body::default())),
     ..Default::default()
   }
-}
-
-fn empty_package() -> Cursor<Vec<u8>> {
-  let mut buffer = Cursor::new(Vec::new());
-  {
-    let mut zip = zip::ZipWriter::new(&mut buffer);
-    let options = zip::write::SimpleFileOptions::default();
-    zip.start_file("[Content_Types].xml", options).unwrap();
-    zip
-      .write_all(
-        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#,
-      )
-      .unwrap();
-    zip.finish().unwrap();
-  }
-  buffer.set_position(0);
-  buffer
 }
 
 #[cfg(feature = "mce")]
@@ -225,7 +214,7 @@ fn wordprocessing_document_loads_minimal_flat_opc_package() {
 #[cfg(feature = "flat-opc")]
 fn wordprocessing_document_flat_opc_reader_and_writer_apis_round_trip() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.FlatOpcTests.cs
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -266,7 +255,7 @@ fn wordprocessing_document_flat_opc_reader_and_writer_apis_round_trip() {
 #[cfg(feature = "flat-opc")]
 fn wordprocessing_document_flat_opc_round_trips_xml_and_binary_parts() {
   // Source: aligned with Open XML SDK DocumentTests.FlatOpcTests and SVG/binary Flat OPC coverage.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -302,7 +291,7 @@ fn wordprocessing_document_flat_opc_writes_alt_chunks_as_binary_parts() {
   // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
   //   CanRoundTripWordprocessingDocumentWithAltChunks
   //   CanTransformWordprocessingDocumentWithAltChunksToFlatOpc
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -391,7 +380,7 @@ fn wordprocessing_document_flat_opc_writes_svg_media_as_xml_part() {
 fn wordprocessing_part_xml_is_written_as_utf8_without_bom() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs
   //   PartsShouldBeEncodedWithUTF8WithoutBOM
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -1126,7 +1115,7 @@ fn wordprocessing_root_element_access_matches_openxml_part_root_element_test() {
 #[test]
 fn part_root_element_rejects_whitespace_only_xml() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: RootElementTest2
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
 
   assert!(main_part.root_element(&mut package).is_err());
@@ -1215,7 +1204,7 @@ fn part_relationship_ids_can_change_for_child_parts() {
 #[test]
 fn delete_invalid_child_part_id_is_safe() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPartTest.cs :: DeleteInvalidPartIdSafely
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   let relationship_count = part_relationship_count(&package, &main_part);
 
@@ -1714,7 +1703,7 @@ fn create_media_data_parts_adds_data_part_reference_relationships_and_saves() {
 #[test]
 fn media_data_part_rejects_foreign_package_relationships() {
   // Source: OpenXmlPartContainer.AddDataPartReferenceRelationship foreign MediaDataPart guard.
-  let mut foreign_package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut foreign_package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let foreign_media_data_part = foreign_package
     .create_media_data_part_by_type(MediaDataPartType::Mp3)
     .unwrap();
@@ -1722,7 +1711,7 @@ fn media_data_part_rejects_foreign_package_relationships() {
     .set_data(&mut foreign_package, b"foreign mp3 bytes".to_vec())
     .unwrap();
 
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -2246,7 +2235,7 @@ fn add_new_header_part_creates_relationship_content_type_and_root_slot() {
 #[test]
 fn add_new_parts_use_unique_upstream_style_part_names() {
   // Source: test/DocumentFormat.OpenXml.Packaging.Tests/PartUriHelperTests
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -2769,7 +2758,7 @@ fn part_extension_selection_matches_openxml_part_tests() {
   //   ExtensionTest
   //   ExtensionTestUndefinedExtension
   //   ExtensionTestFixedContentType
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
 
   let jpg = package
     .add_extended_part_with_id(
@@ -3204,7 +3193,7 @@ fn add_thumbnail_part_with_id_uses_content_type_and_relationship_id() {
 #[test]
 fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
   // Source: upstream AddExtendedPart(..., rId) coverage on packages, parts, and ExtendedPart.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -3340,7 +3329,7 @@ fn add_extended_part_with_id_supports_package_part_and_nested_extended_parts() {
 #[test]
 fn delete_package_part_removes_relationship_part_and_content_type() {
   // Source: upstream Docx/Xlsx/Pptx DeletePart(package part) coverage.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let thumbnail = package
     .add_thumbnail_part_with_id("image/jpeg", "rIdSdkThumbnail")
     .unwrap();
@@ -3365,7 +3354,7 @@ fn delete_package_part_removes_relationship_part_and_content_type() {
 #[test]
 fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
   // Source: upstream OpenXmlPartContainer.DeletePart/DeleteParts and ExtendedPart child coverage.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -3440,7 +3429,7 @@ fn delete_child_parts_removes_unreachable_descendants_and_supports_batches() {
 #[test]
 fn delete_parts_removes_selected_direct_children() {
   // Source: aligned with upstream OpenXmlPartContainer.DeleteParts<T>().
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -3501,7 +3490,7 @@ fn delete_parts_removes_selected_direct_children() {
 #[test]
 fn add_part_and_create_relationship_to_part_share_existing_parts() {
   // Source: upstream AddPart(existing part) / CreateRelationshipToPart same-package semantics.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -3793,7 +3782,7 @@ fn add_part_from_package_imports_real_hyperlink_relationships() {
     .collect();
   let source_external_count = source_main.external_relationships(&source).count();
 
-  let mut target = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut target = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let imported_main = target
     .add_part_from_package_with_id(&source, &source_main, "rIdImportedMain")
     .unwrap();
@@ -3831,7 +3820,7 @@ fn add_part_from_package_imports_real_hyperlink_relationships() {
 #[test]
 fn add_main_document_part_creates_fixed_main_part_path() {
   // Source: upstream WordprocessingDocument.Create(...).AddMainDocumentPart() coverage.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   assert!(package.main_document_part().is_err());
 
   let main_part = package.add_main_document_part().unwrap();
@@ -3857,9 +3846,410 @@ fn add_main_document_part_creates_fixed_main_part_path() {
 }
 
 #[test]
+fn create_apis_create_office_document_packages() {
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs
+  //   W033_DocxCreation / W034_DocxCreation / W035_DocxCreation_Package
+  // Source: test/DocumentFormat.OpenXml.Tests/XlsxTests01.cs
+  //   X002_XlsxCreation / X003_XlsxCreation_Stream
+  // Source: test/DocumentFormat.OpenXml.Tests/PptxTests01.cs
+  //   P003_PptxCreation_Stream
+  let mut word = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+  assert!(word.main_document_part().is_err());
+  let word_main = word.add_main_document_part().unwrap();
+  word_main
+    .set_root_element(
+      &mut word,
+      Document {
+        body: Some(Box::new(Body {
+          body_choice: vec![BodyChoice::WP(Box::new(Paragraph {
+            paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
+              run_choice: vec![RunChoice::WT(Box::new(Text {
+                xml_content: Some("Hello World!".to_string()),
+                ..Default::default()
+              }))],
+              ..Default::default()
+            }))],
+            ..Default::default()
+          }))],
+          ..Default::default()
+        })),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let mut word_buffer = Cursor::new(Vec::new());
+  word.save(&mut word_buffer).unwrap();
+  let mut reopened_word =
+    WordprocessingDocument::new(Cursor::new(word_buffer.into_inner())).unwrap();
+  let reopened_word_main = reopened_word.main_document_part().unwrap();
+  let reopened_word_root = reopened_word_main.root_element(&mut reopened_word).unwrap();
+  assert_eq!(main_document_body_child_count(reopened_word_root), 1);
+
+  let mut spreadsheet = SpreadsheetDocument::create(SpreadsheetDocumentType::Workbook);
+  assert!(spreadsheet.workbook_part().is_err());
+  let workbook_part = spreadsheet.add_new_part_auto_id::<WorkbookPart>().unwrap();
+  let worksheet_part = workbook_part
+    .add_new_part_auto_id::<_, WorksheetPart>(&mut spreadsheet)
+    .unwrap();
+  worksheet_part
+    .set_root_element(
+      &mut spreadsheet,
+      Worksheet {
+        x_sheet_data: Box::new(SheetData::default()),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let worksheet_relationship_id = workbook_part
+    .get_id_of_part(&spreadsheet, &worksheet_part)
+    .unwrap()
+    .to_string();
+  workbook_part
+    .set_root_element(
+      &mut spreadsheet,
+      SpreadsheetWorkbook {
+        sheets: Box::new(Sheets {
+          x_sheet: vec![Sheet {
+            name: "mySheet".to_string(),
+            sheet_id: 1,
+            id: worksheet_relationship_id,
+            ..Default::default()
+          }],
+        }),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let mut spreadsheet_buffer = Cursor::new(Vec::new());
+  spreadsheet.save(&mut spreadsheet_buffer).unwrap();
+  let mut reopened_spreadsheet =
+    SpreadsheetDocument::new(Cursor::new(spreadsheet_buffer.into_inner())).unwrap();
+  let reopened_workbook_part = reopened_spreadsheet.workbook_part().unwrap();
+  let reopened_workbook = reopened_workbook_part
+    .root_element(&mut reopened_spreadsheet)
+    .unwrap();
+  assert_eq!(reopened_workbook.sheets.x_sheet.len(), 1);
+  assert_eq!(reopened_workbook.sheets.x_sheet[0].name, "mySheet");
+  assert_eq!(
+    reopened_workbook_part
+      .worksheet_parts(&reopened_spreadsheet)
+      .count(),
+    1
+  );
+
+  let mut presentation = PresentationDocument::create(PresentationDocumentType::Presentation);
+  assert!(presentation.presentation_part().is_err());
+  let presentation_part = presentation
+    .add_new_part_auto_id::<PresentationPart>()
+    .unwrap();
+  let slide_part = presentation_part
+    .add_new_part_auto_id::<_, SlidePart>(&mut presentation)
+    .unwrap();
+  slide_part
+    .set_root_element(&mut presentation, Slide::default())
+    .unwrap();
+  let slide_relationship_id = presentation_part
+    .get_id_of_part(&presentation, &slide_part)
+    .unwrap()
+    .to_string();
+  presentation_part
+    .set_root_element(
+      &mut presentation,
+      PmlPresentation {
+        slide_id_list: Some(SlideIdList {
+          p_sld_id: vec![SlideId {
+            id: 256,
+            relationship_id: slide_relationship_id,
+            ..Default::default()
+          }],
+        }),
+        ..Default::default()
+      },
+    )
+    .unwrap();
+  let mut presentation_buffer = Cursor::new(Vec::new());
+  presentation.save(&mut presentation_buffer).unwrap();
+  let mut reopened_presentation =
+    PresentationDocument::new(Cursor::new(presentation_buffer.into_inner())).unwrap();
+  let reopened_presentation_part = reopened_presentation.presentation_part().unwrap();
+  let reopened_presentation_root = reopened_presentation_part
+    .root_element(&mut reopened_presentation)
+    .unwrap();
+  assert_eq!(
+    reopened_presentation_root
+      .slide_id_list
+      .as_ref()
+      .unwrap()
+      .p_sld_id
+      .len(),
+    1
+  );
+  assert_eq!(
+    reopened_presentation_part
+      .slide_parts(&reopened_presentation)
+      .count(),
+    1
+  );
+}
+
+#[test]
+fn create_apis_use_requested_document_type_content_types() {
+  // Source: upstream Create(..., *DocumentType) overloads for Word/Spreadsheet/Presentation packages.
+  for (document_type, content_type) in [
+    (
+      WordprocessingDocumentType::Document,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    ),
+    (
+      WordprocessingDocumentType::Template,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+    ),
+    (
+      WordprocessingDocumentType::MacroEnabledDocument,
+      "application/vnd.ms-word.document.macroEnabled.main+xml",
+    ),
+    (
+      WordprocessingDocumentType::MacroEnabledTemplate,
+      "application/vnd.ms-word.template.macroEnabledTemplate.main+xml",
+    ),
+  ] {
+    let mut package = WordprocessingDocument::create(document_type);
+    assert_eq!(package.document_type(), document_type);
+    let main_part = package.add_main_document_part().unwrap();
+    assert_eq!(main_part.content_type(&package), Some(content_type));
+    main_part
+      .set_root_element(&mut package, empty_body_document())
+      .unwrap();
+
+    let bytes = package.to_package_bytes().unwrap();
+    let content_types_xml =
+      String::from_utf8(package_entry_data(bytes.clone(), "[Content_Types].xml")).unwrap();
+    assert!(content_types_xml.contains(content_type));
+    let reopened = WordprocessingDocument::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(reopened.document_type(), document_type);
+  }
+
+  for (document_type, content_type) in [
+    (
+      SpreadsheetDocumentType::Workbook,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    ),
+    (
+      SpreadsheetDocumentType::Template,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml",
+    ),
+    (
+      SpreadsheetDocumentType::MacroEnabledWorkbook,
+      "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+    ),
+    (
+      SpreadsheetDocumentType::MacroEnabledTemplate,
+      "application/vnd.ms-excel.template.macroEnabled.main+xml",
+    ),
+    (
+      SpreadsheetDocumentType::AddIn,
+      "application/vnd.ms-excel.addin.macroEnabled.main+xml",
+    ),
+  ] {
+    let mut package = SpreadsheetDocument::create(document_type);
+    assert_eq!(package.document_type(), document_type);
+    let workbook_part = package.add_new_part_auto_id::<WorkbookPart>().unwrap();
+    assert_eq!(workbook_part.content_type(&package), Some(content_type));
+    workbook_part
+      .set_root_element(
+        &mut package,
+        SpreadsheetWorkbook {
+          sheets: Box::new(Sheets::default()),
+          ..Default::default()
+        },
+      )
+      .unwrap();
+
+    let bytes = package.to_package_bytes().unwrap();
+    let content_types_xml =
+      String::from_utf8(package_entry_data(bytes.clone(), "[Content_Types].xml")).unwrap();
+    assert!(content_types_xml.contains(content_type));
+    let reopened = SpreadsheetDocument::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(reopened.document_type(), document_type);
+  }
+
+  for (document_type, content_type) in [
+    (
+      PresentationDocumentType::Presentation,
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+    ),
+    (
+      PresentationDocumentType::Template,
+      "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml",
+    ),
+    (
+      PresentationDocumentType::Slideshow,
+      "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
+    ),
+    (
+      PresentationDocumentType::MacroEnabledPresentation,
+      "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+    ),
+    (
+      PresentationDocumentType::MacroEnabledTemplate,
+      "application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
+    ),
+    (
+      PresentationDocumentType::MacroEnabledSlideshow,
+      "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
+    ),
+    (
+      PresentationDocumentType::AddIn,
+      "application/vnd.ms-powerpoint.addin.macroEnabled.main+xml",
+    ),
+  ] {
+    let mut package = PresentationDocument::create(document_type);
+    assert_eq!(package.document_type(), document_type);
+    let presentation_part = package.add_new_part_auto_id::<PresentationPart>().unwrap();
+    assert_eq!(presentation_part.content_type(&package), Some(content_type));
+    presentation_part
+      .set_root_element(&mut package, PmlPresentation::default())
+      .unwrap();
+
+    let bytes = package.to_package_bytes().unwrap();
+    let content_types_xml =
+      String::from_utf8(package_entry_data(bytes.clone(), "[Content_Types].xml")).unwrap();
+    assert!(content_types_xml.contains(content_type));
+    let reopened = PresentationDocument::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(reopened.document_type(), document_type);
+  }
+}
+
+#[test]
+fn create_from_template_returns_editable_regular_document_packages() {
+  // Source: test/DocumentFormat.OpenXml.Tests/CreateFromTemplateTests.cs
+  //   CanCreateWordprocessingDocumentFromTemplate
+  //   CanCreateSpreadsheetFromTemplate
+  //   CanCreatePresentationFromTemplate
+  let mut word = WordprocessingDocument::create_from_template(doc_sample("Document.dotx")).unwrap();
+  assert_eq!(word.document_type(), WordprocessingDocumentType::Document);
+  let word_main = word.main_document_part().unwrap();
+  assert!(word_main.root_element(&mut word).is_ok());
+  let word_bytes = word.to_package_bytes().unwrap();
+  let word_content_types = String::from_utf8(package_entry_data(
+    word_bytes.clone(),
+    "[Content_Types].xml",
+  ))
+  .unwrap();
+  assert!(
+    word_content_types
+      .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml")
+  );
+  assert!(
+    !word_content_types
+      .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml")
+  );
+  let reopened_word = WordprocessingDocument::new(Cursor::new(word_bytes)).unwrap();
+  assert_eq!(
+    reopened_word.document_type(),
+    WordprocessingDocumentType::Document
+  );
+
+  let mut spreadsheet =
+    SpreadsheetDocument::create_from_template(doc_sample("Spreadsheet.xltx")).unwrap();
+  assert_eq!(
+    spreadsheet.document_type(),
+    SpreadsheetDocumentType::Workbook
+  );
+  let workbook_part = spreadsheet.workbook_part().unwrap();
+  assert!(workbook_part.root_element(&mut spreadsheet).is_ok());
+  let spreadsheet_bytes = spreadsheet.to_package_bytes().unwrap();
+  let spreadsheet_content_types = String::from_utf8(package_entry_data(
+    spreadsheet_bytes.clone(),
+    "[Content_Types].xml",
+  ))
+  .unwrap();
+  assert!(
+    spreadsheet_content_types
+      .contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+  );
+  assert!(
+    !spreadsheet_content_types
+      .contains("application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml")
+  );
+  let reopened_spreadsheet = SpreadsheetDocument::new(Cursor::new(spreadsheet_bytes)).unwrap();
+  assert_eq!(
+    reopened_spreadsheet.document_type(),
+    SpreadsheetDocumentType::Workbook
+  );
+
+  let mut presentation =
+    PresentationDocument::create_from_template(doc_sample("Presentation.potx")).unwrap();
+  assert_eq!(
+    presentation.document_type(),
+    PresentationDocumentType::Presentation
+  );
+  let presentation_part = presentation.presentation_part().unwrap();
+  assert!(presentation_part.root_element(&mut presentation).is_ok());
+  let presentation_bytes = presentation.to_package_bytes().unwrap();
+  let presentation_content_types = String::from_utf8(package_entry_data(
+    presentation_bytes.clone(),
+    "[Content_Types].xml",
+  ))
+  .unwrap();
+  assert!(presentation_content_types.contains(
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+  ));
+  assert!(
+    !presentation_content_types
+      .contains("application/vnd.openxmlformats-officedocument.presentationml.template.main+xml")
+  );
+  let reopened_presentation = PresentationDocument::new(Cursor::new(presentation_bytes)).unwrap();
+  assert_eq!(
+    reopened_presentation.document_type(),
+    PresentationDocumentType::Presentation
+  );
+}
+
+#[test]
+fn change_document_type_updates_main_part_content_type() {
+  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs :: W039_ChangeDocumentType
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
+  let main_part = package.add_main_document_part().unwrap();
+  main_part
+    .set_root_element(&mut package, empty_body_document())
+    .unwrap();
+
+  package
+    .change_document_type(WordprocessingDocumentType::Template)
+    .unwrap();
+
+  assert_eq!(
+    package.document_type(),
+    WordprocessingDocumentType::Template
+  );
+  assert_eq!(
+    main_part.content_type(&package),
+    Some("application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml")
+  );
+  let bytes = package.to_package_bytes().unwrap();
+  let content_types_xml =
+    String::from_utf8(package_entry_data(bytes.clone(), "[Content_Types].xml")).unwrap();
+  assert!(
+    content_types_xml
+      .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml")
+  );
+  assert!(
+    !content_types_xml
+      .contains("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml")
+  );
+
+  let reopened = WordprocessingDocument::new(Cursor::new(bytes)).unwrap();
+  assert_eq!(
+    reopened.document_type(),
+    WordprocessingDocumentType::Template
+  );
+}
+
+#[test]
 fn add_file_properties_and_signature_origin_parts_create_fixed_package_relationships() {
   // Source: upstream W050/X006 AddCoreFilePropertiesPart/AddExtendedFilePropertiesPart/AddCustomFilePropertiesPart/AddDigitalSignatureOriginPart coverage.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -4138,7 +4528,7 @@ fn package_save_roundtrips_unmodified_document() {
 #[test]
 fn package_copy_helpers_include_unsaved_root_changes() {
   // Source: upstream package Clone(stream) behavior adapted to Rust copy helpers.
-  let mut package = WordprocessingDocument::new(empty_package()).unwrap();
+  let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
     .set_root_element(&mut package, empty_body_document())
@@ -4372,7 +4762,7 @@ fn package_save_as_file_round_trips_office_document_types() {
 #[test]
 fn package_copy_retains_part_names_when_adding_more_parts() {
   // Source: test/DocumentFormat.OpenXml.Tests/SaveAndCloneTests.cs :: CloneRetainsPartNames
-  let mut presentation = PresentationDocument::new(empty_package()).unwrap();
+  let mut presentation = PresentationDocument::create(PresentationDocumentType::Presentation);
   let presentation_part = presentation
     .add_new_part::<PresentationPart>("rIdPresentation")
     .unwrap();

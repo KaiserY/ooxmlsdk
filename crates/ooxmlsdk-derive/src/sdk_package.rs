@@ -303,21 +303,18 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
 
         let relationship_id =
           crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
-        let part = if let Some(content_type) = crate::sdk::default_main_part_content_type::<#part_ty>() {
+        let content_type =
+          crate::sdk::typed_main_part_content_type::<#part_ty>(
+            crate::sdk::SdkPackageInternal::storage(self),
+          );
+        let part =
           crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension::<#part_ty>(
             self,
             relationship_id.clone(),
             content_type,
             <#part_ty as crate::sdk::SdkPart>::EXTENSION,
             crate::common::NewPartTargetMode::Fixed,
-          )?
-        } else {
-          crate::sdk::SdkPackage::add_new_part_with_target_mode::<#part_ty>(
-            self,
-            relationship_id.clone(),
-            crate::common::NewPartTargetMode::Fixed,
-          )?
-        };
+          )?;
         self.#main_part_id_ident = Some(part.part_id());
         self.#field_ident = Some(Box::new(
           <#part_ty as crate::sdk::SdkPart>::from_relationship_id(
@@ -337,6 +334,17 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     }
   } else {
     quote! { None }
+  };
+  let document_type_ty: Type = match ident.to_string().as_str() {
+    "WordprocessingDocument" => parse_str("crate::sdk::WordprocessingDocumentType")?,
+    "SpreadsheetDocument" => parse_str("crate::sdk::SpreadsheetDocumentType")?,
+    "PresentationDocument" => parse_str("crate::sdk::PresentationDocumentType")?,
+    _ => {
+      return Err(syn::Error::new_spanned(
+        input,
+        "SdkPackage only supports generated office document packages",
+      ));
+    }
   };
   let package_relationship_methods = package_relationship_method_tokens(&child_infos);
   let root_cache_methods = root_elements_ident.map(|root_elements_ident| {
@@ -471,6 +479,50 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         reader: R,
       ) -> Result<Self, crate::common::SdkError> {
         Self::new_with_settings(reader, crate::sdk::OpenSettings::default())
+      }
+
+      pub fn create(document_type: #document_type_ty) -> Self {
+        let open_settings = crate::sdk::OpenSettings::default();
+        let storage = crate::common::SdkPackageStorage::create(
+          open_settings.open_mode,
+          Some(document_type.content_type()),
+        );
+        Self::from_storage(storage, open_settings.open_mode, open_settings)
+          .expect("empty package storage should initialize")
+      }
+
+      pub fn create_from_template<P: AsRef<std::path::Path>>(
+        path: P,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut package = Self::new_from_file(path)?;
+        package.change_document_type(#document_type_ty::default())?;
+        Ok(package)
+      }
+
+      pub fn document_type(&self) -> #document_type_ty {
+        let content_type = self
+          .#main_part_id_ident
+          .and_then(|part_id| crate::sdk::SdkPackageInternal::storage(self).part(part_id))
+          .map(|part| part.content_type())
+          .or_else(|| {
+            crate::sdk::SdkPackageInternal::storage(self).preferred_main_part_content_type()
+          });
+        content_type
+          .and_then(#document_type_ty::from_content_type)
+          .unwrap_or_default()
+      }
+
+      pub fn change_document_type(
+        &mut self,
+        document_type: #document_type_ty,
+      ) -> Result<(), crate::common::SdkError> {
+        crate::sdk::SdkPackageInternal::storage_mut(self)
+          .set_preferred_main_part_content_type(document_type.content_type());
+        if let Some(part_id) = self.#main_part_id_ident {
+          crate::sdk::SdkPackageInternal::storage_mut(self)
+            .set_part_content_type(part_id, document_type.content_type())?;
+        }
+        Ok(())
       }
 
       pub fn new_with_settings<R: std::io::Read + std::io::Seek>(

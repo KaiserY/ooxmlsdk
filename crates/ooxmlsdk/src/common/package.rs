@@ -789,6 +789,7 @@ pub(crate) struct SdkPackageStorage {
   package_relationships: RelationshipSet,
   parts: Vec<StoredPart>,
   by_path: HashMap<Box<str>, PartId>,
+  preferred_main_part_content_type: Option<Box<str>>,
   open_mode: PackageOpenMode,
 }
 
@@ -800,12 +801,28 @@ impl Clone for SdkPackageStorage {
       package_relationships: self.package_relationships.clone(),
       parts: self.parts.clone(),
       by_path: self.by_path.clone(),
+      preferred_main_part_content_type: self.preferred_main_part_content_type.clone(),
       open_mode: self.open_mode,
     }
   }
 }
 
 impl SdkPackageStorage {
+  pub(crate) fn create(
+    open_mode: PackageOpenMode,
+    preferred_main_part_content_type: Option<&str>,
+  ) -> Self {
+    Self {
+      id: PackageId::new(),
+      content_types: empty_content_types(),
+      package_relationships: RelationshipSet::default(),
+      parts: Vec::new(),
+      by_path: HashMap::new(),
+      preferred_main_part_content_type: preferred_main_part_content_type.map(Into::into),
+      open_mode,
+    }
+  }
+
   pub(crate) fn open<R: Read + Seek>(
     reader: R,
     open_mode: PackageOpenMode,
@@ -861,6 +878,7 @@ impl SdkPackageStorage {
       package_relationships,
       parts,
       by_path,
+      preferred_main_part_content_type: None,
       open_mode,
     })
   }
@@ -936,6 +954,7 @@ impl SdkPackageStorage {
       package_relationships,
       parts,
       by_path,
+      preferred_main_part_content_type: None,
       open_mode,
     })
   }
@@ -1036,6 +1055,16 @@ impl SdkPackageStorage {
       .parts
       .get_mut(part_id.index())
       .filter(|part| !part.is_deleted())
+  }
+
+  #[inline]
+  pub(crate) fn preferred_main_part_content_type(&self) -> Option<&str> {
+    self.preferred_main_part_content_type.as_deref()
+  }
+
+  #[inline]
+  pub(crate) fn set_preferred_main_part_content_type(&mut self, content_type: impl Into<Box<str>>) {
+    self.preferred_main_part_content_type = Some(content_type.into());
   }
 
   #[inline]
@@ -1637,9 +1666,18 @@ impl SdkPackageStorage {
 
   fn add_content_type_override(&mut self, path: &str, content_type: &str) {
     let part_name = format!("/{path}");
-    if self.content_types.types_choice.iter().any(|child| {
-      matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
-    }) {
+    if let Some(existing) = self
+      .content_types
+      .types_choice
+      .iter_mut()
+      .find_map(|child| match child {
+        TypesChoice::Override(override_type) if override_type.part_name == part_name => {
+          Some(override_type)
+        }
+        _ => None,
+      })
+    {
+      existing.content_type = content_type.to_string();
       return;
     }
 
@@ -1659,6 +1697,30 @@ impl SdkPackageStorage {
     self.content_types.types_choice.retain(|child| {
       !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
     });
+  }
+
+  pub(crate) fn set_part_content_type(
+    &mut self,
+    part_id: PartId,
+    content_type: impl Into<Box<str>>,
+  ) -> Result<(), SdkError> {
+    let content_type = content_type.into();
+    if content_type.is_empty() {
+      return Err(SdkError::CommonError(
+        "cannot set a part to an empty content type".to_string(),
+      ));
+    }
+    let path = {
+      let part = self.part_mut(part_id).ok_or_else(|| {
+        SdkError::CommonError(format!(
+          "part id {part_id:?} is not present in package storage"
+        ))
+      })?;
+      part.content_type = content_type.clone();
+      part.path().to_string()
+    };
+    self.add_content_type_override(&path, &content_type);
+    Ok(())
   }
 
   fn existing_relationship_id_for_target(
@@ -1859,11 +1921,6 @@ struct FlatOpcPart {
 #[cfg(feature = "flat-opc")]
 fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
   Types {
-    xmlns: vec![super::XmlNamespaceDecl::new(
-      "",
-      "http://schemas.openxmlformats.org/package/2006/content-types",
-    )],
-    xml_header: super::XmlHeaderType::Standalone,
     types_choice: raw_parts
       .iter()
       .map(|part| {
@@ -1873,6 +1930,18 @@ fn content_types_from_raw_parts(raw_parts: &[RawPart]) -> Types {
         }))
       })
       .collect(),
+    ..empty_content_types()
+  }
+}
+
+fn empty_content_types() -> Types {
+  Types {
+    xmlns: vec![super::XmlNamespaceDecl::new(
+      "",
+      "http://schemas.openxmlformats.org/package/2006/content-types",
+    )],
+    xml_header: super::XmlHeaderType::Standalone,
+    types_choice: Vec::new(),
   }
 }
 

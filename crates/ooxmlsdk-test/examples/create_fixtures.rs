@@ -2452,6 +2452,7 @@ fn main() {
   create_xlsx_fixtures(&root);
   create_sml_fixtures(&root);
   create_pptx_fixtures(&root, &png);
+  create_pml_fixtures(&root);
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
   create_drawingml_fixtures(&root);
@@ -4465,5 +4466,495 @@ fn create_sml_fixtures(root: &Path) {
       ("xl/worksheets/sheet1.xml", sheet),
     ]);
     save(root, "test-data/spreadsheet/freeze_panes.xlsx", &data);
+  }
+}
+
+// ── PML layout XMLs ──────────────────────────────────────────────────────────
+
+// Title + Content layout (type="obj"): title ph at top, body ph (idx=1) below.
+const TITLE_CONTENT_LAYOUT_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             type="obj">
+  <p:cSld name="Title and Content">
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Title 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="title"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="274638"/><a:ext cx="8229600" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Content 2"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="1600200"/><a:ext cx="8229600" cy="4525963"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sldLayout>"#;
+
+fn create_pml_fixtures(root: &Path) {
+  // ── pml/placeholder_body.pptx ────────────────────────────────────────────
+  // Title-and-content layout (type="obj") with a title placeholder and a body
+  // placeholder (idx=1) containing multilevel bullet text (lvl 0/1/2).
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Title 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="title"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Slide Title</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Content 2"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Top-level bullet</a:t></a:r></a:p>
+          <a:p>
+            <a:pPr lvl="1"/>
+            <a:r><a:t>Second-level bullet</a:t></a:r>
+          </a:p>
+          <a:p>
+            <a:pPr lvl="2"/>
+            <a:r><a:t>Third-level bullet</a:t></a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let data = make_pptx(PptxParts {
+      content_types: pptx_content_types(1, ""),
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: TITLE_CONTENT_LAYOUT_XML,
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide.to_vec(),
+      slide_rels: slide_to_layout_rels("../slideLayouts/slideLayout1.xml", ""),
+      extra: vec![],
+    });
+    save(root, "test-data/pml/placeholder_body.pptx", &data);
+  }
+
+  // ── pml/text_body_props.pptx ─────────────────────────────────────────────
+  // Three text boxes each with a distinct <a:bodyPr> configuration:
+  //   1. anchor="t", <a:noAutofit/>
+  //   2. anchor="ctr", <a:spAutoFit/>
+  //   3. vert="vert", anchor="b", <a:normAutofit/>
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Box 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="t"><a:noAutofit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>No autofit, top</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Box 2"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="3200400" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Shape autofit, center</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="4" name="Box 3"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="5943600" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr vert="vert" anchor="b"><a:normAutofit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Vert, bottom</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/text_body_props.pptx", &data);
+  }
+
+  // ── pml/shape_rotation.pptx ──────────────────────────────────────────────
+  // Two shapes: one with rot="2700000" (45°), one with flipH="1" flipV="1".
+  // EMU rotation unit: 60,000 per degree; 2,700,000 = 45°.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Rotated 1"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm rot="2700000">
+            <a:off x="1828800" y="457200"/>
+            <a:ext cx="2286000" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Flipped 2"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm flipH="1" flipV="1">
+            <a:off x="5029200" y="457200"/>
+            <a:ext cx="2286000" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="triangle"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/shape_rotation.pptx", &data);
+  }
+
+  // ── pml/group_shape.pptx ─────────────────────────────────────────────────
+  // <p:grpSp> wrapping two child shapes.  The group transform has chOff/chExt
+  // matching the union bounding box of its children.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="2" name="Group 1"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="914400" y="457200"/>
+            <a:ext cx="5486400" cy="1371600"/>
+            <a:chOff x="914400" y="457200"/>
+            <a:chExt cx="5486400" cy="1371600"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="3" name="Rect 1"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="914400" y="457200"/>
+              <a:ext cx="2286000" cy="1371600"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr/>
+            <a:lstStyle/>
+            <a:p><a:r><a:t>Left</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="4" name="Ellipse 2"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="4114800" y="457200"/>
+              <a:ext cx="2286000" cy="1371600"/>
+            </a:xfrm>
+            <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr/>
+            <a:lstStyle/>
+            <a:p><a:r><a:t>Right</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      </p:grpSp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/group_shape.pptx", &data);
+  }
+
+  // ── pml/notes_slide.pptx ─────────────────────────────────────────────────
+  // NotesSlidePart with a body placeholder containing speaker notes text.
+  // Exercises the slide → notesSlide relationship and the <p:notes> element.
+  {
+    let notes_xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+         xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+         xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Notes Placeholder 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="body" idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Speaker notes for this slide.</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:notes>"#;
+    let notes_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="../slides/slide1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/>"#,
+    );
+    let ct = pptx_content_types(
+      1,
+      r#"
+  <Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>"#,
+    );
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: blank_slide().to_vec(),
+      slide_rels,
+      extra: vec![
+        ("ppt/notesSlides/notesSlide1.xml", notes_xml.to_vec()),
+        ("ppt/notesSlides/_rels/notesSlide1.xml.rels", notes_rels),
+      ],
+    });
+    save(root, "test-data/pml/notes_slide.pptx", &data);
+  }
+
+  // ── pml/slide_transition.pptx ────────────────────────────────────────────
+  // <p:transition> as a child of <p:sld>, after <p:clrMapOvr>.
+  // Uses a fade transition at medium speed with click-to-advance.
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+  <p:transition spd="med" advClick="1">
+    <p:fade/>
+  </p:transition>
+</p:sld>"#;
+    let data = dml_pptx(slide.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_transition.pptx", &data);
+  }
+
+  // ── pml/slide_hyperlink.pptx ─────────────────────────────────────────────
+  // Text run with <a:hlinkClick r:id="rId2"/> in its <a:rPr>.
+  // The slide relationship file maps rId2 to an external URL.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="TextBox 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="914400" y="914400"/>
+            <a:ext cx="2743200" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p>
+            <a:r>
+              <a:rPr lang="en-US" dirty="0">
+                <a:hlinkClick r:id="rId2"/>
+              </a:rPr>
+              <a:t>Visit ooxmlsdk</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://github.com/KaiserY/ooxmlsdk" TargetMode="External"/>"#,
+    );
+    let data = make_pptx(PptxParts {
+      content_types: pptx_content_types(1, ""),
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide,
+      slide_rels,
+      extra: vec![],
+    });
+    save(root, "test-data/pml/slide_hyperlink.pptx", &data);
   }
 }

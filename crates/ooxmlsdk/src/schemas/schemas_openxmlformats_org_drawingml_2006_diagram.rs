@@ -1165,9 +1165,7 @@ pub struct FillColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub fill_color_list_choice: Vec<FillColorListChoice>,
 }
@@ -1190,9 +1188,7 @@ pub struct LineColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub line_color_list_choice: Vec<LineColorListChoice>,
 }
@@ -1215,9 +1211,7 @@ pub struct EffectColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub effect_color_list_choice: Vec<EffectColorListChoice>,
 }
@@ -1240,9 +1234,7 @@ pub struct TextLineColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub text_line_color_list_choice: Vec<TextLineColorListChoice>,
 }
@@ -1265,9 +1257,7 @@ pub struct TextFillColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub text_fill_color_list_choice: Vec<TextFillColorListChoice>,
 }
@@ -1290,9 +1280,7 @@ pub struct TextEffectColorList {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub text_effect_color_list_choice: Vec<TextEffectColorListChoice>,
 }
@@ -2728,7 +2716,6 @@ pub struct ShapeProperties {
 #[sdk(qname = "a:CT_TextBody/dgm:t")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -2754,7 +2741,6 @@ pub struct PtExtensionList {
 pub struct DiagramDefinitionExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -2828,12 +2814,6 @@ pub enum FillColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineColorListChoice {
@@ -2855,12 +2835,6 @@ pub enum LineColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectColorListChoice {
@@ -2882,12 +2856,6 @@ pub enum EffectColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextLineColorListChoice {
@@ -2909,12 +2877,6 @@ pub enum TextLineColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextFillColorListChoice {
@@ -2936,12 +2898,6 @@ pub enum TextFillColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextEffectColorListChoice {
@@ -2963,12 +2919,6 @@ pub enum TextEffectColorListChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<crate::schemas::a::PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ForEachChoice {

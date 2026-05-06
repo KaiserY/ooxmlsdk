@@ -829,10 +829,11 @@ fn build_type_decl(
     }
   };
 
+  let generate_direct_xml_other_children = schema_type.have_direct_xml_other_children;
   let route_xml_other_children_to_choice = if schema_type.parent_have_xml_other_children {
     route_parent_xml_other_children(schema_type, &mut members, &mut extra_types)
   } else {
-    add_xml_other_variants_to_single_repeated_choice(schema_type, &members, &mut extra_types)
+    false
   };
 
   let xml_content = build_xml_content_type_ref(schema_type, schema, context)?;
@@ -875,11 +876,8 @@ fn build_type_decl(
           SchemaTypeXmlHeader::Standalone => XmlHeaderMode::Standalone,
         },
         have_xml_other_attrs: schema_type.have_xml_other_attrs,
-        have_xml_other_children: if schema_type.parent_have_xml_other_children {
-          schema_type.have_direct_xml_other_children && !route_xml_other_children_to_choice
-        } else {
-          schema_type.have_xml_other_children && !route_xml_other_children_to_choice
-        },
+        have_xml_other_children: generate_direct_xml_other_children
+          && !route_xml_other_children_to_choice,
       },
       content_structure: None,
       members,
@@ -895,56 +893,6 @@ fn route_parent_xml_other_children(
 ) -> bool {
   add_xml_other_variant_to_single_repeated_choice(members, extra_types)
     || promote_single_repeated_child_to_xml_other_choice(schema_type, members, extra_types)
-}
-
-fn add_xml_other_variants_to_single_repeated_choice(
-  schema_type: &SchemaType,
-  members: &[MemberDecl],
-  extra_types: &mut [TypeDecl],
-) -> bool {
-  if !schema_type.have_xml_other_children {
-    return false;
-  }
-
-  if !add_xml_other_variant_to_single_repeated_choice(members, extra_types) {
-    return false;
-  }
-
-  let choice_fields = members
-    .iter()
-    .filter_map(|member| match member {
-      MemberDecl::Field(field)
-        if matches!(field.wire, FieldWireDecl::Choice)
-          && field.cardinality == Cardinality::Many =>
-      {
-        Some(field)
-      }
-      _ => None,
-    })
-    .collect::<Vec<_>>();
-
-  let [choice_field] = choice_fields.as_slice() else {
-    return false;
-  };
-
-  let Some(choice_type) = extra_types
-    .iter_mut()
-    .find(|ty| ty.rust_name == choice_field.type_ref.rust_type && ty.kind == TypeKind::ChoiceEnum)
-  else {
-    return false;
-  };
-
-  add_choice_variant_if_missing(
-    choice_type,
-    "XmlText",
-    "Unknown XML text.",
-    VariantWireDecl::Text,
-    TypeRefDecl {
-      rust_type: "StringValue".to_string(),
-      module_path: Some("crate::simple_type".to_string()),
-    },
-  );
-  true
 }
 
 fn add_xml_other_variant_to_single_repeated_choice(

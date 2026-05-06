@@ -464,7 +464,6 @@ fn create_docx_fixtures(root: &Path, png: &[u8]) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/document/minimal_empty.docx", &data);
   }
@@ -482,7 +481,6 @@ fn create_docx_fixtures(root: &Path, png: &[u8]) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/document/minimal_text.docx", &data);
   }
@@ -559,7 +557,6 @@ fn create_docx_fixtures(root: &Path, png: &[u8]) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/document/minimal_table.docx", &data);
   }
@@ -1136,7 +1133,6 @@ fn create_mce_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/mce/ignorable_unknown_ns.docx", &data);
   }
@@ -1161,7 +1157,6 @@ fn create_mce_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/mce/process_content.docx", &data);
   }
@@ -1189,7 +1184,6 @@ fn create_mce_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/mce/alternate_content_fallback.docx", &data);
   }
@@ -1364,7 +1358,6 @@ fn create_mce_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/mce/must_understand_ok.docx", &data);
   }
@@ -1400,7 +1393,6 @@ fn create_mce_fixtures(root: &Path) {
       ("[Content_Types].xml", &docx_content_types("", "")),
       ("_rels/.rels", &root_rels("word/document.xml")),
       ("word/document.xml", doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
     ]);
     save(root, "test-data/mce/nested_alternate_content.docx", &data);
   }
@@ -1449,7 +1441,6 @@ fn create_opc_fixtures(root: &Path, png: &[u8]) {
       ("[Content_Types].xml", &ct),
       ("_rels/.rels", &root_r),
       ("word/document.xml", minimal_doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
       ("docProps/core.xml", core_xml),
     ]);
     save(root, "test-data/opc/core_properties.docx", &data);
@@ -1472,7 +1463,6 @@ fn create_opc_fixtures(root: &Path, png: &[u8]) {
       ("[Content_Types].xml", &ct),
       ("_rels/.rels", &root_r),
       ("word/document.xml", minimal_doc),
-      ("word/_rels/document.xml.rels", empty_rels()),
       ("docProps/thumbnail.png", png),
     ]);
     save(root, "test-data/opc/thumbnail.docx", &data);
@@ -1951,8 +1941,8 @@ fn create_drawingml_fixtures(root: &Path) {
   }
 
   // ── DML-05: effects ──────────────────────────────────────────────────────
-  // Shape with effectLst containing outerShdw and glow.
-  // Exercises effectLst, outerShdw (blurRad/dist/dir/alpha), glow.
+  // Shape with effectLst containing glow and outerShdw.
+  // Exercises effectLst, glow, outerShdw (blurRad/dist/dir/alpha).
   {
     let slide = slide_with_shapes(
       r#"      <p:sp>
@@ -1969,12 +1959,12 @@ fn create_drawingml_fixtures(root: &Path) {
             <a:solidFill><a:srgbClr val="2F5496"/></a:solidFill>
           </a:ln>
           <a:effectLst>
-            <a:outerShdw blurRad="57150" dist="38100" dir="5400000" algn="ctr" rotWithShape="0">
-              <a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr>
-            </a:outerShdw>
             <a:glow rad="127000">
               <a:srgbClr val="4472C4"><a:alpha val="50000"/></a:srgbClr>
             </a:glow>
+            <a:outerShdw blurRad="57150" dist="38100" dir="5400000" algn="ctr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr>
+            </a:outerShdw>
           </a:effectLst>
         </p:spPr>
         <p:txBody>

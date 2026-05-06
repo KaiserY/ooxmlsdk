@@ -2599,7 +2599,6 @@ pub struct NoFill {
 #[sdk(qname = "a:CT_SolidColorFillProperties/a:solidFill")]
 pub struct SolidFill {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2785,7 +2784,6 @@ pub struct AlphaBiLevel {
 #[sdk(qname = "a:CT_AlphaInverseEffect/a:alphaInv")]
 pub struct AlphaInverse {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2883,7 +2881,6 @@ pub struct ColorChange {
 #[sdk(qname = "a:CT_ColorReplaceEffect/a:clrRepl")]
 pub struct ColorReplacement {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2905,9 +2902,7 @@ pub struct Duotone {
     qname = "a:CT_HslColor/a:hslClr",
     qname = "a:CT_SystemColor/a:sysClr",
     qname = "a:CT_SchemeColor/a:schemeClr",
-    qname = "a:CT_PresetColor/a:prstClr",
-    text,
-    any
+    qname = "a:CT_PresetColor/a:prstClr"
   ))]
   pub duotone_choice: Vec<DuotoneChoice>,
 }
@@ -2948,7 +2943,6 @@ pub struct FillOverlay {
 #[sdk(qname = "a:CT_GlowEffect/a:glow")]
 pub struct Glow {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Radius
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
@@ -2985,7 +2979,6 @@ pub struct Hsl {
 #[sdk(qname = "a:CT_InnerShadowEffect/a:innerShdw")]
 pub struct InnerShadow {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
@@ -3026,7 +3019,6 @@ pub struct LuminanceEffect {
 #[sdk(qname = "a:CT_OuterShadowEffect/a:outerShdw")]
 pub struct OuterShadow {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
@@ -3089,7 +3081,6 @@ pub struct OuterShadow {
 #[sdk(qname = "a:CT_PresetShadowEffect/a:prstShdw")]
 pub struct PresetShadow {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Preset Shadow
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(kind = "token"))]
@@ -3381,7 +3372,6 @@ pub struct FillProperties {
 #[sdk(qname = "a:CT_StyleMatrixReference/a:fillRef")]
 pub struct FillReference {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
@@ -3400,7 +3390,6 @@ pub struct FillReference {
 #[sdk(qname = "a:CT_StyleMatrixReference/a:effectRef")]
 pub struct EffectReference {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
@@ -3419,7 +3408,6 @@ pub struct EffectReference {
 #[sdk(qname = "a:CT_StyleMatrixReference/a:lnRef")]
 pub struct LineReference {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
@@ -3508,7 +3496,6 @@ pub struct MinorFont {
 #[sdk(qname = "a:CT_FontReference/a:fontRef")]
 pub struct FontReference {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Identifier
   #[sdk(attr(qname = ":idx"))]
   #[sdk(string_format(kind = "token"))]
@@ -3547,7 +3534,6 @@ pub struct ShapeAutoFit {
 #[sdk(qname = "a:CT_Color/a:buClr")]
 pub struct BulletColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3563,7 +3549,6 @@ pub struct BulletColor {
 #[sdk(qname = "a:CT_Color/a:extrusionClr")]
 pub struct ExtrusionColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3579,7 +3564,6 @@ pub struct ExtrusionColor {
 #[sdk(qname = "a:CT_Color/a:contourClr")]
 pub struct ContourColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3595,7 +3579,6 @@ pub struct ContourColor {
 #[sdk(qname = "a:CT_Color/a:clrFrom")]
 pub struct ColorFrom {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3611,7 +3594,6 @@ pub struct ColorFrom {
 #[sdk(qname = "a:CT_Color/a:clrTo")]
 pub struct ColorTo {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3627,7 +3609,6 @@ pub struct ColorTo {
 #[sdk(qname = "a:CT_Color/a:fgClr")]
 pub struct ForegroundColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3643,7 +3624,6 @@ pub struct ForegroundColor {
 #[sdk(qname = "a:CT_Color/a:bgClr")]
 pub struct BackgroundColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -3659,7 +3639,6 @@ pub struct BackgroundColor {
 #[sdk(qname = "a:CT_Color/a:highlight")]
 pub struct Highlight {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4227,6 +4206,7 @@ pub struct UnderlineFill {
 #[sdk(qname = "a:CT_RegularTextRun/a:r")]
 pub struct Run {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Text Character Properties
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
@@ -4430,7 +4410,6 @@ pub struct EndTime {
 #[sdk(qname = "a:CT_CustomColor/a:custClr")]
 pub struct CustomColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Name
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
@@ -4621,7 +4600,6 @@ pub struct FormatScheme {
 #[sdk(qname = "a:CT_Color2/a:dk1")]
 pub struct Dark1Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4636,7 +4614,6 @@ pub struct Dark1Color {
 #[sdk(qname = "a:CT_Color2/a:lt1")]
 pub struct Light1Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4651,7 +4628,6 @@ pub struct Light1Color {
 #[sdk(qname = "a:CT_Color2/a:dk2")]
 pub struct Dark2Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4666,7 +4642,6 @@ pub struct Dark2Color {
 #[sdk(qname = "a:CT_Color2/a:lt2")]
 pub struct Light2Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4681,7 +4656,6 @@ pub struct Light2Color {
 #[sdk(qname = "a:CT_Color2/a:accent1")]
 pub struct Accent1Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4696,7 +4670,6 @@ pub struct Accent1Color {
 #[sdk(qname = "a:CT_Color2/a:accent2")]
 pub struct Accent2Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4711,7 +4684,6 @@ pub struct Accent2Color {
 #[sdk(qname = "a:CT_Color2/a:accent3")]
 pub struct Accent3Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4726,7 +4698,6 @@ pub struct Accent3Color {
 #[sdk(qname = "a:CT_Color2/a:accent4")]
 pub struct Accent4Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4741,7 +4712,6 @@ pub struct Accent4Color {
 #[sdk(qname = "a:CT_Color2/a:accent5")]
 pub struct Accent5Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4756,7 +4726,6 @@ pub struct Accent5Color {
 #[sdk(qname = "a:CT_Color2/a:accent6")]
 pub struct Accent6Color {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4771,7 +4740,6 @@ pub struct Accent6Color {
 #[sdk(qname = "a:CT_Color2/a:hlink")]
 pub struct Hyperlink {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -4786,7 +4754,6 @@ pub struct Hyperlink {
 #[sdk(qname = "a:CT_Color2/a:folHlink")]
 pub struct FollowedHyperlinkColor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -5082,7 +5049,6 @@ pub struct BuildChart {
 #[sdk(qname = "a:CT_TextBody/a:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<BodyProperties>,
@@ -5582,7 +5548,6 @@ pub struct SourceRectangle {
 #[sdk(qname = "a:CT_GradientStop/a:gs")]
 pub struct GradientStop {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Position
   #[sdk(attr(qname = ":pos"))]
   #[sdk(number_range(range = 0..= 100000))]
@@ -6794,7 +6759,6 @@ pub struct TableCellBorders {
 #[sdk(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle")]
 pub struct TableCellTextStyle {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Bold
   #[sdk(attr(qname = ":b"))]
   #[sdk(string_format(kind = "token"))]
@@ -8313,9 +8277,7 @@ pub struct Paragraph {
     qname = "a:CT_RegularTextRun/a:r",
     qname = "a:CT_TextLineBreak/a:br",
     qname = "a:CT_TextField/a:fld",
-    qname = "a14:CT_TextMath/a14:m",
-    text,
-    any
+    qname = "a14:CT_TextMath/a14:m"
   ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
   /// End Paragraph Run Properties.
@@ -8398,7 +8360,6 @@ pub type Text = crate::simple_type::StringValue;
 pub struct ShapePropertiesExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8420,7 +8381,6 @@ pub struct ShapePropertiesExtension {
 pub struct GvmlGroupShapeExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8574,9 +8534,7 @@ pub struct GroupShape {
     qname = "a:CT_GvmlPicture/a:pic",
     qname = "a14:CT_GvmlContentPart/a14:contentPart",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp",
-    text,
-    any
+    qname = "a:CT_GvmlGroupShape/a:grpSp"
   ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
@@ -8598,7 +8556,6 @@ pub struct GvmlGroupShapeExtensionList {
 pub struct NonVisualGroupDrawingShapePropsExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8613,7 +8570,6 @@ pub struct NonVisualGroupDrawingShapePropsExtension {
 pub struct OfficeStyleSheetExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8627,7 +8583,6 @@ pub struct OfficeStyleSheetExtension {
 pub struct ConnectorLockingExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8855,7 +8810,6 @@ pub struct ConnectorLockingExtensionList {
 pub struct DataModelExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8873,7 +8827,6 @@ pub struct DataModelExtension {
 pub struct PtExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8887,7 +8840,6 @@ pub struct PtExtension {
 pub struct HyperlinkExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8910,7 +8862,6 @@ pub struct HyperlinkExtensionList {
 pub struct LinePropertiesExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -8970,7 +8921,6 @@ pub struct LinePropertiesExtensionList {
 pub struct NonVisualDrawingPropertiesExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -9044,7 +8994,6 @@ pub struct NonVisualPicturePropertiesExtensionList {
 pub struct NonVisualPicturePropertiesExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -9075,7 +9024,6 @@ pub struct BlipExtensionList {
 pub struct BlipExtension {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// URI
   #[sdk(attr(qname = ":uri"))]
   #[sdk(string_format(kind = "token"))]
@@ -9897,12 +9845,6 @@ pub enum DuotoneChoice {
   /// Preset Color.
   #[sdk(child(qname = "a:CT_PresetColor/a:prstClr"))]
   APrstClr(std::boxed::Box<PresetColor>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {
@@ -11898,12 +11840,6 @@ pub enum ParagraphChoice {
   /// Defines the TextMath Class.
   #[sdk(empty_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
   A14M,
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSpacingChoice {
@@ -12009,12 +11945,6 @@ pub enum GroupShapeChoice {
   AGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
   AGrpSp(std::boxed::Box<GroupShape>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NonVisualGroupDrawingShapePropsExtensionChoice {

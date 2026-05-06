@@ -34,33 +34,60 @@ fn assert_test_data_round_trip(file_name: &str) {
 
 fn assert_package_file_round_trip(path: &Path, file_name: &str) {
   let kind = doc_sample_kind(file_name);
-  let original_bytes = fs::read(path).unwrap();
+  let original_bytes = fs::read(path).unwrap_or_else(|err| {
+    panic!("round-trip failed for {file_name} while reading source package {path:?}: {err}");
+  });
 
   match kind {
     DocSampleKind::Wordprocessing => {
-      let original = WordprocessingDocument::new_from_file(path).unwrap();
+      let original = WordprocessingDocument::new_from_file(path).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while opening original wordprocessing package {path:?}: {err:?}");
+      });
       let mut buffer = Cursor::new(Vec::new());
-      original.save(&mut buffer).unwrap();
+      original.save(&mut buffer).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while saving wordprocessing package: {err:?}");
+      });
       let roundtripped_bytes = buffer.into_inner();
-      let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      let reopened =
+        WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap_or_else(|err| {
+          panic!("round-trip failed for {file_name} while reopening saved wordprocessing package: {err:?}");
+        });
       assert_wordprocessing_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Spreadsheet => {
-      let original = SpreadsheetDocument::new_from_file(path).unwrap();
+      let original = SpreadsheetDocument::new_from_file(path).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while opening original spreadsheet package {path:?}: {err:?}");
+      });
       let mut buffer = Cursor::new(Vec::new());
-      original.save(&mut buffer).unwrap();
+      original.save(&mut buffer).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while saving spreadsheet package: {err:?}");
+      });
       let roundtripped_bytes = buffer.into_inner();
-      let reopened = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      let reopened = SpreadsheetDocument::new(Cursor::new(roundtripped_bytes.clone()))
+        .unwrap_or_else(|err| {
+          panic!(
+            "round-trip failed for {file_name} while reopening saved spreadsheet package: {err:?}"
+          );
+        });
       assert_spreadsheet_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
     DocSampleKind::Presentation => {
-      let original = PresentationDocument::new_from_file(path).unwrap();
+      let original = PresentationDocument::new_from_file(path).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while opening original presentation package {path:?}: {err:?}");
+      });
       let mut buffer = Cursor::new(Vec::new());
-      original.save(&mut buffer).unwrap();
+      original.save(&mut buffer).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while saving presentation package: {err:?}");
+      });
       let roundtripped_bytes = buffer.into_inner();
-      let reopened = PresentationDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap();
+      let reopened = PresentationDocument::new(Cursor::new(roundtripped_bytes.clone()))
+        .unwrap_or_else(|err| {
+          panic!(
+            "round-trip failed for {file_name} while reopening saved presentation package: {err:?}"
+          );
+        });
       assert_presentation_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }
@@ -459,6 +486,9 @@ fn format_xml_equivalence_errors(
     "{entry_name}: xml mismatch after strict and compatible comparison ({})",
     relaxed_options.describe()
   ));
+  if let Some(summary) = summarize_xml_mismatch_cause(relaxed_errors) {
+    errors.push(format!("{entry_name}: first structural cause: {summary}"));
+  }
 
   for error in relaxed_errors.iter().take(24) {
     errors.push(format!("{entry_name}: relaxed: {error}"));
@@ -478,6 +508,64 @@ fn format_xml_equivalence_errors(
   ));
 
   errors
+}
+
+fn summarize_xml_mismatch_cause(errors: &[String]) -> Option<String> {
+  errors
+    .iter()
+    .find_map(|error| summarize_single_xml_mismatch(error))
+}
+
+fn summarize_single_xml_mismatch(error: &str) -> Option<String> {
+  if let Some((path, detail)) = error.split_once(": missing child in roundtripped XML: ") {
+    return Some(format!(
+      "round-trip dropped {} under {}",
+      detail,
+      summarize_xml_parent_path(path)
+    ));
+  }
+
+  if let Some((path, detail)) = error.split_once(": extra child in roundtripped XML: ") {
+    return Some(format!(
+      "round-trip added {} under {}",
+      detail,
+      summarize_xml_parent_path(path)
+    ));
+  }
+
+  if let Some((path, detail)) = error.split_once(": element name mismatch: original ")
+    && let Some((original, roundtripped)) = detail.split_once(", roundtripped ")
+  {
+    return Some(format!(
+      "element at {} changed from {} to {}",
+      path, original, roundtripped
+    ));
+  }
+
+  if let Some((path, detail)) = error.split_once(": node kind mismatch: original ")
+    && let Some((original, roundtripped)) = detail.split_once(", roundtripped ")
+  {
+    return Some(format!(
+      "node at {} changed from {} to {}",
+      path, original, roundtripped
+    ));
+  }
+
+  if let Some((path, detail)) = error.split_once(": missing attr in roundtripped XML: ") {
+    return Some(format!(
+      "round-trip dropped attribute {} at {}",
+      detail, path
+    ));
+  }
+
+  None
+}
+
+fn summarize_xml_parent_path(path: &str) -> &str {
+  path
+    .rsplit_once('/')
+    .map(|(parent, _)| parent)
+    .unwrap_or(path)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,18 +1,9 @@
 {
   "Types": [
     {
-      "ClassName": "Fonts",
-      "HaveDirectXmlOtherChildren": false,
-      "ParentHaveXmlOtherChildren": true
-    },
-    {
       "ClassName": "RunPropertiesDefault",
       "HaveXmlnsFields": true,
       "HaveXmlOtherAttrs": true
-    },
-    {
-      "ClassName": "RunPropertiesBaseStyle",
-      "HaveXmlOtherChildren": true
     },
     {
       "ClassName": "SpacingBetweenLines",

@@ -134,68 +134,17 @@ fn is_invalid(file_name: &str) -> bool {
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
-  !matches!(
-    file_name,
-    "animation.pptx"
-      | "3dtestdash.pptx"
-      | "3dtestdot.pptx"
-      | "Complex01.docx"
-      | "Complex01.xlsx"
-      | "complex0.docx"
-      | "complex2010.docx"
-      | "Document.docx"
-      | "extlst.xlsx"
-      | "HelloWorld.docx"
-      | "HelloO14.docx"
-      | "layout_altcontent.pptx"
-      | "malformed_uri.xlsx"
-      | "malformed_uri_long.xlsx"
-      | "master_altcontent.pptx"
-      | "mcdoc.docx"
-      | "MCExecl.xlsx"
-      | "mcppt.pptx"
-      | "missingcalcchainpart.xlsx"
-      | "notes_altcontent.pptx"
-      | "Of16-01.docx"
-      | "Of16-01.pptx"
-      | "Of16-02.docx"
-      | "Of16-02.pptx"
-      | "Of16-03.docx"
-      | "Of16-03.pptx"
-      | "Of16-04.docx"
-      | "Of16-05.docx"
-      | "Of16-06.docx"
-      | "Of16-07.docx"
-      | "Of16-08.docx"
-      | "Of16-09-UnknownElement.docx"
-      | "Of16-10-SymEx.docx"
-      | "simpleSdt.docx"
-      | "slide_altcontent.pptx"
-      | "Spreadsheet.xlsx"
-      | "Youtube.xlsx"
-  )
+  let _ = file_name;
+  true
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
-  matches!(file_name, "5Errors.docx" | "InvalidDocProps.docx")
+  matches!(file_name, "5Errors.docx" | "simpleSdt.docx")
 }
 
 fn is_test_data_open_only(file_name: &str) -> bool {
-  matches!(
-    file_name,
-    "test-data/document/minimal_empty.docx"
-      | "test-data/document/minimal_table.docx"
-      | "test-data/document/minimal_text.docx"
-      | "test-data/drawingml/effects.pptx"
-      | "test-data/mce/alternate_content_fallback.docx"
-      | "test-data/mce/alternate_content_pptx.pptx"
-      | "test-data/mce/ignorable_unknown_ns.docx"
-      | "test-data/mce/must_understand_ok.docx"
-      | "test-data/mce/nested_alternate_content.docx"
-      | "test-data/mce/process_content.docx"
-      | "test-data/opc/core_properties.docx"
-      | "test-data/opc/thumbnail.docx"
-  )
+  let _ = file_name;
+  false
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

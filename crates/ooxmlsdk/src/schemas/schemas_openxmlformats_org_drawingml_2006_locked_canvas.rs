@@ -24,9 +24,7 @@ pub struct LockedCanvas {
     qname = "a:CT_GvmlPicture/a:pic",
     qname = "a14:CT_GvmlContentPart/a14:contentPart",
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
-    qname = "a:CT_GvmlGroupShape/a:grpSp",
-    text,
-    any
+    qname = "a:CT_GvmlGroupShape/a:grpSp"
   ))]
   pub locked_canvas_choice: Vec<LockedCanvasChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
@@ -49,10 +47,4 @@ pub enum LockedCanvasChoice {
   AGraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
   AGrpSp(std::boxed::Box<crate::schemas::a::GroupShape>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }

@@ -229,7 +229,7 @@ fn body_choice_sdt_block(choice: &BodyChoice) -> Option<&SdtBlock> {
 #[cfg(not(feature = "mce"))]
 fn body_choice_alternate_content(choice: &BodyChoice) -> Option<&str> {
   match choice {
-    BodyChoice::XmlAny(xml) if xml.contains("<mc:AlternateContent") => Some(xml.as_ref()),
+    BodyChoice::XmlAny(xml) if xml.starts_with("<mc:AlternateContent") => Some(xml.as_ref()),
     _ => None,
   }
 }

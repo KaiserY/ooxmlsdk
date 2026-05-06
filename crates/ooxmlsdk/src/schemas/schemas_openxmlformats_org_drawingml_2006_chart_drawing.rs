@@ -10,7 +10,6 @@
 pub struct RelativeAnchorSize {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: Option<FromAnchor>,
@@ -32,7 +31,6 @@ pub struct RelativeAnchorSize {
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
   pub from_anchor: Option<FromAnchor>,
@@ -96,9 +94,7 @@ pub struct GroupShape {
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
     qname = "cdr:CT_Connector/cdr:cxnSp",
     qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart",
-    text,
-    any
+    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
 }
@@ -290,7 +286,6 @@ pub struct Style {
 #[sdk(qname = "a:CT_TextBody/cdr:txBody")]
 pub struct TextBody {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Body Properties
   #[sdk(child(qname = "a:CT_TextBodyProperties/a:bodyPr"))]
   pub body_properties: std::boxed::Box<crate::schemas::a::BodyProperties>,
@@ -562,12 +557,6 @@ pub enum GroupShapeChoice {
   CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
   Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
-  /// Unknown XML text.
-  #[sdk(text)]
-  XmlText(crate::simple_type::StringValue),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

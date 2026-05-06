@@ -2,7 +2,6 @@
   "Types": [
     {
       "ClassName": "ChartSpace",
-      "HaveXmlOtherChildren": true,
       "Children": [
         {
           "PropertyName": "ChartData",

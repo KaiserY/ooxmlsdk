@@ -72,14 +72,7 @@ fn main_document_body_child_count(
   document
     .body
     .as_ref()
-    .map(|body| {
-      body
-        .body_choice
-        .iter()
-        .filter(|choice| !matches!(choice, BodyChoice::XmlText(text) if text.trim().is_empty()))
-        .count()
-        + usize::from(body.w_sect_pr.is_some())
-    })
+    .map(|body| body.body_choice.len() + usize::from(body.w_sect_pr.is_some()))
     .unwrap_or_default()
 }
 

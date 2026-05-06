@@ -175,6 +175,22 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 have_xml_other_attrs,
                 &children,
               );
+          let parent_have_xml_other_children = parent_have_xml_other_children_for_common_content(
+            ty,
+            kind,
+            schema.module_name.as_str(),
+          );
+          let have_direct_xml_other_children =
+            have_direct_xml_other_children_for_common_part_root_content(
+              ty,
+              kind,
+              schema.module_name.as_str(),
+              have_xml_other_children,
+            ) || have_direct_xml_other_children_for_targeted_mce_content(
+              ty,
+              kind,
+              schema.module_name.as_str(),
+            );
           assign_particle_ids(&mut children);
 
           let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
@@ -197,8 +213,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             have_xmlns_fields,
             have_xml_other_attrs,
             have_xml_other_children,
-            have_direct_xml_other_children: false,
-            parent_have_xml_other_children: false,
+            have_direct_xml_other_children,
+            parent_have_xml_other_children,
             text_value_type: String::new(),
             api_kind: resolve_api_kind(ty, &type_map),
             attributes: ty
@@ -909,6 +925,82 @@ fn have_xml_other_children_for_text_list_style_extension_siblings(
       .children
       .iter()
       .any(|child| is_extension_list_name(child.name.as_str()))
+}
+
+fn parent_have_xml_other_children_for_common_content(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  kind: SchemaTypeKind,
+  module_name: &str,
+) -> bool {
+  matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
+    && is_office2007_or_default(schema_type.version.as_deref())
+    && !is_extension_schema_type(schema_type)
+    && ((module_name.contains("wordprocessingml_2006_main")
+      && matches!(
+        schema_type.name.as_str(),
+        "w:CT_Body/w:body" | "w:CT_FontsList/w:fonts" | "w:CT_P/w:p" | "w:CT_R/w:r"
+      ))
+      || (module_name.contains("presentationml_2006_main")
+        && schema_type.name == "p:CT_GroupShape/p:spTree"))
+}
+
+fn have_direct_xml_other_children_for_common_part_root_content(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  kind: SchemaTypeKind,
+  module_name: &str,
+  have_xml_other_children: bool,
+) -> bool {
+  have_xml_other_children
+    && matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
+    && is_office2007_or_default(schema_type.version.as_deref())
+    && is_common_ooxml_content_module(module_name)
+    && !is_extension_schema_type(schema_type)
+    && is_part_root_schema_type(schema_type)
+}
+
+fn have_direct_xml_other_children_for_targeted_mce_content(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  kind: SchemaTypeKind,
+  module_name: &str,
+) -> bool {
+  if !matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
+    || is_extension_schema_type(schema_type)
+  {
+    return false;
+  }
+
+  let name = schema_type.name.as_str();
+  let is_common_office2007_content = is_office2007_or_default(schema_type.version.as_deref())
+    && is_common_ooxml_content_module(module_name);
+
+  (is_common_office2007_content
+    && module_name.contains("wordprocessingml_2006_main")
+    && matches!(
+      name,
+      "w:CT_Settings/w:settings"
+        | "w:CT_RPr/w:rPr"
+        | "w:CT_RPrBaseStyleable/w:rPr"
+        | "w:CT_PPr/w:pPr"
+    ))
+    || (is_common_office2007_content
+      && module_name.contains("presentationml_2006_main")
+      && matches!(
+        name,
+        "a:CT_TextListStyle/p:titleStyle"
+          | "a:CT_TextListStyle/p:bodyStyle"
+          | "a:CT_TextListStyle/p:otherStyle"
+      ))
+    || (is_common_office2007_content
+      && module_name.contains("spreadsheetml_2006_main")
+      && name == "x:CT_Rst/x:si")
+    || (is_common_office2007_content
+      && module_name.contains("drawingml_2006_main")
+      && name == "a:CT_RegularTextRun/a:r")
+    || (is_common_office2007_content
+      && module_name.contains("drawingml_2006_spreadsheet_drawing")
+      && name == "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")
+    || (module_name.contains("microsoft_com_office_drawing_2014_chartex")
+      && name == "cx:CT_ChartSpace/cx:chartSpace")
 }
 
 fn have_xml_other_attrs_for_mixed_version_content(

@@ -144,35 +144,44 @@ where
 #[inline(always)]
 #[cfg_attr(not(feature = "parts"), allow(dead_code))]
 pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
-  actual == canonical || relationship_type_matches_alias(actual, canonical)
+  actual == canonical || canonical_relationship_type(actual).as_ref() == canonical
 }
 
 #[inline(always)]
 #[cfg_attr(not(feature = "parts"), allow(dead_code))]
 pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
+  actual != canonical && canonical_relationship_type(actual).as_ref() == canonical
+}
+
+#[inline]
+#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+pub(crate) fn canonical_relationship_type(value: &str) -> std::borrow::Cow<'_, str> {
+  if value == "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail" {
+    return std::borrow::Cow::Borrowed(
+      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
+    );
+  }
+
+  if value == "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects" {
+    return std::borrow::Cow::Borrowed(
+      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
+    );
+  }
+
   if let Some(suffix) =
-    canonical.strip_prefix("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
+    value.strip_prefix("http://purl.oclc.org/ooxml/officeDocument/relationships/")
   {
     let alias_suffix = match suffix {
-      "custom-properties" => "customProperties",
-      "extended-properties" => "extendedProperties",
+      "customProperties" => "custom-properties",
+      "extendedProperties" => "extended-properties",
       other => other,
     };
-    return actual
-      .strip_prefix("http://purl.oclc.org/ooxml/officeDocument/relationships/")
-      .is_some_and(|actual_suffix| actual_suffix == alias_suffix);
+    return std::borrow::Cow::Owned(format!(
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/{alias_suffix}"
+    ));
   }
 
-  if canonical == "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
-  {
-    return actual == "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail";
-  }
-
-  if canonical == "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects" {
-    return actual == "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects";
-  }
-
-  false
+  std::borrow::Cow::Borrowed(value)
 }
 
 #[inline]
@@ -507,6 +516,24 @@ mod tests {
       "",
       "word",
       "document",
+    ));
+  }
+
+  #[test]
+  fn relationship_type_aliases_canonicalize_to_transitional_types() {
+    assert_eq!(
+      canonical_relationship_type("http://purl.oclc.org/ooxml/officeDocument/relationships/theme"),
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+    );
+    assert_eq!(
+      canonical_relationship_type(
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail"
+      ),
+      "http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail"
+    );
+    assert!(relationship_type_matches(
+      "http://schemas.microsoft.com/office/2006/relationships/stylesWithtEffects",
+      "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects",
     ));
   }
 }

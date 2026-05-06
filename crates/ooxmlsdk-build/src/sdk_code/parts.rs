@@ -260,7 +260,6 @@ fn part_child_kind_value(cardinality: PartChildCardinality) -> &'static str {
 pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
   let mut mod_list: Vec<ItemMod> = vec![];
   let mut part_ref_variants: Vec<TokenStream> = vec![];
-  let mut part_ref_from_relationship_type_branches: Vec<TokenStream> = vec![];
   let mut part_ref_from_part_id_groups: BTreeMap<String, Vec<TokenStream>> = BTreeMap::new();
   let mut root_element_variants: Vec<TokenStream> = vec![];
 
@@ -300,46 +299,40 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       #( #part_attrs )*
       #struct_ident(#part_ty),
     });
-    let relationship_type_str = part.relationship_type.as_str();
-    let content_type_str = part.content_type.as_str();
-    let path_prefix_str = part.path_prefix.as_str();
-    let target_name_str = part.target_name.as_str();
+    let relationship_type = part.relationship_type.as_str();
     let exact_match_condition = part_exact_match_condition_tokens(part, quote! { part });
+    let make_part_ref = quote! {
+      return Some(<#part_ty>::make_part_ref(
+        storage,
+        part_id,
+        relationship_id,
+      ));
+    };
+    let part_ref_arm = if let Some(exact_match_condition) = exact_match_condition {
+      quote! {
+        #( #part_attrs )*
+        #relationship_type if #exact_match_condition => {
+          #make_part_ref
+        }
+      }
+    } else {
+      quote! {
+        #( #part_attrs )*
+        #relationship_type => {
+          #make_part_ref
+        }
+      }
+    };
     part_ref_from_part_id_groups
       .entry(part.relationship_type.clone())
       .or_default()
-      .push(quote! {
-        #( #part_attrs )*
-        if #exact_match_condition {
-          return Some(<#part_ty>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ));
-        }
-      });
-    part_ref_from_relationship_type_branches.push(quote! {
-      #( #part_attrs )*
-      if crate::common::part_descriptor_matches(
-        relationship_type,
-        part.content_type(),
-        part.path(),
-        #relationship_type_str,
-        #content_type_str,
-        #path_prefix_str,
-        #target_name_str,
-      ) {
-        return Some(<#part_ty>::make_part_ref(
-          storage,
-          part_id,
-          relationship_id,
-        ));
-      }
-    });
+      .push(part_ref_arm);
   }
 
-  let part_ref_from_part_id_match_arms =
-    part_ref_relationship_type_match_arms(&part_ref_from_part_id_groups);
+  let part_ref_from_part_id_match_arms = part_ref_from_part_id_groups
+    .values()
+    .flat_map(|arms| arms.iter())
+    .collect::<Vec<_>>();
 
   Ok(quote! {
     #( #mod_list )*
@@ -421,11 +414,9 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           };
           return Some(PartRef::ExtendedPart(part));
         };
-        match relationship_type {
+        match crate::common::canonical_relationship_type(relationship_type).as_ref() {
           #( #part_ref_from_part_id_match_arms )*
-          _ => {
-            #( #part_ref_from_relationship_type_branches )*
-          }
+          _ => {}
         }
         let part = if let Some(relationship_id) = relationship_id {
           <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
@@ -803,44 +794,31 @@ fn root_part_content_type(part: &PartModuleDecl) -> &str {
   }
 }
 
-fn part_ref_relationship_type_match_arms(
-  groups: &BTreeMap<String, Vec<TokenStream>>,
-) -> Vec<TokenStream> {
-  groups
-    .iter()
-    .map(|(relationship_type, branches)| {
-      let relationship_type = relationship_type.as_str();
-      quote! {
-        #relationship_type => {
-          #( #branches )*
-        }
-      }
-    })
-    .collect()
-}
-
-fn part_exact_match_condition_tokens(part: &PartModuleDecl, part_expr: TokenStream) -> TokenStream {
+fn part_exact_match_condition_tokens(
+  part: &PartModuleDecl,
+  part_expr: TokenStream,
+) -> Option<TokenStream> {
   let content_type = part.content_type.as_str();
   if content_type.is_empty() {
     if part.relationship_type
       == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
     {
       let expected_path = fixed_xml_part_path(part);
-      return quote! { #part_expr.path() == #expected_path };
+      return Some(quote! { #part_expr.path() == #expected_path });
     }
-    return quote! { true };
+    return None;
   }
 
   if part.relationship_type
     == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
   {
     let expected_path = fixed_xml_part_path(part);
-    return quote! {
+    return Some(quote! {
       #part_expr.content_type() == #content_type || #part_expr.path() == #expected_path
-    };
+    });
   }
 
-  quote! { #part_expr.content_type() == #content_type }
+  Some(quote! { #part_expr.content_type() == #content_type })
 }
 
 fn fixed_xml_part_path(part: &PartModuleDecl) -> String {

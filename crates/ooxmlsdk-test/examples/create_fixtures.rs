@@ -2719,15 +2719,14 @@ fn create_vba_preserve_fixtures(root: &Path) {
   </w:body>
 </w:document>"#;
 
-    let content_types = format!(
-      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    let content_types = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>
 </Types>"#
-    )
+    .to_string()
     .into_bytes();
 
     let doc_rels = docx_doc_rels(

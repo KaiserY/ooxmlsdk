@@ -323,7 +323,7 @@ fn doc_sample_kind(file_name: &str) -> DocSampleKind {
     .extension()
     .and_then(|ext| ext.to_str())
   {
-    Some("docx") | Some("dotx") => DocSampleKind::Wordprocessing,
+    Some("docx") | Some("docm") | Some("dotx") => DocSampleKind::Wordprocessing,
     Some("xlsx") | Some("xltx") => DocSampleKind::Spreadsheet,
     Some("pptx") | Some("potx") => DocSampleKind::Presentation,
     other => panic!("unsupported doc sample extension for {file_name}: {other:?}"),

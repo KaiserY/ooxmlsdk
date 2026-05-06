@@ -20,8 +20,8 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main::{
   Presentation as PmlPresentation, Slide,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, BodyChoice2, Document, Header, Paragraph, ParagraphChoice, ParagraphChoice5,
-  Run, RunChoice, SdtPropertiesChoice, Text,
+  Body, BodyChoice, Document, Header, Paragraph, ParagraphChoice, Run, RunChoice,
+  SdtPropertiesChoice, Text,
 };
 use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
@@ -703,10 +703,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .as_mut()
     .and_then(|body| {
       body.body_choice.iter_mut().find_map(|choice| match choice {
-        BodyChoice::Choice1(c) => match c.as_mut() {
-          BodyChoice2::WSdt(sdt) => Some(sdt.as_mut()),
-          _ => None,
-        },
+        BodyChoice::WSdt(sdt) => Some(sdt.as_mut()),
         _ => None,
       })
     })
@@ -741,10 +738,7 @@ fn wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test() {
     .as_ref()
     .and_then(|body| {
       body.body_choice.iter().find_map(|choice| match choice {
-        BodyChoice::Choice1(c) => match c.as_ref() {
-          BodyChoice2::WSdt(sdt) => Some(sdt.as_ref()),
-          _ => None,
-        },
+        BodyChoice::WSdt(sdt) => Some(sdt.as_ref()),
         _ => None,
       })
     })
@@ -4141,18 +4135,16 @@ fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
   let body = root.body.as_mut().unwrap();
   body.body_choice.insert(
     0,
-    BodyChoice::Choice1(Box::new(BodyChoice2::WP(Box::new(Paragraph {
-      paragraph_choice: vec![ParagraphChoice::Choice(Box::new(ParagraphChoice5::WR(
-        Box::new(Run {
-          run_choice: vec![RunChoice::WT(Box::new(Text {
-            xml_content: Some("Hello World from clone".to_string()),
-            ..Default::default()
-          }))],
+    BodyChoice::WP(Box::new(Paragraph {
+      paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
+        run_choice: vec![RunChoice::WT(Box::new(Text {
+          xml_content: Some("Hello World from clone".to_string()),
           ..Default::default()
-        }),
-      )))],
+        }))],
+        ..Default::default()
+      }))],
       ..Default::default()
-    })))),
+    })),
   );
 
   let clone_bytes = clone.to_package_bytes().unwrap();

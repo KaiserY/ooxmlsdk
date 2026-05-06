@@ -59,11 +59,7 @@ Default dev loop after generator work:
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
 - `cargo fmt --all`
 - `cargo test --workspace`
-- `cargo test --workspace --no-default-features --features flat-opc`
-- `cargo test --workspace --no-default-features --features mce`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
 - `cargo fmt --all`
 
 Full generator/feature validation:
@@ -111,7 +107,7 @@ The parts-only lane should avoid fixtures that require `flat-opc`, validators, o
 
 ## Compatibility Test Suite
 
-The suite lives in `crates/ooxmlsdk-test`. It generates a fixed set of minimal OOXML fixtures and round-trips each one through open → save → reopen.
+The suite lives in `crates/ooxmlsdk-test`. It generates a fixed set of OOXML fixtures and round-trips each one through open → save → reopen.
 
 **Generating fixtures** (run once, or when a fixture definition changes):
 
@@ -119,7 +115,7 @@ The suite lives in `crates/ooxmlsdk-test`. It generates a fixed set of minimal O
 cargo run -p ooxmlsdk-test --example create_fixtures
 ```
 
-This writes 22 files into `test-data/` (5 DOCX, 5 XLSX, 5 PPTX, 7 MCE-specific). The fixtures are committed; regenerate only when `examples/create_fixtures.rs` changes.
+This writes the committed fixture set into `test-data/`, including document, spreadsheet, slideshow, MCE, OPC, DrawingML, and WML coverage. The fixtures are committed; regenerate only when `examples/create_fixtures.rs` changes.
 
 **Running the round-trip test:**
 

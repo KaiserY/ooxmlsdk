@@ -31,12 +31,12 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 
 ## Summary
 
-- `blocked_by_api`: 137
-- `covered`: 194
+- `blocked_by_api`: 136
+- `covered`: 197
 - `covered_by_doc_samples`: 38
 - `missing`: 0
 - `not_applicable`: 130
-- `partial`: 487
+- `partial`: 485
 
 ## Tests
 
@@ -812,17 +812,17 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:45` `LoadExt` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_test` verifies x14 workbook extension typing |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/M4Conformance.cs:56` `LoadExt2` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::chart_extension_loads_pivot_options_from_m4_conformance_test` verifies c14 pivot options extension typing |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:22` `LoadAttributeTest` | Fact | `covered` | `mce_unknown` | Covered by wordprocessing MCE attribute round-trip test |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:82` `LoadIgnorable` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::text_round_trip_preserves_ignorable_whitespace_list_from_markup_compatibility_test` covers `mc:Ignorable` lexical preservation through public schema parse/write |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:108` `LoadPreserveAttr` | Fact | `covered` | `mce_unknown` | Covered by wordprocessing MCE preserve attribute round-trip test |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:147` `LoadProcessContent` | Fact | `covered` | `mce_unknown` | `spreadsheet.rs::shared_string_table_process_content_preserves_extension_attributes_from_mc_support_test` preserves ProcessContent and extension attributes |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:82` `LoadIgnorable` | Fact | `covered` | `mce_unknown` | `packages.rs::process_all_parts_uses_xmlns_declared_on_intermediate_elements` covers inherited namespace declarations for `mc:Ignorable`; `wordprocessing.rs::text_round_trip_preserves_ignorable_whitespace_list_from_markup_compatibility_test` covers lexical preservation |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:108` `LoadPreserveAttr` | Fact | `covered` | `mce_unknown` | `packages.rs::process_all_parts_preserves_requested_ignorable_attributes_only` covers ProcessAllParts removal of ignorable attributes while preserving requested attributes; wordprocessing round-trip tests cover lexical preservation |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:147` `LoadProcessContent` | Fact | `covered` | `mce_unknown` | `packages.rs::process_all_parts_uses_process_content_for_ignorable_wrapper` covers ProcessAllParts unwrapping of ignorable ProcessContent elements |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:178` `LoadACB` | Fact | `covered` | `mce_unknown` | `wordprocessing.rs::body_alternate_content_fallback_preserves_multiple_known_children` covers body-level alternate content block load/save |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:204` `LoadACB2` | Fact | `blocked_by_api` | `open_settings` | Requires ProcessLoadedPartsOnly alternate content selection for presentation table styles; current public root load preserves none of the selected `a:tblStyle` entries |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:247` `MCSave` | Fact | `blocked_by_api` | `open_settings` | Requires ProcessLoadedPartsOnly/ProcessAllParts package-wide MC processing semantics |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:317` `MCMustUnderstand` | Fact | `blocked_by_api` | `open_settings` | Requires NamespaceNotUnderstand-style errors from package-wide MC processing |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:317` `MCMustUnderstand` | Fact | `covered` | `open_settings` | `packages.rs::process_all_parts_rejects_unsupported_must_understand_namespace` covers package-wide ProcessAllParts rejection for unsupported MustUnderstand namespaces |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:360` `ParticalProperty` | Fact | `covered` | `mce_unknown` | `packages.rs::wordprocessing_sdt_alias_mutation_is_saved_from_mc_support_test` verifies SDT alias mutation persists through save/reopen |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:401` `WriteExtraAttr` | Fact | `covered` | `mce_unknown` | `packages.rs::wordprocessing_font_table_touch_preserves_w14_namespace_from_mc_support_test` verifies touched font table roots preserve the w14 namespace declaration |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:438` `Bug718314` | Fact | `partial` | `mce_unknown` | Empty body-level alternate content now round-trips; upstream ProcessAllParts removal semantics require OpenSettings-style API |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:466` `Bug718316` | Fact | `partial` | `mce_unknown` | Choice-only body-level alternate content now round-trips; upstream ProcessAllParts removal semantics require OpenSettings-style API |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:438` `Bug718314` | Fact | `covered` | `mce_unknown` | `packages.rs::process_all_parts_selects_body_alternate_content_after_round_trip_parse` covers empty body-level alternate content removal under `ProcessAllParts` |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs:466` `Bug718316` | Fact | `covered` | `mce_unknown` | `packages.rs::process_all_parts_selects_body_alternate_content_after_round_trip_parse` covers unmatched choice-only body-level alternate content removal under `ProcessAllParts` |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:21` `AcbSyntaxValidationTest` | Fact | `blocked_by_api` | `validator` | Requires upstream-style markup compatibility validator processing |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:125` `CompatibilityRuleAttributesValidationTest` | Fact | `blocked_by_api` | `validator` | Requires upstream-style markup compatibility validator processing |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/McValidationTest.cs:221` `GetChildMcTest` | Fact | `blocked_by_api` | `validator` | Requires upstream-style markup compatibility validator processing |

@@ -204,6 +204,7 @@ pub struct Inline {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_Anchor/wp:anchor")]
 pub struct Anchor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Distance From Text on Top Edge
   #[sdk(attr(qname = ":distT"))]
@@ -363,6 +364,7 @@ pub struct WrapPolygon {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosH/wp:positionH")]
 pub struct HorizontalPosition {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Horizontal Position Relative Base
   #[sdk(attr(qname = ":relativeFrom"))]
@@ -379,6 +381,7 @@ pub struct HorizontalPosition {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "wp:CT_PosV/wp:positionV")]
 pub struct VerticalPosition {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Vertical Position Relative Base
   #[sdk(attr(qname = ":relativeFrom"))]

@@ -964,47 +964,7 @@ fn namespace_decls(
 
 #[cfg(feature = "mce")]
 fn namespace_supported(ns: &str, target: crate::sdk::FileFormatVersion) -> bool {
-  namespace_minimum_version(ns)
-    .is_some_and(|version| file_format_rank(version) <= file_format_rank(target))
-}
-
-#[cfg(feature = "mce")]
-fn namespace_minimum_version(ns: &str) -> Option<crate::sdk::FileFormatVersion> {
-  use crate::sdk::FileFormatVersion;
-  if ns.contains("openxmlformats.org") || ns.contains("/2006/") || ns.contains(":office:") {
-    Some(FileFormatVersion::Office2007)
-  } else if ns.contains("/2010/") || ns.contains("14") {
-    Some(FileFormatVersion::Office2010)
-  } else if ns.contains("/2012/") || ns.contains("15") {
-    Some(FileFormatVersion::Office2013)
-  } else if ns.contains("/2016/") || ns.contains("16") {
-    Some(FileFormatVersion::Office2016)
-  } else if ns.contains("/2019/") {
-    Some(FileFormatVersion::Office2019)
-  } else if ns.contains("/2021/") {
-    Some(FileFormatVersion::Office2021)
-  } else if ns.contains("/2022/")
-    || ns.contains("/2023/")
-    || ns.contains("/2024/")
-    || ns.contains("/2025/")
-  {
-    Some(FileFormatVersion::Microsoft365)
-  } else {
-    None
-  }
-}
-
-#[cfg(feature = "mce")]
-fn file_format_rank(version: crate::sdk::FileFormatVersion) -> u8 {
-  match version {
-    crate::sdk::FileFormatVersion::Office2007 => 0,
-    crate::sdk::FileFormatVersion::Office2010 => 1,
-    crate::sdk::FileFormatVersion::Office2013 => 2,
-    crate::sdk::FileFormatVersion::Office2016 => 3,
-    crate::sdk::FileFormatVersion::Office2019 => 4,
-    crate::sdk::FileFormatVersion::Office2021 => 5,
-    crate::sdk::FileFormatVersion::Microsoft365 => 6,
-  }
+  crate::sdk::namespace_supported(ns, target)
 }
 
 #[cfg(feature = "mce")]

@@ -907,6 +907,7 @@ pub struct BackgroundProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/p:bgRef")]
 pub struct BackgroundStyleReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -1445,6 +1446,7 @@ pub struct TimePercentage {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeTargetElement/p:tgtEl")]
 pub struct TargetElement {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_Empty/p:sldTgt",
@@ -1520,6 +1522,7 @@ pub struct EndSync {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeParallel/p:par")]
 pub struct ParallelTimeNode {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Parallel TimeNode
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -1529,6 +1532,7 @@ pub struct ParallelTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeSequence/p:seq")]
 pub struct SequenceTimeNode {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Concurrent
   #[sdk(attr(qname = ":concurrent"))]
@@ -1555,6 +1559,7 @@ pub struct SequenceTimeNode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLTimeNodeExclusive/p:excl")]
 pub struct ExclusiveTimeNode {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Common TimeNode Properties
   #[sdk(child(qname = "p:CT_TLCommonTimeNodeData/p:cTn"))]
@@ -1996,6 +2001,7 @@ pub struct StringVariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:clrVal")]
 pub struct ColorValue {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2011,6 +2017,7 @@ pub struct ColorValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/p:penClr")]
 pub struct PenColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2082,6 +2089,7 @@ pub struct HslColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonBehaviorData/p:cBhvr")]
 pub struct CommonBehavior {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Additive
   #[sdk(attr(qname = ":additive"))]
@@ -2159,6 +2167,7 @@ pub struct VariantValue {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TLCommonMediaNodeData/p:cMediaNode")]
 pub struct CommonMediaNode {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Volume
   #[sdk(attr(qname = ":vol"))]
@@ -2365,6 +2374,7 @@ pub struct ByColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:from")]
 pub struct FromColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2380,6 +2390,7 @@ pub struct FromColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color3/p:to")]
 pub struct ToColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3600,6 +3611,7 @@ pub struct OleObjectLink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_SlideTransition/p:transition")]
 pub struct Transition {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// spd
   #[sdk(attr(qname = ":spd"))]
@@ -3709,6 +3721,7 @@ pub struct Background {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:spTree")]
 pub struct ShapeTree {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
@@ -3734,6 +3747,7 @@ pub struct ShapeTree {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_GroupShape/p:grpSp")]
 pub struct GroupShape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
@@ -4085,6 +4099,7 @@ pub struct Iterate {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:childTnLst")]
 pub struct ChildTimeNodeList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
@@ -4107,6 +4122,7 @@ pub struct ChildTimeNodeList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_TimeNodeList/p:subTnLst")]
 pub struct SubTimeNodeList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "p:CT_TLTimeNodeParallel/p:par",
@@ -4503,6 +4519,7 @@ pub struct ShowProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorMRU/p:clrMru")]
 pub struct ColorMostRecentlyUsed {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",

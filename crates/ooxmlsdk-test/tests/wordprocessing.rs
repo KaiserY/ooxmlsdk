@@ -1,12 +1,12 @@
 use ooxmlsdk::common::XmlHeaderType;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, BodyChoice2, CommentChoice, Comments, DeletedRun, DeletedRunChoice,
-  DeletedRunChoice2, Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice,
-  ParagraphChoice2, Run, RunChoice, Text,
+  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, DeletedRunChoice2,
+  Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice, ParagraphChoice2, Run,
+  RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  SdtBlock, SdtPropertiesChoice,
+  BodyChoice2, SdtBlock, SdtPropertiesChoice,
 };
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
@@ -1219,10 +1219,13 @@ fn paragraph_round_trip_from_different_amount_of_children_test() {
     assert_stable_roundtrip::<Paragraph>(fixtures::WORDPROCESSING_PARAGRAPH_ONLY_RUN_XML);
 
   assert_eq!(paragraph_run_count(&parsed), 1);
+  let serialized = trim_xml_declaration(&serialized);
   assert!(
-    trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r /></w:p>"
-      || trim_xml_declaration(&serialized) == "<w:p w:rsidP=\"001\"><w:r></w:r></w:p>"
-      || trim_xml_declaration(&serialized).contains("<w:r ")
+    (serialized.starts_with("<w:p ") || serialized.starts_with("<w:p>"))
+      && serialized.contains("w:rsidP=\"001\"")
+      && (serialized.contains("<w:r ") || serialized.contains("<w:r>"))
+      && (serialized.ends_with("</w:p>") || serialized.ends_with("/>")),
+    "{serialized}"
   );
   assert_eq!(paragraph_run_count(&reparsed), 1);
 }

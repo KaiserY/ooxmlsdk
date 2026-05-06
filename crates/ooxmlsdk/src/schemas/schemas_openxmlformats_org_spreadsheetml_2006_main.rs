@@ -2709,6 +2709,7 @@ pub struct Workbook {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_FilterColumn/x:filterColumn")]
 pub struct FilterColumn {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Filter Column Data
   #[sdk(attr(qname = ":colId"))]
@@ -2736,6 +2737,7 @@ pub struct FilterColumn {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SortState/x:sortState")]
 pub struct SortState {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Sort by Columns
   #[sdk(attr(qname = ":columnSort"))]
@@ -2813,6 +2815,7 @@ pub struct Authors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CommentList/x:commentList")]
 pub struct CommentList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Comment.
   #[sdk(child(qname = "x:CT_Comment/x:comment"))]
@@ -2822,6 +2825,7 @@ pub struct CommentList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Comment/x:comment")]
 pub struct Comment {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Cell Reference
   #[sdk(attr(qname = ":ref"))]
@@ -3246,6 +3250,7 @@ pub struct TextField {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CacheField/x:cacheField")]
 pub struct CacheField {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// name
   #[sdk(attr(qname = ":name"))]
@@ -4314,6 +4319,7 @@ pub struct ChartFormat {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotHierarchy/x:pivotHierarchy")]
 pub struct PivotHierarchy {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Outline New Levels
   #[sdk(attr(qname = ":outline"))]
@@ -4675,6 +4681,7 @@ pub struct PivotAreaReferences {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_PivotAreaReference/x:reference")]
 pub struct PivotAreaReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Field Index
   #[sdk(attr(qname = ":field"))]
@@ -5921,6 +5928,7 @@ pub struct UserInfo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Row/x:row")]
 pub struct Row {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Row Index
   #[sdk(attr(qname = ":r"))]
@@ -6333,6 +6341,7 @@ pub struct HeaderFooter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_AutoFilter/x:autoFilter")]
 pub struct AutoFilter {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Cell or Range Reference
   #[sdk(attr(qname = ":ref"))]
@@ -6351,6 +6360,7 @@ pub struct AutoFilter {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_CfRule/x:cfRule")]
 pub struct ConditionalFormattingRule {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Type
   #[sdk(attr(qname = ":type"))]
@@ -6672,6 +6682,7 @@ pub struct InputCells {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Control/x:control")]
 pub struct Control {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Shape Id
   #[sdk(attr(qname = ":shapeId"))]
@@ -6733,6 +6744,7 @@ pub struct MergeCell {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_DataValidation/x:dataValidation")]
 pub struct DataValidation {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// type
   #[sdk(attr(qname = ":type"))]
@@ -6787,6 +6799,7 @@ pub struct DataValidation {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetView/x:sheetView")]
 pub struct SheetView {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Window Protection
   #[sdk(attr(qname = ":windowProtection"))]
@@ -6960,6 +6973,7 @@ pub struct CustomSheetView {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleObject/x:oleObject")]
 pub struct OleObject {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// OLE ProgId
   #[sdk(attr(qname = ":progId"))]
@@ -7516,6 +7530,7 @@ pub struct Fill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Border/x:border")]
 pub struct Border {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Diagonal Up
   #[sdk(attr(qname = ":diagonalUp"))]
@@ -7834,6 +7849,7 @@ pub struct Value {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_OleItems/x:oleItems")]
 pub struct OleItems {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(qname = "x:CT_OleItem/x:oleItem", qname = "x14:CT_OleItem/x14:oleItem"))]
   pub ole_items_choice: Vec<OleItemsChoice>,
@@ -7842,6 +7858,7 @@ pub struct OleItems {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_ExternalBook/x:externalBook")]
 pub struct ExternalBook {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Relationship to supporting book file path
   #[sdk(attr(qname = "r:id"))]
@@ -9072,6 +9089,7 @@ pub struct Columns {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_SheetData/x:sheetData")]
 pub struct SheetData {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Row.
   #[sdk(child(qname = "x:CT_Row/x:row"))]
@@ -9349,6 +9367,7 @@ pub struct DateGroupItem {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Filters/x:filters")]
 pub struct Filters {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Filter by Blank
   #[sdk(attr(qname = ":blank"))]
@@ -10090,6 +10109,7 @@ pub struct NumberingFormats {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Fonts/x:fonts")]
 pub struct Fonts {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Font Count
   #[sdk(attr(qname = ":count"))]

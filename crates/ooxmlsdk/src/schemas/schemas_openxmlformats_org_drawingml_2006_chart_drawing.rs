@@ -30,6 +30,7 @@ pub struct RelativeAnchorSize {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_AbsSizeAnchor/cdr:absSizeAnchor")]
 pub struct AbsoluteAnchorSize {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
@@ -81,6 +82,7 @@ pub struct Shape {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "cdr:CT_GroupShape/cdr:grpSp")]
 pub struct GroupShape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]

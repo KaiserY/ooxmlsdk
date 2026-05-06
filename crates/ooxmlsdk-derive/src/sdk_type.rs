@@ -381,7 +381,11 @@ fn mce_xml_other_children_process_tokens(
 fn mce_context_scope_tokens(
   xmlns_fields: &[Ident],
   xml_other_attrs_field: Option<&Ident>,
-) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+) -> (
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+) {
   let xmlns_expr = if let Some(ident) = xmlns_fields.first() {
     quote! { self.#ident.as_slice() }
   } else {
@@ -394,12 +398,22 @@ fn mce_context_scope_tokens(
   };
 
   if xmlns_fields.is_empty() && xml_other_attrs_field.is_none() {
-    (quote! {}, quote! {})
+    (quote! {}, quote! {}, quote! {})
   } else {
+    let process_attrs_tokens = if let Some(ident) = xml_other_attrs_field {
+      quote! {
+        self
+          .#ident
+          .retain(|(name, _)| !context.should_remove_ignorable_attribute(std::convert::AsRef::<str>::as_ref(name)));
+      }
+    } else {
+      quote! {}
+    };
     (
       quote! {
-        let __mce_checkpoint = context.push(#xmlns_expr, #attrs_expr);
+        let __mce_checkpoint = context.push(#xmlns_expr, #attrs_expr, settings)?;
       },
+      process_attrs_tokens,
       quote! {
         context.pop(__mce_checkpoint);
       },
@@ -6029,7 +6043,7 @@ fn expand_named_struct(
     .iter()
     .map(mce_process_choice_field_tokens)
     .collect::<Vec<_>>();
-  let (mce_context_push_tokens, mce_context_pop_tokens) =
+  let (mce_context_push_tokens, mce_xml_other_attrs_process_tokens, mce_context_pop_tokens) =
     mce_context_scope_tokens(&xmlns_fields, xml_other_attrs_field.as_ref());
   let mce_xml_other_children_process_tokens =
     mce_xml_other_children_process_tokens(has_xml_other_children_field);
@@ -6085,6 +6099,7 @@ fn expand_named_struct(
           return Ok(());
         }
         #mce_context_push_tokens
+        #mce_xml_other_attrs_process_tokens
         #mce_xml_other_children_process_tokens
         #( #mce_child_process_tokens )*
         #( #mce_choice_process_tokens )*

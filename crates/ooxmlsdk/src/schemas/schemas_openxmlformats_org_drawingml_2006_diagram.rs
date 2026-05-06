@@ -1150,6 +1150,7 @@ pub struct ColorTransformCategory {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:fillClrLst")]
 pub struct FillColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1173,6 +1174,7 @@ pub struct FillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:linClrLst")]
 pub struct LineColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1196,6 +1198,7 @@ pub struct LineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:effectClrLst")]
 pub struct EffectColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1219,6 +1222,7 @@ pub struct EffectColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txLinClrLst")]
 pub struct TextLineColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1242,6 +1246,7 @@ pub struct TextLineColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txFillClrLst")]
 pub struct TextFillColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]
@@ -1265,6 +1270,7 @@ pub struct TextFillColorList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "dgm:CT_Colors/dgm:txEffectClrLst")]
 pub struct TextEffectColorList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Color Application Method Type
   #[sdk(attr(qname = ":meth"))]

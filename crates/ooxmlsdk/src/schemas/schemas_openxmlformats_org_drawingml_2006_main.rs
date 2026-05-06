@@ -2598,6 +2598,7 @@ pub struct NoFill {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_SolidColorFillProperties/a:solidFill")]
 pub struct SolidFill {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2783,6 +2784,7 @@ pub struct AlphaBiLevel {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_AlphaInverseEffect/a:alphaInv")]
 pub struct AlphaInverse {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2880,6 +2882,7 @@ pub struct ColorChange {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_ColorReplaceEffect/a:clrRepl")]
 pub struct ColorReplacement {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2895,6 +2898,7 @@ pub struct ColorReplacement {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_DuotoneEffect/a:duotone")]
 pub struct Duotone {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -2942,6 +2946,7 @@ pub struct FillOverlay {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GlowEffect/a:glow")]
 pub struct Glow {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Radius
   #[sdk(attr(qname = ":rad"))]
@@ -2978,6 +2983,7 @@ pub struct Hsl {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_InnerShadowEffect/a:innerShdw")]
 pub struct InnerShadow {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
@@ -3018,6 +3024,7 @@ pub struct LuminanceEffect {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_OuterShadowEffect/a:outerShdw")]
 pub struct OuterShadow {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
@@ -3080,6 +3087,7 @@ pub struct OuterShadow {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_PresetShadowEffect/a:prstShdw")]
 pub struct PresetShadow {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Preset Shadow
   #[sdk(attr(qname = ":prst"))]
@@ -3371,6 +3379,7 @@ pub struct FillProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:fillRef")]
 pub struct FillReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -3389,6 +3398,7 @@ pub struct FillReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:effectRef")]
 pub struct EffectReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -3407,6 +3417,7 @@ pub struct EffectReference {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_StyleMatrixReference/a:lnRef")]
 pub struct LineReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Style Matrix Index
   #[sdk(attr(qname = ":idx"))]
@@ -3495,6 +3506,7 @@ pub struct MinorFont {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_FontReference/a:fontRef")]
 pub struct FontReference {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Identifier
   #[sdk(attr(qname = ":idx"))]
@@ -3533,6 +3545,7 @@ pub struct ShapeAutoFit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:buClr")]
 pub struct BulletColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3548,6 +3561,7 @@ pub struct BulletColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:extrusionClr")]
 pub struct ExtrusionColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3563,6 +3577,7 @@ pub struct ExtrusionColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:contourClr")]
 pub struct ContourColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3578,6 +3593,7 @@ pub struct ContourColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrFrom")]
 pub struct ColorFrom {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3593,6 +3609,7 @@ pub struct ColorFrom {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:clrTo")]
 pub struct ColorTo {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3608,6 +3625,7 @@ pub struct ColorTo {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:fgClr")]
 pub struct ForegroundColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3623,6 +3641,7 @@ pub struct ForegroundColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:bgClr")]
 pub struct BackgroundColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -3638,6 +3657,7 @@ pub struct BackgroundColor {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color/a:highlight")]
 pub struct Highlight {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4409,6 +4429,7 @@ pub struct EndTime {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_CustomColor/a:custClr")]
 pub struct CustomColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Name
   #[sdk(attr(qname = ":name"))]
@@ -4599,6 +4620,7 @@ pub struct FormatScheme {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk1")]
 pub struct Dark1Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4613,6 +4635,7 @@ pub struct Dark1Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt1")]
 pub struct Light1Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4627,6 +4650,7 @@ pub struct Light1Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:dk2")]
 pub struct Dark2Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4641,6 +4665,7 @@ pub struct Dark2Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:lt2")]
 pub struct Light2Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4655,6 +4680,7 @@ pub struct Light2Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent1")]
 pub struct Accent1Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4669,6 +4695,7 @@ pub struct Accent1Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent2")]
 pub struct Accent2Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4683,6 +4710,7 @@ pub struct Accent2Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent3")]
 pub struct Accent3Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4697,6 +4725,7 @@ pub struct Accent3Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent4")]
 pub struct Accent4Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4711,6 +4740,7 @@ pub struct Accent4Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent5")]
 pub struct Accent5Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4725,6 +4755,7 @@ pub struct Accent5Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:accent6")]
 pub struct Accent6Color {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4739,6 +4770,7 @@ pub struct Accent6Color {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:hlink")]
 pub struct Hyperlink {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -4753,6 +4785,7 @@ pub struct Hyperlink {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_Color2/a:folHlink")]
 pub struct FollowedHyperlinkColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
@@ -5547,6 +5580,7 @@ pub struct SourceRectangle {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GradientStop/a:gs")]
 pub struct GradientStop {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Position
   #[sdk(attr(qname = ":pos"))]
@@ -6758,6 +6792,7 @@ pub struct TableCellBorders {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_TableStyleTextStyle/a:tcTxStyle")]
 pub struct TableCellTextStyle {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Bold
   #[sdk(attr(qname = ":b"))]
@@ -8520,6 +8555,7 @@ pub struct GraphicFrame {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "a:CT_GvmlGroupShape/a:grpSp")]
 pub struct GroupShape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]

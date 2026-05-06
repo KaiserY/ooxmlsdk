@@ -64,17 +64,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
         .map(|ty| {
           let composite_kind = resolve_composite_kind(ty);
           let kind = resolve_kind(ty, &type_map);
-          let have_xmlns_fields = ty.has_xmlns_fields
-            || !ty.part.is_empty()
-            || ty.base_class == "OpenXmlPartRootElement"
-            || has_extension_xmlns_fields(ty, kind)
-            || has_drawing_payload_xmlns_fields(ty, kind, &type_map)
-            || has_spreadsheet_repeated_part_root_content_xmlns_fields(
-              ty,
-              kind,
-              schema.module_name.as_str(),
-              &type_map,
-            );
           let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> = ty
             .children
             .iter()
@@ -159,6 +148,18 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             &type_map,
             &children,
           );
+          let have_xmlns_fields = ty.has_xmlns_fields
+            || !ty.part.is_empty()
+            || ty.base_class == "OpenXmlPartRootElement"
+            || has_extension_xmlns_fields(ty, kind)
+            || has_drawing_payload_xmlns_fields(ty, kind, &type_map)
+            || has_spreadsheet_repeated_part_root_content_xmlns_fields(
+              ty,
+              kind,
+              schema.module_name.as_str(),
+              &type_map,
+            )
+            || has_mce_context_xmlns_fields(ty, kind, have_xml_other_attrs, &type_map, &children);
           let have_xml_other_children =
             have_xml_other_children_for_mixed_version_content(ty, &type_map, &children)
               || have_xml_other_children_for_spreadsheet_repeated_part_root_content_child(
@@ -1036,6 +1037,33 @@ fn have_xml_other_attrs_for_mixed_version_content(
         )
         || have_xml_other_attrs_for_derived_text_content(schema_type, kind, type_map)
         || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, "")))
+}
+
+fn has_mce_context_xmlns_fields(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  kind: SchemaTypeKind,
+  have_xml_other_attrs: bool,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+  children: &[SchemaTypeChild],
+) -> bool {
+  have_xml_other_attrs
+    && can_have_xmlns_fields(kind)
+    && matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
+    && !is_extension_schema_type(schema_type)
+    && children.iter().any(child_can_carry_mce_context)
+    && (children_need_xml_other_children_for_mixed_version_content(children, type_map)
+      || particle_has_any_repeated_child(&schema_type.particle)
+      || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, ""))
+}
+
+fn child_can_carry_mce_context(child: &SchemaTypeChild) -> bool {
+  matches!(
+    child.kind,
+    SchemaTypeChildKind::Child
+      | SchemaTypeChildKind::Choice
+      | SchemaTypeChildKind::Sequence
+      | SchemaTypeChildKind::Any
+  ) || child.children.iter().any(child_can_carry_mce_context)
 }
 
 fn have_xml_other_attrs_for_derived_text_content(

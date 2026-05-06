@@ -158,6 +158,7 @@ pub struct Style {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_R/m:r")]
 pub struct Run {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Run Properties
   #[sdk(child(qname = "m:CT_RPR/m:rPr"))]
@@ -454,6 +455,7 @@ pub struct Superscript {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathPara/m:oMathPara")]
 pub struct Paragraph {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Office Math Paragraph Properties
   #[sdk(child(qname = "m:CT_OMathParaPr/m:oMathParaPr"))]
@@ -499,6 +501,7 @@ pub struct Paragraph {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMath/m:oMath")]
 pub struct OfficeMath {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "m:CT_Acc/m:acc",
@@ -935,6 +938,7 @@ pub struct EndChar {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_CtrlPr/m:ctrlPr")]
 pub struct ControlProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "w:CT_RPr/w:rPr",
@@ -960,6 +964,7 @@ pub struct AccentProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:e")]
 pub struct Base {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1031,6 +1036,7 @@ pub struct Base {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:num")]
 pub struct Numerator {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1102,6 +1108,7 @@ pub struct Numerator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:den")]
 pub struct Denominator {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1173,6 +1180,7 @@ pub struct Denominator {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:fName")]
 pub struct FunctionName {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1244,6 +1252,7 @@ pub struct FunctionName {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:lim")]
 pub struct Limit {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1315,6 +1324,7 @@ pub struct Limit {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sub")]
 pub struct SubArgument {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1386,6 +1396,7 @@ pub struct SubArgument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:sup")]
 pub struct SuperArgument {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]
@@ -1457,6 +1468,7 @@ pub struct SuperArgument {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "m:CT_OMathArg/m:deg")]
 pub struct Degree {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Argument Properties
   #[sdk(child(qname = "m:CT_OMathArgPr/m:argPr"))]

@@ -547,6 +547,82 @@ fn process_all_parts_uses_process_content_for_ignorable_wrapper() {
   assert!(!serialized.contains("<w:t>discarded</w:t>"));
 }
 
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_uses_xmlns_declared_on_intermediate_elements() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadIgnorable
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><w:body><w:p xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w14:discarded><w:r><w:t>discarded</w:t></w:r></w14:discarded><w:r><w:t>kept</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2007,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+  let serialized = root.to_xml().unwrap();
+
+  assert!(serialized.contains("<w:t>kept</w:t>"));
+  assert!(!serialized.contains("<w14:discarded"));
+  assert!(!serialized.contains("<w:t>discarded</w:t>"));
+}
+
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_rejects_unsupported_must_understand_namespace() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   MustUnderstand_Known_NonIgnorableAttributes_FullMode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:MustUnderstand="w14"><w:body><w:p><w:r><w:t>text</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2007,
+    },
+    ..Default::default()
+  };
+
+  let err =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap_err();
+  let err = format!("{err:?}");
+  assert!(
+    err.contains("MustUnderstand") && err.contains("Office2007") && err.contains("2010"),
+    "{err}"
+  );
+}
+
+#[cfg(feature = "mce")]
+#[test]
+fn process_all_parts_preserves_requested_ignorable_attributes_only() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
+  //   LoadIgnorableAttribute
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:body><w:p><w:r mc:PreserveAttributes="w14:keepAttr" w14:dropAttr="drop" w14:keepAttr="keep"><w:t>text</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2007,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+  let serialized = root.to_xml().unwrap();
+
+  assert!(serialized.contains(r#"w14:keepAttr="keep""#));
+  assert!(!serialized.contains(r#"w14:dropAttr="drop""#));
+}
+
 #[test]
 fn wordprocessing_mce_packages_open_save_and_reopen_from_autosave_tests() {
   // Source: test/DocumentFormat.OpenXml.Tests/Documents/DocumentTests.Autosave.cs

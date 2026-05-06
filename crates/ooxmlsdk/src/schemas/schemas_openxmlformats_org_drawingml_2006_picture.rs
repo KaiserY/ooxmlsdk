@@ -8,6 +8,7 @@
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "pic:CT_Picture/pic:pic")]
 pub struct Picture {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Picture Properties
   #[sdk(child(qname = "pic:CT_PictureNonVisual/pic:nvPicPr"))]

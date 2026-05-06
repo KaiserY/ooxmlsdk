@@ -407,6 +407,7 @@ pub struct MceContext {
   namespaces: Vec<(String, String)>,
   ignorable_namespaces: Vec<String>,
   process_content: Vec<String>,
+  preserve_attributes: Vec<String>,
 }
 
 #[cfg(feature = "mce")]
@@ -415,6 +416,7 @@ pub struct MceContextCheckpoint {
   namespaces: usize,
   ignorable_namespaces: usize,
   process_content: usize,
+  preserve_attributes: usize,
 }
 
 #[cfg(feature = "mce")]
@@ -423,7 +425,8 @@ impl MceContext {
     &mut self,
     namespaces: &[crate::common::XmlNamespaceDecl],
     attrs: &[(N, V)],
-  ) -> MceContextCheckpoint
+    settings: &MarkupCompatibilityProcessSettings,
+  ) -> Result<MceContextCheckpoint, crate::common::SdkError>
   where
     N: AsRef<str>,
     V: AsRef<str>,
@@ -432,6 +435,7 @@ impl MceContext {
       namespaces: self.namespaces.len(),
       ignorable_namespaces: self.ignorable_namespaces.len(),
       process_content: self.process_content.len(),
+      preserve_attributes: self.preserve_attributes.len(),
     };
 
     self.namespaces.extend(namespaces.iter().map(|decl| {
@@ -455,7 +459,29 @@ impl MceContext {
         .extend(value.split_whitespace().map(str::to_string));
     }
 
-    checkpoint
+    if let Some(value) = mce_attr(attrs, "PreserveAttributes") {
+      self
+        .preserve_attributes
+        .extend(value.split_whitespace().map(str::to_string));
+    }
+
+    if let Some(value) = mce_attr(attrs, "MustUnderstand") {
+      for prefix in value.split_whitespace() {
+        let Some(ns) = self.namespace_for_prefix(prefix) else {
+          return Err(crate::common::SdkError::CommonError(format!(
+            "MCE MustUnderstand prefix `{prefix}` is not declared"
+          )));
+        };
+        if !namespace_supported(ns, settings.target_file_format_version) {
+          return Err(crate::common::SdkError::CommonError(format!(
+            "MCE MustUnderstand namespace `{ns}` is not supported by target file format {:?}",
+            settings.target_file_format_version
+          )));
+        }
+      }
+    }
+
+    Ok(checkpoint)
   }
 
   pub(crate) fn pop(&mut self, checkpoint: MceContextCheckpoint) {
@@ -464,6 +490,9 @@ impl MceContext {
       .ignorable_namespaces
       .truncate(checkpoint.ignorable_namespaces);
     self.process_content.truncate(checkpoint.process_content);
+    self
+      .preserve_attributes
+      .truncate(checkpoint.preserve_attributes);
   }
 
   pub(crate) fn is_process_content_qname(&self, qname: &str) -> bool {
@@ -484,6 +513,27 @@ impl MceContext {
       .any(|candidate| candidate == namespace)
   }
 
+  pub(crate) fn should_remove_ignorable_attribute(&self, qname: &str) -> bool {
+    let Some((prefix, _)) = qname.split_once(':') else {
+      return false;
+    };
+    let Some(namespace) = self.namespace_for_prefix(prefix) else {
+      return false;
+    };
+    self.is_ignorable_namespace(namespace) && !self.is_preserved_attribute_qname(qname)
+  }
+
+  fn is_preserved_attribute_qname(&self, qname: &str) -> bool {
+    self.preserve_attributes.iter().any(|candidate| {
+      candidate == "*"
+        || candidate == qname
+        || candidate
+          .strip_suffix(":*")
+          .zip(qname.split_once(':'))
+          .is_some_and(|(prefix, (qname_prefix, _))| prefix == qname_prefix)
+    })
+  }
+
   pub(crate) fn namespace_for_prefix(&self, prefix: &str) -> Option<&str> {
     self
       .namespaces
@@ -494,6 +544,50 @@ impl MceContext {
 
   pub(crate) fn namespaces(&self) -> &[(String, String)] {
     self.namespaces.as_slice()
+  }
+}
+
+#[cfg(feature = "mce")]
+pub(crate) fn namespace_supported(ns: &str, target: FileFormatVersion) -> bool {
+  namespace_minimum_version(ns)
+    .is_some_and(|version| file_format_rank(version) <= file_format_rank(target))
+}
+
+#[cfg(feature = "mce")]
+fn namespace_minimum_version(ns: &str) -> Option<FileFormatVersion> {
+  if ns.contains("openxmlformats.org") || ns.contains("/2006/") || ns.contains(":office:") {
+    Some(FileFormatVersion::Office2007)
+  } else if ns.contains("/2010/") || ns.contains("14") {
+    Some(FileFormatVersion::Office2010)
+  } else if ns.contains("/2012/") || ns.contains("15") {
+    Some(FileFormatVersion::Office2013)
+  } else if ns.contains("/2016/") || ns.contains("16") {
+    Some(FileFormatVersion::Office2016)
+  } else if ns.contains("/2019/") {
+    Some(FileFormatVersion::Office2019)
+  } else if ns.contains("/2021/") {
+    Some(FileFormatVersion::Office2021)
+  } else if ns.contains("/2022/")
+    || ns.contains("/2023/")
+    || ns.contains("/2024/")
+    || ns.contains("/2025/")
+  {
+    Some(FileFormatVersion::Microsoft365)
+  } else {
+    None
+  }
+}
+
+#[cfg(feature = "mce")]
+fn file_format_rank(version: FileFormatVersion) -> u8 {
+  match version {
+    FileFormatVersion::Office2007 => 0,
+    FileFormatVersion::Office2010 => 1,
+    FileFormatVersion::Office2013 => 2,
+    FileFormatVersion::Office2016 => 3,
+    FileFormatVersion::Office2019 => 4,
+    FileFormatVersion::Office2021 => 5,
+    FileFormatVersion::Microsoft365 => 6,
   }
 }
 

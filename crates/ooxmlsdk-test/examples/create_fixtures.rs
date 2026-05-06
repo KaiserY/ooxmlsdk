@@ -2450,6 +2450,7 @@ fn main() {
 
   create_docx_fixtures(&root, &png);
   create_xlsx_fixtures(&root);
+  create_sml_fixtures(&root);
   create_pptx_fixtures(&root, &png);
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
@@ -3972,5 +3973,497 @@ fn create_wml_styles_fixtures(root: &Path) {
       ("word/styles.xml", styles),
     ]);
     save(root, "test-data/wml/style_linked.docx", &data);
+  }
+}
+
+fn create_sml_fixtures(root: &Path) {
+  // ── cell_types.xlsx ──────────────────────────────────────────────────────
+  // Exercises error cell (t="e"), formula-string cell (t="str"), and blank cell
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" t="e"><x:v>#DIV/0!</x:v></x:c>
+      <x:c r="B1" t="str"><x:f>TEXT(42,"0.00")</x:f><x:v>42.00</x:v></x:c>
+      <x:c r="C1"/>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/cell_types.xlsx", &data);
+  }
+
+  // ── sst_rich_text.xlsx ───────────────────────────────────────────────────
+  // SST with a plain entry and a rich-text entry; sheet references both
+  {
+    let sst = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:sst xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2" uniqueCount="2">
+  <x:si><x:t>Plain string</x:t></x:si>
+  <x:si>
+    <x:r><x:rPr><x:b/><x:sz val="14"/><x:color rgb="FFFF0000"/><x:rFont val="Arial"/></x:rPr><x:t>Bold red</x:t></x:r>
+    <x:r><x:rPr><x:sz val="11"/><x:rFont val="Arial"/></x:rPr><x:t xml:space="preserve"> normal</x:t></x:r>
+  </x:si>
+</x:sst>"#;
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1" t="s"><x:v>0</x:v></x:c></x:row>
+    <x:row r="2"><x:c r="A2" t="s"><x:v>1</x:v></x:c></x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/sharedStrings.xml", sst),
+    ]);
+    save(root, "test-data/spreadsheet/sst_rich_text.xlsx", &data);
+  }
+
+  // ── formula_shared.xlsx ──────────────────────────────────────────────────
+  // Shared formula: definition cell A1 with ref A1:A3, dependents A2/A3 with si only
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:f t="shared" ref="A1:A3" si="0">B1*2</x:f><x:v>20</x:v></x:c>
+      <x:c r="B1"><x:v>10</x:v></x:c>
+    </x:row>
+    <x:row r="2">
+      <x:c r="A2"><x:f t="shared" si="0"/><x:v>40</x:v></x:c>
+      <x:c r="B2"><x:v>20</x:v></x:c>
+    </x:row>
+    <x:row r="3">
+      <x:c r="A3"><x:f t="shared" si="0"/><x:v>60</x:v></x:c>
+      <x:c r="B3"><x:v>30</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/formula_shared.xlsx", &data);
+  }
+
+  // ── formula_array.xlsx ───────────────────────────────────────────────────
+  // Single-cell array formula: SUM(B1:B3*C1:C3) with supporting data
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:f t="array" ref="A1">SUM(B1:B3*C1:C3)</x:f><x:v>32</x:v></x:c>
+      <x:c r="B1"><x:v>1</x:v></x:c>
+      <x:c r="C1"><x:v>2</x:v></x:c>
+    </x:row>
+    <x:row r="2">
+      <x:c r="B2"><x:v>3</x:v></x:c>
+      <x:c r="C2"><x:v>4</x:v></x:c>
+    </x:row>
+    <x:row r="3">
+      <x:c r="B3"><x:v>5</x:v></x:c>
+      <x:c r="C3"><x:v>6</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/formula_array.xlsx", &data);
+  }
+
+  // ── formatting_alignment.xlsx ────────────────────────────────────────────
+  // Various alignment XF entries: center/center/wrap, right/rotated, left/indented
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:fonts count="1">
+    <x:font><x:sz val="11"/><x:name val="Calibri"/></x:font>
+  </x:fonts>
+  <x:fills count="2">
+    <x:fill><x:patternFill patternType="none"/></x:fill>
+    <x:fill><x:patternFill patternType="gray125"/></x:fill>
+  </x:fills>
+  <x:borders count="1">
+    <x:border><x:left/><x:right/><x:top/><x:bottom/><x:diagonal/></x:border>
+  </x:borders>
+  <x:cellStyleXfs count="1">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </x:cellStyleXfs>
+  <x:cellXfs count="4">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><x:alignment horizontal="center" vertical="center" wrapText="1"/></x:xf>
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><x:alignment horizontal="right" textRotation="45"/></x:xf>
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><x:alignment horizontal="left" indent="2"/></x:xf>
+  </x:cellXfs>
+</x:styleSheet>"#;
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" s="1" t="inlineStr"><x:is><x:t>center+wrap</x:t></x:is></x:c>
+      <x:c r="B1" s="2" t="inlineStr"><x:is><x:t>right+rotated</x:t></x:is></x:c>
+      <x:c r="C1" s="3" t="inlineStr"><x:is><x:t>left+indent</x:t></x:is></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/styles.xml", styles),
+    ]);
+    save(
+      root,
+      "test-data/spreadsheet/formatting_alignment.xlsx",
+      &data,
+    );
+  }
+
+  // ── formatting_borders.xlsx ──────────────────────────────────────────────
+  // Three border styles: empty, thin-black, and mixed (medium/dashed/double/thick)
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:fonts count="1">
+    <x:font><x:sz val="11"/><x:name val="Calibri"/></x:font>
+  </x:fonts>
+  <x:fills count="2">
+    <x:fill><x:patternFill patternType="none"/></x:fill>
+    <x:fill><x:patternFill patternType="gray125"/></x:fill>
+  </x:fills>
+  <x:borders count="3">
+    <x:border><x:left/><x:right/><x:top/><x:bottom/><x:diagonal/></x:border>
+    <x:border>
+      <x:left style="thin"><x:color rgb="FF000000"/></x:left>
+      <x:right style="thin"><x:color rgb="FF000000"/></x:right>
+      <x:top style="thin"><x:color rgb="FF000000"/></x:top>
+      <x:bottom style="thin"><x:color rgb="FF000000"/></x:bottom>
+      <x:diagonal/>
+    </x:border>
+    <x:border>
+      <x:left style="medium"><x:color rgb="FF0000FF"/></x:left>
+      <x:right style="dashed"><x:color rgb="FF0000FF"/></x:right>
+      <x:top style="double"><x:color rgb="FF0000FF"/></x:top>
+      <x:bottom style="thick"><x:color rgb="FF0000FF"/></x:bottom>
+      <x:diagonal/>
+    </x:border>
+  </x:borders>
+  <x:cellStyleXfs count="1">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </x:cellStyleXfs>
+  <x:cellXfs count="3">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/>
+  </x:cellXfs>
+</x:styleSheet>"#;
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:v>0</x:v></x:c>
+      <x:c r="B1" s="1"><x:v>1</x:v></x:c>
+      <x:c r="C1" s="2"><x:v>2</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/styles.xml", styles),
+    ]);
+    save(root, "test-data/spreadsheet/formatting_borders.xlsx", &data);
+  }
+
+  // ── number_formats.xlsx ──────────────────────────────────────────────────
+  // Custom numFmt entries 164/165/166; cells exercising each
+  {
+    let styles = br##"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:numFmts count="3">
+    <x:numFmt numFmtId="164" formatCode="#,##0.00"/>
+    <x:numFmt numFmtId="165" formatCode="yyyy-mm-dd"/>
+    <x:numFmt numFmtId="166" formatCode="[Red]0.00%;[Blue]-0.00%"/>
+  </x:numFmts>
+  <x:fonts count="1">
+    <x:font><x:sz val="11"/><x:name val="Calibri"/></x:font>
+  </x:fonts>
+  <x:fills count="2">
+    <x:fill><x:patternFill patternType="none"/></x:fill>
+    <x:fill><x:patternFill patternType="gray125"/></x:fill>
+  </x:fills>
+  <x:borders count="1">
+    <x:border><x:left/><x:right/><x:top/><x:bottom/><x:diagonal/></x:border>
+  </x:borders>
+  <x:cellStyleXfs count="1">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </x:cellStyleXfs>
+  <x:cellXfs count="4">
+    <x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <x:xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+    <x:xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+    <x:xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+  </x:cellXfs>
+</x:styleSheet>"##;
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" s="1"><x:v>1234.567</x:v></x:c>
+      <x:c r="B1" s="2"><x:v>45000</x:v></x:c>
+      <x:c r="C1" s="3"><x:v>0.1234</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/styles.xml", styles),
+    ]);
+    save(root, "test-data/spreadsheet/number_formats.xlsx", &data);
+  }
+
+  // ── defined_names.xlsx ───────────────────────────────────────────────────
+  // Workbook-scoped, sheet-scoped, and built-in _xlnm.Print_Area defined names
+  {
+    let wb = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheets>
+    <x:sheet name="Sheet1" sheetId="1" r:id="rId1"/>
+  </x:sheets>
+  <x:definedNames>
+    <x:definedName name="TotalRevenue">Sheet1!$B$1:$B$10</x:definedName>
+    <x:definedName name="LocalRange" localSheetId="0">Sheet1!$A$1:$A$5</x:definedName>
+    <x:definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:$D$20</x:definedName>
+  </x:definedNames>
+</x:workbook>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", wb),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", empty_worksheet()),
+    ]);
+    save(root, "test-data/spreadsheet/defined_names.xlsx", &data);
+  }
+
+  // ── sheet_visibility.xlsx ────────────────────────────────────────────────
+  // Three sheets: visible, hidden, veryHidden
+  {
+    let wb = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheets>
+    <x:sheet name="Visible" sheetId="1" r:id="rId1"/>
+    <x:sheet name="Hidden" sheetId="2" state="hidden" r:id="rId2"/>
+    <x:sheet name="VeryHidden" sheetId="3" state="veryHidden" r:id="rId3"/>
+  </x:sheets>
+</x:workbook>"#;
+    let wb_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+</Relationships>"#
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(3, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", wb),
+      ("xl/_rels/workbook.xml.rels", wb_rels.as_bytes()),
+      ("xl/worksheets/sheet1.xml", empty_worksheet()),
+      ("xl/worksheets/sheet2.xml", empty_worksheet()),
+      ("xl/worksheets/sheet3.xml", empty_worksheet()),
+    ]);
+    save(root, "test-data/spreadsheet/sheet_visibility.xlsx", &data);
+  }
+
+  // ── merged_cells.xlsx ────────────────────────────────────────────────────
+  // Two merge ranges; value in the top-left cell of each
+  {
+    let sst = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:sst xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2" uniqueCount="2">
+  <x:si><x:t>Merged Header</x:t></x:si>
+  <x:si><x:t>Merged</x:t></x:si>
+</x:sst>"#;
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" t="s"><x:v>0</x:v></x:c>
+      <x:c r="B1"/>
+      <x:c r="C1"/>
+    </x:row>
+    <x:row r="3">
+      <x:c r="A3" t="s"><x:v>1</x:v></x:c>
+      <x:c r="B3"/>
+    </x:row>
+    <x:row r="4">
+      <x:c r="A4"/>
+      <x:c r="B4"/>
+    </x:row>
+  </x:sheetData>
+  <x:mergeCells count="2">
+    <x:mergeCell ref="A1:C1"/>
+    <x:mergeCell ref="A3:B4"/>
+  </x:mergeCells>
+</x:worksheet>"#;
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/sharedStrings.xml", sst),
+    ]);
+    save(root, "test-data/spreadsheet/merged_cells.xlsx", &data);
+  }
+
+  // ── row_col_dims.xlsx ────────────────────────────────────────────────────
+  // Default dimensions, custom column widths, hidden column, custom row height, hidden row
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetFormatPr defaultColWidth="8" defaultRowHeight="15"/>
+  <x:cols>
+    <x:col min="1" max="1" width="20" customWidth="1"/>
+    <x:col min="2" max="3" width="10" customWidth="1"/>
+    <x:col min="4" max="4" hidden="1" width="8"/>
+  </x:cols>
+  <x:sheetData>
+    <x:row r="1" ht="30" customHeight="1">
+      <x:c r="A1"><x:v>100</x:v></x:c>
+      <x:c r="B1"><x:v>200</x:v></x:c>
+    </x:row>
+    <x:row r="2" hidden="1">
+      <x:c r="A2"><x:v>300</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/row_col_dims.xlsx", &data);
+  }
+
+  // ── freeze_panes.xlsx ────────────────────────────────────────────────────
+  // 1×1 freeze: first row and first column frozen; selections for all four panes
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetViews>
+    <x:sheetView workbookViewId="0">
+      <x:pane xSplit="1" ySplit="1" topLeftCell="B2" activePane="bottomRight" state="frozen"/>
+      <x:selection pane="topLeft" activeCell="A1" sqref="A1"/>
+      <x:selection pane="topRight" activeCell="B1" sqref="B1"/>
+      <x:selection pane="bottomLeft" activeCell="A2" sqref="A2"/>
+      <x:selection pane="bottomRight" activeCell="B2" sqref="B2"/>
+    </x:sheetView>
+  </x:sheetViews>
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:v>Header</x:v></x:c>
+      <x:c r="B1"><x:v>Col B</x:v></x:c>
+    </x:row>
+    <x:row r="2">
+      <x:c r="A2"><x:v>Row 2</x:v></x:c>
+      <x:c r="B2"><x:v>Data</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/freeze_panes.xlsx", &data);
   }
 }

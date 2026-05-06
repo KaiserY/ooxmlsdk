@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 #[cfg(feature = "mce")]
 use std::io::Write;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 
 use ooxmlsdk::common::{
   MediaDataPart, PartId, ReferenceRelationshipKind, RelationshipRef, RelationshipTargetKind,
@@ -34,7 +34,8 @@ use ooxmlsdk::sdk::{
   EmbeddedControlPersistenceBinaryDataPartType, EmbeddedControlPersistencePartType,
   EmbeddedObjectPartType, EmbeddedPackagePartType, FontPartType, MailMergeRecipientDataPartType,
   MediaDataPartType, OpenSettings, PackageOpenMode, PresentationDocumentType, SdkPackage, SdkPart,
-  SpreadsheetDocumentType, ThumbnailPartType, WordprocessingDocumentType,
+  SpreadsheetDocumentType, ThumbnailPartType, WordprocessingDocumentType, is_encrypted_office_file,
+  is_encrypted_office_file_path,
 };
 use ooxmlsdk::sdk::{
   FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
@@ -502,6 +503,64 @@ fn process_all_parts_selects_body_alternate_content_after_round_trip_parse() {
 
 #[cfg(feature = "mce")]
 #[test]
+fn process_all_parts_applies_alternate_content_selection_edges() {
+  // Source: test/DocumentFormat.OpenXml.Tests/OpenXmlDomTest/MarkupCompatibilityTest.cs
+  //   NoChoice_NoFallback_O12Mode
+  //   OneChoice_NoFallback_O12Mode
+  //   MultipleChoice_NoMatches_NoFallback_O12Mode
+  //   MultipleChoice_NoMatches_OneFallback_O12Mode
+  //   MultipleChoice_OneFallback_O12Mode
+  //   MultipleChoice_LeadingFallback_O12Mode
+  //   MustUnderstand_Unselected_O12Mode
+  //   MultipleChoice_OneFallback_Ignorable_O12Mode
+  let xml = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:uns="http://test.openxmlsdk.microsoft.com/unknownns1"><w:body><mc:AlternateContent/><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>unsupported-no-fallback</w:t></w:r></w:p></mc:Choice></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>unsupported-with-fallback</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="w"><w:p><w:r><w:t>supported</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>unused-fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="w14"><w:p><w:r><w:t>first-unsupported</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w"><w:p><w:r><w:t>second-supported</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>unused-second-fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent><mc:AlternateContent><mc:Fallback><w:p><w:r><w:t>leading-fallback</w:t></w:r></w:p></mc:Fallback><mc:Choice Requires="w"><w:p><w:r><w:t>leading-choice</w:t></w:r></w:p></mc:Choice></mc:AlternateContent><mc:AlternateContent><mc:Choice Requires="uns"><w:p mc:MustUnderstand="uns"><w:r><w:t>unselected-must-understand</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w"><w:p><w:r><w:t>selected-after-unselected-must-understand</w:t></w:r></w:p></mc:Choice></mc:AlternateContent><mc:AlternateContent mc:Ignorable="uns" uns:dropAttr="drop"><mc:Choice Requires="w14"><w:p><w:r><w:t>ignorable-unsupported</w:t></w:r></w:p></mc:Choice><mc:Choice Requires="w"><w:p><w:r><w:t>ignorable-choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>ignorable-fallback</w:t></w:r></w:p></mc:Fallback><uns:extra><w:p><w:r><w:t>ignorable-extra</w:t></w:r></w:p></uns:extra></mc:AlternateContent><w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#;
+  let settings = OpenSettings {
+    open_mode: PackageOpenMode::Lazy,
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessAllParts,
+      target_file_format_version: FileFormatVersion::Office2007,
+    },
+    ..Default::default()
+  };
+  let mut package =
+    WordprocessingDocument::new_with_settings(minimal_wordprocessing_package(xml), settings)
+      .unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let root = main_part.root_element(&mut package).unwrap();
+  let serialized = root.to_xml().unwrap();
+
+  for expected in [
+    "<w:t>fallback</w:t>",
+    "<w:t>supported</w:t>",
+    "<w:t>second-supported</w:t>",
+    "<w:t>leading-choice</w:t>",
+    "<w:t>selected-after-unselected-must-understand</w:t>",
+    "<w:t>ignorable-choice</w:t>",
+    "<w:t>after</w:t>",
+  ] {
+    assert!(serialized.contains(expected), "{serialized}");
+  }
+
+  for unexpected in [
+    "<mc:AlternateContent",
+    "<w:t>unsupported-no-fallback</w:t>",
+    "<w:t>unsupported-with-fallback</w:t>",
+    "<w:t>unused-fallback</w:t>",
+    "<w:t>first-unsupported</w:t>",
+    "<w:t>unused-second-fallback</w:t>",
+    "<w:t>leading-fallback</w:t>",
+    "<w:t>unselected-must-understand</w:t>",
+    "<w:t>ignorable-unsupported</w:t>",
+    "<w:t>ignorable-fallback</w:t>",
+    "<w:t>ignorable-extra</w:t>",
+    "uns:dropAttr",
+  ] {
+    assert!(!serialized.contains(unexpected), "{serialized}");
+  }
+}
+
+#[cfg(feature = "mce")]
+#[test]
 fn process_all_parts_uses_process_content_for_ignorable_wrapper() {
   // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/MCSupport.cs
   //   LoadProcessContent
@@ -699,6 +758,32 @@ fn open_settings_no_process_accepts_all_supported_target_versions() {
 
     assert_eq!(package.open_settings(), &settings);
   }
+}
+
+#[test]
+fn encrypted_office_file_detection_matches_upstream_package_api() {
+  // Source: test/DocumentFormat.OpenXml.Packaging.Tests/OpenXmlPackageTests.cs
+  //   IsEncryptedOfficeFile_ReturnsTrue_ForEncryptedFile
+  //   IsEncryptedOfficeFile_ReturnsFalse_ForUnencryptedFile
+  //   IsEncryptedOfficeFile_ReturnsTrue_ForEncryptedFilePath
+  //   IsEncryptedOfficeFile_ReturnsFalse_ForUnencryptedFile_FromString
+  let encrypted_path = doc_sample("encrypted_pptx.pptx");
+  let unencrypted_path = doc_sample("Presentation.pptx");
+
+  let mut encrypted = std::fs::File::open(&encrypted_path).unwrap();
+  encrypted.read_exact(&mut [0; 4]).unwrap();
+  let encrypted_position = encrypted.stream_position().unwrap();
+  assert!(is_encrypted_office_file(&mut encrypted).unwrap());
+  assert_eq!(encrypted.stream_position().unwrap(), encrypted_position);
+
+  let mut unencrypted = std::fs::File::open(&unencrypted_path).unwrap();
+  unencrypted.read_exact(&mut [0; 4]).unwrap();
+  let unencrypted_position = unencrypted.stream_position().unwrap();
+  assert!(!is_encrypted_office_file(&mut unencrypted).unwrap());
+  assert_eq!(unencrypted.stream_position().unwrap(), unencrypted_position);
+
+  assert!(is_encrypted_office_file_path(encrypted_path).unwrap());
+  assert!(!is_encrypted_office_file_path(unencrypted_path).unwrap());
 }
 
 #[test]

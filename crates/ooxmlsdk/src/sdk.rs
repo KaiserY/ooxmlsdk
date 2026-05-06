@@ -8,6 +8,63 @@ pub enum RequiredPartKind {}
 pub enum RepeatedPartKind {}
 
 #[cfg(feature = "parts")]
+const OLE_COMPOUND_FILE_SIGNATURE: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+
+#[cfg(feature = "parts")]
+const ENCRYPTED_PACKAGE_CONTENT_TYPE: &str =
+  "application/vnd.openxmlformats-officedocument.encrypted-package";
+
+#[cfg(feature = "parts")]
+pub fn is_encrypted_office_file<R>(reader: &mut R) -> Result<bool, crate::common::SdkError>
+where
+  R: std::io::Read + std::io::Seek,
+{
+  let original_position = reader.stream_position()?;
+  let result = is_encrypted_office_file_inner(reader);
+  reader.seek(std::io::SeekFrom::Start(original_position))?;
+  result
+}
+
+#[cfg(feature = "parts")]
+pub fn is_encrypted_office_file_path(
+  path: impl AsRef<std::path::Path>,
+) -> Result<bool, crate::common::SdkError> {
+  let mut file = std::fs::File::open(path)?;
+  is_encrypted_office_file(&mut file)
+}
+
+#[cfg(feature = "parts")]
+fn is_encrypted_office_file_inner<R>(reader: &mut R) -> Result<bool, crate::common::SdkError>
+where
+  R: std::io::Read + std::io::Seek,
+{
+  let mut header = [0; 8];
+  reader.seek(std::io::SeekFrom::Start(0))?;
+  let read = std::io::Read::read(reader, &mut header)?;
+  if read == header.len() && header == OLE_COMPOUND_FILE_SIGNATURE {
+    return Ok(true);
+  }
+
+  reader.seek(std::io::SeekFrom::Start(0))?;
+  let Ok(mut archive) = zip::ZipArchive::new(reader) else {
+    return Ok(false);
+  };
+  let Ok(mut content_types) = archive.by_name("[Content_Types].xml") else {
+    return Ok(false);
+  };
+  let mut content_types_xml = String::new();
+  if std::io::Read::read_to_string(&mut content_types, &mut content_types_xml).is_err() {
+    return Ok(false);
+  }
+
+  Ok(
+    content_types_xml
+      .to_ascii_lowercase()
+      .contains(ENCRYPTED_PACKAGE_CONTENT_TYPE),
+  )
+}
+
+#[cfg(feature = "parts")]
 pub struct PartChild<T, C>(std::marker::PhantomData<(T, C)>);
 
 #[cfg(feature = "parts")]

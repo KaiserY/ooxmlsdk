@@ -142,19 +142,19 @@ where
 }
 
 #[inline(always)]
-#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+#[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
   actual == canonical || canonical_relationship_type(actual).as_ref() == canonical
 }
 
 #[inline(always)]
-#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+#[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   actual != canonical && canonical_relationship_type(actual).as_ref() == canonical
 }
 
 #[inline]
-#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+#[cfg(feature = "parts")]
 pub(crate) fn canonical_relationship_type(value: &str) -> std::borrow::Cow<'_, str> {
   if value == "http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail" {
     return std::borrow::Cow::Borrowed(
@@ -185,7 +185,7 @@ pub(crate) fn canonical_relationship_type(value: &str) -> std::borrow::Cow<'_, s
 }
 
 #[inline]
-#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+#[cfg(feature = "parts")]
 pub(crate) fn part_descriptor_matches(
   actual_relationship_type: &str,
   actual_content_type: &str,
@@ -221,7 +221,7 @@ pub(crate) fn part_descriptor_matches(
 }
 
 #[inline]
-#[cfg_attr(not(feature = "parts"), allow(dead_code))]
+#[cfg(feature = "parts")]
 fn package_main_part_path_matches(
   actual_path: &str,
   descriptor_path_prefix: &str,
@@ -497,6 +497,7 @@ mod tests {
     assert_eq!(byte, u8::MAX);
   }
 
+  #[cfg(feature = "parts")]
   #[test]
   fn variable_content_main_part_descriptors_match_by_target_path() {
     assert!(part_descriptor_matches(
@@ -519,6 +520,7 @@ mod tests {
     ));
   }
 
+  #[cfg(feature = "parts")]
   #[test]
   fn relationship_type_aliases_canonicalize_to_transitional_types() {
     assert_eq!(

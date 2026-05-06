@@ -380,8 +380,9 @@ impl<'a> From<&'a RelationshipInfo> for RelationshipRef<'a> {
   }
 }
 
+#[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct RelationshipSet {
+pub struct RelationshipSet {
   xml_header: super::XmlHeaderType,
   relationships: Vec<RelationshipInfo>,
   by_id: HashMap<Box<str>, usize>,
@@ -782,8 +783,9 @@ impl StoredPart {
   }
 }
 
+#[doc(hidden)]
 #[derive(Debug)]
-pub(crate) struct SdkPackageStorage {
+pub struct SdkPackageStorage {
   id: PackageId,
   content_types: Types,
   package_relationships: RelationshipSet,

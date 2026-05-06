@@ -954,8 +954,6 @@ fn expand_part_handle(
       }
     }
 
-    impl crate::sdk::SdkPartInternal for #ident {}
-
     impl #ident {
       #[inline]
       pub(crate) const fn part_id(&self) -> crate::common::PartId {
@@ -968,17 +966,11 @@ fn expand_part_handle(
         part_id: crate::common::PartId,
         relationship_id: Option<&str>,
       ) -> crate::parts::PartRef {
+        let _ = storage;
         let part = if let Some(relationship_id) = relationship_id {
-          <Self as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-            storage,
-            relationship_id,
-            part_id,
-          )
+          <Self as crate::sdk::SdkPart>::from_relationship_id(relationship_id, part_id)
         } else {
-          <Self as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-            storage,
-            part_id,
-          )
+          <Self as crate::sdk::SdkPart>::from_part_id(part_id)
         };
         crate::parts::PartRef::#ident(part)
       }
@@ -1803,7 +1795,7 @@ fn part_handle_root_method_tokens(
     impl #part_ident {
       #[inline]
       pub fn is_root_element_loaded<P: crate::sdk::SdkPackage>(&self, package: &P) -> bool {
-        crate::sdk::SdkPackageInternal::is_root_element_loaded(package, self.id)
+        crate::sdk::SdkPackage::is_root_element_loaded(package, self.id)
       }
 
       #[inline]
@@ -1811,19 +1803,19 @@ fn part_handle_root_method_tokens(
         &self,
         package: &mut P,
       ) -> Option<crate::parts::PartRootElement> {
-        crate::sdk::SdkPackageInternal::unload_root_element(package, self.id)
+        crate::sdk::SdkPackage::unload_root_element(package, self.id)
       }
 
       pub fn root_element<'a, P: crate::sdk::SdkPackage>(
         &self,
         package: &'a mut P,
       ) -> Result<&'a #root_ty, crate::common::SdkError> {
-        if crate::sdk::SdkPackageInternal::root_element(package, self.id)
+        if crate::sdk::SdkPackage::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .is_none()
         {
           let root_element = {
-            let part = crate::sdk::SdkPackageInternal::storage(package).part(self.id).ok_or_else(|| {
+            let part = crate::sdk::SdkPackage::storage(package).part(self.id).ok_or_else(|| {
               crate::common::SdkError::CommonError(format!(
                 "part id {:?} is not present in package storage",
                 self.id,
@@ -1832,7 +1824,7 @@ fn part_handle_root_method_tokens(
             #root_ty::from_bytes(part.data().bytes())?
           };
 
-          *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
+          *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
             crate::common::SdkError::CommonError(format!(
               "part id {:?} is not present in package root cache",
               self.id,
@@ -1840,7 +1832,7 @@ fn part_handle_root_method_tokens(
           })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
         }
 
-        crate::sdk::SdkPackageInternal::root_element(package, self.id)
+        crate::sdk::SdkPackage::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .ok_or_else(|| {
             crate::common::SdkError::CommonError(
@@ -1854,12 +1846,12 @@ fn part_handle_root_method_tokens(
         &self,
         package: &'a mut P,
       ) -> Result<&'a mut #root_ty, crate::common::SdkError> {
-        if crate::sdk::SdkPackageInternal::root_element(package, self.id)
+        if crate::sdk::SdkPackage::root_element(package, self.id)
           .and_then(crate::parts::PartRootElement::#root_accessor_ident)
           .is_none()
         {
           let root_element = {
-            let part = crate::sdk::SdkPackageInternal::storage(package).part(self.id).ok_or_else(|| {
+            let part = crate::sdk::SdkPackage::storage(package).part(self.id).ok_or_else(|| {
               crate::common::SdkError::CommonError(format!(
                 "part id {:?} is not present in package storage",
                 self.id,
@@ -1868,7 +1860,7 @@ fn part_handle_root_method_tokens(
             #root_ty::from_bytes(part.data().bytes())?
           };
 
-          *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
+          *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
             crate::common::SdkError::CommonError(format!(
               "part id {:?} is not present in package root cache",
               self.id,
@@ -1876,7 +1868,7 @@ fn part_handle_root_method_tokens(
           })? = Some(crate::parts::PartRootElement::#part_ident(Box::new(root_element)));
         }
 
-        crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id)
+        crate::sdk::SdkPackage::root_element_slot_mut(package, self.id)
           .and_then(Option::as_mut)
           .and_then(crate::parts::PartRootElement::#root_accessor_mut_ident)
           .ok_or_else(|| {
@@ -1892,7 +1884,7 @@ fn part_handle_root_method_tokens(
         package: &mut P,
         root_element: #root_ty,
       ) -> Result<(), crate::common::SdkError> {
-        *crate::sdk::SdkPackageInternal::root_element_slot_mut(package, self.id).ok_or_else(|| {
+        *crate::sdk::SdkPackage::root_element_slot_mut(package, self.id).ok_or_else(|| {
           crate::common::SdkError::CommonError(format!(
             "part id {:?} is not present in package root cache",
             self.id,
@@ -1922,11 +1914,7 @@ fn part_handle_child_methods_tokens(
           relationship
             .target_part_id()
             .map(|part_id| {
-              <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                crate::sdk::SdkPackageInternal::storage(package),
-                relationship.id(),
-                part_id,
-              )
+              <#part_ty as crate::sdk::SdkPart>::from_relationship_id(relationship.id(), part_id)
             })
         } else {
           None
@@ -1941,7 +1929,7 @@ fn part_handle_child_methods_tokens(
           package: &'a P,
         ) -> impl Iterator<Item = #part_ty> + 'a {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
+          crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .filter_map(#map_relationship)
@@ -1953,7 +1941,7 @@ fn part_handle_child_methods_tokens(
           package: &P,
         ) -> Option<#part_ty> {
           let _ = &self.#method_ident;
-          <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
+          crate::sdk::SdkPackage::storage(package).relationships(self.id)
             .into_iter()
             .flat_map(|relationships| relationships.iter())
             .find_map(#map_relationship)
@@ -1969,7 +1957,7 @@ fn part_handle_child_methods_tokens(
     ) -> Option<crate::parts::PartRef> {
       let _ = relationship.target_part_id()?;
       crate::parts::PartRef::from_relationship_storage(
-        crate::sdk::SdkPackageInternal::storage(package),
+        crate::sdk::SdkPackage::storage(package),
         relationship,
       )
     }
@@ -1981,7 +1969,7 @@ fn part_handle_child_methods_tokens(
         &'a self,
         package: &'a P,
       ) -> impl Iterator<Item = crate::parts::IdPartPair<'a>> + 'a {
-        <Self as crate::sdk::SdkPartInternal>::relationships(self, package)
+        crate::sdk::SdkPackage::storage(package).relationships(self.id)
           .into_iter()
           .flat_map(|relationships| relationships.iter())
           .filter_map(|relationship| {
@@ -2013,7 +2001,7 @@ fn part_handle_child_methods_tokens(
         relationship_id: &str,
       ) -> Option<crate::parts::PartRef> {
         let relationship =
-          <Self as crate::sdk::SdkPartInternal>::relationships(self, package)?.get(relationship_id)?;
+          crate::sdk::SdkPackage::storage(package).relationships(self.id)?.get(relationship_id)?;
         Self::part_ref_from_relationship(package, relationship)
       }
 
@@ -2052,7 +2040,7 @@ fn part_handle_child_methods_tokens(
         part: &T,
       ) -> Option<&'a str> {
         let target_part_id = part.part_id();
-        <Self as crate::sdk::SdkPartInternal>::relationships(self, package)?.iter().find_map(|relationship| {
+        crate::sdk::SdkPackage::storage(package).relationships(self.id)?.iter().find_map(|relationship| {
           (relationship.target_part_id() == Some(target_part_id)).then_some(relationship.id())
         })
       }

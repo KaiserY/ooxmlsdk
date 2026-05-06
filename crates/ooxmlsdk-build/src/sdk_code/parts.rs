@@ -380,7 +380,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         part_id: crate::common::PartId,
       ) -> Option<Self> {
         Self::from_storage(
-          crate::sdk::SdkPackageInternal::storage(package),
+          crate::sdk::SdkPackage::storage(package),
           part_id,
           None,
         )
@@ -587,22 +587,22 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     {
       validate_missing_internal_relationships(package)?;
 
-      let part_count = crate::sdk::SdkPackageInternal::storage(package).parts().len();
+      let part_count = crate::sdk::SdkPackage::storage(package).parts().len();
       for index in 0..part_count {
         let part_id = crate::common::PartId::from_index(index);
-        if crate::sdk::SdkPackageInternal::storage(package).part(part_id).is_none()
-          || crate::sdk::SdkPackageInternal::is_root_element_loaded(package, part_id)
+        if crate::sdk::SdkPackage::storage(package).part(part_id).is_none()
+          || crate::sdk::SdkPackage::is_root_element_loaded(package, part_id)
         {
           continue;
         }
 
         let root_element = crate::parts::PartRootElement::from_part_id(
-          crate::sdk::SdkPackageInternal::storage(package),
+          crate::sdk::SdkPackage::storage(package),
           part_id,
-          crate::sdk::SdkPackageInternal::open_settings(package),
+          crate::sdk::SdkPackage::open_settings(package),
         )?;
         if let Some(root_element) = root_element
-          && let Some(slot) = crate::sdk::SdkPackageInternal::root_element_slot_mut(package, part_id)
+          && let Some(slot) = crate::sdk::SdkPackage::root_element_slot_mut(package, part_id)
         {
           *slot = Some(root_element);
         }
@@ -617,8 +617,8 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
     where
       P: crate::sdk::SdkPackage,
     {
-      let storage = crate::sdk::SdkPackageInternal::storage(package);
-      let open_settings = crate::sdk::SdkPackageInternal::open_settings(package);
+      let storage = crate::sdk::SdkPackage::storage(package);
+      let open_settings = crate::sdk::SdkPackage::open_settings(package);
 
       for relationship in storage.package_relationships().iter() {
         validate_missing_internal_relationship(open_settings, relationship)?;
@@ -680,7 +680,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         .compression_method(zip::CompressionMethod::Deflated)
         .unix_permissions(0o755);
       let mut entry_set = std::collections::HashSet::<String>::new();
-      let storage = crate::sdk::SdkPackageInternal::storage(package);
+      let storage = crate::sdk::SdkPackage::storage(package);
 
       zip.start_file("[Content_Types].xml", options)?;
       zip.write_all(&storage.content_types().to_xml_bytes()?)?;
@@ -718,7 +718,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
         }
 
         zip.start_file(part.path(), options)?;
-        if let Some(root_element) = crate::sdk::SdkPackageInternal::root_element(package, part_id) {
+        if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
           zip.write_all(&root_element.to_xml_bytes()?)?;
         } else {
           zip.write_all(part.data().bytes())?;

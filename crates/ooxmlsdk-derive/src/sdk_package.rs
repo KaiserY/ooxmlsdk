@@ -29,13 +29,10 @@ fn package_child_init_tokens(
       quote! {
         if let Some(child_part_id) = relationship.target_part_id() {
           let item_index = #field_ident.len();
-          #field_ident.push(
-            <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-              &storage,
-              relationship.id(),
-              child_part_id,
-            ),
-          );
+          #field_ident.push(<#part_ty as crate::sdk::SdkPart>::from_relationship_id(
+            relationship.id(),
+            child_part_id,
+          ));
           relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
             field_index: #field_index,
             item_index,
@@ -51,13 +48,10 @@ fn package_child_init_tokens(
       quote! {
         if #field_ident.is_none() {
           if let Some(child_part_id) = relationship.target_part_id() {
-            #field_ident = Some(Box::new(
-              <#part_ty as crate::sdk::SdkPartInternal>::from_relationship_id_with_relationships(
-                &storage,
-                relationship.id(),
-                child_part_id,
-              ),
-            ));
+            #field_ident = Some(Box::new(<#part_ty as crate::sdk::SdkPart>::from_relationship_id(
+              relationship.id(),
+              child_part_id,
+            )));
             relationship_order.push(crate::sdk::RelationshipModelEntry::Child {
               field_index: #field_index,
               item_index: 0,
@@ -257,10 +251,10 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         }
 
         let relationship_id =
-          crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
+          crate::sdk::SdkPackage::relationships(self).next_relationship_id();
         let content_type =
           crate::sdk::typed_main_part_content_type::<#part_ty>(
-            crate::sdk::SdkPackageInternal::storage(self),
+            crate::sdk::SdkPackage::storage(self),
           );
         let part =
           crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension::<#part_ty>(
@@ -385,7 +379,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
     }
   };
   Ok(quote! {
-    impl crate::sdk::SdkPackageInternal for #ident {
+    impl crate::sdk::SdkPackage for #ident {
       #[inline]
       fn storage(&self) -> &crate::common::SdkPackageStorage {
         &self.#storage_ident
@@ -425,8 +419,6 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       #root_cache_methods
     }
 
-    impl crate::sdk::SdkPackage for #ident {}
-
     impl #ident {
       #main_part_relationship_type
 
@@ -457,10 +449,10 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       pub fn document_type(&self) -> #document_type_ty {
         let content_type = self
           .#main_part_id_ident
-          .and_then(|part_id| crate::sdk::SdkPackageInternal::storage(self).part(part_id))
+          .and_then(|part_id| crate::sdk::SdkPackage::storage(self).part(part_id))
           .map(|part| part.content_type())
           .or_else(|| {
-            crate::sdk::SdkPackageInternal::storage(self).preferred_main_part_content_type()
+            crate::sdk::SdkPackage::storage(self).preferred_main_part_content_type()
           });
         content_type
           .and_then(#document_type_ty::from_content_type)
@@ -471,10 +463,10 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         &mut self,
         document_type: #document_type_ty,
       ) -> Result<(), crate::common::SdkError> {
-        crate::sdk::SdkPackageInternal::storage_mut(self)
+        crate::sdk::SdkPackage::storage_mut(self)
           .set_preferred_main_part_content_type(document_type.content_type());
         if let Some(part_id) = self.#main_part_id_ident {
-          crate::sdk::SdkPackageInternal::storage_mut(self)
+          crate::sdk::SdkPackage::storage_mut(self)
             .set_part_content_type(part_id, document_type.content_type())?;
         }
         Ok(())
@@ -570,7 +562,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
       ) -> Result<Vec<crate::validator::ValidationErrorInfo>, crate::common::SdkError> {
         self.load_all_parts()?;
         let mut context = crate::validator::ValidationContext::default();
-        let parts: Vec<_> = crate::sdk::SdkPackageInternal::storage(self)
+        let parts: Vec<_> = crate::sdk::SdkPackage::storage(self)
           .parts()
           .iter()
           .enumerate()
@@ -584,7 +576,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
           .collect();
 
         for (part_id, part_uri) in parts {
-          let Some(root_element) = crate::sdk::SdkPackageInternal::root_element(self, part_id) else {
+          let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) else {
             continue;
           };
           context.with_part_uri(part_uri, |context| {
@@ -807,7 +799,7 @@ pub(crate) fn expand_sdk_package(input: &DeriveInput) -> syn::Result<proc_macro2
         extension: impl Into<std::borrow::Cow<'static, str>>,
       ) -> Result<T, crate::common::SdkError>
   {
-        let relationship_id = crate::sdk::SdkPackageInternal::relationships(self).next_relationship_id();
+        let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
         crate::sdk::SdkPackage::add_new_part_with_content_type_and_extension(
           self,
           relationship_id,

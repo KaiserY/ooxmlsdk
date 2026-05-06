@@ -630,12 +630,15 @@ pub trait SdkMceChoice: SdkChoice {
 }
 
 #[cfg(feature = "mce")]
+pub(crate) type MceNamespace = (Box<str>, Box<str>);
+
+#[cfg(feature = "mce")]
 #[derive(Clone, Debug, Default)]
 pub struct MceContext {
-  namespaces: Vec<(String, String)>,
-  ignorable_namespaces: Vec<String>,
-  process_content: Vec<String>,
-  preserve_attributes: Vec<String>,
+  namespaces: Vec<MceNamespace>,
+  ignorable_namespaces: Vec<Box<str>>,
+  process_content: Vec<Box<str>>,
+  preserve_attributes: Vec<Box<str>>,
 }
 
 #[cfg(feature = "mce")]
@@ -666,17 +669,16 @@ impl MceContext {
       preserve_attributes: self.preserve_attributes.len(),
     };
 
-    self.namespaces.extend(namespaces.iter().map(|decl| {
-      (
-        decl.prefix.as_ref().to_owned(),
-        decl.uri.as_ref().to_owned(),
-      )
-    }));
+    self.namespaces.extend(
+      namespaces
+        .iter()
+        .map(|decl| (decl.prefix.as_ref().into(), decl.uri.as_ref().into())),
+    );
 
     if let Some(value) = mce_attr(attrs, "Ignorable") {
       for prefix in value.split_whitespace() {
         if let Some(ns) = self.namespace_for_prefix(prefix) {
-          self.ignorable_namespaces.push(ns.to_string());
+          self.ignorable_namespaces.push(ns.into());
         }
       }
     }
@@ -684,13 +686,13 @@ impl MceContext {
     if let Some(value) = mce_attr(attrs, "ProcessContent") {
       self
         .process_content
-        .extend(value.split_whitespace().map(str::to_string));
+        .extend(value.split_whitespace().map(Into::into));
     }
 
     if let Some(value) = mce_attr(attrs, "PreserveAttributes") {
       self
         .preserve_attributes
-        .extend(value.split_whitespace().map(str::to_string));
+        .extend(value.split_whitespace().map(Into::into));
     }
 
     if let Some(value) = mce_attr(attrs, "MustUnderstand") {
@@ -725,6 +727,7 @@ impl MceContext {
 
   pub(crate) fn is_process_content_qname(&self, qname: &str) -> bool {
     self.process_content.iter().any(|candidate| {
+      let candidate = candidate.as_ref();
       candidate == "*"
         || candidate == qname
         || candidate
@@ -738,7 +741,7 @@ impl MceContext {
     self
       .ignorable_namespaces
       .iter()
-      .any(|candidate| candidate == namespace)
+      .any(|candidate| candidate.as_ref() == namespace)
   }
 
   pub(crate) fn should_remove_ignorable_attribute(&self, qname: &str) -> bool {
@@ -753,6 +756,7 @@ impl MceContext {
 
   fn is_preserved_attribute_qname(&self, qname: &str) -> bool {
     self.preserve_attributes.iter().any(|candidate| {
+      let candidate = candidate.as_ref();
       candidate == "*"
         || candidate == qname
         || candidate
@@ -767,10 +771,10 @@ impl MceContext {
       .namespaces
       .iter()
       .rev()
-      .find_map(|(candidate, uri)| (candidate == prefix).then_some(uri.as_str()))
+      .find_map(|(candidate, uri)| (candidate.as_ref() == prefix).then_some(uri.as_ref()))
   }
 
-  pub(crate) fn namespaces(&self) -> &[(String, String)] {
+  pub(crate) fn namespaces(&self) -> &[MceNamespace] {
     self.namespaces.as_slice()
   }
 }
@@ -1764,7 +1768,11 @@ pub trait SdkPackage: Clone + Sized + 'static {
     if crate::sdk::SdkPackage::storage(self).id()
       == crate::sdk::SdkPackage::storage(source_package).id()
     {
-      return self.add_part_with_id(part.clone(), relationship_id);
+      let part_id = part.part_id();
+      crate::sdk::SdkPackage::storage_mut(self)
+        .add_package_relationship_to_part(relationship_id.clone(), part_id)?;
+      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(self);
+      return Ok(T::from_relationship_id(relationship_id, part_id));
     }
 
     let (imported_part_id, added_count) = crate::sdk::SdkPackage::storage_mut(self)
@@ -3731,7 +3739,14 @@ pub trait SdkPart: Clone + Sized + 'static {
     if crate::sdk::SdkPackage::storage(package).id()
       == crate::sdk::SdkPackage::storage(source_package).id()
     {
-      return self.add_part_with_id(package, part.clone(), relationship_id);
+      let part_id = part.part_id();
+      crate::sdk::SdkPackage::storage_mut(package).add_child_relationship_to_part(
+        self.part_id(),
+        relationship_id.clone(),
+        part_id,
+      )?;
+      crate::sdk::SdkPackage::refresh_relationship_model_from_storage(package);
+      return Ok(T::from_relationship_id(relationship_id, part_id));
     }
 
     let (imported_part_id, added_count) = crate::sdk::SdkPackage::storage_mut(package)

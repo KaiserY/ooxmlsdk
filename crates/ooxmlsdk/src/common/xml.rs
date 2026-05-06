@@ -781,7 +781,7 @@ fn mce_unknown_element_replacement(
     namespaces
       .iter()
       .rev()
-      .find_map(|(candidate, ns)| (candidate == prefix).then_some(ns.as_str()))
+      .find_map(|(candidate, ns)| (candidate.as_ref() == prefix).then_some(ns.as_ref()))
       .filter(|ns| context.is_ignorable_namespace(ns))
   });
 
@@ -903,7 +903,7 @@ fn attr_value(
 #[cfg(feature = "mce")]
 fn choice_requires_supported(
   requires: Option<&str>,
-  namespaces: &[(String, String)],
+  namespaces: &[crate::sdk::MceNamespace],
   target: crate::sdk::FileFormatVersion,
 ) -> Result<bool, SdkError> {
   let Some(requires) = requires else {
@@ -913,7 +913,7 @@ fn choice_requires_supported(
     let Some((_, ns)) = namespaces
       .iter()
       .rev()
-      .find(|(candidate, _)| candidate == prefix)
+      .find(|(candidate, _)| candidate.as_ref() == prefix)
     else {
       return Ok(false);
     };
@@ -926,9 +926,9 @@ fn choice_requires_supported(
 
 #[cfg(feature = "mce")]
 fn namespaces_with(
-  namespaces: &[(String, String)],
+  namespaces: &[crate::sdk::MceNamespace],
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<(String, String)>, SdkError> {
+) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
   let mut merged = namespaces.to_vec();
   merged.extend(namespace_decls(start)?);
   Ok(merged)
@@ -938,7 +938,7 @@ fn namespaces_with(
 fn namespaces_from_context_with(
   context: &crate::sdk::MceContext,
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<(String, String)>, SdkError> {
+) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
   let mut namespaces = context.namespaces().to_vec();
   namespaces.extend(namespace_decls(start)?);
   Ok(namespaces)
@@ -947,15 +947,19 @@ fn namespaces_from_context_with(
 #[cfg(feature = "mce")]
 fn namespace_decls(
   start: &quick_xml::events::BytesStart<'_>,
-) -> Result<Vec<(String, String)>, SdkError> {
+) -> Result<Vec<crate::sdk::MceNamespace>, SdkError> {
   let mut namespaces = Vec::new();
   for attr in start.attributes() {
     let attr = attr?;
     let key = attr.key.as_ref();
     if let Some(prefix) = key.strip_prefix(b"xmlns:") {
       namespaces.push((
-        String::from_utf8_lossy(prefix).into_owned(),
-        String::from_utf8_lossy(attr.value.as_ref()).into_owned(),
+        String::from_utf8_lossy(prefix)
+          .into_owned()
+          .into_boxed_str(),
+        String::from_utf8_lossy(attr.value.as_ref())
+          .into_owned()
+          .into_boxed_str(),
       ));
     }
   }

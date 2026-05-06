@@ -32,11 +32,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 ## Summary
 
 - `blocked_by_api`: 136
-- `covered`: 207
+- `covered`: 213
 - `covered_by_doc_samples`: 38
 - `missing`: 0
 - `not_applicable`: 130
-- `partial`: 475
+- `partial`: 469
 
 ## Tests
 
@@ -260,10 +260,10 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:294` `W042_AddNewPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:309` `W041_AddAlternativeFormatImportPart` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:324` `W040_AddExternalRelationship` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:350` `W039_ChangeDocumentType` | Fact | `covered` | `wordprocessing` | `packages.rs::change_document_type_updates_main_part_content_type` covers public document type change, content type override update, save, and reopen |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:350` `W039_ChangeDocumentType` | Fact | `covered` | `wordprocessing` | `packages.rs::change_document_type_updates_main_part_content_type_and_preserves_relationships` covers public document type change, content type override update, save, and reopen |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:365` `W038_DocxCreation_Package` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:379` `W037_DocxCreation_Package_Settings` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
-| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:402` `W036_DocxCreation_File` | Fact | `partial` | `wordprocessing` | Wordprocessing schema/package behavior partially covered by wordprocessing.rs and doc_samples |
+| `DocumentFormat.OpenXml.Tests/DocxTests01.cs:402` `W036_DocxCreation_File` | Fact | `covered` | `wordprocessing` | `packages.rs::add_main_document_part_errors_when_main_part_exists` covers the public error path when adding a second main document part |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:422` `W035_DocxCreation_Package` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:445` `W034_DocxCreation` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
 | `DocumentFormat.OpenXml.Tests/DocxTests01.cs:467` `W033_DocxCreation` | Fact | `covered` | `wordprocessing` | `packages.rs::create_apis_create_office_document_packages` covers Word package creation, main document insertion, save, and reopen through public Rust APIs |
@@ -884,11 +884,11 @@ Generated from `../Open-XML-SDK/test` by scanning `[Fact]` and `[Theory]` test m
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:481` `OpenXmlPackageGetAllPartsTestWord` | Fact | `covered` | `package_parts` | `packages.rs::package_get_all_parts_matches_openxml_package_tests` covers Word package part traversal through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:496` `OpenXmlPackageGetAllPartsTestPowerPoint` | Fact | `covered` | `package_parts` | `packages.rs::package_get_all_parts_matches_openxml_package_tests` and `presentation_child_accessors_resolve_repeated_parts` cover package traversal/accessors |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:512` `CreateRelationshipToPartTest` | Fact | `covered` | `package_parts` | `packages.rs::create_relationship_to_part_reuses_existing_parts_from_package` covers public same-package relationship creation |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:547` `WordDocumentTypeIsRetrievedIfAvailable` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:556` `SpreadhseetDocumentTypeIsRetrievedIfAvailable` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:565` `PresentationDocumentTypeIsRetrievedIfAvailable` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:574` `DocumentTypeUsesDefault` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
-| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:597` `ChangeDocumentTypeInternalTest` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:547` `WordDocumentTypeIsRetrievedIfAvailable` | Fact | `covered` | `package_parts` | `packages.rs::document_type_is_read_from_existing_template_packages` covers Word template type detection from main part content type |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:556` `SpreadhseetDocumentTypeIsRetrievedIfAvailable` | Fact | `covered` | `package_parts` | `packages.rs::document_type_is_read_from_existing_template_packages` covers spreadsheet template type detection from main part content type |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:565` `PresentationDocumentTypeIsRetrievedIfAvailable` | Fact | `covered` | `package_parts` | `packages.rs::document_type_is_read_from_existing_template_packages` covers presentation template type detection from main part content type |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:574` `DocumentTypeUsesDefault` | Fact | `covered` | `package_parts` | `packages.rs::document_type_defaults_when_no_main_part_is_persisted` covers default document type when a typed package is saved without a main part |
+| `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:597` `ChangeDocumentTypeInternalTest` | Fact | `covered` | `package_parts` | `packages.rs::change_document_type_updates_main_part_content_type_and_preserves_relationships` covers document type changes while preserving main part hyperlink and external relationships |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:630` `AutoSaveCreateTestDefault` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:649` `AutoSaveCreateTestFalse` | Fact | `partial` | `package_parts` | Package/part behavior mostly covered through public Rust package APIs |
 | `DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs:671` `LoadPackageWithMediaReferenceTest` | Fact | `covered` | `package_parts` | `packages.rs::media_reference_relationships_resolve_shared_data_part_from_openxml_package_test` covers media reference relationship resolution |

@@ -4207,8 +4207,43 @@ fn create_from_template_returns_editable_regular_document_packages() {
 }
 
 #[test]
-fn change_document_type_updates_main_part_content_type() {
-  // Source: test/DocumentFormat.OpenXml.Tests/DocxTests01.cs :: W039_ChangeDocumentType
+fn document_type_is_read_from_existing_template_packages() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   WordDocumentTypeIsRetrievedIfAvailable
+  //   SpreadhseetDocumentTypeIsRetrievedIfAvailable
+  //   PresentationDocumentTypeIsRetrievedIfAvailable
+  let word = WordprocessingDocument::new_from_file(doc_sample("Document.dotx")).unwrap();
+  assert_eq!(word.document_type(), WordprocessingDocumentType::Template);
+
+  let spreadsheet = SpreadsheetDocument::new_from_file(doc_sample("Spreadsheet.xltx")).unwrap();
+  assert_eq!(
+    spreadsheet.document_type(),
+    SpreadsheetDocumentType::Template
+  );
+
+  let presentation = PresentationDocument::new_from_file(doc_sample("Presentation.potx")).unwrap();
+  assert_eq!(
+    presentation.document_type(),
+    PresentationDocumentType::Template
+  );
+}
+
+#[test]
+fn document_type_defaults_when_no_main_part_is_persisted() {
+  // Source: test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs
+  //   DocumentTypeUsesDefault
+  let package = SpreadsheetDocument::create(SpreadsheetDocumentType::MacroEnabledTemplate);
+  let bytes = package.to_package_bytes().unwrap();
+
+  let reopened = SpreadsheetDocument::new(Cursor::new(bytes)).unwrap();
+  assert_eq!(reopened.document_type(), SpreadsheetDocumentType::Workbook);
+}
+
+#[test]
+fn change_document_type_updates_main_part_content_type_and_preserves_relationships() {
+  // Source:
+  //   test/DocumentFormat.OpenXml.Tests/DocxTests01.cs :: W039_ChangeDocumentType
+  //   test/DocumentFormat.OpenXml.Tests/ofapiTest/OpenXmlPackageTest.cs :: ChangeDocumentTypeInternalTest
   let mut package = WordprocessingDocument::create(WordprocessingDocumentType::Document);
   let main_part = package.add_main_document_part().unwrap();
   main_part
@@ -4244,6 +4279,58 @@ fn change_document_type_updates_main_part_content_type() {
     reopened.document_type(),
     WordprocessingDocumentType::Template
   );
+
+  let mut package = WordprocessingDocument::new_from_file(doc_sample("May_12_04.docx")).unwrap();
+  let main_part = package.main_document_part().unwrap();
+  let hyperlink_count = main_part.hyperlink_relationships(&package).count();
+  let external_count = main_part.external_relationships(&package).count();
+  assert_eq!(
+    package.document_type(),
+    WordprocessingDocumentType::Document
+  );
+  assert!(
+    main_part
+      .get_hyperlink_relationship(&package, "rId15")
+      .is_some()
+  );
+  assert!(
+    main_part
+      .get_hyperlink_relationship(&package, "rId18")
+      .is_some()
+  );
+
+  package
+    .change_document_type(WordprocessingDocumentType::Template)
+    .unwrap();
+
+  assert_eq!(
+    package.document_type(),
+    WordprocessingDocumentType::Template
+  );
+  assert_eq!(
+    main_part.hyperlink_relationships(&package).count(),
+    hyperlink_count
+  );
+  assert_eq!(
+    main_part.external_relationships(&package).count(),
+    external_count
+  );
+  let internal_hyperlink = main_part
+    .get_hyperlink_relationship(&package, "rId15")
+    .unwrap();
+  assert_eq!(internal_hyperlink.target(), "#_THIS_WEEK_IN");
+  assert!(matches!(
+    internal_hyperlink.target_mode(),
+    TargetMode::Internal
+  ));
+  let external_hyperlink = main_part
+    .get_hyperlink_relationship(&package, "rId18")
+    .unwrap();
+  assert_eq!(external_hyperlink.target(), "http://www.iaswresearch.org/");
+  assert!(matches!(
+    external_hyperlink.target_mode(),
+    TargetMode::External
+  ));
 }
 
 #[test]

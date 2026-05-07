@@ -47,62 +47,11 @@ The checked-in generated runtime covers OOXML namespaces and parts associated wi
 
 In practical terms, the runtime includes support for newer namespaces and package relationships such as later DrawingML, chart extensions, SVG and 3D-related parts, threaded comments, dynamic-array-era spreadsheet extensions, and other post-2007 additions tracked in the upstream Open XML SDK metadata.
 
-## Quick Start
+## Documentation
 
-Most users should keep the default features enabled:
+Rust API documentation is published on [docs.rs/ooxmlsdk](https://docs.rs/ooxmlsdk).
 
-```toml
-[dependencies]
-ooxmlsdk = "0.6.1"
-```
-
-If you want package APIs without optional validators or MCE-specific behavior, disable default features and enable only `parts`:
-
-```toml
-[dependencies]
-ooxmlsdk = { version = "0.6.1", default-features = false, features = ["parts"] }
-```
-
-If you need Flat OPC APIs, enable `flat-opc`:
-
-```toml
-[dependencies]
-ooxmlsdk = { version = "0.6.1", default-features = false, features = ["flat-opc"] }
-```
-
-If you want MCE processing during package open/root loading, enable `mce`:
-
-```toml
-[dependencies]
-ooxmlsdk = { version = "0.6.1", default-features = false, features = ["mce"] }
-```
-
-Read, inspect, and save a package:
-
-```rust
-use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
-use ooxmlsdk::sdk::SdkPackage;
-
-fn round_trip(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-  let document = WordprocessingDocument::new_from_file(path)?;
-  let main_part = document.main_document_part().expect("main document part");
-  assert!(document.get_id_of_part(&main_part).is_some());
-
-  let mut out = std::io::Cursor::new(Vec::new());
-  document.save(&mut out)?;
-  Ok(())
-}
-```
-
-Parse XML into generated schema types:
-
-```rust
-use ooxmlsdk::schemas::opc_core_properties::CoreProperties;
-
-fn parse_core_properties(xml: &str) -> Result<CoreProperties, Box<dyn std::error::Error>> {
-  Ok(xml.parse()?)
-}
-```
+For Open XML package concepts, file format background, and WordprocessingML, SpreadsheetML, PresentationML, Flat OPC, and Markup Compatibility guidance, see the Microsoft Learn [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk). This crate follows many of the same package and schema concepts while exposing Rust APIs and feature flags.
 
 ## Package API
 

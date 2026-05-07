@@ -28,6 +28,15 @@ If the local checkout is missing or clearly stale and exact upstream behavior ma
 
 Use `crates/ooxmlsdk-test/UPSTREAM_TEST_MATRIX.md` to decide whether upstream behavior is already covered, missing, partial, blocked by API, or not applicable. Add or update `// Source:` comments on upstream-derived tests so coverage remains auditable.
 
+## Project Documentation References
+When updating this project's user-facing documentation, start with the checked-out repository docs and local references before browsing:
+
+- `README.md`, `CHANGELOG.md`, `COMPATIBILITY.md`, and `docs/specs/` in this checkout for the Rust crate's current public API, feature surface, compatibility notes, and project-specific terminology.
+- `../ooxmlsdk` for another local checkout of `https://github.com/KaiserY/ooxmlsdk` when it exists and is distinct from the current repository. If the path resolves to this checkout, treat the current files as the source. Use the GitHub repository only as a fallback when the local checkout is missing or clearly stale.
+- `../open-xml-docs` for Microsoft Learn Open XML conceptual docs and samples from `https://github.com/OfficeDev/open-xml-docs`. Useful paths include `docs/general/`, `docs/word/`, `docs/spreadsheet/`, `docs/presentation/`, `docs/migration/`, and `samples/`.
+
+Treat these documentation sources as reference paths for context, not as requirements that override local code, tests, or repository-specific guidance.
+
 ## Generated Data
 Treat checked-in `data/`, `sdk_data/`, and `schemas/OpenPackagingConventions-XMLSchema/` as generator inputs. `crates/ooxmlsdk-build/src/sdk_data/sdk_data_model.rs` is hand-written input model code, not generated output.
 

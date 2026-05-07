@@ -144,6 +144,8 @@ mod tests {
       .flat_map(|page| &page.items)
       .filter_map(|item| match item {
         crate::layout::PageItem::Text(text) => Some(text),
+        crate::layout::PageItem::Image(_) => None,
+        crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
       })
       .collect::<Vec<_>>();
@@ -202,6 +204,218 @@ mod tests {
   }
 
   #[test]
+  fn paragraph_styles_inherit_doc_defaults_and_based_on_chain() {
+    let path = fixture_path("test-data/wml/style_inheritance.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    let normal = paragraph_at(&doc, 0);
+    assert_eq!(normal.runs[0].style.font_size_pt, 11.0);
+    assert_eq!(normal.format.spacing_after_pt, 8.0);
+
+    let body_text = paragraph_at(&doc, 1);
+    assert_eq!(body_text.runs[0].style.font_size_pt, 12.0);
+    assert_eq!(body_text.format.spacing_after_pt, 8.0);
+
+    let body_indent = paragraph_at(&doc, 2);
+    assert_eq!(body_indent.runs[0].style.font_size_pt, 12.0);
+    assert_eq!(body_indent.format.indent_left_pt, 36.0);
+    assert_eq!(body_indent.format.spacing_after_pt, 8.0);
+  }
+
+  #[test]
+  fn numbering_labels_and_indents_are_extracted() {
+    let path = fixture_path("test-data/wml/numbering_ordered.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let labels = doc
+      .blocks
+      .iter()
+      .filter_map(|block| match block {
+        crate::docx::Block::Paragraph(paragraph) => paragraph.list_label.as_deref(),
+        crate::docx::Block::Table(_) => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(labels, ["1. ", "a. ", "i. ", "b. ", "2. ", "3. "]);
+    assert_eq!(paragraph_at(&doc, 0).format.indent_left_pt, 36.0);
+    assert_eq!(paragraph_at(&doc, 1).format.indent_left_pt, 72.0);
+    assert_eq!(paragraph_at(&doc, 2).format.indent_left_pt, 108.0);
+
+    let path = fixture_path("test-data/wml/numbering_bullets.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    assert_eq!(
+      paragraph_at(&doc, 0).list_label.as_deref(),
+      Some("\u{2022} ")
+    );
+
+    let path = fixture_path("test-data/wml/numbering_restart.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    assert_eq!(paragraph_at(&doc, 1).list_label.as_deref(), Some("1. "));
+    assert_eq!(paragraph_at(&doc, 3).list_label.as_deref(), Some("3. "));
+    assert_eq!(paragraph_at(&doc, 5).list_label.as_deref(), Some("1. "));
+  }
+
+  #[test]
+  fn paragraph_alignment_is_extracted_and_applied_to_layout() {
+    let path = fixture_path("test-data/wml/para_alignment.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(
+      paragraph_at(&doc, 0).format.alignment,
+      crate::docx::ParagraphAlignment::Left
+    );
+    assert_eq!(
+      paragraph_at(&doc, 1).format.alignment,
+      crate::docx::ParagraphAlignment::Center
+    );
+    assert_eq!(
+      paragraph_at(&doc, 2).format.alignment,
+      crate::docx::ParagraphAlignment::Right
+    );
+    assert_eq!(
+      paragraph_at(&doc, 3).format.alignment,
+      crate::docx::ParagraphAlignment::Justify
+    );
+    assert_eq!(
+      paragraph_at(&doc, 4).format.alignment,
+      crate::docx::ParagraphAlignment::Justify
+    );
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let left = text_item(&layout, "Left aligned paragraph.").x_pt;
+    let center = text_item(&layout, "Center aligned paragraph.").x_pt;
+    let right = text_item(&layout, "Right aligned paragraph.").x_pt;
+
+    assert_eq!(left, doc.page.margin_left_pt);
+    assert!(center > left);
+    assert!(right > center);
+  }
+
+  #[test]
+  fn paragraph_borders_and_shading_are_extracted_and_rendered() {
+    let path = fixture_path("test-data/wml/para_borders_shading.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    let boxed = paragraph_at(&doc, 0);
+    assert_eq!(
+      boxed.format.shading,
+      Some(crate::docx::RgbColor {
+        r: 0xDE,
+        g: 0xEA,
+        b: 0xF1
+      })
+    );
+    assert_eq!(boxed.format.borders.top.unwrap().color.b, 0xC4);
+    assert_eq!(boxed.format.borders.left.unwrap().width_pt, 0.75);
+
+    let patterned = paragraph_at(&doc, 1);
+    assert_eq!(
+      patterned.format.shading,
+      Some(crate::docx::RgbColor {
+        r: 0xFF,
+        g: 0xFF,
+        b: 0x00
+      })
+    );
+
+    let top_bottom = paragraph_at(&doc, 2);
+    assert!(top_bottom.format.borders.top.is_some());
+    assert!(top_bottom.format.borders.bottom.is_some());
+    assert!(top_bottom.format.borders.left.is_none());
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Fill(fill)
+            if fill.color.r == 0xDE && fill.color.g == 0xEA && fill.color.b == 0xF1
+        )
+      })
+    }));
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Line(line)
+            if line.color.r == 0x44 && line.color.g == 0x72 && line.color.b == 0xC4
+        )
+      })
+    }));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn default_header_and_footer_are_repeated_on_layout_pages() {
+    let path = fixture_path("test-data/wml/header_footer.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.header_blocks.len(), 1);
+    assert_eq!(doc.footer_blocks.len(), 1);
+    assert_eq!(doc.page.header_distance_pt, 36.0);
+    assert_eq!(doc.page.footer_distance_pt, 36.0);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let header = text_item(&layout, "Page Header");
+    let footer = text_item(&layout, "Page Footer");
+    let body = text_item(&layout, "Document body text.");
+
+    assert!(header.y_pt < body.y_pt);
+    assert!(footer.y_pt > body.y_pt);
+    assert!(header.x_pt > doc.page.margin_left_pt);
+    assert!(footer.x_pt > doc.page.margin_left_pt);
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn inline_images_are_extracted_laid_out_and_rendered() {
+    let path = fixture_path("test-data/wml/image_inline_props.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let paragraph = paragraph_at(&doc, 0);
+    let image = paragraph
+      .inlines
+      .iter()
+      .find_map(|item| match item {
+        crate::docx::InlineItem::Image(image) => Some(image),
+        crate::docx::InlineItem::Text(_) => None,
+      })
+      .expect("inline image");
+
+    assert_eq!(image.content_type.as_deref(), Some("image/png"));
+    assert_eq!(image.width_pt, 72.0);
+    assert_eq!(image.height_pt, 72.0);
+    assert_eq!(
+      image.alt_text.as_deref(),
+      Some("Alt text for accessibility")
+    );
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Image(image)
+            if image.width_pt == 72.0 && image.height_pt == 72.0
+        )
+      })
+    }));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
   fn minimal_table_docx_flows_cells_and_borders_into_layout() {
     let path = fixture_path("test-data/document/minimal_table.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -232,6 +446,55 @@ mod tests {
     }));
   }
 
+  #[test]
+  fn table_borders_and_cell_shading_are_extracted_and_rendered() {
+    let path = fixture_path("test-data/wml/table_borders.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let table = match &doc.blocks[0] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected table"),
+    };
+
+    assert_eq!(table.preferred_width_pt, Some(432.0));
+    assert_eq!(
+      table.borders.unwrap().inside_vertical.unwrap().color.b,
+      0xC4
+    );
+    assert_eq!(table.rows[0].cells[1].borders.right.unwrap().color.r, 0xFF);
+    assert_eq!(
+      table.rows[0].cells[2].shading,
+      Some(crate::docx::RgbColor {
+        r: 0xDE,
+        g: 0xEA,
+        b: 0xF1
+      })
+    );
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Fill(fill)
+            if fill.color.r == 0xDE && fill.color.g == 0xEA && fill.color.b == 0xF1
+        )
+      })
+    }));
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Line(line)
+            if line.color.r == 0xFF && line.width_pt == 1.0
+        )
+      })
+    }));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
   fn fixture_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../..")
@@ -243,5 +506,23 @@ mod tests {
       crate::docx::Block::Paragraph(paragraph) => paragraph,
       crate::docx::Block::Table(_) => panic!("expected paragraph at block {index}"),
     }
+  }
+
+  fn text_item<'a>(
+    layout: &'a crate::layout::LayoutDocument,
+    text: &str,
+  ) -> &'a crate::layout::TextItem {
+    layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .find_map(|item| match item {
+        crate::layout::PageItem::Text(item) if item.text == text => Some(item),
+        crate::layout::PageItem::Text(_) => None,
+        crate::layout::PageItem::Image(_) => None,
+        crate::layout::PageItem::Fill(_) => None,
+        crate::layout::PageItem::Line(_) => None,
+      })
+      .unwrap_or_else(|| panic!("text item {text:?}"))
   }
 }

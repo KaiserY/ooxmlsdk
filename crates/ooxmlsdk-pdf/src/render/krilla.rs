@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use krilla::color::rgb;
 use krilla::configure::{Configuration, PdfVersion};
-use krilla::geom::{PathBuilder, Point};
+use krilla::geom::{PathBuilder, Point, Size, Transform};
+use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, Stroke};
@@ -40,11 +41,60 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           );
         }
         PageItem::Text(_) => {}
+        PageItem::Fill(fill_item) => {
+          surface.set_stroke(None);
+          surface.set_fill(Some(Fill {
+            paint: rgb::Color::new(fill_item.color.r, fill_item.color.g, fill_item.color.b).into(),
+            opacity: NormalizedF32::ONE,
+            rule: Default::default(),
+          }));
+          let mut path = PathBuilder::new();
+          path.move_to(fill_item.x_pt, fill_item.y_pt);
+          path.line_to(fill_item.x_pt + fill_item.width_pt, fill_item.y_pt);
+          path.line_to(
+            fill_item.x_pt + fill_item.width_pt,
+            fill_item.y_pt + fill_item.height_pt,
+          );
+          path.line_to(fill_item.x_pt, fill_item.y_pt + fill_item.height_pt);
+          path.close();
+          if let Some(path) = path.finish() {
+            surface.draw_path(&path);
+          }
+        }
+        PageItem::Image(image) => {
+          let _alt_text = image.alt_text.as_deref();
+          if let Some(size) = Size::from_wh(image.width_pt.max(1.0), image.height_pt.max(1.0)) {
+            match decode_image(&image.data, image.content_type.as_deref()) {
+              Ok(pdf_image) => {
+                surface.push_transform(&Transform::from_translate(image.x_pt, image.y_pt));
+                surface.draw_image(pdf_image, size);
+                surface.pop();
+              }
+              Err(_) => {
+                surface.set_fill(None);
+                surface.set_stroke(Some(Stroke {
+                  width: 0.5,
+                  paint: rgb::Color::new(128, 128, 128).into(),
+                  ..Default::default()
+                }));
+                let mut path = PathBuilder::new();
+                path.move_to(image.x_pt, image.y_pt);
+                path.line_to(image.x_pt + image.width_pt, image.y_pt);
+                path.line_to(image.x_pt + image.width_pt, image.y_pt + image.height_pt);
+                path.line_to(image.x_pt, image.y_pt + image.height_pt);
+                path.close();
+                if let Some(path) = path.finish() {
+                  surface.draw_path(&path);
+                }
+              }
+            }
+          }
+        }
         PageItem::Line(line) => {
           surface.set_fill(None);
           surface.set_stroke(Some(Stroke {
             width: line.width_pt,
-            paint: rgb::Color::new(0, 0, 0).into(),
+            paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
             ..Default::default()
           }));
           let mut path = PathBuilder::new();
@@ -62,6 +112,73 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))
+}
+
+fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
+  let bytes = data.to_vec().into();
+  let result = match content_type {
+    Some("image/png") if valid_png_crc(data) => Image::from_png(bytes, true),
+    Some("image/png") => Err("invalid PNG CRC".to_string()),
+    Some("image/jpeg") | Some("image/jpg") => Image::from_jpeg(bytes, true),
+    Some("image/gif") => Image::from_gif(bytes, true),
+    Some("image/webp") => Image::from_webp(bytes, true),
+    _ if data.starts_with(b"\x89PNG\r\n\x1a\n") && valid_png_crc(data) => {
+      Image::from_png(bytes, true)
+    }
+    _ if data.starts_with(b"\x89PNG\r\n\x1a\n") => Err("invalid PNG CRC".to_string()),
+    _ if data.starts_with(b"\xff\xd8\xff") => Image::from_jpeg(bytes, true),
+    _ if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") => Image::from_gif(bytes, true),
+    _ if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" => {
+      Image::from_webp(bytes, true)
+    }
+    _ => Err(format!(
+      "unsupported image content type {}",
+      content_type.unwrap_or("unknown")
+    )),
+  };
+
+  result.map_err(PdfError::Krilla)
+}
+
+fn valid_png_crc(data: &[u8]) -> bool {
+  if !data.starts_with(b"\x89PNG\r\n\x1a\n") {
+    return false;
+  }
+
+  let mut offset = 8;
+  while offset + 12 <= data.len() {
+    let length = u32::from_be_bytes([
+      data[offset],
+      data[offset + 1],
+      data[offset + 2],
+      data[offset + 3],
+    ]) as usize;
+    let chunk_type_start = offset + 4;
+    let chunk_data_start = offset + 8;
+    let chunk_data_end = chunk_data_start.saturating_add(length);
+    let crc_end = chunk_data_end.saturating_add(4);
+    if crc_end > data.len() {
+      return false;
+    }
+
+    let expected = u32::from_be_bytes([
+      data[chunk_data_end],
+      data[chunk_data_end + 1],
+      data[chunk_data_end + 2],
+      data[chunk_data_end + 3],
+    ]);
+    let mut hasher = crc32fast::Hasher::new();
+    hasher.update(&data[chunk_type_start..chunk_data_end]);
+    if hasher.finalize() != expected {
+      return false;
+    }
+    if &data[chunk_type_start..chunk_type_start + 4] == b"IEND" {
+      return true;
+    }
+    offset = crc_end;
+  }
+
+  false
 }
 
 fn serialize_settings(options: &PdfOptions) -> SerializeSettings {

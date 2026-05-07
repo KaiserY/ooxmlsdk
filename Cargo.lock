@@ -657,10 +657,12 @@ dependencies = [
 name = "ooxmlsdk-pdf"
 version = "0.6.2"
 dependencies = [
+ "crc32fast",
  "fontdb",
  "krilla",
  "krilla-svg",
  "ooxmlsdk",
+ "quick-xml",
  "thiserror",
 ]
 

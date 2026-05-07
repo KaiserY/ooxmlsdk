@@ -13,8 +13,10 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
+crc32fast = { workspace = true }
 fontdb = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
+quick-xml = { workspace = true }
 thiserror = { workspace = true }

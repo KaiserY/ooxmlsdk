@@ -1,4 +1,6 @@
-use crate::docx::{Block, DocxDocument, PageSetup, TextStyle};
+use crate::docx::{
+  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor, TextStyle,
+};
 use crate::error::Result;
 use crate::options::PdfOptions;
 
@@ -23,6 +25,8 @@ pub(crate) struct Page {
 #[derive(Clone, Debug)]
 pub(crate) enum PageItem {
   Text(TextItem),
+  Image(ImageItem),
+  Fill(FillItem),
   Line(LineItem),
 }
 
@@ -34,6 +38,26 @@ pub(crate) struct TextItem {
   pub style: TextStyle,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct ImageItem {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub data: Vec<u8>,
+  pub content_type: Option<String>,
+  pub alt_text: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FillItem {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub color: RgbColor,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct LineItem {
   pub x1_pt: f32,
@@ -41,6 +65,7 @@ pub(crate) struct LineItem {
   pub x2_pt: f32,
   pub y2_pt: f32,
   pub width_pt: f32,
+  pub color: RgbColor,
 }
 
 pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
@@ -97,7 +122,87 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
     pages.push(current);
   }
 
+  apply_headers_and_footers(document, &mut pages, content_width);
+
   Ok(LayoutDocument { pages })
+}
+
+fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], content_width: f32) {
+  if document.header_blocks.is_empty() && document.footer_blocks.is_empty() {
+    return;
+  }
+
+  for page in pages {
+    let mut adornment = Page {
+      setup: page.setup,
+      items: Vec::new(),
+    };
+    let mut discarded_pages = Vec::new();
+    let header_bottom = page
+      .setup
+      .margin_top_pt
+      .max(page.setup.header_distance_pt + 1.0);
+    let mut y = page.setup.header_distance_pt;
+    for block in &document.header_blocks {
+      y = layout_repeating_block(
+        block,
+        page.setup,
+        &mut adornment,
+        &mut discarded_pages,
+        y,
+        header_bottom,
+        content_width,
+      );
+    }
+
+    let mut y =
+      (page.setup.height_pt - page.setup.footer_distance_pt - DEFAULT_LINE_HEIGHT_PT).max(0.0);
+    let footer_bottom = page.setup.height_pt - 1.0;
+    for block in &document.footer_blocks {
+      y = layout_repeating_block(
+        block,
+        page.setup,
+        &mut adornment,
+        &mut discarded_pages,
+        y,
+        footer_bottom,
+        content_width,
+      );
+    }
+
+    page.items.extend(adornment.items);
+  }
+}
+
+fn layout_repeating_block(
+  block: &Block,
+  setup: PageSetup,
+  page: &mut Page,
+  discarded_pages: &mut Vec<Page>,
+  y: f32,
+  content_bottom: f32,
+  content_width: f32,
+) -> f32 {
+  match block {
+    Block::Paragraph(paragraph) => layout_paragraph(
+      paragraph,
+      setup,
+      page,
+      discarded_pages,
+      y + paragraph.format.spacing_before_pt,
+      content_bottom,
+      content_width,
+    ),
+    Block::Table(table) => layout_table(
+      table,
+      setup,
+      page,
+      discarded_pages,
+      y,
+      content_bottom,
+      content_width,
+    ),
+  }
 }
 
 pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument {
@@ -166,7 +271,7 @@ fn layout_table(
   let table_left = setup.margin_left_pt;
   let table_right = table_left + column_widths.iter().sum::<f32>();
 
-  for row in &table.rows {
+  for (row_index, row) in table.rows.iter().enumerate() {
     let row_height = table_row_height(row);
     if y + row_height > content_bottom && !current.items.is_empty() {
       pages.push(std::mem::replace(
@@ -181,22 +286,148 @@ fn layout_table(
 
     let row_top = y;
     let row_bottom = y + row_height;
-    push_line(current, table_left, row_top, table_right, row_top);
-    push_line(current, table_left, row_bottom, table_right, row_bottom);
 
     let mut cell_left = table_left;
     for (index, width) in column_widths.iter().enumerate() {
-      push_line(current, cell_left, row_top, cell_left, row_bottom);
       if let Some(cell) = row.cells.get(index) {
+        if let Some(color) = cell.shading {
+          current.items.push(PageItem::Fill(FillItem {
+            x_pt: cell_left,
+            y_pt: row_top,
+            width_pt: *width,
+            height_pt: row_height,
+            color,
+          }));
+        }
+        if let Some(border) = vertical_border(table, row, index, true) {
+          push_styled_line(current, cell_left, row_top, cell_left, row_bottom, border);
+        }
         layout_table_cell(cell, setup, current, cell_left, row_top, *width, row_height);
       }
       cell_left += *width;
     }
-    push_line(current, table_right, row_top, table_right, row_bottom);
+    if let Some(border) = horizontal_border(table, row_index, true) {
+      push_styled_line(current, table_left, row_top, table_right, row_top, border);
+    }
+    if let Some(border) = horizontal_border(table, row_index, false) {
+      push_styled_line(
+        current,
+        table_left,
+        row_bottom,
+        table_right,
+        row_bottom,
+        border,
+      );
+    }
+    if let Some(border) = row
+      .cells
+      .last()
+      .and_then(|cell| cell.borders.right)
+      .or_else(|| table.borders.and_then(|borders| borders.right))
+      .or(Some(BorderStyle::default()))
+    {
+      push_styled_line(
+        current,
+        table_right,
+        row_top,
+        table_right,
+        row_bottom,
+        border,
+      );
+    }
     y = row_bottom;
   }
 
   y + TABLE_SPACING_AFTER_PT
+}
+
+fn horizontal_border(
+  table: &crate::docx::Table,
+  row_index: usize,
+  top_edge: bool,
+) -> Option<BorderStyle> {
+  let borders = table.borders;
+  let row = table.rows.get(row_index)?;
+  if top_edge {
+    row
+      .cells
+      .first()
+      .and_then(|cell| cell.borders.top)
+      .or_else(|| {
+        borders.and_then(|borders| {
+          if row_index == 0 {
+            borders.top
+          } else {
+            borders.inside_horizontal
+          }
+        })
+      })
+      .or(Some(BorderStyle::default()))
+  } else {
+    row
+      .cells
+      .first()
+      .and_then(|cell| cell.borders.bottom)
+      .or_else(|| {
+        borders.and_then(|borders| {
+          if row_index + 1 == table.rows.len() {
+            borders.bottom
+          } else {
+            borders.inside_horizontal
+          }
+        })
+      })
+      .or(Some(BorderStyle::default()))
+  }
+}
+
+fn vertical_border(
+  table: &crate::docx::Table,
+  row: &crate::docx::TableRow,
+  cell_index: usize,
+  left_edge: bool,
+) -> Option<BorderStyle> {
+  let borders = table.borders;
+  let cell = row.cells.get(cell_index)?;
+  if left_edge {
+    cell
+      .borders
+      .left
+      .or_else(|| {
+        if cell_index > 0 {
+          row
+            .cells
+            .get(cell_index - 1)
+            .and_then(|previous| previous.borders.right)
+        } else {
+          None
+        }
+      })
+      .or_else(|| {
+        borders.and_then(|borders| {
+          if cell_index == 0 {
+            borders.left
+          } else {
+            borders.inside_vertical
+          }
+        })
+      })
+      .or(Some(BorderStyle::default()))
+  } else {
+    cell
+      .borders
+      .right
+      .or_else(|| {
+        borders.and_then(|borders| {
+          if cell_index + 1 == row.cells.len() {
+            borders.right
+          } else {
+            borders.inside_vertical
+          }
+        })
+      })
+      .or(Some(BorderStyle::default()))
+  }
 }
 
 fn table_column_widths(
@@ -206,6 +437,17 @@ fn table_column_widths(
 ) -> Vec<f32> {
   if table.column_widths_pt.len() >= column_count {
     let mut widths = table.column_widths_pt[..column_count].to_vec();
+    if let Some(preferred) = table.preferred_width_pt
+      && preferred > 0.0
+    {
+      let total = widths.iter().sum::<f32>();
+      if total > 0.0 {
+        let scale = preferred / total;
+        for width in &mut widths {
+          *width *= scale;
+        }
+      }
+    }
     let total = widths.iter().sum::<f32>();
     if total > content_width && total > 0.0 {
       let scale = content_width / total;
@@ -229,9 +471,12 @@ fn table_row_height(row: &crate::docx::TableRow) -> f32 {
         .iter()
         .map(|block| match block {
           Block::Paragraph(paragraph) => paragraph
-            .runs
+            .inlines
             .iter()
-            .filter(|run| !run.text.is_empty())
+            .filter(|item| match item {
+              InlineItem::Text(run) => !run.text.is_empty(),
+              InlineItem::Image(_) => true,
+            })
             .count()
             .max(1),
           Block::Table(table) => table.rows.len().max(1),
@@ -261,26 +506,51 @@ fn layout_table_cell(
     match block {
       Block::Paragraph(paragraph) => {
         let mut text_x = text_left;
-        for run in &paragraph.runs {
-          if run.text.is_empty() {
-            continue;
+        for item in &paragraph.inlines {
+          match item {
+            InlineItem::Text(run) => {
+              if run.text.is_empty() {
+                continue;
+              }
+              if text_y > text_bottom {
+                return;
+              }
+              let available = (text_right - text_x).max(DEFAULT_FONT_SIZE_PT);
+              let clipped = clip_to_width(&run.text, run.style.font_size_pt, available);
+              if clipped.is_empty() {
+                continue;
+              }
+              let width = approximate_text_width(&clipped, run.style.font_size_pt);
+              page.items.push(PageItem::Text(TextItem {
+                x_pt: text_x,
+                y_pt: text_y,
+                text: clipped,
+                style: run.style,
+              }));
+              text_x += width;
+            }
+            InlineItem::Image(image) => {
+              if text_y > text_bottom {
+                return;
+              }
+              let width = image.width_pt.min((text_right - text_x).max(1.0));
+              let height = if image.width_pt > 0.0 {
+                image.height_pt * (width / image.width_pt)
+              } else {
+                image.height_pt
+              };
+              page.items.push(PageItem::Image(ImageItem {
+                x_pt: text_x,
+                y_pt: text_y - DEFAULT_FONT_SIZE_PT,
+                width_pt: width,
+                height_pt: height,
+                data: image.data.clone(),
+                content_type: image.content_type.clone(),
+                alt_text: image.alt_text.clone(),
+              }));
+              text_x += width;
+            }
           }
-          if text_y > text_bottom {
-            return;
-          }
-          let available = (text_right - text_x).max(DEFAULT_FONT_SIZE_PT);
-          let clipped = clip_to_width(&run.text, run.style.font_size_pt, available);
-          if clipped.is_empty() {
-            continue;
-          }
-          let width = approximate_text_width(&clipped, run.style.font_size_pt);
-          page.items.push(PageItem::Text(TextItem {
-            x_pt: text_x,
-            y_pt: text_y,
-            text: clipped,
-            style: run.style,
-          }));
-          text_x += width;
         }
         text_y += paragraph
           .format
@@ -344,70 +614,267 @@ fn layout_paragraph(
   content_bottom: f32,
   content_width: f32,
 ) -> f32 {
+  let start_item_index = current.items.len();
+  let paragraph_top = y;
   let line_left = setup.margin_left_pt + paragraph.format.indent_left_pt;
   let first_line_left =
     (line_left + paragraph.format.first_line_indent_pt).max(setup.margin_left_pt);
   let line_right = line_left + content_width;
+  let paragraph_left = line_left.min(first_line_left);
   let base_line_height = paragraph
     .format
     .line_height_pt
     .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
   let mut line_height = base_line_height;
-  let mut emitted = false;
-  let mut x = first_line_left;
+  let mut emitted = paragraph.list_label.is_some();
+  let mut x = if let Some(label) = &paragraph.list_label {
+    current.items.push(PageItem::Text(TextItem {
+      x_pt: first_line_left,
+      y_pt: y,
+      text: label.clone(),
+      style: TextStyle::default(),
+    }));
+    line_left
+  } else {
+    first_line_left
+  };
 
-  for run in &paragraph.runs {
-    let mut chunk = String::new();
-    let mut chunk_x = x;
+  for item in &paragraph.inlines {
+    match item {
+      InlineItem::Text(run) => {
+        let mut chunk = String::new();
+        let mut chunk_x = x;
 
-    for ch in run.text.chars() {
-      if ch == '\n' {
+        for ch in run.text.chars() {
+          if ch == '\n' {
+            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+            x = line_left;
+            chunk_x = x;
+            emitted = true;
+            continue;
+          }
+
+          let mut encoded = [0; 4];
+          let text = if ch == '\t' {
+            "    "
+          } else {
+            ch.encode_utf8(&mut encoded)
+          };
+          let width = approximate_text_width(text, run.style.font_size_pt);
+
+          if x + width > line_right && x > line_left {
+            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+            x = line_left;
+            chunk_x = x;
+          }
+
+          if chunk.is_empty() {
+            chunk_x = x;
+          }
+          chunk.push_str(text);
+          x += width;
+          line_height = line_height.max(run.style.font_size_pt * 1.25);
+          emitted = true;
+        }
+
         flush_text(current, chunk_x, y, &mut chunk, run.style);
-        y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
-        x = line_left;
-        chunk_x = x;
+      }
+      InlineItem::Image(image) => {
+        let (width, height) = fit_image_to_line(image.width_pt, image.height_pt, content_width);
+        if x + width > line_right && x > line_left {
+          y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+          x = line_left;
+        }
+        current.items.push(PageItem::Image(ImageItem {
+          x_pt: x,
+          y_pt: y,
+          width_pt: width,
+          height_pt: height,
+          data: image.data.clone(),
+          content_type: image.content_type.clone(),
+          alt_text: image.alt_text.clone(),
+        }));
+        x += width;
+        line_height = line_height.max(height);
         emitted = true;
-        continue;
       }
-
-      let mut encoded = [0; 4];
-      let text = if ch == '\t' {
-        "    "
-      } else {
-        ch.encode_utf8(&mut encoded)
-      };
-      let width = approximate_text_width(text, run.style.font_size_pt);
-
-      if x + width > line_right && x > line_left {
-        flush_text(current, chunk_x, y, &mut chunk, run.style);
-        y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
-        x = line_left;
-        chunk_x = x;
-      }
-
-      if chunk.is_empty() {
-        chunk_x = x;
-      }
-      chunk.push_str(text);
-      x += width;
-      line_height = line_height.max(run.style.font_size_pt * 1.25);
-      emitted = true;
     }
-
-    flush_text(current, chunk_x, y, &mut chunk, run.style);
   }
 
+  let paragraph_bottom;
   if emitted {
-    y += line_height
+    paragraph_bottom = y + line_height;
+    y = paragraph_bottom
       + paragraph
         .format
         .spacing_after_pt
         .max(PARAGRAPH_SPACING_AFTER_PT);
   } else {
-    y += base_line_height + paragraph.format.spacing_after_pt;
+    paragraph_bottom = y + base_line_height;
+    y = paragraph_bottom + paragraph.format.spacing_after_pt;
+  }
+
+  if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
+    align_paragraph_items(
+      &mut current.items[start_item_index..],
+      paragraph.format.alignment,
+      line_right,
+    );
+  }
+  if start_item_index <= current.items.len() {
+    decorate_paragraph(
+      current,
+      start_item_index,
+      paragraph,
+      paragraph_left,
+      paragraph_top,
+      line_right - paragraph_left,
+      paragraph_bottom - paragraph_top,
+    );
   }
 
   y
+}
+
+fn decorate_paragraph(
+  page: &mut Page,
+  start_item_index: usize,
+  paragraph: &crate::docx::Paragraph,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+) {
+  let padding = 2.0;
+  let x = x - padding;
+  let y = y - padding;
+  let width = width + padding * 2.0;
+  let height = height + padding * 2.0;
+
+  if let Some(color) = paragraph.format.shading {
+    page.items.insert(
+      start_item_index,
+      PageItem::Fill(FillItem {
+        x_pt: x,
+        y_pt: y,
+        width_pt: width,
+        height_pt: height,
+        color,
+      }),
+    );
+  }
+
+  if let Some(border) = paragraph.format.borders.top {
+    push_styled_line(page, x, y, x + width, y, border);
+  }
+  if let Some(border) = paragraph.format.borders.right {
+    push_styled_line(page, x + width, y, x + width, y + height, border);
+  }
+  if let Some(border) = paragraph.format.borders.bottom {
+    push_styled_line(page, x, y + height, x + width, y + height, border);
+  }
+  if let Some(border) = paragraph.format.borders.left {
+    push_styled_line(page, x, y, x, y + height, border);
+  }
+}
+
+fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, line_right: f32) {
+  if matches!(
+    alignment,
+    ParagraphAlignment::Left | ParagraphAlignment::Justify
+  ) {
+    return;
+  }
+
+  let mut line_ys = Vec::new();
+  for item in items.iter() {
+    let Some(y) = item_y(item) else {
+      continue;
+    };
+    if !line_ys.iter().any(|seen| f32::abs(*seen - y) < 0.01) {
+      line_ys.push(y);
+    }
+  }
+
+  for y in line_ys {
+    let mut min_x = f32::MAX;
+    let mut max_x: f32 = 0.0;
+    for item in items.iter() {
+      if let Some(item_y) = item_y(item)
+        && f32::abs(item_y - y) < 0.01
+        && let Some((x, width)) = item_horizontal_bounds(item)
+      {
+        min_x = min_x.min(x);
+        max_x = max_x.max(x + width);
+      }
+    }
+
+    if min_x == f32::MAX || max_x <= min_x {
+      continue;
+    }
+
+    let available = line_right - min_x;
+    let line_width = max_x - min_x;
+    let offset = match alignment {
+      ParagraphAlignment::Center => (available - line_width).max(0.0) / 2.0,
+      ParagraphAlignment::Right => (available - line_width).max(0.0),
+      ParagraphAlignment::Left | ParagraphAlignment::Justify => 0.0,
+    };
+    if offset <= 0.0 {
+      continue;
+    }
+
+    for item in items.iter_mut() {
+      if let Some(item_y) = item_y(item)
+        && f32::abs(item_y - y) < 0.01
+      {
+        shift_item_x(item, offset);
+      }
+    }
+  }
+}
+
+fn item_y(item: &PageItem) -> Option<f32> {
+  match item {
+    PageItem::Text(text) => Some(text.y_pt),
+    PageItem::Image(image) => Some(image.y_pt),
+    PageItem::Fill(_) => None,
+    PageItem::Line(_) => None,
+  }
+}
+
+fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
+  match item {
+    PageItem::Text(text) => Some((
+      text.x_pt,
+      approximate_text_width(&text.text, text.style.font_size_pt),
+    )),
+    PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::Fill(_) => None,
+    PageItem::Line(_) => None,
+  }
+}
+
+fn shift_item_x(item: &mut PageItem, offset: f32) {
+  match item {
+    PageItem::Text(text) => text.x_pt += offset,
+    PageItem::Image(image) => image.x_pt += offset,
+    PageItem::Fill(_) => {}
+    PageItem::Line(_) => {}
+  }
+}
+
+fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
+  let width = width.max(1.0);
+  let height = height.max(1.0);
+  if width <= max_width {
+    (width, height)
+  } else {
+    let scale = max_width.max(1.0) / width;
+    (width * scale, height * scale)
+  }
 }
 
 fn next_line(
@@ -446,13 +913,14 @@ fn flush_text(page: &mut Page, x: f32, y: f32, chunk: &mut String, style: TextSt
   }));
 }
 
-fn push_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32) {
+fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
   page.items.push(PageItem::Line(LineItem {
     x1_pt: x1,
     y1_pt: y1,
     x2_pt: x2,
     y2_pt: y2,
-    width_pt: 0.5,
+    width_pt: border.width_pt,
+    color: border.color,
   }));
 }
 

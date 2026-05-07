@@ -26,6 +26,7 @@ pub(crate) fn layout(
         margin_right_pt: 36.0,
         margin_bottom_pt: 36.0,
         margin_left_pt: 36.0,
+        ..PageSetup::default()
       })
       .unwrap_or(PageSetup {
         width_pt: 960.0,
@@ -34,6 +35,7 @@ pub(crate) fn layout(
         margin_right_pt: 36.0,
         margin_bottom_pt: 36.0,
         margin_left_pt: 36.0,
+        ..PageSetup::default()
       })
   };
 

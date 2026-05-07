@@ -29,6 +29,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     for item in &page.items {
       match item {
         PageItem::Text(text) if !text.text.is_empty() => {
+          let baseline_y = text.y_pt - text.style.baseline_shift_pt;
           if let Some(color) = text.style.highlight {
             surface.set_stroke(None);
             surface.set_fill(Some(Fill {
@@ -37,15 +38,15 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
               rule: Default::default(),
             }));
             let width = approximate_text_width(&text.text, text.style.font_size_pt);
-            let top = text.y_pt - text.style.font_size_pt;
+            let top = baseline_y - text.style.font_size_pt;
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, top);
             path.line_to(text.x_pt + width, top);
             path.line_to(
               text.x_pt + width,
-              text.y_pt + text.style.font_size_pt * 0.25,
+              baseline_y + text.style.font_size_pt * 0.25,
             );
-            path.line_to(text.x_pt, text.y_pt + text.style.font_size_pt * 0.25);
+            path.line_to(text.x_pt, baseline_y + text.style.font_size_pt * 0.25);
             path.close();
             if let Some(path) = path.finish() {
               surface.draw_path(&path);
@@ -54,7 +55,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           surface.set_stroke(None);
           surface.set_fill(Some(fill(text.style)));
           surface.draw_text(
-            Point::from_xy(text.x_pt, text.y_pt),
+            Point::from_xy(text.x_pt, baseline_y),
             fonts.select(text.style).clone(),
             text.style.font_size_pt,
             &text.text,
@@ -69,7 +70,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
                 .into(),
               ..Default::default()
             }));
-            let underline_y = text.y_pt + (text.style.font_size_pt * 0.12).max(1.0);
+            let underline_y = baseline_y + (text.style.font_size_pt * 0.12).max(1.0);
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, underline_y);
             path.line_to(
@@ -88,7 +89,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
                 .into(),
               ..Default::default()
             }));
-            let strike_y = text.y_pt - (text.style.font_size_pt * 0.32);
+            let strike_y = baseline_y - (text.style.font_size_pt * 0.32);
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, strike_y);
             path.line_to(

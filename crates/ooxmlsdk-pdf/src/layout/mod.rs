@@ -1,5 +1,6 @@
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor, TextStyle,
+  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
+  TableCellVerticalAlignment, TextStyle,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -627,7 +628,17 @@ fn layout_table_cell(
   width: f32,
   height: f32,
 ) {
-  let mut text_y = y + TABLE_CELL_PADDING_PT + DEFAULT_FONT_SIZE_PT;
+  let content_height = table_cell_content_height(cell);
+  let mut text_y = match cell.vertical_alignment {
+    TableCellVerticalAlignment::Top => y + TABLE_CELL_PADDING_PT + DEFAULT_FONT_SIZE_PT,
+    TableCellVerticalAlignment::Center => {
+      y + ((height - content_height) / 2.0).max(TABLE_CELL_PADDING_PT) + DEFAULT_FONT_SIZE_PT
+    }
+    TableCellVerticalAlignment::Bottom => {
+      y + (height - TABLE_CELL_PADDING_PT - content_height).max(TABLE_CELL_PADDING_PT)
+        + DEFAULT_FONT_SIZE_PT
+    }
+  };
   let text_left = x + TABLE_CELL_PADDING_PT;
   let text_right = x + width - TABLE_CELL_PADDING_PT;
   let text_bottom = y + height - TABLE_CELL_PADDING_PT;
@@ -703,6 +714,21 @@ fn layout_table_cell(
       }
     }
   }
+}
+
+fn table_cell_content_height(cell: &crate::docx::TableCell) -> f32 {
+  cell
+    .blocks
+    .iter()
+    .map(|block| match block {
+      Block::Paragraph(paragraph) => paragraph
+        .format
+        .line_height_pt
+        .unwrap_or(DEFAULT_LINE_HEIGHT_PT),
+      Block::Table(table) => table.rows.len().max(1) as f32 * TABLE_ROW_MIN_HEIGHT_PT,
+    })
+    .sum::<f32>()
+    .max(DEFAULT_LINE_HEIGHT_PT)
 }
 
 fn layout_nested_table(

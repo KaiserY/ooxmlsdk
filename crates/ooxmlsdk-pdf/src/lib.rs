@@ -198,6 +198,34 @@ mod tests {
         b: 0,
       })
     );
+    let superscript = paragraph
+      .runs
+      .iter()
+      .find(|run| run.text == "sup")
+      .expect("superscript run");
+    assert!(superscript.style.baseline_shift_pt > 0.0);
+    assert!(superscript.style.font_size_pt < 11.0);
+
+    let subscript = paragraph
+      .runs
+      .iter()
+      .find(|run| run.text == "sub")
+      .expect("subscript run");
+    assert!(subscript.style.baseline_shift_pt < 0.0);
+    assert!(subscript.style.font_size_pt < 11.0);
+
+    assert!(
+      paragraph
+        .runs
+        .iter()
+        .any(|run| run.text.contains(" CAPS") && run.style.uppercase)
+    );
+    assert!(
+      paragraph
+        .runs
+        .iter()
+        .any(|run| run.text.contains(" SMALLCAPS") && run.style.uppercase)
+    );
   }
 
   #[test]
@@ -620,6 +648,35 @@ mod tests {
   }
 
   #[test]
+  fn floating_anchor_images_are_extracted_as_images() {
+    let path = fixture_path("test-data/wml/image_floating.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let paragraph = paragraph_at(&doc, 0);
+    let image = paragraph
+      .inlines
+      .iter()
+      .find_map(|item| match item {
+        crate::docx::InlineItem::Image(image) => Some(image),
+        crate::docx::InlineItem::Text(_) | crate::docx::InlineItem::PageBreak => None,
+      })
+      .expect("floating image");
+
+    assert_eq!(image.content_type.as_deref(), Some("image/png"));
+    assert_eq!(image.width_pt, 72.0);
+    assert_eq!(image.height_pt, 72.0);
+    assert!(
+      paragraph
+        .runs
+        .iter()
+        .any(|run| run.text == "Text beside the floating image.")
+    );
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
   fn minimal_table_docx_flows_cells_and_borders_into_layout() {
     let path = fixture_path("test-data/document/minimal_table.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -725,6 +782,18 @@ mod tests {
     };
     assert_eq!(table.rows[0].height_pt, Some(24.0));
     assert!(table.rows[0].exact_height);
+    assert_eq!(
+      table.rows[0].cells[0].vertical_alignment,
+      crate::docx::TableCellVerticalAlignment::Center
+    );
+    assert_eq!(
+      table.rows[1].cells[0].vertical_alignment,
+      crate::docx::TableCellVerticalAlignment::Top
+    );
+    assert_eq!(
+      table.rows[2].cells[0].vertical_alignment,
+      crate::docx::TableCellVerticalAlignment::Bottom
+    );
   }
 
   fn fixture_path(relative: &str) -> PathBuf {

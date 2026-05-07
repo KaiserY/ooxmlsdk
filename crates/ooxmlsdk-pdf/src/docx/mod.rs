@@ -8,7 +8,9 @@ use ooxmlsdk::parts::{
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use ooxmlsdk::schemas::{
+  schemas_microsoft_com_vml as v, schemas_openxmlformats_org_wordprocessingml_2006_main as w,
+};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -66,6 +68,15 @@ pub(crate) struct TableCell {
   pub borders: CellBordersModel,
   pub grid_span: usize,
   pub vertical_merge_continue: bool,
+  pub vertical_alignment: TableCellVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TableCellVerticalAlignment {
+  #[default]
+  Top,
+  Center,
+  Bottom,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -149,10 +160,12 @@ pub(crate) struct InlineImage {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TextStyle {
   pub font_size_pt: f32,
+  pub baseline_shift_pt: f32,
   pub bold: bool,
   pub italic: bool,
   pub underline: bool,
   pub strikethrough: bool,
+  pub uppercase: bool,
   pub color: RgbColor,
   pub highlight: Option<RgbColor>,
 }
@@ -161,10 +174,12 @@ impl Default for TextStyle {
   fn default() -> Self {
     Self {
       font_size_pt: 11.0,
+      baseline_shift_pt: 0.0,
       bold: false,
       italic: false,
       underline: false,
       strikethrough: false,
+      uppercase: false,
       color: RgbColor { r: 0, g: 0, b: 0 },
       highlight: None,
     }
@@ -744,6 +759,14 @@ fn table_cell_model(
       .and_then(|properties| properties.vertical_merge.as_ref())
       .map(|merge| matches!(merge.val, None | Some(w::MergedCellValues::Continue)))
       .unwrap_or(false),
+    vertical_alignment: properties
+      .and_then(|properties| properties.table_cell_vertical_alignment.as_ref())
+      .map(|alignment| match alignment.val {
+        w::TableVerticalAlignmentValues::Center => TableCellVerticalAlignment::Center,
+        w::TableVerticalAlignmentValues::Bottom => TableCellVerticalAlignment::Bottom,
+        w::TableVerticalAlignmentValues::Top => TableCellVerticalAlignment::Top,
+      })
+      .unwrap_or_default(),
   }
 }
 
@@ -1039,6 +1062,11 @@ fn push_run(
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
+      w::RunChoice::WSym(symbol) => {
+        if let Some(symbol) = symbol_text(symbol) {
+          text.push(symbol);
+        }
+      }
       w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::WFootnoteReference(reference) => {
@@ -1058,12 +1086,43 @@ fn push_run(
         if let Some(image) = inline_image(drawing, images) {
           inlines.push(InlineItem::Image(image));
         }
+        push_drawing_textboxes(drawing, inlines, style);
+      }
+      w::RunChoice::WPict(picture) => {
+        flush_run_text(inlines, &mut text, style);
+        if let Some(image) = pict_image(picture, images) {
+          inlines.push(InlineItem::Image(image));
+        }
+        push_pict_textboxes(picture, inlines, base_style, styles, images);
+      }
+      w::RunChoice::WPtab(_) => text.push('\t'),
+      w::RunChoice::WRuby(ruby) => {
+        flush_run_text(inlines, &mut text, style);
+        push_ruby_base(ruby, inlines, base_style, styles, images);
       }
       _ => {}
     }
   }
 
   flush_run_text(inlines, &mut text, style);
+}
+
+fn push_ruby_base(
+  ruby: &w::Ruby,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &ruby.ruby_base.ruby_base_choice {
+    match choice {
+      w::RubyBaseChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::RubyBaseChoice::WIns(inserted) => {
+        push_inserted_run(inserted, inlines, base_style, styles, images);
+      }
+      _ => {}
+    }
+  }
 }
 
 fn push_sdt_run(
@@ -1161,25 +1220,557 @@ fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextSt
 fn flush_run_text(inlines: &mut Vec<InlineItem>, text: &mut String, style: TextStyle) {
   if !text.is_empty() {
     inlines.push(InlineItem::Text(TextRun {
-      text: std::mem::take(text),
+      text: run_display_text(std::mem::take(text), style),
       style,
     }));
   }
 }
 
+fn run_display_text(text: String, style: TextStyle) -> String {
+  if style.uppercase {
+    text.to_uppercase()
+  } else {
+    text
+  }
+}
+
+fn symbol_text(symbol: &w::SymbolChar) -> Option<char> {
+  let code = u32::from_str_radix(symbol.char.as_deref()?, 16).ok()?;
+  let low_byte = code & 0xFF;
+  let font = symbol.font.as_deref().unwrap_or("").to_ascii_lowercase();
+
+  if font.contains("wingdings") {
+    return wingdings_symbol(low_byte).or_else(|| char::from_u32(code));
+  }
+  if font == "symbol" || font.ends_with(" symbol") {
+    return symbol_font_symbol(low_byte).or_else(|| char::from_u32(code));
+  }
+
+  char::from_u32(code).or_else(|| {
+    if (0xF000..=0xF0FF).contains(&code) {
+      char::from_u32(low_byte)
+    } else {
+      None
+    }
+  })
+}
+
+fn symbol_font_symbol(code: u32) -> Option<char> {
+  Some(match code {
+    0x41 => 'Α',
+    0x42 => 'Β',
+    0x43 => 'Χ',
+    0x44 => 'Δ',
+    0x45 => 'Ε',
+    0x46 => 'Φ',
+    0x47 => 'Γ',
+    0x48 => 'Η',
+    0x49 => 'Ι',
+    0x4A => 'ϑ',
+    0x4B => 'Κ',
+    0x4C => 'Λ',
+    0x4D => 'Μ',
+    0x4E => 'Ν',
+    0x4F => 'Ο',
+    0x50 => 'Π',
+    0x51 => 'Θ',
+    0x52 => 'Ρ',
+    0x53 => 'Σ',
+    0x54 => 'Τ',
+    0x55 => 'Υ',
+    0x56 => 'ς',
+    0x57 => 'Ω',
+    0x58 => 'Ξ',
+    0x59 => 'Ψ',
+    0x5A => 'Ζ',
+    0x61 => 'α',
+    0x62 => 'β',
+    0x63 => 'χ',
+    0x64 => 'δ',
+    0x65 => 'ε',
+    0x66 => 'φ',
+    0x67 => 'γ',
+    0x68 => 'η',
+    0x69 => 'ι',
+    0x6A => 'ϕ',
+    0x6B => 'κ',
+    0x6C => 'λ',
+    0x6D => 'μ',
+    0x6E => 'ν',
+    0x6F => 'ο',
+    0x70 => 'π',
+    0x71 => 'θ',
+    0x72 => 'ρ',
+    0x73 => 'σ',
+    0x74 => 'τ',
+    0x75 => 'υ',
+    0x76 => 'ϖ',
+    0x77 => 'ω',
+    0x78 => 'ξ',
+    0x79 => 'ψ',
+    0x7A => 'ζ',
+    0xA2 => '′',
+    0xA3 => '≤',
+    0xA5 => '∞',
+    0xA7 => '♣',
+    0xA8 => '♦',
+    0xA9 => '♥',
+    0xAA => '♠',
+    0xB1 => '±',
+    0xB4 => '×',
+    0xB5 => '∝',
+    0xB6 => '∂',
+    0xB7 => '•',
+    0xB8 => '÷',
+    0xB9 => '≠',
+    0xBA => '≡',
+    0xBB => '≈',
+    0xBC => '…',
+    0xBD => '⏐',
+    0xBE => '⎯',
+    0xBF => '↵',
+    0xC0 => 'ℵ',
+    0xC1 => 'ℑ',
+    0xC2 => 'ℜ',
+    0xC3 => '℘',
+    0xC4 => '⊗',
+    0xC5 => '⊕',
+    0xC6 => '∅',
+    0xC7 => '∩',
+    0xC8 => '∪',
+    0xC9 => '⊃',
+    0xCA => '⊇',
+    0xCB => '⊄',
+    0xCC => '⊂',
+    0xCD => '⊆',
+    0xCE => '∈',
+    0xCF => '∉',
+    0xD0 => '∠',
+    0xD1 => '∇',
+    0xD2 => '®',
+    0xD3 => '©',
+    0xD4 => '™',
+    0xD5 => '∏',
+    0xD6 => '√',
+    0xD7 => '⋅',
+    0xD8 => '¬',
+    0xD9 => '∧',
+    0xDA => '∨',
+    0xDB => '⇔',
+    0xDC => '⇐',
+    0xDD => '⇑',
+    0xDE => '⇒',
+    0xDF => '⇓',
+    0xE0 => '◊',
+    0xE1 => '〈',
+    0xE2 => '®',
+    0xE3 => '©',
+    0xE4 => '™',
+    0xE5 => '∑',
+    0xE6 => '⎛',
+    0xE7 => '⎜',
+    0xE8 => '⎝',
+    0xE9 => '⎡',
+    0xEA => '⎢',
+    0xEB => '⎣',
+    0xEC => '⎧',
+    0xED => '⎨',
+    0xEE => '⎩',
+    0xEF => '⎪',
+    0xF1 => '〉',
+    0xF2 => '∫',
+    0xF3 => '⌠',
+    0xF4 => '⎮',
+    0xF5 => '⌡',
+    0xF6 => '⎞',
+    0xF7 => '⎟',
+    0xF8 => '⎠',
+    0xF9 => '⎤',
+    0xFA => '⎥',
+    0xFB => '⎦',
+    0xFC => '⎫',
+    0xFD => '⎬',
+    0xFE => '⎭',
+    _ => return char::from_u32(code),
+  })
+}
+
+fn wingdings_symbol(code: u32) -> Option<char> {
+  Some(match code {
+    0x4A => '☺',
+    0x4C => '●',
+    0x6C => '●',
+    0x6D => '■',
+    0x6E => '□',
+    0x71 => '❑',
+    0x72 => '❒',
+    0x73 => '⬧',
+    0x74 => '◆',
+    0x75 => '❖',
+    0x76 => '⬥',
+    0x77 => '⌧',
+    0x78 => '⌦',
+    0x9F => '•',
+    0xA8 => '◻',
+    0xF0 => '➔',
+    0xFC => '✓',
+    0xFD => '☒',
+    0xFE => '☑',
+    _ => return None,
+  })
+}
+
 fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
-  let w::DrawingChoice::WpInline(inline) = drawing.drawing_choice.as_ref()? else {
-    return None;
+  match drawing.drawing_choice.as_ref()? {
+    w::DrawingChoice::WpInline(inline) => {
+      let relationship_id = embedded_image_relationship_id(&inline.graphic.graphic_data)?;
+      let resource = images.by_relationship_id.get(&relationship_id)?;
+      Some(InlineImage {
+        data: resource.data.clone(),
+        content_type: resource.content_type.clone(),
+        width_pt: units::emu_to_points(inline.extent.cx),
+        height_pt: units::emu_to_points(inline.extent.cy),
+        alt_text: inline.doc_properties.description.clone(),
+      })
+    }
+    w::DrawingChoice::WpAnchor(anchor) => {
+      let graphic = anchor.a_graphic.as_ref()?;
+      let extent = anchor.extent.as_ref()?;
+      let relationship_id = embedded_image_relationship_id(&graphic.graphic_data)?;
+      let resource = images.by_relationship_id.get(&relationship_id)?;
+      Some(InlineImage {
+        data: resource.data.clone(),
+        content_type: resource.content_type.clone(),
+        width_pt: units::emu_to_points(extent.cx),
+        height_pt: units::emu_to_points(extent.cy),
+        alt_text: anchor
+          .wp_doc_pr
+          .as_ref()
+          .and_then(|properties| properties.description.clone()),
+      })
+    }
+  }
+}
+
+fn push_drawing_textboxes(drawing: &w::Drawing, inlines: &mut Vec<InlineItem>, style: TextStyle) {
+  let Some(graphic_data) = drawing_graphic_data(drawing) else {
+    return;
   };
-  let relationship_id = embedded_image_relationship_id(&inline.graphic.graphic_data)?;
-  let resource = images.by_relationship_id.get(&relationship_id)?;
+
+  for child in &graphic_data.xml_children {
+    if let Some(text) = drawing_textbox_text(child) {
+      inlines.push(InlineItem::Text(TextRun { text, style }));
+    }
+  }
+}
+
+fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
+  match drawing.drawing_choice.as_ref()? {
+    w::DrawingChoice::WpInline(inline) => Some(&inline.graphic.graphic_data),
+    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.a_graphic.as_ref()?.graphic_data),
+  }
+}
+
+fn pict_image(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
+  picture
+    .picture_choice
+    .iter()
+    .find_map(|choice| picture_choice_image(choice, images))
+}
+
+fn push_pict_textboxes(
+  picture: &w::Picture,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &picture.picture_choice {
+    push_picture_choice_textboxes(choice, inlines, base_style, styles, images);
+  }
+}
+
+fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Option<InlineImage> {
+  match choice {
+    w::PictureChoice::VGroup(group) => group_image(group, images),
+    w::PictureChoice::VImage(image) => image_file_image(image, images),
+    w::PictureChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+    w::PictureChoice::VShape(shape) => shape_image(shape, images),
+    _ => None,
+  }
+}
+
+fn push_picture_choice_textboxes(
+  choice: &w::PictureChoice,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  match choice {
+    w::PictureChoice::VGroup(group) => {
+      push_group_textboxes(group, inlines, base_style, styles, images);
+    }
+    w::PictureChoice::VImage(image) => {
+      push_image_file_textboxes(image, inlines, base_style, styles, images);
+    }
+    w::PictureChoice::VRect(rectangle) => {
+      push_rectangle_textboxes(rectangle, inlines, base_style, styles, images);
+    }
+    w::PictureChoice::VShape(shape) => {
+      push_shape_textboxes(shape, inlines, base_style, styles, images);
+    }
+    _ => {}
+  }
+}
+
+fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
+  group.group_choice.iter().find_map(|choice| match choice {
+    v::GroupChoice::VGroup(group) => group_image(group, images),
+    v::GroupChoice::VImage(image) => image_file_image(image, images),
+    v::GroupChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+    v::GroupChoice::VShape(shape) => shape_image(shape, images),
+    _ => None,
+  })
+}
+
+fn push_group_textboxes(
+  group: &v::Group,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &group.group_choice {
+    match choice {
+      v::GroupChoice::VGroup(group) => {
+        push_group_textboxes(group, inlines, base_style, styles, images);
+      }
+      v::GroupChoice::VImage(image) => {
+        push_image_file_textboxes(image, inlines, base_style, styles, images);
+      }
+      v::GroupChoice::VRect(rectangle) => {
+        push_rectangle_textboxes(rectangle, inlines, base_style, styles, images);
+      }
+      v::GroupChoice::VShape(shape) => {
+        push_shape_textboxes(shape, inlines, base_style, styles, images);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<InlineImage> {
+  image
+    .image_file_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::ImageFileChoice::VImagedata(data) => vml_image_data(
+        data,
+        image.style.as_deref(),
+        image.alternate.clone(),
+        images,
+      ),
+      _ => None,
+    })
+}
+
+fn push_image_file_textboxes(
+  image: &v::ImageFile,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &image.image_file_choice {
+    if let v::ImageFileChoice::VTextbox(textbox) = choice {
+      push_vml_textbox(textbox, inlines, base_style, styles, images);
+    }
+  }
+}
+
+fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineImage> {
+  rectangle
+    .rectangle_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::RectangleChoice::VImagedata(data) => vml_image_data(
+        data,
+        rectangle.style.as_deref(),
+        rectangle.alternate.clone(),
+        images,
+      ),
+      _ => None,
+    })
+}
+
+fn push_rectangle_textboxes(
+  rectangle: &v::Rectangle,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &rectangle.rectangle_choice {
+    if let v::RectangleChoice::VTextbox(textbox) = choice {
+      push_vml_textbox(textbox, inlines, base_style, styles, images);
+    }
+  }
+}
+
+fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::VImagedata(data) => vml_image_data(
+      data,
+      shape.style.as_deref(),
+      shape.alternate.clone(),
+      images,
+    ),
+    _ => None,
+  })
+}
+
+fn push_shape_textboxes(
+  shape: &v::Shape,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &shape.shape_choice {
+    if let v::ShapeChoice::VTextbox(textbox) = choice {
+      push_vml_textbox(textbox, inlines, base_style, styles, images);
+    }
+  }
+}
+
+fn push_vml_textbox(
+  textbox: &v::TextBox,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
+    return;
+  };
+  push_textbox_content(content, inlines, base_style, styles, images);
+}
+
+fn push_textbox_content(
+  content: &w::TextBoxContent,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  let mut numbering = NumberingCatalog::default();
+  for choice in &content.text_box_content_choice {
+    match choice {
+      w::TextBoxContentChoice::WP(paragraph) => {
+        let paragraph = paragraph_model(paragraph, styles, &mut numbering, images);
+        inlines.extend(paragraph.inlines);
+        inlines.push(InlineItem::Text(TextRun {
+          text: "\n".into(),
+          style: base_style,
+        }));
+      }
+      w::TextBoxContentChoice::WTbl(table) => {
+        let table = table_model(table, styles, &mut numbering, images);
+        push_table_text(&table, inlines, base_style);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyle) {
+  for row in &table.rows {
+    for (index, cell) in row.cells.iter().enumerate() {
+      if index > 0 {
+        inlines.push(InlineItem::Text(TextRun {
+          text: "\t".into(),
+          style,
+        }));
+      }
+      for block in &cell.blocks {
+        match block {
+          Block::Paragraph(paragraph) => {
+            inlines.extend(paragraph.inlines.clone());
+          }
+          Block::Table(table) => push_table_text(table, inlines, style),
+        }
+      }
+    }
+    inlines.push(InlineItem::Text(TextRun {
+      text: "\n".into(),
+      style,
+    }));
+  }
+}
+
+fn vml_image_data(
+  data: &v::ImageData,
+  style: Option<&str>,
+  alt_text: Option<String>,
+  images: &ImageCatalog,
+) -> Option<InlineImage> {
+  let relationship_id = data.relationship_id.as_ref().or(data.rel_id.as_ref())?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let (width_pt, height_pt) = vml_style_size(style).unwrap_or((72.0, 72.0));
+
   Some(InlineImage {
     data: resource.data.clone(),
     content_type: resource.content_type.clone(),
-    width_pt: units::emu_to_points(inline.extent.cx),
-    height_pt: units::emu_to_points(inline.extent.cy),
-    alt_text: inline.doc_properties.description.clone(),
+    width_pt,
+    height_pt,
+    alt_text: alt_text.or_else(|| data.title.clone()),
   })
+}
+
+fn vml_style_size(style: Option<&str>) -> Option<(f32, f32)> {
+  let mut width = None;
+  let mut height = None;
+
+  for declaration in style?.split(';') {
+    let Some((name, value)) = declaration.split_once(':') else {
+      continue;
+    };
+    match name.trim().to_ascii_lowercase().as_str() {
+      "width" => width = vml_measure_to_points(value),
+      "height" => height = vml_measure_to_points(value),
+      _ => {}
+    }
+  }
+
+  Some((width?, height?))
+}
+
+fn vml_measure_to_points(value: &str) -> Option<f32> {
+  let value = value.trim();
+  if value.is_empty() {
+    return None;
+  }
+
+  let (number, multiplier) = if let Some(number) = value.strip_suffix("pt") {
+    (number, 1.0)
+  } else if let Some(number) = value.strip_suffix("in") {
+    (number, 72.0)
+  } else if let Some(number) = value.strip_suffix("cm") {
+    (number, 72.0 / 2.54)
+  } else if let Some(number) = value.strip_suffix("mm") {
+    (number, 72.0 / 25.4)
+  } else if let Some(number) = value.strip_suffix("px") {
+    (number, 0.75)
+  } else {
+    (value, 1.0)
+  };
+
+  number
+    .trim()
+    .parse::<f32>()
+    .ok()
+    .map(|points| points * multiplier)
 }
 
 fn embedded_image_relationship_id(
@@ -1210,6 +1801,63 @@ fn blip_embed_relationship_id(xml: &str) -> Option<String> {
       _ => {}
     }
   }
+}
+
+fn drawing_textbox_text(xml: &str) -> Option<String> {
+  if !xml.contains("txbxContent") {
+    return None;
+  }
+
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(true);
+  let mut textbox_depth = 0usize;
+  let mut paragraph_depth = 0usize;
+  let mut in_text = false;
+  let mut output = String::new();
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) => {
+        if qname_ends_with(event.name().as_ref(), b"txbxContent") {
+          textbox_depth += 1;
+        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") {
+          paragraph_depth += 1;
+        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") {
+          in_text = true;
+        }
+      }
+      Event::End(event) => {
+        if qname_ends_with(event.name().as_ref(), b"t") {
+          in_text = false;
+        } else if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") {
+          paragraph_depth = paragraph_depth.saturating_sub(1);
+          output.push('\n');
+        } else if qname_ends_with(event.name().as_ref(), b"txbxContent") {
+          textbox_depth = textbox_depth.saturating_sub(1);
+        }
+      }
+      Event::Text(event) if textbox_depth > 0 && in_text => {
+        output.push_str(event.xml10_content().ok()?.as_ref());
+      }
+      Event::CData(event) if textbox_depth > 0 && in_text => {
+        output.push_str(event.xml10_content().ok()?.as_ref());
+      }
+      Event::Eof => break,
+      _ => {}
+    }
+  }
+
+  if paragraph_depth > 0 {
+    output.push('\n');
+  }
+  (!output.is_empty()).then_some(output)
+}
+
+fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
+  qname == local_name
+    || qname
+      .strip_suffix(local_name)
+      .is_some_and(|prefix| prefix.ends_with(b":"))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1339,6 +1987,30 @@ fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps<'_>>) {
   }
   if let Some(double_strike) = properties.double_strike() {
     style.strikethrough = double_strike.val.unwrap_or(true);
+  }
+  if let Some(caps) = properties.caps() {
+    style.uppercase = caps.val.unwrap_or(true);
+  }
+  if let Some(small_caps) = properties.small_caps()
+    && small_caps.val.unwrap_or(true)
+  {
+    style.uppercase = true;
+    style.font_size_pt = (style.font_size_pt * 0.85).max(1.0);
+  }
+  if let Some(vertical_alignment) = properties.vertical_text_alignment() {
+    match vertical_alignment.val {
+      w::VerticalPositionValues::Superscript => {
+        style.baseline_shift_pt = style.font_size_pt * 0.35;
+        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
+      }
+      w::VerticalPositionValues::Subscript => {
+        style.baseline_shift_pt = -(style.font_size_pt * 0.2);
+        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
+      }
+      w::VerticalPositionValues::Baseline => {
+        style.baseline_shift_pt = 0.0;
+      }
+    }
   }
   if let Some(highlight) = properties.highlight() {
     style.highlight = highlight_color(highlight.val);
@@ -1531,6 +2203,9 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   if (values.font_size_pt - TextStyle::default().font_size_pt).abs() > f32::EPSILON {
     target.font_size_pt = values.font_size_pt;
   }
+  if values.baseline_shift_pt.abs() > f32::EPSILON {
+    target.baseline_shift_pt = values.baseline_shift_pt;
+  }
   if values.bold {
     target.bold = true;
   }
@@ -1542,6 +2217,9 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   }
   if values.strikethrough {
     target.strikethrough = true;
+  }
+  if values.uppercase {
+    target.uppercase = true;
   }
   if values.color != TextStyle::default().color {
     target.color = values.color;
@@ -1947,6 +2625,30 @@ impl<'a> RunProps<'a> {
     }
   }
 
+  fn caps(&self) -> Option<&'a w::Caps> {
+    match self {
+      Self::Direct(properties) => properties.caps.as_ref(),
+      Self::Style(properties) => properties.caps.as_ref(),
+      Self::BaseStyle(properties) => properties.caps.as_ref(),
+    }
+  }
+
+  fn small_caps(&self) -> Option<&'a w::SmallCaps> {
+    match self {
+      Self::Direct(properties) => properties.small_caps.as_ref(),
+      Self::Style(properties) => properties.small_caps.as_ref(),
+      Self::BaseStyle(properties) => properties.small_caps.as_ref(),
+    }
+  }
+
+  fn vertical_text_alignment(&self) -> Option<&'a w::VerticalTextAlignment> {
+    match self {
+      Self::Direct(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
+    }
+  }
+
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
       Self::Direct(properties) => properties.highlight.as_ref(),
@@ -2017,4 +2719,202 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
   }
 
   setup
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn symbol_runs_emit_unicode_text() {
+    let mut inlines = Vec::new();
+    let run = w::Run {
+      run_choice: vec![
+        w::RunChoice::WSym(Box::new(w::SymbolChar {
+          font: Some("Symbol".into()),
+          char: Some("F0B7".into()),
+        })),
+        w::RunChoice::WSym(Box::new(w::SymbolChar {
+          font: Some("Wingdings".into()),
+          char: Some("F0FC".into()),
+        })),
+        w::RunChoice::WSym(Box::new(w::SymbolChar {
+          font: None,
+          char: Some("00A9".into()),
+        })),
+      ],
+      ..Default::default()
+    };
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+    );
+
+    assert_eq!(inline_text(&inlines), "•✓©");
+  }
+
+  #[test]
+  fn ruby_runs_emit_base_text() {
+    let mut inlines = Vec::new();
+    let ruby = w::Ruby {
+      ruby_base: Box::new(w::RubyBase {
+        ruby_base_choice: vec![w::RubyBaseChoice::WR(Box::new(w::Run {
+          run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
+            xml_content: Some("漢".into()),
+            ..Default::default()
+          }))],
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }),
+      ..Default::default()
+    };
+    let run = w::Run {
+      run_choice: vec![
+        w::RunChoice::WT(Box::new(w::Text {
+          xml_content: Some("Before ".into()),
+          ..Default::default()
+        })),
+        w::RunChoice::WRuby(Box::new(ruby)),
+        w::RunChoice::WT(Box::new(w::Text {
+          xml_content: Some(" after".into()),
+          ..Default::default()
+        })),
+      ],
+      ..Default::default()
+    };
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+    );
+
+    assert_eq!(inline_text(&inlines), "Before 漢 after");
+  }
+
+  #[test]
+  fn vml_pict_runs_emit_images() {
+    let mut catalog = ImageCatalog::default();
+    catalog.by_relationship_id.insert(
+      "rId1".into(),
+      ImageResource {
+        data: vec![1, 2, 3],
+        content_type: Some("image/png".into()),
+      },
+    );
+    let run = w::Run {
+      run_choice: vec![w::RunChoice::WPict(Box::new(w::Picture {
+        picture_choice: vec![w::PictureChoice::VShape(Box::new(v::Shape {
+          style: Some("width:1in;height:24pt".into()),
+          alternate: Some("VML image".into()),
+          shape_choice: vec![v::ShapeChoice::VImagedata(Box::new(v::ImageData {
+            relationship_id: Some("rId1".into()),
+            ..Default::default()
+          }))],
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut inlines = Vec::new();
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &catalog,
+    );
+
+    let image = inlines
+      .iter()
+      .find_map(|item| match item {
+        InlineItem::Image(image) => Some(image),
+        InlineItem::Text(_) | InlineItem::PageBreak => None,
+      })
+      .expect("VML image");
+    assert_eq!(image.content_type.as_deref(), Some("image/png"));
+    assert_eq!(image.width_pt, 72.0);
+    assert_eq!(image.height_pt, 24.0);
+    assert_eq!(image.alt_text.as_deref(), Some("VML image"));
+  }
+
+  #[test]
+  fn vml_textboxes_emit_text_content() {
+    let run = w::Run {
+      run_choice: vec![w::RunChoice::WPict(Box::new(w::Picture {
+        picture_choice: vec![w::PictureChoice::VShape(Box::new(v::Shape {
+          shape_choice: vec![v::ShapeChoice::VTextbox(Box::new(v::TextBox {
+            text_box_choice: Some(v::TextBoxChoice::WTxbxContent(Box::new(
+              w::TextBoxContent {
+                text_box_content_choice: vec![w::TextBoxContentChoice::WP(Box::new(
+                  w::Paragraph {
+                    paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
+                      run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
+                        xml_content: Some("Text inside VML box".into()),
+                        ..Default::default()
+                      }))],
+                      ..Default::default()
+                    }))],
+                    ..Default::default()
+                  },
+                ))],
+                ..Default::default()
+              },
+            ))),
+            ..Default::default()
+          }))],
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut inlines = Vec::new();
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+    );
+
+    assert!(inline_text(&inlines).contains("Text inside VML box"));
+  }
+
+  #[test]
+  fn drawing_textboxes_extract_cached_text() {
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <wps:txbx>
+    <w:txbxContent>
+      <w:p><w:r><w:t>Modern text box</w:t></w:r></w:p>
+      <w:p><w:r><w:t>Second line</w:t></w:r></w:p>
+    </w:txbxContent>
+  </wps:txbx>
+</wps:wsp>"#;
+
+    assert_eq!(
+      drawing_textbox_text(xml).as_deref(),
+      Some("Modern text box\nSecond line\n")
+    );
+  }
+
+  fn inline_text(inlines: &[InlineItem]) -> String {
+    inlines
+      .iter()
+      .filter_map(|item| match item {
+        InlineItem::Text(run) => Some(run.text.as_str()),
+        InlineItem::Image(_) | InlineItem::PageBreak => None,
+      })
+      .collect()
+  }
 }

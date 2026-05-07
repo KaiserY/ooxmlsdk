@@ -1,0 +1,247 @@
+//! PDF conversion support for Open XML packages.
+//!
+//! The crate is intentionally split into three stages:
+//!
+//! 1. DOCX extraction from `ooxmlsdk` package/schema types.
+//! 2. Word-like layout into an internal page/display-list model.
+//! 3. PDF rendering through `krilla`.
+
+mod docx;
+mod error;
+mod layout;
+mod options;
+mod pptx;
+mod render;
+mod xlsx;
+
+use std::io::{Read, Seek};
+
+use ooxmlsdk::parts::{
+  presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
+  wordprocessing_document::WordprocessingDocument,
+};
+
+pub use error::{PdfError, Result};
+pub use options::{PdfOptions, PdfStandard};
+
+/// Convert a DOCX stream into PDF bytes.
+pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
+where
+  R: Read + Seek,
+{
+  let mut document = WordprocessingDocument::new(reader)?;
+  convert_wordprocessing_document(&mut document, options)
+}
+
+/// Convert an opened Wordprocessing document into PDF bytes.
+pub fn convert_wordprocessing_document(
+  document: &mut WordprocessingDocument,
+  options: PdfOptions,
+) -> Result<Vec<u8>> {
+  let doc = docx::extract(document, &options)?;
+  let pages = layout::layout(&doc, &options)?;
+  render::krilla::render(&pages, &options)
+}
+
+/// Convert an XLSX stream into PDF bytes.
+pub fn convert_xlsx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
+where
+  R: Read + Seek,
+{
+  let mut document = SpreadsheetDocument::new(reader)?;
+  convert_spreadsheet_document(&mut document, options)
+}
+
+/// Convert an opened spreadsheet document into PDF bytes.
+pub fn convert_spreadsheet_document(
+  document: &mut SpreadsheetDocument,
+  options: PdfOptions,
+) -> Result<Vec<u8>> {
+  let pages = xlsx::layout(document, &options)?;
+  render::krilla::render(&pages, &options)
+}
+
+/// Convert a PPTX stream into PDF bytes.
+pub fn convert_pptx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
+where
+  R: Read + Seek,
+{
+  let mut document = PresentationDocument::new(reader)?;
+  convert_presentation_document(&mut document, options)
+}
+
+/// Convert an opened presentation document into PDF bytes.
+pub fn convert_presentation_document(
+  document: &mut PresentationDocument,
+  options: PdfOptions,
+) -> Result<Vec<u8>> {
+  let pages = pptx::layout(document, &options)?;
+  render::krilla::render(&pages, &options)
+}
+
+#[cfg(test)]
+mod tests {
+  use std::fs::File;
+  use std::path::PathBuf;
+
+  use super::*;
+
+  #[test]
+  fn convert_docx_writes_pdf_document() {
+    let path = fixture_path("test-data/document/minimal_empty.docx");
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+
+    assert!(pdf.starts_with(b"%PDF-"));
+    assert!(pdf.ends_with(b"%%EOF\n") || pdf.ends_with(b"%%EOF"));
+  }
+
+  #[test]
+  fn convert_xlsx_writes_pdf_document() {
+    let path = fixture_path("test-data/spreadsheet/minimal_values.xlsx");
+    let pdf = convert_xlsx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+
+    assert!(pdf.starts_with(b"%PDF-"));
+    assert!(pdf.ends_with(b"%%EOF\n") || pdf.ends_with(b"%%EOF"));
+  }
+
+  #[test]
+  fn convert_pptx_writes_pdf_document() {
+    let path = fixture_path("test-data/slideshow/minimal_text.pptx");
+    let pdf = convert_pptx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+
+    assert!(pdf.starts_with(b"%PDF-"));
+    assert!(pdf.ends_with(b"%%EOF\n") || pdf.ends_with(b"%%EOF"));
+  }
+
+  #[test]
+  fn minimal_text_docx_flows_text_into_layout() {
+    let path = fixture_path("test-data/document/minimal_text.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.blocks.len(), 1);
+    assert!(layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Text(text) if text.text == "Hello ooxmlsdk"
+        )
+      })
+    }));
+  }
+
+  #[test]
+  fn run_formatting_is_preserved_in_layout_items() {
+    let path = fixture_path("test-data/wml/char_formatting.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    let texts = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .filter_map(|item| match item {
+        crate::layout::PageItem::Text(text) => Some(text),
+        crate::layout::PageItem::Line(_) => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert!(
+      texts
+        .iter()
+        .any(|item| item.text.contains("Bold") && item.style.bold)
+    );
+    assert!(
+      texts
+        .iter()
+        .any(|item| item.text.contains("Italic") && item.style.italic)
+    );
+    assert!(
+      texts
+        .iter()
+        .any(|item| item.text.contains("14pt") && (item.style.font_size_pt - 14.0).abs() < 0.1)
+    );
+    assert!(texts.iter().any(|item| {
+      item.text.contains("Red")
+        && item.style.color
+          == crate::docx::RgbColor {
+            r: 0xC0,
+            g: 0,
+            b: 0,
+          }
+    }));
+  }
+
+  #[test]
+  fn paragraph_spacing_and_indentation_are_extracted() {
+    let path = fixture_path("test-data/wml/para_indent.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    let first = paragraph_at(&doc, 0);
+    assert_eq!(first.format.indent_left_pt, 36.0);
+
+    let third = paragraph_at(&doc, 2);
+    assert_eq!(third.format.first_line_indent_pt, 18.0);
+
+    let fourth = paragraph_at(&doc, 3);
+    assert_eq!(fourth.format.first_line_indent_pt, -18.0);
+
+    let path = fixture_path("test-data/wml/para_spacing.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let spaced = paragraph_at(&doc, 0);
+
+    assert_eq!(spaced.format.spacing_before_pt, 12.0);
+    assert_eq!(spaced.format.spacing_after_pt, 6.0);
+
+    let double_spaced = paragraph_at(&doc, 3);
+    assert_eq!(double_spaced.format.line_height_pt, Some(28.0));
+  }
+
+  #[test]
+  fn minimal_table_docx_flows_cells_and_borders_into_layout() {
+    let path = fixture_path("test-data/document/minimal_table.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(
+      doc
+        .blocks
+        .iter()
+        .any(|block| matches!(block, crate::docx::Block::Table(_)))
+    );
+    for expected in ["A1", "B1", "A2", "B2"] {
+      assert!(layout.pages.iter().any(|page| {
+        page.items.iter().any(|item| {
+          matches!(
+            item,
+            crate::layout::PageItem::Text(text) if text.text.contains(expected)
+          )
+        })
+      }));
+    }
+    assert!(layout.pages.iter().any(|page| {
+      page
+        .items
+        .iter()
+        .any(|item| matches!(item, crate::layout::PageItem::Line(_)))
+    }));
+  }
+
+  fn fixture_path(relative: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../..")
+      .join(relative)
+  }
+
+  fn paragraph_at(doc: &crate::docx::DocxDocument, index: usize) -> &crate::docx::Paragraph {
+    match &doc.blocks[index] {
+      crate::docx::Block::Paragraph(paragraph) => paragraph,
+      crate::docx::Block::Table(_) => panic!("expected paragraph at block {index}"),
+    }
+  }
+}

@@ -4,13 +4,14 @@ members = [
   "crates/ooxmlsdk",
   "crates/ooxmlsdk-build",
   "crates/ooxmlsdk-derive",
+  "crates/ooxmlsdk-pdf",
   "crates/ooxmlsdk-test",
 ]
 
 [workspace.package]
 version = "0.6.2"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 authors = ["KaiserY"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/KaiserY/ooxmlsdk"
@@ -24,6 +25,7 @@ readme = "README.md"
 ooxmlsdk = { version = "0.6.2", path = "crates/ooxmlsdk", default-features = false }
 ooxmlsdk-build = { version = "0.6.2", path = "crates/ooxmlsdk-build" }
 ooxmlsdk-derive = { version = "0.6.2", path = "crates/ooxmlsdk-derive" }
+ooxmlsdk-pdf = { version = "0.6.2", path = "crates/ooxmlsdk-pdf" }
 ooxmlsdk-test = { version = "0.6.2", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.39.3"
@@ -42,6 +44,9 @@ criterion = "0.8.2"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
 walkdir = "2.5.0"
 toml = "1.1"
+fontdb = "0.23"
+krilla = { git = "https://github.com/LaurenzV/krilla", rev = "88483e2", default-features = false, features = ["raster-images", "pdf", "simple-text"] }
+krilla-svg = { git = "https://github.com/LaurenzV/krilla", rev = "88483e2" }
 
 [profile.dev]
 incremental = false

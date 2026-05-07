@@ -77,8 +77,9 @@ structural fidelity, not rendering or layout.
 | Content controls (SDT block: plain text, alias/tag/id/lock) | ✅ | `wml/content_controls.docx` |
 | Content controls (SDT run: date picker with fullDate/dateFormat; dropDownList with listItems) | ✅ | `wml/content_controls.docx` |
 | VBA macros preserve-only (.docm; macroEnabled content type; microsoft.com rel type; OLE2 bin round-trip) | ✅ | `wml/vba_preserve.docm` |
-| Custom XML | 🔲 | |
-| Embedded objects | 🔲 | |
+| Custom XML data storage (CustomXmlPart + CustomXmlPropertiesPart with ds:datastoreItem/itemID/schemaRefs) | ✅ | `wml/custom_xml.docx` |
+| Custom XML inline tagging (w:customXml block with w:customXmlPr/w:attr) | ✅ | `wml/custom_xml.docx` |
+| Embedded OLE objects (w:object + VML shape + o:OLEObject; EmbeddedObjectPart OLE2 bin; oleObject content type via Default Extension="bin") | ✅ | `wml/embedded_object.docx` |
 
 ## SpreadsheetML (XLSX)
 
@@ -112,10 +113,11 @@ structural fidelity, not rendering or layout.
 | Custom number formats | ✅ | `spreadsheet/number_formats.xlsx` |
 | Column/row dimensions | ✅ | `spreadsheet/row_col_dims.xlsx` |
 | Freeze panes | ✅ | `spreadsheet/freeze_panes.xlsx` |
-| Conditional formatting | 🔲 | |
-| Data validation | 🔲 | |
-| Charts | 🔲 | |
-| Pivot tables | 🔲 | |
+| Conditional formatting (cellIs greaterThan + expression rules with dxfId, dxfs in styles.xml) | ✅ | `spreadsheet/conditional_cellis.xlsx` |
+| Conditional formatting (3-stop colorScale, dataBar, iconSet 3TrafficLights1) | ✅ | `spreadsheet/conditional_visual.xlsx` |
+| Data validation (whole between with prompts/errors; list inline literal; custom with errorStyle warning) | ✅ | `spreadsheet/data_validation.xlsx` |
+| Charts (DrawingsPart twoCellAnchor graphicFrame; ChartPart c:barChart with strRef cat + numRef val + cached values; catAx/valAx) | ✅ | `spreadsheet/chart_bar.xlsx` |
+| Pivot tables (PivotCacheDefinition + PivotCacheRecords + PivotTableDefinition; rowFields/colFields/dataFields; sharedItems with x:s indexed records) | ✅ | `spreadsheet/pivot_table.xlsx` |
 | VBA macros (preserve-only) | 🔲 | |
 
 ## PresentationML (PPTX)

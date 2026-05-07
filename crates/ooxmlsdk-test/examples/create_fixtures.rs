@@ -2471,6 +2471,12 @@ fn main() {
   create_wml_bookmarks_fixtures(&root);
   create_wml_sdt_fixtures(&root);
   create_vba_preserve_fixtures(&root);
+  create_wml_custom_xml_fixtures(&root);
+  create_wml_embedded_fixtures(&root, &png);
+  create_sml_conditional_fixtures(&root);
+  create_sml_validation_fixtures(&root);
+  create_sml_chart_fixtures(&root);
+  create_sml_pivot_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -4956,5 +4962,651 @@ fn create_pml_fixtures(root: &Path) {
       extra: vec![],
     });
     save(root, "test-data/pml/slide_hyperlink.pptx", &data);
+  }
+}
+
+fn create_wml_custom_xml_fixtures(root: &Path) {
+  // ── WML-CX-01: custom_xml ────────────────────────────────────────────────
+  // Document with a CustomXmlPart (item1.xml) carrying a user namespace +
+  // a CustomXmlPropertiesPart (itemProps1.xml) declaring ds:itemID GUID and
+  // two ds:schemaRef entries. Body uses inline w:customXml block tagging
+  // with a w:customXmlPr w:attr child.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:customXml w:uri="http://example.com/schema/contacts" w:element="contact">
+      <w:customXmlPr>
+        <w:attr w:uri="http://example.com/schema/contacts" w:name="id" w:val="42"/>
+      </w:customXmlPr>
+      <w:p>
+        <w:r><w:t>Alice (id=42)</w:t></w:r>
+      </w:p>
+    </w:customXml>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+
+    let item = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<contacts xmlns="http://example.com/schema/contacts">
+  <contact id="42"><name>Alice</name><email>alice@example.com</email></contact>
+</contacts>"#;
+
+    let item_props = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ds:datastoreItem ds:itemID="{D9D1AB4F-6A5F-4F8D-9EF6-0F61D62E2A98}"
+                  xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml">
+  <ds:schemaRefs>
+    <ds:schemaRef ds:uri="http://example.com/schema/contacts"/>
+    <ds:schemaRef ds:uri="http://example.com/schema/v2"/>
+  </ds:schemaRefs>
+</ds:datastoreItem>"#;
+
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"/>"#,
+      "",
+    );
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/>"#,
+    );
+
+    let item_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("customXml/item1.xml", item),
+      ("customXml/_rels/item1.xml.rels", &item_rels),
+      ("customXml/itemProps1.xml", item_props),
+    ]);
+    save(root, "test-data/wml/custom_xml.docx", &data);
+  }
+}
+
+fn create_wml_embedded_fixtures(root: &Path, png: &[u8]) {
+  // ── WML-EO-01: embedded_object ───────────────────────────────────────────
+  // Document with a w:object wrapping a VML shape (icon image via rId4) and
+  // an o:OLEObject (embedded OLE2 payload via rId5). EmbeddedObjectPart at
+  // word/embeddings/oleObject1.bin carries an OLE2 magic header. Default
+  // Extension="bin" maps to oleObject content type.
+  {
+    let mut ole_bin = vec![0u8; 512];
+    ole_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    ole_bin[24] = 0x3E;
+    ole_bin[25] = 0x00;
+    ole_bin[26] = 0x03;
+    ole_bin[27] = 0x00;
+
+    let doc = br##"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:v="urn:schemas-microsoft-com:vml">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:object w:dxaOrig="1440" w:dyaOrig="1440">
+          <v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:50pt;height:50pt">
+            <v:imagedata r:id="rId4" o:title=""/>
+          </v:shape>
+          <o:OLEObject Type="Embed" ProgID="Excel.Sheet.12" ShapeID="_x0000_i1025"
+                       DrawAspect="Icon" ObjectID="_1693817012" r:id="rId5"/>
+        </w:object>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"##;
+
+    let content_types = docx_content_types(
+      "",
+      r#"
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.oleObject"/>"#,
+    );
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="embeddings/oleObject1.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/media/image1.png", png),
+      ("word/embeddings/oleObject1.bin", &ole_bin),
+    ]);
+    save(root, "test-data/wml/embedded_object.docx", &data);
+  }
+}
+
+fn create_sml_conditional_fixtures(root: &Path) {
+  // ── SML-CF-01: conditional_cellis ────────────────────────────────────────
+  // Two rules in one block: cellIs greaterThan 10 (dxfId=0) + expression
+  // MOD(ROW(),2)=0 (dxfId=1). styles.xml carries 2 dxfs (font bold/red,
+  // fill yellow; font italic).
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:fonts count="1"><x:font><x:sz val="11"/><x:name val="Calibri"/></x:font></x:fonts>
+  <x:fills count="2">
+    <x:fill><x:patternFill patternType="none"/></x:fill>
+    <x:fill><x:patternFill patternType="gray125"/></x:fill>
+  </x:fills>
+  <x:borders count="1">
+    <x:border><x:left/><x:right/><x:top/><x:bottom/><x:diagonal/></x:border>
+  </x:borders>
+  <x:cellStyleXfs count="1"><x:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></x:cellStyleXfs>
+  <x:cellXfs count="1"><x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></x:cellXfs>
+  <x:dxfs count="2">
+    <x:dxf>
+      <x:font><x:b/><x:color rgb="FFFF0000"/></x:font>
+      <x:fill><x:patternFill><x:bgColor rgb="FFFFFF00"/></x:patternFill></x:fill>
+    </x:dxf>
+    <x:dxf>
+      <x:font><x:i/></x:font>
+    </x:dxf>
+  </x:dxfs>
+</x:styleSheet>"#;
+
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1"><x:v>5</x:v></x:c></x:row>
+    <x:row r="2"><x:c r="A2"><x:v>15</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3"><x:v>25</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:conditionalFormatting sqref="A1:A3">
+    <x:cfRule type="cellIs" priority="1" dxfId="0" operator="greaterThan">
+      <x:formula>10</x:formula>
+    </x:cfRule>
+    <x:cfRule type="expression" priority="2" dxfId="1" stopIfTrue="0">
+      <x:formula>MOD(ROW(),2)=0</x:formula>
+    </x:cfRule>
+  </x:conditionalFormatting>
+</x:worksheet>"#;
+
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/styles.xml", styles),
+    ]);
+    save(root, "test-data/spreadsheet/conditional_cellis.xlsx", &data);
+  }
+
+  // ── SML-CF-02: conditional_visual ────────────────────────────────────────
+  // Three visualisation rules across distinct ranges: 3-stop colorScale,
+  // dataBar, iconSet (3TrafficLights1).
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1"><x:v>1</x:v></x:c><x:c r="B1"><x:v>10</x:v></x:c><x:c r="C1"><x:v>33</x:v></x:c></x:row>
+    <x:row r="2"><x:c r="A2"><x:v>5</x:v></x:c><x:c r="B2"><x:v>50</x:v></x:c><x:c r="C2"><x:v>66</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3"><x:v>9</x:v></x:c><x:c r="B3"><x:v>90</x:v></x:c><x:c r="C3"><x:v>99</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:conditionalFormatting sqref="A1:A3">
+    <x:cfRule type="colorScale" priority="1">
+      <x:colorScale>
+        <x:cfvo type="min"/>
+        <x:cfvo type="percentile" val="50"/>
+        <x:cfvo type="max"/>
+        <x:color rgb="FFF8696B"/>
+        <x:color rgb="FFFFEB84"/>
+        <x:color rgb="FF63BE7B"/>
+      </x:colorScale>
+    </x:cfRule>
+  </x:conditionalFormatting>
+  <x:conditionalFormatting sqref="B1:B3">
+    <x:cfRule type="dataBar" priority="2">
+      <x:dataBar>
+        <x:cfvo type="min"/>
+        <x:cfvo type="max"/>
+        <x:color rgb="FF638EC6"/>
+      </x:dataBar>
+    </x:cfRule>
+  </x:conditionalFormatting>
+  <x:conditionalFormatting sqref="C1:C3">
+    <x:cfRule type="iconSet" priority="3">
+      <x:iconSet iconSet="3TrafficLights1">
+        <x:cfvo type="percent" val="0"/>
+        <x:cfvo type="percent" val="33"/>
+        <x:cfvo type="percent" val="67"/>
+      </x:iconSet>
+    </x:cfRule>
+  </x:conditionalFormatting>
+</x:worksheet>"#;
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/conditional_visual.xlsx", &data);
+  }
+}
+
+fn create_sml_validation_fixtures(root: &Path) {
+  // ── SML-DV-01: data_validation ───────────────────────────────────────────
+  // Three rules in one block: whole between 1..100 with prompts/errors;
+  // list with inline literal "red,green,blue"; custom with errorStyle warning.
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:v>50</x:v></x:c>
+      <x:c r="B1" t="inlineStr"><x:is><x:t>red</x:t></x:is></x:c>
+      <x:c r="C1" t="inlineStr"><x:is><x:t>short</x:t></x:is></x:c>
+    </x:row>
+  </x:sheetData>
+  <x:dataValidations count="3">
+    <x:dataValidation type="whole" operator="between" allowBlank="1"
+                      showInputMessage="1" showErrorAlert="1"
+                      errorTitle="Out of range" error="Enter 1 to 100."
+                      promptTitle="Hint" prompt="Whole number 1-100." sqref="A1:A10">
+      <x:formula1>1</x:formula1>
+      <x:formula2>100</x:formula2>
+    </x:dataValidation>
+    <x:dataValidation type="list" allowBlank="1" showDropDown="0" sqref="B1:B10">
+      <x:formula1>"red,green,blue"</x:formula1>
+    </x:dataValidation>
+    <x:dataValidation type="custom" errorStyle="warning"
+                      showErrorAlert="1" sqref="C1">
+      <x:formula1>LEN(C1)&lt;=10</x:formula1>
+    </x:dataValidation>
+  </x:dataValidations>
+</x:worksheet>"#;
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/data_validation.xlsx", &data);
+  }
+}
+
+fn create_sml_chart_fixtures(root: &Path) {
+  // ── CHART-01: chart_bar ──────────────────────────────────────────────────
+  // Worksheet with a x:drawing pointing to drawing1.xml (twoCellAnchor
+  // graphicFrame referencing chart1.xml). chart1.xml has barChart with one
+  // series (cat strRef + val numRef + cached values) and a catAx/valAx pair.
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>Quarter</x:t></x:is></x:c><x:c r="B1" t="inlineStr"><x:is><x:t>Sales</x:t></x:is></x:c></x:row>
+    <x:row r="2"><x:c r="A2" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c><x:c r="B2"><x:v>10</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3" t="inlineStr"><x:is><x:t>Q2</x:t></x:is></x:c><x:c r="B3"><x:v>20</x:v></x:c></x:row>
+    <x:row r="4"><x:c r="A4" t="inlineStr"><x:is><x:t>Q3</x:t></x:is></x:c><x:c r="B4"><x:v>30</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:drawing r:id="rId2"/>
+</x:worksheet>"#;
+
+    let sheet_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let drawing = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>15</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame macro="">
+      <xdr:nvGraphicFramePr>
+        <xdr:cNvPr id="2" name="Chart 1"/>
+        <xdr:cNvGraphicFramePr/>
+      </xdr:nvGraphicFramePr>
+      <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+      <a:graphic>
+        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+          <c:chart r:id="rId1"/>
+        </a:graphicData>
+      </a:graphic>
+    </xdr:graphicFrame>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>"#;
+
+    let drawing_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let chart = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:autoTitleDeleted val="1"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        <c:varyColors val="0"/>
+        <c:ser>
+          <c:idx val="0"/>
+          <c:order val="0"/>
+          <c:tx>
+            <c:strRef>
+              <c:f>Sheet1!$B$1</c:f>
+              <c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Sales</c:v></c:pt></c:strCache>
+            </c:strRef>
+          </c:tx>
+          <c:cat>
+            <c:strRef>
+              <c:f>Sheet1!$A$2:$A$4</c:f>
+              <c:strCache>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>Q1</c:v></c:pt>
+                <c:pt idx="1"><c:v>Q2</c:v></c:pt>
+                <c:pt idx="2"><c:v>Q3</c:v></c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:cat>
+          <c:val>
+            <c:numRef>
+              <c:f>Sheet1!$B$2:$B$4</c:f>
+              <c:numCache>
+                <c:formatCode>General</c:formatCode>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>10</c:v></c:pt>
+                <c:pt idx="1"><c:v>20</c:v></c:pt>
+                <c:pt idx="2"><c:v>30</c:v></c:pt>
+              </c:numCache>
+            </c:numRef>
+          </c:val>
+        </c:ser>
+        <c:axId val="111"/>
+        <c:axId val="222"/>
+      </c:barChart>
+      <c:catAx>
+        <c:axId val="111"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:crossAx val="222"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="222"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:crossAx val="111"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/>
+    <c:dispBlanksAs val="gap"/>
+  </c:chart>
+</c:chartSpace>"#;
+
+    let content_types = xlsx_content_types(
+      1,
+      r#"
+  <Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+  <Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/worksheets/_rels/sheet1.xml.rels", &sheet_rels),
+      ("xl/drawings/drawing1.xml", drawing),
+      ("xl/drawings/_rels/drawing1.xml.rels", &drawing_rels),
+      ("xl/charts/chart1.xml", chart),
+    ]);
+    save(root, "test-data/spreadsheet/chart_bar.xlsx", &data);
+  }
+}
+
+fn create_sml_pivot_fixtures(root: &Path) {
+  // ── SML-PT-01: pivot_table ───────────────────────────────────────────────
+  // Two sheets — Source data (Region/Quarter/Sales, 3 rows) and a Pivot
+  // sheet displaying a row=Region / col=Quarter / data=Sum of Sales pivot.
+  // Cache definition lists 3 cacheFields (two strings with sharedItems,
+  // one numeric); cache records carry 3 records using <x:x> for indexed
+  // strings and <x:n> for the numeric column.
+  {
+    let source_sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" t="inlineStr"><x:is><x:t>Region</x:t></x:is></x:c>
+      <x:c r="B1" t="inlineStr"><x:is><x:t>Quarter</x:t></x:is></x:c>
+      <x:c r="C1" t="inlineStr"><x:is><x:t>Sales</x:t></x:is></x:c>
+    </x:row>
+    <x:row r="2">
+      <x:c r="A2" t="inlineStr"><x:is><x:t>North</x:t></x:is></x:c>
+      <x:c r="B2" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c>
+      <x:c r="C2"><x:v>100</x:v></x:c>
+    </x:row>
+    <x:row r="3">
+      <x:c r="A3" t="inlineStr"><x:is><x:t>North</x:t></x:is></x:c>
+      <x:c r="B3" t="inlineStr"><x:is><x:t>Q2</x:t></x:is></x:c>
+      <x:c r="C3"><x:v>200</x:v></x:c>
+    </x:row>
+    <x:row r="4">
+      <x:c r="A4" t="inlineStr"><x:is><x:t>South</x:t></x:is></x:c>
+      <x:c r="B4" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c>
+      <x:c r="C4"><x:v>300</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+
+    let pivot_sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheetData/>
+</x:worksheet>"#;
+
+    let pivot_sheet_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let cache_def = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotCacheDefinition xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                        r:id="rId1" recordCount="3" refreshOnLoad="1"
+                        createdVersion="6" refreshedVersion="6" minRefreshableVersion="3">
+  <x:cacheSource type="worksheet">
+    <x:worksheetSource ref="A1:C4" sheet="Source"/>
+  </x:cacheSource>
+  <x:cacheFields count="3">
+    <x:cacheField name="Region" numFmtId="0">
+      <x:sharedItems count="2">
+        <x:s v="North"/>
+        <x:s v="South"/>
+      </x:sharedItems>
+    </x:cacheField>
+    <x:cacheField name="Quarter" numFmtId="0">
+      <x:sharedItems count="2">
+        <x:s v="Q1"/>
+        <x:s v="Q2"/>
+      </x:sharedItems>
+    </x:cacheField>
+    <x:cacheField name="Sales" numFmtId="0">
+      <x:sharedItems containsSemiMixedTypes="0" containsString="0"
+                     containsNumber="1" containsInteger="1"
+                     minValue="100" maxValue="300"/>
+    </x:cacheField>
+  </x:cacheFields>
+</x:pivotCacheDefinition>"#;
+
+    let cache_def_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" Target="pivotCacheRecords1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let cache_records = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotCacheRecords xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                     count="3">
+  <x:r><x:x v="0"/><x:x v="0"/><x:n v="100"/></x:r>
+  <x:r><x:x v="0"/><x:x v="1"/><x:n v="200"/></x:r>
+  <x:r><x:x v="1"/><x:x v="0"/><x:n v="300"/></x:r>
+</x:pivotCacheRecords>"#;
+
+    let pivot_table = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotTableDefinition xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                        name="PivotTable1" cacheId="1" applyNumberFormats="0"
+                        applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0"
+                        applyAlignmentFormats="0" applyWidthHeightFormats="1"
+                        dataCaption="Values" updatedVersion="6" minRefreshableVersion="3"
+                        useAutoFormatting="1" itemPrintTitles="1" createdVersion="6"
+                        indent="0" outline="1" outlineData="1" multipleFieldFilters="0">
+  <x:location ref="A1:D5" firstHeaderRow="1" firstDataRow="2" firstDataCol="1"/>
+  <x:pivotFields count="3">
+    <x:pivotField axis="axisRow" showAll="0">
+      <x:items count="3">
+        <x:item x="0"/><x:item x="1"/><x:item t="default"/>
+      </x:items>
+    </x:pivotField>
+    <x:pivotField axis="axisCol" showAll="0">
+      <x:items count="3">
+        <x:item x="0"/><x:item x="1"/><x:item t="default"/>
+      </x:items>
+    </x:pivotField>
+    <x:pivotField dataField="1" showAll="0"/>
+  </x:pivotFields>
+  <x:rowFields count="1"><x:field x="0"/></x:rowFields>
+  <x:rowItems count="3">
+    <x:i><x:x/></x:i>
+    <x:i><x:x v="1"/></x:i>
+    <x:i t="grand"><x:x/></x:i>
+  </x:rowItems>
+  <x:colFields count="1"><x:field x="1"/></x:colFields>
+  <x:colItems count="3">
+    <x:i><x:x/></x:i>
+    <x:i><x:x v="1"/></x:i>
+    <x:i t="grand"><x:x/></x:i>
+  </x:colItems>
+  <x:dataFields count="1">
+    <x:dataField name="Sum of Sales" fld="2" baseField="0" baseItem="0"/>
+  </x:dataFields>
+  <x:pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1"
+                         showRowStripes="0" showColStripes="0" showLastColumn="1"/>
+</x:pivotTableDefinition>"#;
+
+    let pivot_table_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let workbook = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheets>
+    <x:sheet name="Source" sheetId="1" r:id="rId1"/>
+    <x:sheet name="Pivot" sheetId="2" r:id="rId2"/>
+  </x:sheets>
+  <x:pivotCaches>
+    <x:pivotCache cacheId="1" r:id="rId10"/>
+  </x:pivotCaches>
+</x:workbook>"#;
+
+    let wb_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let content_types = xlsx_content_types(
+      2,
+      r#"
+  <Override PartName="/xl/pivotCache/pivotCacheDefinition1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>
+  <Override PartName="/xl/pivotCache/pivotCacheRecords1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>
+  <Override PartName="/xl/pivotTables/pivotTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", workbook),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", source_sheet),
+      ("xl/worksheets/sheet2.xml", pivot_sheet),
+      ("xl/worksheets/_rels/sheet2.xml.rels", &pivot_sheet_rels),
+      ("xl/pivotCache/pivotCacheDefinition1.xml", cache_def),
+      (
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels",
+        &cache_def_rels,
+      ),
+      ("xl/pivotCache/pivotCacheRecords1.xml", cache_records),
+      ("xl/pivotTables/pivotTable1.xml", pivot_table),
+      (
+        "xl/pivotTables/_rels/pivotTable1.xml.rels",
+        &pivot_table_rels,
+      ),
+    ]);
+    save(root, "test-data/spreadsheet/pivot_table.xlsx", &data);
   }
 }

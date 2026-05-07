@@ -2481,6 +2481,10 @@ fn main() {
   create_pml_media_fixtures(&root, &png);
   create_pml_tables_fixtures(&root);
   create_pml_animations_fixtures(&root);
+  create_dml_pattern_fill_fixtures(&root);
+  create_dml_custom_geom_fixtures(&root);
+  create_sml_vba_fixtures(&root);
+  create_pml_chart_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -6032,5 +6036,229 @@ fn create_pml_animations_fixtures(root: &Path) {
   {
     let data = dml_pptx(PML_ANIMATION_SLIDE.to_vec(), "", "", vec![]);
     save(root, "test-data/pml/slide_animation.pptx", &data);
+  }
+}
+
+fn create_dml_pattern_fill_fixtures(root: &Path) {
+  // ── DML-PATT-01: pattern_fill ─────────────────────────────────────────────
+  // Single shape using <a:pattFill prst="ltHorz"> with fg/bgClr srgbClr.
+  // Exercises CT_PatternFillProperties; prst, fgClr, bgClr round-trip.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="HatchRect"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="4114800" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:pattFill prst="ltHorz">
+            <a:fgClr><a:srgbClr val="4472C4"/></a:fgClr>
+            <a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>
+          </a:pattFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/pattern_fill.pptx", &data);
+  }
+}
+
+fn create_dml_custom_geom_fixtures(root: &Path) {
+  // ── DML-CUSTGEOM-01: custom_geom ─────────────────────────────────────────
+  // Shape using <a:custGeom> with a right-triangle path (3 lnTo commands +
+  // close). Exercises CT_CustomGeometry2D, pathLst, path w/h, moveTo, lnTo,
+  // close. No avLst adjustments.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Triangle"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="4114800" cy="3657600"/></a:xfrm>
+          <a:custGeom>
+            <a:avLst/>
+            <a:pathLst>
+              <a:path w="100" h="100">
+                <a:moveTo><a:pt x="0" y="100"/></a:moveTo>
+                <a:lnTo><a:pt x="100" y="100"/></a:lnTo>
+                <a:lnTo><a:pt x="0" y="0"/></a:lnTo>
+                <a:close/>
+              </a:path>
+            </a:pathLst>
+          </a:custGeom>
+          <a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/custom_geom.pptx", &data);
+  }
+}
+
+fn create_sml_vba_fixtures(root: &Path) {
+  // ── SML-VBA-01: vba_preserve ─────────────────────────────────────────────
+  // Macro-enabled workbook (.xlsm) with a minimal OLE2 placeholder for
+  // xl/vbaProject.bin. Tests the XLSX counterpart of the WML VBA fixture:
+  // macroEnabled workbook content type; microsoft.com vbaProject rel type;
+  // <Default Extension="bin"> entry. vbaData.xml is not used (Excel-only).
+  {
+    let mut vba_bin = vec![0u8; 512];
+    vba_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    vba_bin[24] = 0x3E;
+    vba_bin[25] = 0x00;
+    vba_bin[26] = 0x03;
+    vba_bin[27] = 0x00;
+
+    let content_types = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>"#
+    .to_string()
+    .into_bytes();
+
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", empty_worksheet()),
+      ("xl/vbaProject.bin", &vba_bin),
+    ]);
+    save(root, "test-data/spreadsheet/vba_preserve.xlsm", &data);
+  }
+}
+
+fn create_pml_chart_fixtures(root: &Path) {
+  // ── PML-CHART-01: slide_chart ─────────────────────────────────────────────
+  // Single slide with a p:graphicFrame embedding a ChartPart (bar chart with
+  // 3 categories and 3 values). Tests ChartPart round-trip from within a
+  // PresentationML slide (vs the spreadsheet/chart_bar.xlsx XLSX variant).
+  {
+    let chart = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:autoTitleDeleted val="1"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        <c:varyColors val="0"/>
+        <c:ser>
+          <c:idx val="0"/>
+          <c:order val="0"/>
+          <c:cat>
+            <c:strRef>
+              <c:f></c:f>
+              <c:strCache>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>Q1</c:v></c:pt>
+                <c:pt idx="1"><c:v>Q2</c:v></c:pt>
+                <c:pt idx="2"><c:v>Q3</c:v></c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:cat>
+          <c:val>
+            <c:numRef>
+              <c:f></c:f>
+              <c:numCache>
+                <c:formatCode>General</c:formatCode>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>10</c:v></c:pt>
+                <c:pt idx="1"><c:v>20</c:v></c:pt>
+                <c:pt idx="2"><c:v>30</c:v></c:pt>
+              </c:numCache>
+            </c:numRef>
+          </c:val>
+        </c:ser>
+        <c:axId val="111"/>
+        <c:axId val="222"/>
+      </c:barChart>
+      <c:catAx>
+        <c:axId val="111"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:crossAx val="222"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="222"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:crossAx val="111"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/>
+    <c:dispBlanksAs val="gap"/>
+  </c:chart>
+</c:chartSpace>"#;
+
+    let slide = slide_with_shapes(
+      r#"      <p:graphicFrame>
+        <p:nvGraphicFramePr>
+          <p:cNvPr id="2" name="Chart 1"/>
+          <p:cNvGraphicFramePr/>
+          <p:nvPr/>
+        </p:nvGraphicFramePr>
+        <p:xfrm>
+          <a:off x="457200" y="457200"/>
+          <a:ext cx="5943600" cy="4114800"/>
+        </p:xfrm>
+        <a:graphic>
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId2"/>
+          </a:graphicData>
+        </a:graphic>
+      </p:graphicFrame>
+"#,
+    );
+
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>"#,
+    );
+
+    let ct = pptx_content_types(
+      1,
+      r#"
+  <Override PartName="/ppt/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>"#,
+    );
+
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide,
+      slide_rels,
+      extra: vec![("ppt/charts/chart1.xml", chart.to_vec())],
+    });
+    save(root, "test-data/pml/slide_chart.pptx", &data);
   }
 }

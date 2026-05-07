@@ -118,7 +118,7 @@ structural fidelity, not rendering or layout.
 | Data validation (whole between with prompts/errors; list inline literal; custom with errorStyle warning) | ✅ | `spreadsheet/data_validation.xlsx` |
 | Charts (DrawingsPart twoCellAnchor graphicFrame; ChartPart c:barChart with strRef cat + numRef val + cached values; catAx/valAx) | ✅ | `spreadsheet/chart_bar.xlsx` |
 | Pivot tables (PivotCacheDefinition + PivotCacheRecords + PivotTableDefinition; rowFields/colFields/dataFields; sharedItems with x:s indexed records) | ✅ | `spreadsheet/pivot_table.xlsx` |
-| VBA macros (preserve-only) | 🔲 | |
+| VBA macros (preserve-only) | ✅ | `spreadsheet/vba_preserve.xlsm` |
 
 ## PresentationML (PPTX)
 
@@ -145,7 +145,7 @@ structural fidelity, not rendering or layout.
 | Table cell borders (`<a:tcPr><a:lnB>`) | ✅ | `pml/slide_table.pptx` |
 | Entrance animation (`<p:timing>`, `<p:animEffect filter="fade">`) | ✅ | `pml/slide_animation.pptx` |
 | Animation build list (`<p:bldLst><p:bldP>`) | ✅ | `pml/slide_animation.pptx` |
-| Charts | 🔲 | |
+| Charts (ChartPart + bar series in `p:graphicFrame`) | ✅ | `pml/slide_chart.pptx` |
 | Embedded videos | 🔲 | |
 
 ## DrawingML (shared across DOCX/XLSX/PPTX)
@@ -162,8 +162,8 @@ structural fidelity, not rendering or layout.
 | Paragraph properties (alignment/spacing/indent) | ✅ | `drawingml/text_run_props.pptx` |
 | Superscript / subscript (baseline) | ✅ | `drawingml/text_run_props.pptx` |
 | Theme part (clrScheme/fontScheme/fmtScheme) | ✅ | `drawingml/theme.pptx` |
-| Pattern fill | 🔲 | |
-| Custom geometry (custGeom) | 🔲 | |
+| Pattern fill (`<a:pattFill>` with `prst`, `fgClr`, `bgClr`) | ✅ | `drawingml/pattern_fill.pptx` |
+| Custom geometry (`<a:custGeom>` path commands: moveTo/lnTo/close) | ✅ | `drawingml/custom_geom.pptx` |
 | 3D effects (scene3d/sp3d) | 🔲 | |
 
 ## MCE (Markup Compatibility and Extensibility)

@@ -8,10 +8,12 @@
 
 mod docx;
 mod error;
+mod fonts;
 mod layout;
 mod options;
 mod pptx;
 mod render;
+mod text_metrics;
 mod xlsx;
 
 use std::io::{Read, Seek};
@@ -129,6 +131,172 @@ mod tests {
         )
       })
     }));
+  }
+
+  #[test]
+  fn paragraph_layout_wraps_on_word_boundaries() {
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 56.0,
+        height_pt: 200.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        header_distance_pt: 0.0,
+        footer_distance_pt: 0.0,
+      },
+      default_tab_stop_pt: 36.0,
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      endnote_blocks: Vec::new(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+        runs: vec![crate::docx::TextRun {
+          text: "One Two Six".into(),
+          style: crate::docx::TextStyle::default(),
+        }],
+        inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
+          text: "One Two Six".into(),
+          style: crate::docx::TextStyle::default(),
+        })],
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let lines = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        crate::layout::PageItem::Text(text) => Some(text.text.trim().to_string()),
+        crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(lines, ["One", "Two", "Six"]);
+  }
+
+  #[test]
+  fn paragraph_tabs_advance_to_default_tab_stops() {
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 300.0,
+        height_pt: 200.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        header_distance_pt: 0.0,
+        footer_distance_pt: 0.0,
+      },
+      default_tab_stop_pt: 36.0,
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      endnote_blocks: Vec::new(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+        runs: vec![crate::docx::TextRun {
+          text: "Left\tRight".into(),
+          style: crate::docx::TextStyle::default(),
+        }],
+        inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
+          text: "Left\tRight".into(),
+          style: crate::docx::TextStyle::default(),
+        })],
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let texts = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        crate::layout::PageItem::Text(text) => Some(text),
+        crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(texts.len(), 2);
+    assert_eq!(texts[0].text, "Left");
+    assert_eq!(texts[1].text, "Right");
+    assert!((texts[1].x_pt - 46.0).abs() < 0.1);
+  }
+
+  #[test]
+  fn paragraph_right_tabs_align_following_text_to_stop() {
+    let format = crate::docx::ParagraphFormat {
+      tab_stops: vec![crate::docx::TabStop {
+        position_pt: 100.0,
+        alignment: crate::docx::TabStopAlignment::Right,
+      }],
+      ..Default::default()
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 300.0,
+        height_pt: 200.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        header_distance_pt: 0.0,
+        footer_distance_pt: 0.0,
+      },
+      default_tab_stop_pt: 36.0,
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      endnote_blocks: Vec::new(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        format,
+        list_label: None,
+        runs: vec![crate::docx::TextRun {
+          text: "Title\t99".into(),
+          style: crate::docx::TextStyle::default(),
+        }],
+        inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
+          text: "Title\t99".into(),
+          style: crate::docx::TextStyle::default(),
+        })],
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let texts = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        crate::layout::PageItem::Text(text) => Some(text),
+        crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert_eq!(texts.len(), 2);
+    assert_eq!(texts[1].text, "99");
+    assert!(texts[1].x_pt < 110.0);
+    assert!(texts[1].x_pt > 90.0);
   }
 
   #[test]

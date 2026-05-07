@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use image::ImageFormat as RasterImageFormat;
 use krilla::color::rgb;
 use krilla::configure::{Configuration, PdfVersion};
 use krilla::geom::{PathBuilder, Point, Size, Transform};
@@ -12,8 +13,10 @@ use krilla::{Document, SerializeSettings};
 
 use crate::docx::TextStyle;
 use crate::error::{PdfError, Result};
+use crate::fonts::load_sans_face;
 use crate::layout::{LayoutDocument, PageItem};
 use crate::options::PdfOptions;
+use crate::text_metrics::measure_text;
 
 pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
   let mut pdf = Document::new_with(serialize_settings(options));
@@ -37,7 +40,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
               opacity: NormalizedF32::ONE,
               rule: Default::default(),
             }));
-            let width = approximate_text_width(&text.text, text.style.font_size_pt);
+            let width = measure_text(&text.text, text.style);
             let top = baseline_y - text.style.font_size_pt;
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, top);
@@ -74,7 +77,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, underline_y);
             path.line_to(
-              text.x_pt + approximate_text_width(&text.text, text.style.font_size_pt),
+              text.x_pt + measure_text(&text.text, text.style),
               underline_y,
             );
             if let Some(path) = path.finish() {
@@ -92,10 +95,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             let strike_y = baseline_y - (text.style.font_size_pt * 0.32);
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, strike_y);
-            path.line_to(
-              text.x_pt + approximate_text_width(&text.text, text.style.font_size_pt),
-              strike_y,
-            );
+            path.line_to(text.x_pt + measure_text(&text.text, text.style), strike_y);
             if let Some(path) = path.finish() {
               surface.draw_path(&path);
             }
@@ -175,36 +175,17 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))
 }
 
-fn approximate_text_width(text: &str, font_size: f32) -> f32 {
-  text
-    .chars()
-    .map(|ch| match ch {
-      ' ' => font_size * 0.28,
-      '\t' => font_size * 1.12,
-      ch if ch.is_ascii_punctuation() => font_size * 0.3,
-      ch if ch.is_ascii() => font_size * 0.52,
-      _ => font_size,
-    })
-    .sum()
-}
-
 fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
   let bytes = data.to_vec().into();
-  let result = match content_type {
-    Some("image/png") if valid_png_crc(data) => Image::from_png(bytes, true),
-    Some("image/png") => Err("invalid PNG CRC".to_string()),
-    Some("image/jpeg") | Some("image/jpg") => Image::from_jpeg(bytes, true),
-    Some("image/gif") => Image::from_gif(bytes, true),
-    Some("image/webp") => Image::from_webp(bytes, true),
-    _ if data.starts_with(b"\x89PNG\r\n\x1a\n") && valid_png_crc(data) => {
-      Image::from_png(bytes, true)
-    }
-    _ if data.starts_with(b"\x89PNG\r\n\x1a\n") => Err("invalid PNG CRC".to_string()),
-    _ if data.starts_with(b"\xff\xd8\xff") => Image::from_jpeg(bytes, true),
-    _ if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") => Image::from_gif(bytes, true),
-    _ if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" => {
-      Image::from_webp(bytes, true)
-    }
+  let format = content_type
+    .and_then(image_format_from_content_type)
+    .or_else(|| image::guess_format(data).ok());
+  let result = match format {
+    Some(RasterImageFormat::Png) if valid_png_crc(data) => Image::from_png(bytes, true),
+    Some(RasterImageFormat::Png) => Err("invalid PNG CRC".to_string()),
+    Some(RasterImageFormat::Jpeg) => Image::from_jpeg(bytes, true),
+    Some(RasterImageFormat::Gif) => Image::from_gif(bytes, true),
+    Some(RasterImageFormat::WebP) => Image::from_webp(bytes, true),
     _ => Err(format!(
       "unsupported image content type {}",
       content_type.unwrap_or("unknown")
@@ -212,6 +193,16 @@ fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
   };
 
   result.map_err(PdfError::Krilla)
+}
+
+fn image_format_from_content_type(content_type: &str) -> Option<RasterImageFormat> {
+  match content_type {
+    "image/png" => Some(RasterImageFormat::Png),
+    "image/jpeg" | "image/jpg" => Some(RasterImageFormat::Jpeg),
+    "image/gif" => Some(RasterImageFormat::Gif),
+    "image/webp" => Some(RasterImageFormat::WebP),
+    _ => None,
+  }
 }
 
 fn valid_png_crc(data: &[u8]) -> bool {
@@ -302,61 +293,13 @@ impl FontSet {
 }
 
 fn load_font(bold: bool, italic: bool) -> Result<Font> {
-  let mut db = fontdb::Database::new();
-  db.load_system_fonts();
-  if let Some(id) = db.query(&fontdb::Query {
-    families: &[fontdb::Family::SansSerif],
-    weight: if bold {
-      fontdb::Weight::BOLD
-    } else {
-      fontdb::Weight::NORMAL
-    },
-    style: if italic {
-      fontdb::Style::Italic
-    } else {
-      fontdb::Style::Normal
-    },
-    ..fontdb::Query::default()
-  }) && let Some((data, index)) = db.with_face_data(id, |data, index| (data.to_vec(), index))
-    && let Some(font) = Font::new(Arc::new(data).into(), index)
+  if let Some(face) = load_sans_face(bold, italic)
+    && let Some(font) = Font::new(Arc::new(face.data).into(), face.index)
   {
     return Ok(font);
   }
 
-  for path in fallback_font_paths(bold, italic) {
-    let Ok(data) = std::fs::read(path) else {
-      continue;
-    };
-    if let Some(font) = Font::new(Arc::new(data).into(), 0) {
-      return Ok(font);
-    }
-  }
-
   Err(PdfError::FontUnavailable)
-}
-
-fn fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static str] {
-  match (bold, italic) {
-    (true, true) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ],
-    (true, false) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ],
-    (false, true) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ],
-    (false, false) => &[
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-      "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-      "/usr/share/fonts/truetype/ubuntu/Ubuntu[wdth,wght].ttf",
-    ],
-  }
 }
 
 fn fill(style: TextStyle) -> Fill {

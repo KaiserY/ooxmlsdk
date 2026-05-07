@@ -17,9 +17,12 @@ use quick_xml::events::Event;
 use crate::error::Result;
 use crate::options::PdfOptions;
 
+const DEFAULT_TAB_STOP_PT: f32 = 36.0;
+
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
+  pub default_tab_stop_pt: f32,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
   pub first_header_blocks: Vec<Block>,
@@ -112,7 +115,7 @@ impl Default for BorderStyle {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
   pub spacing_before_pt: f32,
   pub spacing_after_pt: f32,
@@ -120,10 +123,25 @@ pub(crate) struct ParagraphFormat {
   pub indent_left_pt: f32,
   pub indent_right_pt: f32,
   pub first_line_indent_pt: f32,
+  pub tab_stops: Vec<TabStop>,
   pub alignment: ParagraphAlignment,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub page_break_before: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TabStop {
+  pub position_pt: f32,
+  pub alignment: TabStopAlignment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TabStopAlignment {
+  #[default]
+  Left,
+  Center,
+  Right,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -229,6 +247,7 @@ pub(crate) fn extract(
   let styles = StylesCatalog::load(package, &main)?;
   let mut numbering = NumberingCatalog::load(package, &main)?;
   let images = ImageCatalog::load(package, &main);
+  let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let document = main.root_element(package)?;
   let section = document
     .body
@@ -300,6 +319,7 @@ pub(crate) fn extract(
 
   Ok(DocxDocument {
     page,
+    default_tab_stop_pt,
     header_blocks,
     footer_blocks,
     first_header_blocks,
@@ -310,6 +330,20 @@ pub(crate) fn extract(
     title_page,
     blocks,
   })
+}
+
+fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> f32 {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .w_default_tab_stop
+        .as_ref()
+        .map(|stop| stop.val as f32 / 20.0)
+    })
+    .filter(|value| value.is_finite() && *value > 0.0)
+    .unwrap_or(DEFAULT_TAB_STOP_PT)
 }
 
 fn body_blocks(
@@ -947,6 +981,10 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
     format.first_line_indent_pt = first_line - hanging;
   }
 
+  if let Some(tabs) = properties.tabs() {
+    format.tab_stops = tab_stops(tabs);
+  }
+
   if let Some(justification) = properties.justification() {
     format.alignment = match justification.val {
       w::JustificationValues::Center => ParagraphAlignment::Center,
@@ -970,6 +1008,33 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(borders) = properties.paragraph_borders() {
     format.borders = paragraph_borders_model(borders);
   }
+}
+
+fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
+  let mut stops = tabs
+    .w_tab
+    .iter()
+    .filter_map(|tab| {
+      let alignment = match tab.val {
+        w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Decimal => {
+          TabStopAlignment::Left
+        }
+        w::TabStopValues::Center => TabStopAlignment::Center,
+        w::TabStopValues::Right | w::TabStopValues::End | w::TabStopValues::Number => {
+          TabStopAlignment::Right
+        }
+        w::TabStopValues::Clear | w::TabStopValues::Bar => return None,
+      };
+      Some(TabStop {
+        position_pt: tab.position as f32 / 20.0,
+        alignment,
+      })
+    })
+    .filter(|stop| stop.position_pt.is_finite() && stop.position_pt >= 0.0)
+    .collect::<Vec<_>>();
+  stops.sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
+  stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < 0.1);
+  stops
 }
 
 fn paragraph_inlines(
@@ -2094,12 +2159,12 @@ impl StylesCatalog {
   }
 
   fn paragraph_format(&self, style_id: Option<&str>) -> ParagraphFormat {
-    let mut format = self.doc_default_paragraph;
+    let mut format = self.doc_default_paragraph.clone();
     let style_id = style_id
       .map(str::to_string)
       .or_else(|| self.default_paragraph_style_id.clone());
     for entry in self.style_chain(style_id.as_deref()) {
-      merge_format_values(&mut format, entry.paragraph_format);
+      merge_format_values(&mut format, entry.paragraph_format.clone());
     }
     format
   }
@@ -2184,6 +2249,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
   if values.first_line_indent_pt != 0.0 {
     target.first_line_indent_pt = values.first_line_indent_pt;
+  }
+  if !values.tab_stops.is_empty() {
+    target.tab_stops = values.tab_stops;
   }
   if values.alignment != ParagraphAlignment::default() {
     target.alignment = values.alignment;
@@ -2386,7 +2454,7 @@ impl NumberingCatalog {
       .and_then(|override_| override_.level.as_ref())
       .or_else(|| abstract_num.levels.get(&level_index))?;
 
-    merge_format_values(format, level.format_properties);
+    merge_format_values(format, level.format_properties.clone());
     let start = level_override
       .and_then(|override_| override_.start)
       .unwrap_or(level.start);
@@ -2531,6 +2599,15 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.indentation.as_ref(),
       Self::BaseStyle(properties) => properties.indentation.as_ref(),
       Self::Previous(properties) => properties.indentation.as_ref(),
+    }
+  }
+
+  fn tabs(&self) -> Option<&'a w::Tabs> {
+    match self {
+      Self::Direct(properties) => properties.tabs.as_ref(),
+      Self::Style(properties) => properties.tabs.as_ref(),
+      Self::BaseStyle(properties) => properties.tabs.as_ref(),
+      Self::Previous(properties) => properties.tabs.as_ref(),
     }
   }
 

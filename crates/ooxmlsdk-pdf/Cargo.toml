@@ -15,8 +15,15 @@ readme.workspace = true
 [dependencies]
 crc32fast = { workspace = true }
 fontdb = { workspace = true }
+hypher = { workspace = true }
+icu_segmenter = { workspace = true }
+image = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
 quick-xml = { workspace = true }
+rustybuzz = { workspace = true }
 thiserror = { workspace = true }
+ttf-parser = { workspace = true }
+unicode-bidi = { workspace = true }
+unicode-script = { workspace = true }

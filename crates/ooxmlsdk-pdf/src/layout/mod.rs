@@ -1,9 +1,14 @@
+use std::cell::RefCell;
+
+use icu_segmenter::LineSegmenter;
+
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
-  TableCellVerticalAlignment, TextStyle,
+  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor, TabStop,
+  TabStopAlignment, TableCellVerticalAlignment, TextStyle,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
+use crate::text_metrics::measure_text;
 
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
@@ -69,6 +74,20 @@ pub(crate) struct LineItem {
   pub color: RgbColor,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct FlowContext {
+  setup: PageSetup,
+  content_bottom: f32,
+  content_width: f32,
+  default_tab_stop_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ResolvedTabStop {
+  x_pt: f32,
+  alignment: TabStopAlignment,
+}
+
 pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
   let mut pages = Vec::new();
   let mut current = Page {
@@ -80,61 +99,35 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
   let content_width =
     (document.page.width_pt - document.page.margin_left_pt - document.page.margin_right_pt)
       .max(DEFAULT_FONT_SIZE_PT);
+  let flow = FlowContext {
+    setup: document.page,
+    content_bottom,
+    content_width,
+    default_tab_stop_pt: document.default_tab_stop_pt,
+  };
 
   for block in &document.blocks {
-    y = layout_document_block(
-      block,
-      document.page,
-      &mut current,
-      &mut pages,
-      y,
-      content_bottom,
-      content_width,
-    );
+    y = layout_document_block(block, flow, &mut current, &mut pages, y);
   }
 
   if !document.footnote_blocks.is_empty() {
     y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
     for block in &document.footnote_blocks {
-      y = layout_document_block(
-        block,
-        document.page,
-        &mut current,
-        &mut pages,
-        y,
-        content_bottom,
-        content_width,
-      );
+      y = layout_document_block(block, flow, &mut current, &mut pages, y);
     }
   }
 
   if !document.endnote_blocks.is_empty() {
     y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
     for block in &document.endnote_blocks {
-      y = layout_document_block(
-        block,
-        document.page,
-        &mut current,
-        &mut pages,
-        y,
-        content_bottom,
-        content_width,
-      );
+      y = layout_document_block(block, flow, &mut current, &mut pages, y);
     }
   }
 
   if !document.comment_blocks.is_empty() {
     y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
     for block in &document.comment_blocks {
-      y = layout_document_block(
-        block,
-        document.page,
-        &mut current,
-        &mut pages,
-        y,
-        content_bottom,
-        content_width,
-      );
+      y = layout_document_block(block, flow, &mut current, &mut pages, y);
     }
   }
 
@@ -149,12 +142,10 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
 
 fn layout_document_block(
   block: &Block,
-  setup: PageSetup,
+  flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
   mut y: f32,
-  content_bottom: f32,
-  content_width: f32,
 ) -> f32 {
   match block {
     Block::Paragraph(paragraph) => {
@@ -162,33 +153,31 @@ fn layout_document_block(
         pages.push(std::mem::replace(
           current,
           Page {
-            setup,
+            setup: flow.setup,
             items: Vec::new(),
           },
         ));
-        y = setup.margin_top_pt;
+        y = flow.setup.margin_top_pt;
       }
 
       y += paragraph.format.spacing_before_pt;
-      layout_paragraph(
-        paragraph,
-        setup,
-        current,
-        pages,
-        y,
-        content_bottom,
-        (content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
+      let paragraph_flow = FlowContext {
+        content_width: (flow.content_width
+          - paragraph.format.indent_left_pt
+          - paragraph.format.indent_right_pt)
           .max(DEFAULT_FONT_SIZE_PT),
-      )
+        ..flow
+      };
+      layout_paragraph(paragraph, paragraph_flow, current, pages, y)
     }
     Block::Table(table) => layout_table(
       table,
-      setup,
+      flow.setup,
       current,
       pages,
       y,
-      content_bottom,
-      content_width,
+      flow.content_bottom,
+      flow.content_width,
     ),
   }
 }
@@ -258,12 +247,15 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
     for block in header_blocks {
       y = layout_repeating_block(
         block,
-        page.setup,
         &mut adornment,
         &mut discarded_pages,
         y,
-        header_bottom,
-        content_width,
+        FlowContext {
+          setup: page.setup,
+          content_bottom: header_bottom,
+          content_width,
+          default_tab_stop_pt: document.default_tab_stop_pt,
+        },
       );
     }
 
@@ -273,12 +265,15 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
     for block in footer_blocks {
       y = layout_repeating_block(
         block,
-        page.setup,
         &mut adornment,
         &mut discarded_pages,
         y,
-        footer_bottom,
-        content_width,
+        FlowContext {
+          setup: page.setup,
+          content_bottom: footer_bottom,
+          content_width,
+          default_tab_stop_pt: document.default_tab_stop_pt,
+        },
       );
     }
 
@@ -288,31 +283,27 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
 
 fn layout_repeating_block(
   block: &Block,
-  setup: PageSetup,
   page: &mut Page,
   discarded_pages: &mut Vec<Page>,
   y: f32,
-  content_bottom: f32,
-  content_width: f32,
+  flow: FlowContext,
 ) -> f32 {
   match block {
     Block::Paragraph(paragraph) => layout_paragraph(
       paragraph,
-      setup,
+      flow,
       page,
       discarded_pages,
       y + paragraph.format.spacing_before_pt,
-      content_bottom,
-      content_width,
     ),
     Block::Table(table) => layout_table(
       table,
-      setup,
+      flow.setup,
       page,
       discarded_pages,
       y,
-      content_bottom,
-      content_width,
+      flow.content_bottom,
+      flow.content_width,
     ),
   }
 }
@@ -657,11 +648,11 @@ fn layout_table_cell(
                 return;
               }
               let available = (text_right - text_x).max(DEFAULT_FONT_SIZE_PT);
-              let clipped = clip_to_width(&run.text, run.style.font_size_pt, available);
+              let clipped = clip_to_width(&run.text, run.style, available);
               if clipped.is_empty() {
                 continue;
               }
-              let width = approximate_text_width(&clipped, run.style.font_size_pt);
+              let width = measure_text(&clipped, run.style);
               page.items.push(PageItem::Text(TextItem {
                 x_pt: text_x,
                 y_pt: text_y,
@@ -766,19 +757,18 @@ fn layout_nested_table(
 
 fn layout_paragraph(
   paragraph: &crate::docx::Paragraph,
-  setup: PageSetup,
+  flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
   mut y: f32,
-  content_bottom: f32,
-  content_width: f32,
 ) -> f32 {
   let start_item_index = current.items.len();
   let paragraph_top = y;
+  let setup = flow.setup;
   let line_left = setup.margin_left_pt + paragraph.format.indent_left_pt;
   let first_line_left =
     (line_left + paragraph.format.first_line_indent_pt).max(setup.margin_left_pt);
-  let line_right = line_left + content_width;
+  let line_right = line_left + flow.content_width;
   let paragraph_left = line_left.min(first_line_left);
   let base_line_height = paragraph
     .format
@@ -786,6 +776,7 @@ fn layout_paragraph(
     .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
   let mut line_height = base_line_height;
   let mut emitted = paragraph.list_label.is_some();
+  let mut pending_tab: Option<ResolvedTabStop> = None;
   let mut x = if let Some(label) = &paragraph.list_label {
     current.items.push(PageItem::Text(TextItem {
       x_pt: first_line_left,
@@ -804,35 +795,150 @@ fn layout_paragraph(
         let mut chunk = String::new();
         let mut chunk_x = x;
 
-        for ch in run.text.chars() {
-          if ch == '\n' {
+        for segment in text_segments(&run.text) {
+          if segment == "\n" {
             flush_text(current, chunk_x, y, &mut chunk, run.style);
-            y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+            y = next_line(
+              setup,
+              current,
+              pages,
+              y,
+              &mut line_height,
+              flow.content_bottom,
+            );
             x = line_left;
             chunk_x = x;
+            pending_tab = None;
+            emitted = true;
+            continue;
+          }
+          if segment == "\t" {
+            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            let mut tab_stop = next_tab_stop(
+              x,
+              line_left,
+              &paragraph.format.tab_stops,
+              flow.default_tab_stop_pt,
+            );
+            x = tab_stop.x_pt;
+            if x > line_right {
+              y = next_line(
+                setup,
+                current,
+                pages,
+                y,
+                &mut line_height,
+                flow.content_bottom,
+              );
+              tab_stop = next_tab_stop(
+                line_left,
+                line_left,
+                &paragraph.format.tab_stops,
+                flow.default_tab_stop_pt,
+              );
+              x = tab_stop.x_pt;
+            }
+            chunk_x = x;
+            pending_tab = Some(tab_stop);
+            line_height = line_height.max(run.style.font_size_pt * 1.25);
             emitted = true;
             continue;
           }
 
-          let mut encoded = [0; 4];
-          let text = if ch == '\t' {
-            "    "
-          } else {
-            ch.encode_utf8(&mut encoded)
-          };
-          let width = approximate_text_width(text, run.style.font_size_pt);
+          let width = measure_text(&segment, run.style);
+          let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
+          let whitespace = segment.chars().all(char::is_whitespace);
+          if let Some(tab_stop) = pending_tab.take()
+            && !whitespace
+          {
+            x = aligned_tab_x(tab_stop, width, line_left, line_right);
+            chunk_x = x;
+          }
 
           if x + width > line_right && x > line_left {
             flush_text(current, chunk_x, y, &mut chunk, run.style);
-            y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+            y = next_line(
+              setup,
+              current,
+              pages,
+              y,
+              &mut line_height,
+              flow.content_bottom,
+            );
             x = line_left;
             chunk_x = x;
+            pending_tab = None;
+            if whitespace {
+              emitted = true;
+              continue;
+            }
+          }
+
+          if width > line_capacity && x <= line_left && !whitespace {
+            for text in emergency_break_segments(&segment) {
+              let width = measure_text(&text, run.style);
+              if width > line_capacity && text.chars().count() > 1 {
+                for ch in text.chars() {
+                  let mut encoded = [0; 4];
+                  let text = ch.encode_utf8(&mut encoded);
+                  let width = measure_text(text, run.style);
+
+                  if x + width > line_right && x > line_left {
+                    flush_text(current, chunk_x, y, &mut chunk, run.style);
+                    y = next_line(
+                      setup,
+                      current,
+                      pages,
+                      y,
+                      &mut line_height,
+                      flow.content_bottom,
+                    );
+                    x = line_left;
+                    chunk_x = x;
+                    pending_tab = None;
+                  }
+
+                  if chunk.is_empty() {
+                    chunk_x = x;
+                  }
+                  chunk.push_str(text);
+                  x += width;
+                  line_height = line_height.max(run.style.font_size_pt * 1.25);
+                  emitted = true;
+                }
+                continue;
+              }
+
+              if x + width > line_right && x > line_left {
+                flush_text(current, chunk_x, y, &mut chunk, run.style);
+                y = next_line(
+                  setup,
+                  current,
+                  pages,
+                  y,
+                  &mut line_height,
+                  flow.content_bottom,
+                );
+                x = line_left;
+                chunk_x = x;
+                pending_tab = None;
+              }
+
+              if chunk.is_empty() {
+                chunk_x = x;
+              }
+              chunk.push_str(&text);
+              x += width;
+              line_height = line_height.max(run.style.font_size_pt * 1.25);
+              emitted = true;
+            }
+            continue;
           }
 
           if chunk.is_empty() {
             chunk_x = x;
           }
-          chunk.push_str(text);
+          chunk.push_str(&segment);
           x += width;
           line_height = line_height.max(run.style.font_size_pt * 1.25);
           emitted = true;
@@ -841,9 +947,18 @@ fn layout_paragraph(
         flush_text(current, chunk_x, y, &mut chunk, run.style);
       }
       InlineItem::Image(image) => {
-        let (width, height) = fit_image_to_line(image.width_pt, image.height_pt, content_width);
+        pending_tab = None;
+        let (width, height) =
+          fit_image_to_line(image.width_pt, image.height_pt, flow.content_width);
         if x + width > line_right && x > line_left {
-          y = next_line(setup, current, pages, y, &mut line_height, content_bottom);
+          y = next_line(
+            setup,
+            current,
+            pages,
+            y,
+            &mut line_height,
+            flow.content_bottom,
+          );
           x = line_left;
         }
         current.items.push(PageItem::Image(ImageItem {
@@ -864,6 +979,7 @@ fn layout_paragraph(
         x = first_line_left;
         line_height = base_line_height;
         emitted = false;
+        pending_tab = None;
       }
     }
   }
@@ -901,6 +1017,107 @@ fn layout_paragraph(
   }
 
   y
+}
+
+fn text_segments(text: &str) -> Vec<String> {
+  let mut segments = Vec::new();
+  let mut start = 0;
+
+  for (index, ch) in text.char_indices() {
+    if ch != '\n' && ch != '\t' {
+      continue;
+    }
+
+    push_line_segments(&text[start..index], &mut segments);
+    segments.push(ch.to_string());
+    start = index + ch.len_utf8();
+  }
+
+  push_line_segments(&text[start..], &mut segments);
+  segments
+}
+
+fn emergency_break_segments(text: &str) -> Vec<String> {
+  if text.chars().all(|ch| ch.is_ascii_alphabetic()) && text.chars().count() > 8 {
+    let mut pieces = hypher::hyphenate(text, hypher::Lang::English)
+      .map(str::to_string)
+      .collect::<Vec<_>>();
+    if pieces.len() > 1 {
+      let last = pieces.len() - 1;
+      for piece in &mut pieces[..last] {
+        piece.push('-');
+      }
+      return pieces;
+    }
+  }
+
+  text.chars().map(|ch| ch.to_string()).collect()
+}
+
+fn push_line_segments(text: &str, segments: &mut Vec<String>) {
+  if text.is_empty() {
+    return;
+  }
+
+  thread_local! {
+    static LINE_SEGMENTER: RefCell<LineSegmenter> = RefCell::new(LineSegmenter::new_auto());
+  }
+
+  LINE_SEGMENTER.with_borrow(|segmenter| {
+    let mut start = 0;
+    for point in segmenter.segment_str(text) {
+      if point == 0 {
+        continue;
+      }
+      if start < point {
+        segments.push(text[start..point].to_string());
+      }
+      start = point;
+    }
+
+    if start < text.len() {
+      segments.push(text[start..].to_string());
+    }
+  });
+}
+
+fn next_tab_stop(
+  x: f32,
+  line_left: f32,
+  tab_stops: &[TabStop],
+  default_tab_stop_pt: f32,
+) -> ResolvedTabStop {
+  let relative_x = (x - line_left).max(0.0);
+  if let Some(stop) = tab_stops
+    .iter()
+    .copied()
+    .find(|stop| stop.position_pt > relative_x + 0.1)
+  {
+    return ResolvedTabStop {
+      x_pt: line_left + stop.position_pt,
+      alignment: stop.alignment,
+    };
+  }
+
+  let default_tab_stop_pt = default_tab_stop_pt.max(DEFAULT_FONT_SIZE_PT);
+  ResolvedTabStop {
+    x_pt: line_left + ((relative_x / default_tab_stop_pt).floor() + 1.0) * default_tab_stop_pt,
+    alignment: TabStopAlignment::Left,
+  }
+}
+
+fn aligned_tab_x(
+  tab_stop: ResolvedTabStop,
+  text_width: f32,
+  line_left: f32,
+  line_right: f32,
+) -> f32 {
+  let x = match tab_stop.alignment {
+    TabStopAlignment::Left => tab_stop.x_pt,
+    TabStopAlignment::Center => tab_stop.x_pt - text_width / 2.0,
+    TabStopAlignment::Right => tab_stop.x_pt - text_width,
+  };
+  x.clamp(line_left, line_right)
 }
 
 fn decorate_paragraph(
@@ -1012,10 +1229,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
 
 fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
-    PageItem::Text(text) => Some((
-      text.x_pt,
-      approximate_text_width(&text.text, text.style.font_size_pt),
-    )),
+    PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, text.style))),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -1102,7 +1316,7 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
   }));
 }
 
-fn clip_to_width(text: &str, font_size: f32, max_width: f32) -> String {
+fn clip_to_width(text: &str, style: TextStyle, max_width: f32) -> String {
   let mut width = 0.0;
   let mut clipped = String::new();
   for ch in text.chars() {
@@ -1114,7 +1328,7 @@ fn clip_to_width(text: &str, font_size: f32, max_width: f32) -> String {
     } else {
       ch.encode_utf8(&mut encoded)
     };
-    let next = approximate_text_width(value, font_size);
+    let next = measure_text(value, style);
     if width + next > max_width && !clipped.is_empty() {
       break;
     }
@@ -1122,19 +1336,4 @@ fn clip_to_width(text: &str, font_size: f32, max_width: f32) -> String {
     clipped.push_str(value);
   }
   clipped
-}
-
-fn approximate_text_width(text: &str, font_size: f32) -> f32 {
-  text
-    .chars()
-    .map(|ch| {
-      if ch.is_whitespace() {
-        font_size * 0.33
-      } else if ch.is_ascii() {
-        font_size * 0.55
-      } else {
-        font_size
-      }
-    })
-    .sum()
 }

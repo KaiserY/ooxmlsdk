@@ -139,8 +139,13 @@ structural fidelity, not rendering or layout.
 | Hyperlinks in runs (hlinkClick) | ✅ | `pml/slide_hyperlink.pptx` |
 | Slide transitions (fade, spd, advClick) | ✅ | `pml/slide_transition.pptx` |
 | Speaker notes (NotesSlidePart, body placeholder) | ✅ | `pml/notes_slide.pptx` |
+| Theme colour scheme override (`<p:clrMapOvr><a:overrideClrMapping>`) | ✅ | `pml/theme_colors.pptx` |
+| Image crop (`<a:srcRect>`) | ✅ | `pml/slide_pic.pptx` |
+| Table merged cells (`gridSpan` + `hMerge`) | ✅ | `pml/slide_table.pptx` |
+| Table cell borders (`<a:tcPr><a:lnB>`) | ✅ | `pml/slide_table.pptx` |
+| Entrance animation (`<p:timing>`, `<p:animEffect filter="fade">`) | ✅ | `pml/slide_animation.pptx` |
+| Animation build list (`<p:bldLst><p:bldP>`) | ✅ | `pml/slide_animation.pptx` |
 | Charts | 🔲 | |
-| Animations | 🔲 | |
 | Embedded videos | 🔲 | |
 
 ## DrawingML (shared across DOCX/XLSX/PPTX)

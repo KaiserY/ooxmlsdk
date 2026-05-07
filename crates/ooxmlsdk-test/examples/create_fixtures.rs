@@ -2477,6 +2477,10 @@ fn main() {
   create_sml_validation_fixtures(&root);
   create_sml_chart_fixtures(&root);
   create_sml_pivot_fixtures(&root);
+  create_pml_themes_fixtures(&root);
+  create_pml_media_fixtures(&root, &png);
+  create_pml_tables_fixtures(&root);
+  create_pml_animations_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -5608,5 +5612,425 @@ fn create_sml_pivot_fixtures(root: &Path) {
       ),
     ]);
     save(root, "test-data/spreadsheet/pivot_table.xlsx", &data);
+  }
+}
+
+// ── PML-TH-02: pml/theme_colors.pptx ─────────────────────────────────────────
+// Slide with two scheme-color shapes and <a:overrideClrMapping> that swaps
+// bg1/tx1 (light background → dark) demonstrating clrMapOvr non-inherit path.
+const PML_THEME_COLORS_SLIDE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Accent1 Shape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill>
+            <a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="DK1 Shape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="2057400"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill>
+            <a:schemeClr val="dk1"><a:tint val="40000"/></a:schemeClr>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:overrideClrMapping
+        bg1="dk1" tx1="lt1" bg2="lt2" tx2="dk2"
+        accent1="accent1" accent2="accent2" accent3="accent3"
+        accent4="accent4" accent5="accent5" accent6="accent6"
+        hlink="hlink" folHlink="folHlink"/>
+  </p:clrMapOvr>
+</p:sld>"#;
+
+fn create_pml_themes_fixtures(root: &Path) {
+  // PML-TH-02: theme_colors — overrideClrMapping variant
+  {
+    let theme_ct = "\n  <Override PartName=\"/ppt/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+    let theme_master_rel = r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>"#;
+    let data = dml_pptx(
+      PML_THEME_COLORS_SLIDE.to_vec(),
+      theme_ct,
+      theme_master_rel,
+      vec![("ppt/theme/theme1.xml", THEME1_XML.to_vec())],
+    );
+    save(root, "test-data/pml/theme_colors.pptx", &data);
+  }
+}
+
+// ── PML-IMG-02: pml/slide_pic.pptx ───────────────────────────────────────────
+// <p:pic> with <a:srcRect> 10% crop on all four sides; picLocks noChangeAspect;
+// descr alt-text on cNvPr.  Exercises blipFill crop round-trip.
+
+fn create_pml_media_fixtures(root: &Path, png: &[u8]) {
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:pic>
+        <p:nvPicPr>
+          <p:cNvPr id="2" name="Picture 1" descr="A 1x1 red pixel"/>
+          <p:cNvPicPr>
+            <a:picLocks noChangeAspect="1"/>
+          </p:cNvPicPr>
+          <p:nvPr/>
+        </p:nvPicPr>
+        <p:blipFill>
+          <a:blip r:embed="rId2"/>
+          <a:srcRect l="10000" t="10000" r="10000" b="10000"/>
+          <a:stretch><a:fillRect/></a:stretch>
+        </p:blipFill>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="914400" y="914400"/>
+            <a:ext cx="4572000" cy="3429000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+      </p:pic>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>"#,
+    );
+    let ct = pptx_content_types(
+      1,
+      "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>",
+    );
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide.to_vec(),
+      slide_rels,
+      extra: vec![("ppt/media/image1.png", png.to_vec())],
+    });
+    save(root, "test-data/pml/slide_pic.pptx", &data);
+  }
+}
+
+// ── PML-TBL-02: pml/slide_table.pptx ─────────────────────────────────────────
+// 3-column 3-row table: firstRow/bandRow flags; tcPr bottom-border on header
+// cells; horizontal merge (gridSpan=2 leading cell + hMerge continuation).
+
+fn create_pml_tables_fixtures(root: &Path) {
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:graphicFrame>
+        <p:nvGraphicFramePr>
+          <p:cNvPr id="2" name="Table 1"/>
+          <p:cNvGraphicFramePr>
+            <a:graphicFrameLocks noGrp="1"/>
+          </p:cNvGraphicFramePr>
+          <p:nvPr/>
+        </p:nvGraphicFramePr>
+        <p:xfrm>
+          <a:off x="457200" y="457200"/>
+          <a:ext cx="8229600" cy="1714500"/>
+        </p:xfrm>
+        <a:graphic>
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">
+            <a:tbl>
+              <a:tblPr firstRow="1" bandRow="1"/>
+              <a:tblGrid>
+                <a:gridCol w="2743200"/>
+                <a:gridCol w="2743200"/>
+                <a:gridCol w="2743200"/>
+              </a:tblGrid>
+              <!-- header row: col A standalone; cols B+C merged -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>Header A</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr>
+                    <a:lnB w="12700" cap="flat" cmpd="sng">
+                      <a:solidFill><a:schemeClr val="accent1"/></a:solidFill>
+                      <a:prstDash val="solid"/>
+                    </a:lnB>
+                  </a:tcPr>
+                </a:tc>
+                <a:tc gridSpan="2">
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>Merged B+C</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr>
+                    <a:lnB w="12700" cap="flat" cmpd="sng">
+                      <a:solidFill><a:schemeClr val="accent1"/></a:solidFill>
+                      <a:prstDash val="solid"/>
+                    </a:lnB>
+                  </a:tcPr>
+                </a:tc>
+                <a:tc hMerge="1">
+                  <a:txBody><a:bodyPr/><a:lstStyle/><a:p/></a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+              <!-- data row 1 -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C1</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C2</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C3</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+              <!-- data row 2 -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C1</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C2</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C3</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+            </a:tbl>
+          </a:graphicData>
+        </a:graphic>
+      </p:graphicFrame>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let data = dml_pptx(slide.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_table.pptx", &data);
+  }
+}
+
+// ── PML-ANIM-01: pml/slide_animation.pptx ────────────────────────────────────
+// Slide with one text box (id=2); full timing hierarchy (tmRoot→mainSeq→click);
+// <p:set> visibility + <p:animEffect filter="fade" transition="in">;
+// <p:bldLst>; <p:prevCondLst>/<p:nextCondLst> on <p:seq>.
+
+const PML_ANIMATION_SLIDE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="TextBox 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="6400800" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="ctr"/>
+            <a:r>
+              <a:rPr lang="en-US" sz="2400" dirty="0"/>
+              <a:t>Fade In Animation</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+  <p:timing>
+    <p:tnLst>
+      <p:par>
+        <p:cTn id="1" dur="indefin" restart="whenNotActive" nodeType="tmRoot">
+          <p:childTnLst>
+            <p:seq concurrent="1" nextAc="seek">
+              <p:cTn id="2" dur="indefin" nodeType="mainSeq">
+                <p:childTnLst>
+                  <p:par>
+                    <p:cTn id="3" fill="hold">
+                      <p:stCondLst>
+                        <p:cond delay="indefin"/>
+                      </p:stCondLst>
+                      <p:childTnLst>
+                        <p:par>
+                          <p:cTn id="4" fill="hold">
+                            <p:stCondLst>
+                              <p:cond delay="0"/>
+                            </p:stCondLst>
+                            <p:childTnLst>
+                              <p:set>
+                                <p:cBhvr>
+                                  <p:cTn id="5" dur="1" fill="hold"/>
+                                  <p:tgtEl><p:spTgt spid="2"/></p:tgtEl>
+                                  <p:attrNameLst>
+                                    <p:attrName>style.visibility</p:attrName>
+                                  </p:attrNameLst>
+                                </p:cBhvr>
+                                <p:to><p:strVal val="visible"/></p:to>
+                              </p:set>
+                              <p:animEffect transition="in" filter="fade">
+                                <p:cBhvr>
+                                  <p:cTn id="6" dur="500" fill="hold"/>
+                                  <p:tgtEl><p:spTgt spid="2"/></p:tgtEl>
+                                </p:cBhvr>
+                              </p:animEffect>
+                            </p:childTnLst>
+                          </p:cTn>
+                        </p:par>
+                      </p:childTnLst>
+                    </p:cTn>
+                  </p:par>
+                </p:childTnLst>
+              </p:cTn>
+              <p:prevCondLst>
+                <p:cond evt="onPrev" delay="0">
+                  <p:tn val="3"/>
+                </p:cond>
+              </p:prevCondLst>
+              <p:nextCondLst>
+                <p:cond evt="onNext" delay="0">
+                  <p:tn val="3"/>
+                </p:cond>
+              </p:nextCondLst>
+            </p:seq>
+          </p:childTnLst>
+        </p:cTn>
+      </p:par>
+    </p:tnLst>
+    <p:bldLst>
+      <p:bldP spid="2" grpId="0" uiExpand="1" build="allAtOnce"/>
+    </p:bldLst>
+  </p:timing>
+</p:sld>"#;
+
+fn create_pml_animations_fixtures(root: &Path) {
+  {
+    let data = dml_pptx(PML_ANIMATION_SLIDE.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_animation.pptx", &data);
   }
 }

@@ -29,6 +29,28 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     for item in &page.items {
       match item {
         PageItem::Text(text) if !text.text.is_empty() => {
+          if let Some(color) = text.style.highlight {
+            surface.set_stroke(None);
+            surface.set_fill(Some(Fill {
+              paint: rgb::Color::new(color.r, color.g, color.b).into(),
+              opacity: NormalizedF32::ONE,
+              rule: Default::default(),
+            }));
+            let width = approximate_text_width(&text.text, text.style.font_size_pt);
+            let top = text.y_pt - text.style.font_size_pt;
+            let mut path = PathBuilder::new();
+            path.move_to(text.x_pt, top);
+            path.line_to(text.x_pt + width, top);
+            path.line_to(
+              text.x_pt + width,
+              text.y_pt + text.style.font_size_pt * 0.25,
+            );
+            path.line_to(text.x_pt, text.y_pt + text.style.font_size_pt * 0.25);
+            path.close();
+            if let Some(path) = path.finish() {
+              surface.draw_path(&path);
+            }
+          }
           surface.set_stroke(None);
           surface.set_fill(Some(fill(text.style)));
           surface.draw_text(
@@ -39,6 +61,44 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             false,
             TextDirection::Auto,
           );
+          if text.style.underline {
+            surface.set_fill(None);
+            surface.set_stroke(Some(Stroke {
+              width: (text.style.font_size_pt / 18.0).max(0.5),
+              paint: rgb::Color::new(text.style.color.r, text.style.color.g, text.style.color.b)
+                .into(),
+              ..Default::default()
+            }));
+            let underline_y = text.y_pt + (text.style.font_size_pt * 0.12).max(1.0);
+            let mut path = PathBuilder::new();
+            path.move_to(text.x_pt, underline_y);
+            path.line_to(
+              text.x_pt + approximate_text_width(&text.text, text.style.font_size_pt),
+              underline_y,
+            );
+            if let Some(path) = path.finish() {
+              surface.draw_path(&path);
+            }
+          }
+          if text.style.strikethrough {
+            surface.set_fill(None);
+            surface.set_stroke(Some(Stroke {
+              width: (text.style.font_size_pt / 18.0).max(0.5),
+              paint: rgb::Color::new(text.style.color.r, text.style.color.g, text.style.color.b)
+                .into(),
+              ..Default::default()
+            }));
+            let strike_y = text.y_pt - (text.style.font_size_pt * 0.32);
+            let mut path = PathBuilder::new();
+            path.move_to(text.x_pt, strike_y);
+            path.line_to(
+              text.x_pt + approximate_text_width(&text.text, text.style.font_size_pt),
+              strike_y,
+            );
+            if let Some(path) = path.finish() {
+              surface.draw_path(&path);
+            }
+          }
         }
         PageItem::Text(_) => {}
         PageItem::Fill(fill_item) => {
@@ -112,6 +172,19 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))
+}
+
+fn approximate_text_width(text: &str, font_size: f32) -> f32 {
+  text
+    .chars()
+    .map(|ch| match ch {
+      ' ' => font_size * 0.28,
+      '\t' => font_size * 1.12,
+      ch if ch.is_ascii_punctuation() => font_size * 0.3,
+      ch if ch.is_ascii() => font_size * 0.52,
+      _ => font_size,
+    })
+    .sum()
 }
 
 fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {

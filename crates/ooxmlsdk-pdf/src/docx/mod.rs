@@ -3,7 +3,10 @@ mod units;
 use std::collections::HashMap;
 
 use ooxmlsdk::parts::{
-  main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
+  endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
+  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  wordprocessing_comments_part::WordprocessingCommentsPart,
+  wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 use quick_xml::Reader;
@@ -17,6 +20,12 @@ pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
+  pub first_header_blocks: Vec<Block>,
+  pub first_footer_blocks: Vec<Block>,
+  pub footnote_blocks: Vec<Block>,
+  pub endnote_blocks: Vec<Block>,
+  pub comment_blocks: Vec<Block>,
+  pub title_page: bool,
   pub blocks: Vec<Block>,
 }
 
@@ -46,6 +55,8 @@ pub(crate) struct Table {
 #[derive(Clone, Debug)]
 pub(crate) struct TableRow {
   pub cells: Vec<TableCell>,
+  pub height_pt: Option<f32>,
+  pub exact_height: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -53,6 +64,8 @@ pub(crate) struct TableCell {
   pub blocks: Vec<Block>,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
+  pub grid_span: usize,
+  pub vertical_merge_continue: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -121,6 +134,7 @@ pub(crate) struct TextRun {
 pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
+  PageBreak,
 }
 
 #[derive(Clone, Debug)]
@@ -137,7 +151,10 @@ pub(crate) struct TextStyle {
   pub font_size_pt: f32,
   pub bold: bool,
   pub italic: bool,
+  pub underline: bool,
+  pub strikethrough: bool,
   pub color: RgbColor,
+  pub highlight: Option<RgbColor>,
 }
 
 impl Default for TextStyle {
@@ -146,7 +163,10 @@ impl Default for TextStyle {
       font_size_pt: 11.0,
       bold: false,
       italic: false,
+      underline: false,
+      strikethrough: false,
       color: RgbColor { r: 0, g: 0, b: 0 },
+      highlight: None,
     }
   }
 }
@@ -208,17 +228,71 @@ pub(crate) fn extract(
     .unwrap_or_default();
   let header_blocks = section
     .as_ref()
-    .and_then(|section| header_blocks(package, &main, section, &styles))
+    .and_then(|section| {
+      referenced_header_blocks(
+        package,
+        &main,
+        section,
+        &styles,
+        w::HeaderFooterValues::Default,
+      )
+    })
     .unwrap_or_default();
   let footer_blocks = section
     .as_ref()
-    .and_then(|section| footer_blocks(package, &main, section, &styles))
+    .and_then(|section| {
+      referenced_footer_blocks(
+        package,
+        &main,
+        section,
+        &styles,
+        w::HeaderFooterValues::Default,
+      )
+    })
     .unwrap_or_default();
+  let first_header_blocks = section
+    .as_ref()
+    .and_then(|section| {
+      referenced_header_blocks(
+        package,
+        &main,
+        section,
+        &styles,
+        w::HeaderFooterValues::First,
+      )
+    })
+    .unwrap_or_default();
+  let first_footer_blocks = section
+    .as_ref()
+    .and_then(|section| {
+      referenced_footer_blocks(
+        package,
+        &main,
+        section,
+        &styles,
+        w::HeaderFooterValues::First,
+      )
+    })
+    .unwrap_or_default();
+  let footnote_blocks = footnote_blocks(package, &main, &styles)?;
+  let endnote_blocks = endnote_blocks(package, &main, &styles)?;
+  let comment_blocks = comment_blocks(package, &main, &styles)?;
+  let title_page = section
+    .as_ref()
+    .and_then(|section| section.w_title_pg.as_ref())
+    .map(|title_page| title_page.val.unwrap_or(true))
+    .unwrap_or(false);
 
   Ok(DocxDocument {
     page,
     header_blocks,
     footer_blocks,
+    first_header_blocks,
+    first_footer_blocks,
+    footnote_blocks,
+    endnote_blocks,
+    comment_blocks,
+    title_page,
     blocks,
   })
 }
@@ -233,14 +307,51 @@ fn body_blocks(
     .body_choice
     .iter()
     .filter_map(|choice| match choice {
-      w::BodyChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model(
+      w::BodyChoice::WP(paragraph) => Some(vec![Block::Paragraph(paragraph_model(
         paragraph, styles, numbering, images,
-      ))),
-      w::BodyChoice::WTbl(table) => {
-        Some(Block::Table(table_model(table, styles, numbering, images)))
+      ))]),
+      w::BodyChoice::WTbl(table) => Some(vec![Block::Table(table_model(
+        table, styles, numbering, images,
+      ))]),
+      w::BodyChoice::WSdt(sdt) => Some(sdt_block_blocks(sdt, styles, numbering, images)),
+      _ => None,
+    })
+    .flatten()
+    .collect()
+}
+
+fn sdt_block_blocks(
+  sdt: &w::SdtBlock,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+) -> Vec<Block> {
+  let Some(content) = sdt.sdt_content_block.as_ref() else {
+    return Vec::new();
+  };
+
+  content
+    .sdt_content_block_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::SdtContentBlockChoice::WP(paragraph) => Some(vec![Block::Paragraph(paragraph_model(
+        paragraph.as_ref(),
+        styles,
+        numbering,
+        images,
+      ))]),
+      w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
+        table.as_ref(),
+        styles,
+        numbering,
+        images,
+      ))]),
+      w::SdtContentBlockChoice::WSdt(sdt) => {
+        Some(sdt_block_blocks(sdt.as_ref(), styles, numbering, images))
       }
       _ => None,
     })
+    .flatten()
     .collect()
 }
 
@@ -249,6 +360,7 @@ fn header_blocks(
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
+  header_type: w::HeaderFooterValues,
 ) -> Option<Vec<Block>> {
   let relationship_id =
     section
@@ -256,7 +368,7 @@ fn header_blocks(
       .iter()
       .find_map(|choice| match choice {
         w::SectionPropertiesChoice::WHeaderReference(reference)
-          if reference.r#type == w::HeaderFooterValues::Default =>
+          if reference.r#type == header_type =>
         {
           Some(reference.id.as_str())
         }
@@ -265,8 +377,8 @@ fn header_blocks(
   let header_part = main
     .header_parts(package)
     .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
+  let images = ImageCatalog::load_from_header(package, &header_part);
   let header = header_part.root_element(package).ok()?;
-  let images = ImageCatalog::default();
   let mut numbering = NumberingCatalog::default();
   Some(
     header
@@ -291,11 +403,22 @@ fn header_blocks(
   )
 }
 
+fn referenced_header_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  section: &w::SectionProperties,
+  styles: &StylesCatalog,
+  header_type: w::HeaderFooterValues,
+) -> Option<Vec<Block>> {
+  header_blocks(package, main, section, styles, header_type)
+}
+
 fn footer_blocks(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   section: &w::SectionProperties,
   styles: &StylesCatalog,
+  footer_type: w::HeaderFooterValues,
 ) -> Option<Vec<Block>> {
   let relationship_id =
     section
@@ -303,7 +426,7 @@ fn footer_blocks(
       .iter()
       .find_map(|choice| match choice {
         w::SectionPropertiesChoice::WFooterReference(reference)
-          if reference.r#type == w::HeaderFooterValues::Default =>
+          if reference.r#type == footer_type =>
         {
           Some(reference.id.as_str())
         }
@@ -312,8 +435,8 @@ fn footer_blocks(
   let footer_part = main
     .footer_parts(package)
     .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
+  let images = ImageCatalog::load_from_footer(package, &footer_part);
   let footer = footer_part.root_element(package).ok()?;
-  let images = ImageCatalog::default();
   let mut numbering = NumberingCatalog::default();
   Some(
     footer
@@ -336,6 +459,151 @@ fn footer_blocks(
       })
       .collect(),
   )
+}
+
+fn referenced_footer_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  section: &w::SectionProperties,
+  styles: &StylesCatalog,
+  footer_type: w::HeaderFooterValues,
+) -> Option<Vec<Block>> {
+  footer_blocks(package, main, section, styles, footer_type)
+}
+
+fn footnote_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Result<Vec<Block>> {
+  let Some(part) = main.footnotes_part(package) else {
+    return Ok(Vec::new());
+  };
+  let images = ImageCatalog::load_from_footnotes(package, &part);
+  let footnotes = part.root_element(package)?;
+  let mut numbering = NumberingCatalog::default();
+  let mut blocks = Vec::new();
+
+  for footnote in &footnotes.w_footnote {
+    if footnote.id < 1
+      || !matches!(
+        footnote.r#type,
+        None | Some(w::FootnoteEndnoteValues::Normal)
+      )
+    {
+      continue;
+    }
+    append_note_blocks(
+      &mut blocks,
+      format!("{} ", footnote.id),
+      footnote
+        .footnote_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          w::FootnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          _ => None,
+        }),
+      styles,
+      &mut numbering,
+      &images,
+    );
+  }
+
+  Ok(blocks)
+}
+
+fn endnote_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Result<Vec<Block>> {
+  let Some(part) = main.endnotes_part(package) else {
+    return Ok(Vec::new());
+  };
+  let images = ImageCatalog::load_from_endnotes(package, &part);
+  let endnotes = part.root_element(package)?;
+  let mut numbering = NumberingCatalog::default();
+  let mut blocks = Vec::new();
+
+  for endnote in &endnotes.w_endnote {
+    if endnote.id < 1
+      || !matches!(
+        endnote.r#type,
+        None | Some(w::FootnoteEndnoteValues::Normal)
+      )
+    {
+      continue;
+    }
+    append_note_blocks(
+      &mut blocks,
+      format!("{} ", endnote.id),
+      endnote
+        .endnote_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          w::EndnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          _ => None,
+        }),
+      styles,
+      &mut numbering,
+      &images,
+    );
+  }
+
+  Ok(blocks)
+}
+
+fn comment_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Result<Vec<Block>> {
+  let Some(part) = main.wordprocessing_comments_part(package) else {
+    return Ok(Vec::new());
+  };
+  let images = ImageCatalog::load_from_comments(package, &part);
+  let comments = part.root_element(package)?;
+  let mut numbering = NumberingCatalog::default();
+  let mut blocks = Vec::new();
+
+  for comment in &comments.w_comment {
+    append_note_blocks(
+      &mut blocks,
+      format!("[{}] ", comment.id),
+      comment
+        .comment_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          w::CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
+          _ => None,
+        }),
+      styles,
+      &mut numbering,
+      &images,
+    );
+  }
+
+  Ok(blocks)
+}
+
+fn append_note_blocks<'a>(
+  blocks: &mut Vec<Block>,
+  label: impl Into<String>,
+  paragraphs: impl Iterator<Item = &'a w::Paragraph>,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+) {
+  let mut is_first_paragraph = true;
+  let label = label.into();
+  for paragraph in paragraphs {
+    let mut model = paragraph_model(paragraph, styles, numbering, images);
+    if is_first_paragraph {
+      model.list_label = Some(label.clone());
+      is_first_paragraph = false;
+    }
+    blocks.push(Block::Paragraph(model));
+  }
 }
 
 fn paragraph_model(
@@ -363,13 +631,14 @@ fn paragraph_model(
     .and_then(|properties| properties.numbering_properties.as_deref())
     .and_then(|properties| numbering.next_label(properties, &mut format));
 
-  let inlines = paragraph_inlines(paragraph, styles.run_style(style_id), images);
+  let inlines = paragraph_inlines(paragraph, styles.run_style(style_id), styles, images);
   #[cfg(test)]
   let runs = inlines
     .iter()
     .filter_map(|item| match item {
       InlineItem::Text(run) => Some(run.clone()),
       InlineItem::Image(_) => None,
+      InlineItem::PageBreak => None,
     })
     .collect();
 
@@ -424,7 +693,10 @@ fn table_row_model(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
 ) -> TableRow {
+  let (height_pt, exact_height) = table_row_height_properties(row.table_row_properties.as_deref());
   TableRow {
+    height_pt,
+    exact_height,
     cells: row
       .table_row_choice
       .iter()
@@ -464,7 +736,35 @@ fn table_cell_model(
       .and_then(|properties| properties.table_cell_borders.as_deref())
       .map(cell_borders_model)
       .unwrap_or_default(),
+    grid_span: properties
+      .and_then(|properties| properties.grid_span.as_ref())
+      .map(|span| span.val.max(1) as usize)
+      .unwrap_or(1),
+    vertical_merge_continue: properties
+      .and_then(|properties| properties.vertical_merge.as_ref())
+      .map(|merge| matches!(merge.val, None | Some(w::MergedCellValues::Continue)))
+      .unwrap_or(false),
   }
+}
+
+fn table_row_height_properties(properties: Option<&w::TableRowProperties>) -> (Option<f32>, bool) {
+  let Some(properties) = properties else {
+    return (None, false);
+  };
+  properties
+    .table_row_properties_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      w::TableRowPropertiesChoice::WTrHeight(height) => {
+        let height_pt = height.val.map(|value| units::twips_to_points(value as f32));
+        Some((
+          height_pt,
+          matches!(height.height_type, Some(w::HeightRuleValues::Exact)),
+        ))
+      }
+      _ => None,
+    })
+    .unwrap_or((None, false))
 }
 
 fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
@@ -652,20 +952,34 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
 fn paragraph_inlines(
   paragraph: &w::Paragraph,
   base_style: TextStyle,
+  styles: &StylesCatalog,
   images: &ImageCatalog,
 ) -> Vec<InlineItem> {
   let mut inlines = Vec::new();
 
   for choice in &paragraph.paragraph_choice {
     match choice {
-      w::ParagraphChoice::WR(run) => push_run(run, &mut inlines, base_style, images),
+      w::ParagraphChoice::WR(run) => push_run(run, &mut inlines, base_style, styles, images),
+      w::ParagraphChoice::WFldSimple(field) => {
+        push_simple_field(field, &mut inlines, base_style, styles, images);
+      }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
         for item in &hyperlink.hyperlink_choice {
           if let w::HyperlinkChoice::WR(run) = item {
-            push_run(run, &mut inlines, base_style, images);
+            push_run(run, &mut inlines, base_style, styles, images);
           }
         }
       }
+      w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
+        w::ParagraphChoice2::WIns(inserted) => {
+          push_inserted_run(inserted, &mut inlines, base_style, styles, images);
+        }
+        w::ParagraphChoice2::WDel(_)
+        | w::ParagraphChoice2::WMoveFrom(_)
+        | w::ParagraphChoice2::WMoveTo(_) => {}
+        _ => {}
+      },
+      w::ParagraphChoice::WSdt(sdt) => push_sdt_run(sdt, &mut inlines, base_style, styles, images),
       _ => {}
     }
   }
@@ -673,13 +987,40 @@ fn paragraph_inlines(
   inlines
 }
 
+fn push_simple_field(
+  field: &w::SimpleField,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &field.simple_field_choice {
+    match choice {
+      w::SimpleFieldChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::SimpleFieldChoice::WHyperlink(hyperlink) => {
+        for item in &hyperlink.hyperlink_choice {
+          if let w::HyperlinkChoice::WR(run) = item {
+            push_run(run, inlines, base_style, styles, images);
+          }
+        }
+      }
+      w::SimpleFieldChoice::WFldSimple(field) => {
+        push_simple_field(field, inlines, base_style, styles, images);
+      }
+      w::SimpleFieldChoice::WSdt(sdt) => push_sdt_run(sdt, inlines, base_style, styles, images),
+      _ => {}
+    }
+  }
+}
+
 fn push_run(
   run: &w::Run,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
+  styles: &StylesCatalog,
   images: &ImageCatalog,
 ) {
-  let style = run_style(run.run_properties.as_deref(), base_style);
+  let style = run_style(run.run_properties.as_deref(), base_style, styles);
   let mut text = String::new();
 
   for choice in &run.run_choice {
@@ -692,11 +1033,26 @@ fn push_run(
       w::RunChoice::WTab => text.push('\t'),
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
-        Some(w::BreakValues::Page) | Some(w::BreakValues::Column) => text.push('\n'),
+        Some(w::BreakValues::Page) | Some(w::BreakValues::Column) => {
+          flush_run_text(inlines, &mut text, style);
+          inlines.push(InlineItem::PageBreak);
+        }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
       w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
+      w::RunChoice::WFootnoteReference(reference) => {
+        flush_run_text(inlines, &mut text, style);
+        push_note_reference(inlines, reference.id, style);
+      }
+      w::RunChoice::WEndnoteReference(reference) => {
+        flush_run_text(inlines, &mut text, style);
+        push_note_reference(inlines, reference.id, style);
+      }
+      w::RunChoice::WCommentReference(reference) => {
+        flush_run_text(inlines, &mut text, style);
+        push_comment_reference(inlines, &reference.id, style);
+      }
       w::RunChoice::WDrawing(drawing) => {
         flush_run_text(inlines, &mut text, style);
         if let Some(image) = inline_image(drawing, images) {
@@ -708,6 +1064,98 @@ fn push_run(
   }
 
   flush_run_text(inlines, &mut text, style);
+}
+
+fn push_sdt_run(
+  sdt: &w::SdtRun,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  let Some(content) = sdt.sdt_content_run.as_ref() else {
+    return;
+  };
+
+  for choice in &content.sdt_content_run_choice {
+    match choice {
+      w::SdtContentRunChoice::WR(run) => {
+        push_run(run.as_ref(), inlines, base_style, styles, images)
+      }
+      w::SdtContentRunChoice::WFldSimple(field) => {
+        push_simple_field(field.as_ref(), inlines, base_style, styles, images);
+      }
+      w::SdtContentRunChoice::WHyperlink(hyperlink) => {
+        for item in &hyperlink.hyperlink_choice {
+          if let w::HyperlinkChoice::WR(run) = item {
+            push_run(run, inlines, base_style, styles, images);
+          }
+        }
+      }
+      w::SdtContentRunChoice::WSdt(sdt) => {
+        push_sdt_run(sdt.as_ref(), inlines, base_style, styles, images)
+      }
+      w::SdtContentRunChoice::WIns(inserted) => {
+        push_inserted_run(inserted.as_ref(), inlines, base_style, styles, images);
+      }
+      w::SdtContentRunChoice::WDel(_)
+      | w::SdtContentRunChoice::WMoveFrom(_)
+      | w::SdtContentRunChoice::WMoveTo(_) => {}
+      _ => {}
+    }
+  }
+}
+
+fn push_inserted_run(
+  inserted: &w::InsertedRun,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+) {
+  for choice in &inserted.inserted_run_choice {
+    match choice {
+      w::InsertedRunChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
+        w::InsertedRunChoice2::WIns(nested) => {
+          push_inserted_run(nested, inlines, base_style, styles, images);
+        }
+        w::InsertedRunChoice2::WDel(_)
+        | w::InsertedRunChoice2::WMoveFrom(_)
+        | w::InsertedRunChoice2::WMoveTo(_) => {}
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn push_note_reference(inlines: &mut Vec<InlineItem>, id: i64, style: TextStyle) {
+  if id < 1 {
+    return;
+  }
+  inlines.push(InlineItem::Text(TextRun {
+    text: id.to_string(),
+    style: TextStyle {
+      font_size_pt: (style.font_size_pt * 0.75).max(1.0),
+      ..style
+    },
+  }));
+}
+
+fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextStyle) {
+  inlines.push(InlineItem::Text(TextRun {
+    text: format!("[{id}]"),
+    style: TextStyle {
+      font_size_pt: (style.font_size_pt * 0.75).max(1.0),
+      color: RgbColor {
+        r: 0x80,
+        g: 0x40,
+        b: 0x00,
+      },
+      ..style
+    },
+  }));
 }
 
 fn flush_run_text(inlines: &mut Vec<InlineItem>, text: &mut String, style: TextStyle) {
@@ -777,9 +1225,52 @@ struct ImageResource {
 
 impl ImageCatalog {
   fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
+    Self::from_image_parts(package, main.image_parts(package), |image_part| {
+      main.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
+    Self::from_image_parts(package, header.image_parts(package), |image_part| {
+      header.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn load_from_footer(package: &WordprocessingDocument, footer: &FooterPart) -> Self {
+    Self::from_image_parts(package, footer.image_parts(package), |image_part| {
+      footer.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn load_from_footnotes(package: &WordprocessingDocument, footnotes: &FootnotesPart) -> Self {
+    Self::from_image_parts(package, footnotes.image_parts(package), |image_part| {
+      footnotes.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn load_from_endnotes(package: &WordprocessingDocument, endnotes: &EndnotesPart) -> Self {
+    Self::from_image_parts(package, endnotes.image_parts(package), |image_part| {
+      endnotes.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn load_from_comments(
+    package: &WordprocessingDocument,
+    comments: &WordprocessingCommentsPart,
+  ) -> Self {
+    Self::from_image_parts(package, comments.image_parts(package), |image_part| {
+      comments.get_id_of_part(package, image_part)
+    })
+  }
+
+  fn from_image_parts<'a>(
+    package: &WordprocessingDocument,
+    image_parts: impl Iterator<Item = ImagePart> + 'a,
+    relationship_id: impl Fn(&ImagePart) -> Option<&'a str>,
+  ) -> Self {
     let mut by_relationship_id = HashMap::new();
-    for image_part in main.image_parts(package) {
-      let Some(relationship_id) = main.get_id_of_part(package, &image_part) else {
+    for image_part in image_parts {
+      let Some(relationship_id) = relationship_id(&image_part) else {
         continue;
       };
       let Some(data) = image_part.data_to_vec(package) else {
@@ -798,12 +1289,23 @@ impl ImageCatalog {
   }
 }
 
-fn run_style(properties: Option<&w::RunProperties>, base_style: TextStyle) -> TextStyle {
+fn run_style(
+  properties: Option<&w::RunProperties>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> TextStyle {
   let mut style = base_style;
   let Some(properties) = properties else {
     return style;
   };
 
+  style = styles.character_run_style(
+    properties
+      .run_style
+      .as_ref()
+      .map(|run_style| run_style.val.as_str()),
+    style,
+  );
   merge_run_style(&mut style, Some(RunProps::Direct(properties)));
   style
 }
@@ -829,6 +1331,18 @@ fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps<'_>>) {
   {
     style.color = rgb;
   }
+  if let Some(underline) = properties.underline() {
+    style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
+  }
+  if let Some(strike) = properties.strike() {
+    style.strikethrough = strike.val.unwrap_or(true);
+  }
+  if let Some(double_strike) = properties.double_strike() {
+    style.strikethrough = double_strike.val.unwrap_or(true);
+  }
+  if let Some(highlight) = properties.highlight() {
+    style.highlight = highlight_color(highlight.val);
+  }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -841,6 +1355,7 @@ struct StylesCatalog {
 
 #[derive(Clone, Debug, Default)]
 struct StyleEntry {
+  style_type: Option<w::StyleValues>,
   based_on: Option<String>,
   paragraph_format: ParagraphFormat,
   run_style: TextStyle,
@@ -881,6 +1396,7 @@ impl StylesCatalog {
         catalog.default_paragraph_style_id = Some(style_id.to_string());
       }
       let mut entry = StyleEntry {
+        style_type: style.r#type,
         based_on: style
           .based_on
           .as_ref()
@@ -927,6 +1443,24 @@ impl StylesCatalog {
     style
   }
 
+  fn character_run_style(&self, style_id: Option<&str>, base_style: TextStyle) -> TextStyle {
+    let Some(style_id) = style_id else {
+      return base_style;
+    };
+    let mut style = base_style;
+    let mut matched = false;
+    for entry in self.style_chain(Some(style_id)) {
+      if matches!(entry.style_type, Some(w::StyleValues::Character)) {
+        matched = true;
+        merge_style_values(&mut style, entry.run_style);
+      }
+    }
+    if !matched {
+      merge_builtin_character_style(&mut style, style_id);
+    }
+    style
+  }
+
   fn style_chain(&self, style_id: Option<&str>) -> Vec<&StyleEntry> {
     let mut ids = Vec::new();
     let mut current = style_id;
@@ -949,6 +1483,17 @@ impl StylesCatalog {
   }
 }
 
+fn merge_builtin_character_style(style: &mut TextStyle, style_id: &str) {
+  if style_id.eq_ignore_ascii_case("Hyperlink") {
+    style.underline = true;
+    style.color = RgbColor {
+      r: 0x05,
+      g: 0x63,
+      b: 0xC1,
+    };
+  }
+}
+
 fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   if values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
@@ -968,6 +1513,15 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   if values.first_line_indent_pt != 0.0 {
     target.first_line_indent_pt = values.first_line_indent_pt;
   }
+  if values.alignment != ParagraphAlignment::default() {
+    target.alignment = values.alignment;
+  }
+  if values.shading.is_some() {
+    target.shading = values.shading;
+  }
+  if values.borders != CellBordersModel::default() {
+    target.borders = values.borders;
+  }
   if values.page_break_before {
     target.page_break_before = true;
   }
@@ -983,9 +1537,76 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   if values.italic {
     target.italic = true;
   }
+  if values.underline {
+    target.underline = true;
+  }
+  if values.strikethrough {
+    target.strikethrough = true;
+  }
   if values.color != TextStyle::default().color {
     target.color = values.color;
   }
+  if values.highlight.is_some() {
+    target.highlight = values.highlight;
+  }
+}
+
+fn highlight_color(value: w::HighlightColorValues) -> Option<RgbColor> {
+  Some(match value {
+    w::HighlightColorValues::Black => RgbColor { r: 0, g: 0, b: 0 },
+    w::HighlightColorValues::Blue => RgbColor { r: 0, g: 0, b: 255 },
+    w::HighlightColorValues::Cyan => RgbColor {
+      r: 0,
+      g: 255,
+      b: 255,
+    },
+    w::HighlightColorValues::Green => RgbColor { r: 0, g: 255, b: 0 },
+    w::HighlightColorValues::Magenta => RgbColor {
+      r: 255,
+      g: 0,
+      b: 255,
+    },
+    w::HighlightColorValues::Red => RgbColor { r: 255, g: 0, b: 0 },
+    w::HighlightColorValues::Yellow => RgbColor {
+      r: 255,
+      g: 255,
+      b: 0,
+    },
+    w::HighlightColorValues::White => RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    },
+    w::HighlightColorValues::DarkBlue => RgbColor { r: 0, g: 0, b: 128 },
+    w::HighlightColorValues::DarkCyan => RgbColor {
+      r: 0,
+      g: 128,
+      b: 128,
+    },
+    w::HighlightColorValues::DarkGreen => RgbColor { r: 0, g: 128, b: 0 },
+    w::HighlightColorValues::DarkMagenta => RgbColor {
+      r: 128,
+      g: 0,
+      b: 128,
+    },
+    w::HighlightColorValues::DarkRed => RgbColor { r: 128, g: 0, b: 0 },
+    w::HighlightColorValues::DarkYellow => RgbColor {
+      r: 128,
+      g: 128,
+      b: 0,
+    },
+    w::HighlightColorValues::DarkGray => RgbColor {
+      r: 128,
+      g: 128,
+      b: 128,
+    },
+    w::HighlightColorValues::LightGray => RgbColor {
+      r: 192,
+      g: 192,
+      b: 192,
+    },
+    w::HighlightColorValues::None => return None,
+  })
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1299,6 +1920,37 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.color.as_ref(),
       Self::Style(properties) => properties.color.as_ref(),
       Self::BaseStyle(properties) => properties.color.as_ref(),
+    }
+  }
+
+  fn underline(&self) -> Option<&'a w::Underline> {
+    match self {
+      Self::Direct(properties) => properties.underline.as_ref(),
+      Self::Style(properties) => properties.underline.as_ref(),
+      Self::BaseStyle(properties) => properties.underline.as_ref(),
+    }
+  }
+
+  fn strike(&self) -> Option<&'a w::Strike> {
+    match self {
+      Self::Direct(properties) => properties.strike.as_ref(),
+      Self::Style(properties) => properties.strike.as_ref(),
+      Self::BaseStyle(properties) => properties.strike.as_ref(),
+    }
+  }
+
+  fn double_strike(&self) -> Option<&'a w::DoubleStrike> {
+    match self {
+      Self::Direct(properties) => properties.double_strike.as_ref(),
+      Self::Style(properties) => properties.double_strike.as_ref(),
+      Self::BaseStyle(properties) => properties.double_strike.as_ref(),
+    }
+  }
+
+  fn highlight(&self) -> Option<&'a w::Highlight> {
+    match self {
+      Self::Direct(properties) => properties.highlight.as_ref(),
+      Self::Style(_) | Self::BaseStyle(_) => None,
     }
   }
 }

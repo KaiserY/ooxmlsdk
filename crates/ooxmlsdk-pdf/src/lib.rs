@@ -136,6 +136,7 @@ mod tests {
     let path = fixture_path("test-data/wml/char_formatting.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let paragraph = paragraph_at(&doc, 0);
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
 
     let texts = layout
@@ -163,6 +164,16 @@ mod tests {
     assert!(
       texts
         .iter()
+        .any(|item| item.text.contains("Underline") && item.style.underline)
+    );
+    assert!(
+      texts
+        .iter()
+        .any(|item| item.text.contains("Strike") && item.style.strikethrough)
+    );
+    assert!(
+      texts
+        .iter()
         .any(|item| item.text.contains("14pt") && (item.style.font_size_pt - 14.0).abs() < 0.1)
     );
     assert!(texts.iter().any(|item| {
@@ -174,6 +185,19 @@ mod tests {
             b: 0,
           }
     }));
+    let highlight = paragraph
+      .runs
+      .iter()
+      .find(|run| run.text.contains("Highlight"))
+      .expect("highlight run");
+    assert_eq!(
+      highlight.style.highlight,
+      Some(crate::docx::RgbColor {
+        r: 255,
+        g: 255,
+        b: 0,
+      })
+    );
   }
 
   #[test]
@@ -221,6 +245,38 @@ mod tests {
     assert_eq!(body_indent.runs[0].style.font_size_pt, 12.0);
     assert_eq!(body_indent.format.indent_left_pt, 36.0);
     assert_eq!(body_indent.format.spacing_after_pt, 8.0);
+  }
+
+  #[test]
+  fn run_character_styles_are_resolved_from_styles_part() {
+    let path = fixture_path("test-data/wml/run_fonts.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let paragraph = paragraph_at(&doc, 0);
+    assert!(
+      paragraph
+        .runs
+        .iter()
+        .any(|run| run.text.contains("StrongStyle") && run.style.bold)
+    );
+
+    let path = fixture_path("test-data/wml/style_linked.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let quote = paragraph_at(&doc, 1);
+    assert_eq!(
+      quote.format.alignment,
+      crate::docx::ParagraphAlignment::Center
+    );
+    assert!(quote.runs[0].style.italic);
+
+    let inline = paragraph_at(&doc, 2);
+    assert!(
+      inline
+        .runs
+        .iter()
+        .any(|run| run.text == "character-styled word" && run.style.italic)
+    );
   }
 
   #[test]
@@ -378,6 +434,153 @@ mod tests {
   }
 
   #[test]
+  fn first_page_header_is_used_when_title_page_is_enabled() {
+    let path = fixture_path("test-data/wml/header_first_page.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert!(doc.title_page);
+    assert_eq!(doc.header_blocks.len(), 1);
+    assert_eq!(doc.first_header_blocks.len(), 1);
+    assert_eq!(doc.footer_blocks.len(), 1);
+    assert!(doc.first_footer_blocks.is_empty());
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(find_text_item(&layout, "First Page Header").is_some());
+    assert!(find_text_item(&layout, "Default Header (odd pages)").is_none());
+    assert!(find_text_item(&layout, "Default Footer").is_some());
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn explicit_page_break_splits_layout_pages() {
+    let path = fixture_path("test-data/wml/breaks.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert!(doc.blocks.iter().any(|block| {
+      match block {
+        crate::docx::Block::Paragraph(paragraph) => paragraph
+          .inlines
+          .iter()
+          .any(|item| matches!(item, crate::docx::InlineItem::PageBreak)),
+        crate::docx::Block::Table(_) => false,
+      }
+    }));
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.len() >= 2);
+    assert!(layout.pages[0].items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Text(text) if text.text.contains("Before soft return")
+      )
+    }));
+    assert!(layout.pages[1].items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Text(text) if text.text.contains("After page break")
+      )
+    }));
+  }
+
+  #[test]
+  fn simple_fields_and_hyperlinks_emit_cached_text() {
+    let path = fixture_path("test-data/wml/fields_hyperlink.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(find_text_item(&layout, "May 2, 2026").is_some());
+    assert_eq!(
+      text_item(&layout, "Visit example.com").style.color,
+      crate::docx::RgbColor {
+        r: 0x05,
+        g: 0x63,
+        b: 0xC1,
+      }
+    );
+    assert!(text_item(&layout, "Visit example.com").style.underline);
+    assert_eq!(
+      text_item(&layout, "Go to target section").style.color,
+      crate::docx::RgbColor {
+        r: 0x05,
+        g: 0x63,
+        b: 0xC1,
+      }
+    );
+    assert!(text_item(&layout, "Go to target section").style.underline);
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn note_references_emit_inline_markers() {
+    let path = fixture_path("test-data/wml/footnotes.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.footnote_blocks.len(), 2);
+    assert!(find_text_item(&layout, "1").is_some());
+    assert!(find_text_item(&layout, "2").is_some());
+    assert!(find_text_item(&layout, " First footnote content.").is_some());
+    assert!(find_text_item(&layout, " Second footnote content.").is_some());
+
+    let path = fixture_path("test-data/wml/endnotes.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert_eq!(doc.endnote_blocks.len(), 1);
+    assert!(find_text_item(&layout, "1").is_some());
+    assert!(find_text_item(&layout, " Endnote content.").is_some());
+  }
+
+  #[test]
+  fn comments_emit_reference_markers_and_comment_blocks() {
+    let path = fixture_path("test-data/wml/comments.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.comment_blocks.len(), 2);
+    assert!(find_text_item(&layout, "[1]").is_some());
+    assert!(find_text_item(&layout, "[2]").is_some());
+    assert!(find_text_item(&layout, " First comment by Alice.").is_some());
+    assert!(find_text_item(&layout, " Second comment by Bob.").is_some());
+  }
+
+  #[test]
+  fn tracked_insertions_are_emitted_and_deletions_are_skipped() {
+    let path = fixture_path("test-data/wml/tracked_changes.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(find_text_item(&layout, "inserted words").is_some());
+    assert!(find_text_item(&layout, "deleted text").is_none());
+    assert_eq!(
+      paragraph_at(&doc, 3).format.alignment,
+      crate::docx::ParagraphAlignment::Center
+    );
+  }
+
+  #[test]
+  fn content_controls_emit_current_sdt_content() {
+    let path = fixture_path("test-data/wml/content_controls.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(find_text_item(&layout, "Jane Smith").is_some());
+    assert!(find_text_item(&layout, "5/2/2026").is_some());
+    assert!(find_text_item(&layout, "Active").is_some());
+  }
+
+  #[test]
   fn inline_images_are_extracted_laid_out_and_rendered() {
     let path = fixture_path("test-data/wml/image_inline_props.docx");
     let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
@@ -389,6 +592,7 @@ mod tests {
       .find_map(|item| match item {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_) => None,
+        crate::docx::InlineItem::PageBreak => None,
       })
       .expect("inline image");
 
@@ -495,6 +699,34 @@ mod tests {
     assert!(pdf.starts_with(b"%PDF-"));
   }
 
+  #[test]
+  fn table_spans_and_row_heights_are_extracted() {
+    let path = fixture_path("test-data/wml/table_merged.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let table = match &doc.blocks[0] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected table"),
+    };
+
+    assert_eq!(table.rows[0].cells[0].grid_span, 2);
+    assert!(table.rows[1].cells[2].vertical_merge_continue);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(find_text_item(&layout, "A1+A2 (horizontal merge, gridSpan=2)").is_some());
+    assert!(find_text_item(&layout, "A3 top of vertical merge").is_some());
+
+    let path = fixture_path("test-data/wml/table_props.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let table = match &doc.blocks[0] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected table"),
+    };
+    assert_eq!(table.rows[0].height_pt, Some(24.0));
+    assert!(table.rows[0].exact_height);
+  }
+
   fn fixture_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../..")
@@ -512,6 +744,13 @@ mod tests {
     layout: &'a crate::layout::LayoutDocument,
     text: &str,
   ) -> &'a crate::layout::TextItem {
+    find_text_item(layout, text).unwrap_or_else(|| panic!("text item {text:?}"))
+  }
+
+  fn find_text_item<'a>(
+    layout: &'a crate::layout::LayoutDocument,
+    text: &str,
+  ) -> Option<&'a crate::layout::TextItem> {
     layout
       .pages
       .iter()
@@ -523,6 +762,5 @@ mod tests {
         crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
       })
-      .unwrap_or_else(|| panic!("text item {text:?}"))
   }
 }

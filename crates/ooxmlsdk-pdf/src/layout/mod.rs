@@ -81,40 +81,59 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
       .max(DEFAULT_FONT_SIZE_PT);
 
   for block in &document.blocks {
-    match block {
-      Block::Paragraph(paragraph) => {
-        if paragraph.format.page_break_before && !current.items.is_empty() {
-          pages.push(current);
-          current = Page {
-            setup: document.page,
-            items: Vec::new(),
-          };
-          y = document.page.margin_top_pt;
-        }
+    y = layout_document_block(
+      block,
+      document.page,
+      &mut current,
+      &mut pages,
+      y,
+      content_bottom,
+      content_width,
+    );
+  }
 
-        y += paragraph.format.spacing_before_pt;
-        y = layout_paragraph(
-          paragraph,
-          document.page,
-          &mut current,
-          &mut pages,
-          y,
-          content_bottom,
-          (content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
-            .max(DEFAULT_FONT_SIZE_PT),
-        );
-      }
-      Block::Table(table) => {
-        y = layout_table(
-          table,
-          document.page,
-          &mut current,
-          &mut pages,
-          y,
-          content_bottom,
-          content_width,
-        );
-      }
+  if !document.footnote_blocks.is_empty() {
+    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    for block in &document.footnote_blocks {
+      y = layout_document_block(
+        block,
+        document.page,
+        &mut current,
+        &mut pages,
+        y,
+        content_bottom,
+        content_width,
+      );
+    }
+  }
+
+  if !document.endnote_blocks.is_empty() {
+    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    for block in &document.endnote_blocks {
+      y = layout_document_block(
+        block,
+        document.page,
+        &mut current,
+        &mut pages,
+        y,
+        content_bottom,
+        content_width,
+      );
+    }
+  }
+
+  if !document.comment_blocks.is_empty() {
+    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    for block in &document.comment_blocks {
+      y = layout_document_block(
+        block,
+        document.page,
+        &mut current,
+        &mut pages,
+        y,
+        content_bottom,
+        content_width,
+      );
     }
   }
 
@@ -127,12 +146,104 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
   Ok(LayoutDocument { pages })
 }
 
+fn layout_document_block(
+  block: &Block,
+  setup: PageSetup,
+  current: &mut Page,
+  pages: &mut Vec<Page>,
+  mut y: f32,
+  content_bottom: f32,
+  content_width: f32,
+) -> f32 {
+  match block {
+    Block::Paragraph(paragraph) => {
+      if paragraph.format.page_break_before && !current.items.is_empty() {
+        pages.push(std::mem::replace(
+          current,
+          Page {
+            setup,
+            items: Vec::new(),
+          },
+        ));
+        y = setup.margin_top_pt;
+      }
+
+      y += paragraph.format.spacing_before_pt;
+      layout_paragraph(
+        paragraph,
+        setup,
+        current,
+        pages,
+        y,
+        content_bottom,
+        (content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
+          .max(DEFAULT_FONT_SIZE_PT),
+      )
+    }
+    Block::Table(table) => layout_table(
+      table,
+      setup,
+      current,
+      pages,
+      y,
+      content_bottom,
+      content_width,
+    ),
+  }
+}
+
+fn layout_note_separator(
+  setup: PageSetup,
+  current: &mut Page,
+  pages: &mut Vec<Page>,
+  mut y: f32,
+  content_bottom: f32,
+) -> f32 {
+  if y + DEFAULT_LINE_HEIGHT_PT > content_bottom && !current.items.is_empty() {
+    pages.push(std::mem::replace(
+      current,
+      Page {
+        setup,
+        items: Vec::new(),
+      },
+    ));
+    y = setup.margin_top_pt;
+  }
+
+  y += 4.0;
+  current.items.push(PageItem::Line(LineItem {
+    x1_pt: setup.margin_left_pt,
+    y1_pt: y,
+    x2_pt: setup.margin_left_pt + 120.0,
+    y2_pt: y,
+    width_pt: 0.5,
+    color: RgbColor { r: 0, g: 0, b: 0 },
+  }));
+  y + 8.0
+}
+
 fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], content_width: f32) {
-  if document.header_blocks.is_empty() && document.footer_blocks.is_empty() {
+  if document.header_blocks.is_empty()
+    && document.footer_blocks.is_empty()
+    && document.first_header_blocks.is_empty()
+    && document.first_footer_blocks.is_empty()
+  {
     return;
   }
 
-  for page in pages {
+  for (index, page) in pages.iter_mut().enumerate() {
+    let header_blocks =
+      if index == 0 && document.title_page && !document.first_header_blocks.is_empty() {
+        &document.first_header_blocks
+      } else {
+        &document.header_blocks
+      };
+    let footer_blocks =
+      if index == 0 && document.title_page && !document.first_footer_blocks.is_empty() {
+        &document.first_footer_blocks
+      } else {
+        &document.footer_blocks
+      };
     let mut adornment = Page {
       setup: page.setup,
       items: Vec::new(),
@@ -143,7 +254,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
       .margin_top_pt
       .max(page.setup.header_distance_pt + 1.0);
     let mut y = page.setup.header_distance_pt;
-    for block in &document.header_blocks {
+    for block in header_blocks {
       y = layout_repeating_block(
         block,
         page.setup,
@@ -158,7 +269,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
     let mut y =
       (page.setup.height_pt - page.setup.footer_distance_pt - DEFAULT_LINE_HEIGHT_PT).max(0.0);
     let footer_bottom = page.setup.height_pt - 1.0;
-    for block in &document.footer_blocks {
+    for block in footer_blocks {
       y = layout_repeating_block(
         block,
         page.setup,
@@ -260,7 +371,7 @@ fn layout_table(
   let column_count = table
     .rows
     .iter()
-    .map(|row| row.cells.len())
+    .map(|row| row.cells.iter().map(|cell| cell.grid_span).sum::<usize>())
     .max()
     .unwrap_or(0);
   if column_count == 0 {
@@ -288,23 +399,35 @@ fn layout_table(
     let row_bottom = y + row_height;
 
     let mut cell_left = table_left;
-    for (index, width) in column_widths.iter().enumerate() {
-      if let Some(cell) = row.cells.get(index) {
+    let mut grid_index = 0;
+    for (cell_index, cell) in row.cells.iter().enumerate() {
+      if grid_index >= column_widths.len() {
+        break;
+      }
+      let span = cell
+        .grid_span
+        .max(1)
+        .min(column_widths.len().saturating_sub(grid_index));
+      let width = column_widths[grid_index..grid_index + span]
+        .iter()
+        .sum::<f32>();
+      if !cell.vertical_merge_continue {
         if let Some(color) = cell.shading {
           current.items.push(PageItem::Fill(FillItem {
             x_pt: cell_left,
             y_pt: row_top,
-            width_pt: *width,
+            width_pt: width,
             height_pt: row_height,
             color,
           }));
         }
-        if let Some(border) = vertical_border(table, row, index, true) {
+        if let Some(border) = vertical_border(table, row, cell_index, true) {
           push_styled_line(current, cell_left, row_top, cell_left, row_bottom, border);
         }
-        layout_table_cell(cell, setup, current, cell_left, row_top, *width, row_height);
+        layout_table_cell(cell, setup, current, cell_left, row_top, width, row_height);
       }
-      cell_left += *width;
+      cell_left += width;
+      grid_index += span;
     }
     if let Some(border) = horizontal_border(table, row_index, true) {
       push_styled_line(current, table_left, row_top, table_right, row_top, border);
@@ -462,9 +585,10 @@ fn table_column_widths(
 }
 
 fn table_row_height(row: &crate::docx::TableRow) -> f32 {
-  row
+  let content_height = row
     .cells
     .iter()
+    .filter(|cell| !cell.vertical_merge_continue)
     .map(|cell| {
       let line_count = cell
         .blocks
@@ -476,6 +600,7 @@ fn table_row_height(row: &crate::docx::TableRow) -> f32 {
             .filter(|item| match item {
               InlineItem::Text(run) => !run.text.is_empty(),
               InlineItem::Image(_) => true,
+              InlineItem::PageBreak => false,
             })
             .count()
             .max(1),
@@ -485,7 +610,12 @@ fn table_row_height(row: &crate::docx::TableRow) -> f32 {
         .max(1);
       TABLE_CELL_PADDING_PT * 2.0 + DEFAULT_LINE_HEIGHT_PT * line_count as f32
     })
-    .fold(TABLE_ROW_MIN_HEIGHT_PT, f32::max)
+    .fold(TABLE_ROW_MIN_HEIGHT_PT, f32::max);
+  match (row.height_pt, row.exact_height) {
+    (Some(height), true) => height,
+    (Some(height), false) => content_height.max(height),
+    (None, _) => content_height,
+  }
 }
 
 fn layout_table_cell(
@@ -549,6 +679,9 @@ fn layout_table_cell(
                 alt_text: image.alt_text.clone(),
               }));
               text_x += width;
+            }
+            InlineItem::PageBreak => {
+              text_y = text_bottom + 1.0;
             }
           }
         }
@@ -699,6 +832,12 @@ fn layout_paragraph(
         x += width;
         line_height = line_height.max(height);
         emitted = true;
+      }
+      InlineItem::PageBreak => {
+        y = force_page_break(setup, current, pages);
+        x = first_line_left;
+        line_height = base_line_height;
+        emitted = false;
       }
     }
   }
@@ -898,6 +1037,19 @@ fn next_line(
     next_y = setup.margin_top_pt;
   }
   next_y
+}
+
+fn force_page_break(setup: PageSetup, current: &mut Page, pages: &mut Vec<Page>) -> f32 {
+  if !current.items.is_empty() {
+    pages.push(std::mem::replace(
+      current,
+      Page {
+        setup,
+        items: Vec::new(),
+      },
+    ));
+  }
+  setup.margin_top_pt
 }
 
 fn flush_text(page: &mut Page, x: f32, y: f32, chunk: &mut String, style: TextStyle) {

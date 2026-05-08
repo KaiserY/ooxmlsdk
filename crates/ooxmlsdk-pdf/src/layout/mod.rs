@@ -42,6 +42,7 @@ pub(crate) struct LayoutDocument {
   pub pages: Vec<Page>,
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
+  pub outline_entries: Vec<OutlineEntry>,
   pub page_replays: Vec<PageReplay>,
   pub page_replay_applications: Vec<PageReplayApplication>,
   pub backward_moves: Vec<BackwardMove>,
@@ -50,6 +51,15 @@ pub(crate) struct LayoutDocument {
   pub reflow_executions: Vec<ReflowExecution>,
   pub reflow_requests: Vec<ReflowRequest>,
   pub restart_plan: Option<RestartPlan>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OutlineEntry {
+  pub level: u8,
+  pub text: String,
+  pub page_index: usize,
+  pub x_pt: f32,
+  pub y_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -461,6 +471,7 @@ struct RootFrameLayout<'a> {
   emitted_footnotes: HashSet<i64>,
   follows: Vec<FrameFollow>,
   frames: Vec<LayoutFrame>,
+  outline_entries: Vec<OutlineEntry>,
   checkpoints: Vec<LayoutCheckpoint>,
 }
 
@@ -476,6 +487,7 @@ struct LayoutCheckpoint {
   emitted_footnotes: HashSet<i64>,
   follows: Vec<FrameFollow>,
   frames: Vec<LayoutFrame>,
+  outline_entries: Vec<OutlineEntry>,
 }
 
 impl<'a> RootFrameLayout<'a> {
@@ -488,6 +500,7 @@ impl<'a> RootFrameLayout<'a> {
       emitted_footnotes: HashSet::new(),
       follows: Vec::new(),
       frames: Vec::new(),
+      outline_entries: Vec::new(),
       checkpoints: Vec::new(),
     }
   }
@@ -551,6 +564,7 @@ impl<'a> RootFrameLayout<'a> {
       pages: self.pages,
       follows: self.follows,
       frames: self.frames,
+      outline_entries: self.outline_entries,
       page_replays,
       page_replay_applications,
       backward_moves,
@@ -666,6 +680,7 @@ impl<'a> RootFrameLayout<'a> {
       emitted_footnotes: self.emitted_footnotes.clone(),
       follows: self.follows.clone(),
       frames: self.frames.clone(),
+      outline_entries: self.outline_entries.clone(),
     });
   }
 
@@ -722,6 +737,7 @@ impl<'a> RootFrameLayout<'a> {
       Some(block_index),
       &frame_influences,
     );
+    self.record_outline_entry(block, frame_start);
     self.record_follow_transition(
       transition,
       *flow,
@@ -884,6 +900,7 @@ impl<'a> RootFrameLayout<'a> {
       emitted_footnotes: checkpoint.emitted_footnotes.clone(),
       follows: checkpoint.follows.clone(),
       frames: checkpoint.frames.clone(),
+      outline_entries: checkpoint.outline_entries.clone(),
       checkpoints: self.checkpoints[..=checkpoint_index].to_vec(),
     };
     rerun.format_body_from_checkpoint(&checkpoint, &constraints);
@@ -896,6 +913,7 @@ impl<'a> RootFrameLayout<'a> {
     self.emitted_footnotes = rerun.emitted_footnotes;
     self.follows = rerun.follows;
     self.frames = rerun.frames;
+    self.outline_entries = rerun.outline_entries;
     self.checkpoints = rerun.checkpoints;
 
     Some(LayoutRerun {
@@ -1076,6 +1094,68 @@ impl<'a> RootFrameLayout<'a> {
       });
     }
   }
+
+  fn record_outline_entry(&mut self, block: &Block, start: FrameSegmentStart) {
+    let Block::Paragraph(paragraph) = block else {
+      return;
+    };
+    let Some(level) = paragraph.format.outline_level else {
+      return;
+    };
+    let text = paragraph_outline_text(paragraph);
+    if text.is_empty() {
+      return;
+    }
+    if let Some((page_index, text_item)) = first_text_item_from(&self.pages, &self.current, start) {
+      self.outline_entries.push(OutlineEntry {
+        level,
+        text,
+        page_index,
+        x_pt: text_item.x_pt,
+        y_pt: text_item.y_pt,
+      });
+    }
+  }
+}
+
+fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
+  paragraph
+    .inlines
+    .iter()
+    .filter_map(|inline| match inline {
+      InlineItem::Text(text) => Some(text.text.as_str()),
+      InlineItem::Image(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
+    })
+    .collect::<String>()
+    .trim()
+    .to_string()
+}
+
+fn first_text_item_from(
+  pages: &[Page],
+  current: &Page,
+  start: FrameSegmentStart,
+) -> Option<(usize, TextItem)> {
+  for page_index in start.page_index..=pages.len() {
+    let page = if page_index < pages.len() {
+      &pages[page_index]
+    } else {
+      current
+    };
+    let item_start = if page_index == start.page_index {
+      start.item_index
+    } else {
+      0
+    };
+    for item in page.items.iter().skip(item_start) {
+      if let PageItem::Text(text) = item
+        && !text.text.trim().is_empty()
+      {
+        return Some((page_index, text.clone()));
+      }
+    }
+  }
+  None
 }
 
 fn rerun_constraints_for_frame(
@@ -3165,6 +3245,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
     pages: output_pages,
     follows: Vec::new(),
     frames: Vec::new(),
+    outline_entries: Vec::new(),
     page_replays: Vec::new(),
     page_replay_applications: Vec::new(),
     backward_moves: Vec::new(),

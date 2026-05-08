@@ -216,6 +216,7 @@ pub(crate) struct ParagraphFormat {
   pub keep_with_next: bool,
   pub keep_lines: bool,
   pub contextual_spacing: bool,
+  pub outline_level: Option<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

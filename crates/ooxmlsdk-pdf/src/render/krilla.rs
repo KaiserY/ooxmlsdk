@@ -7,19 +7,23 @@ use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
 use krilla::configure::{Configuration, PdfVersion};
+use krilla::destination::XyzDestination;
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use krilla::num::NormalizedF32;
+use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
 
-use crate::docx::TextStyle;
+use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
 use crate::fonts::load_sans_face;
-use crate::layout::{FillItem, ImageItem, LayoutDocument, LineItem, PageItem, TextItem};
+use crate::layout::{
+  FillItem, ImageItem, LayoutDocument, LineItem, OutlineEntry, PageItem, TextItem,
+};
 use crate::options::PdfOptions;
 use crate::text_metrics::{measure_text, shape_text};
 
@@ -169,6 +173,39 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             .source_frame_index
             .is_none_or(|index| index < document.frames.len())
             && text.source_line_index.is_none_or(|index| index < 4096)
+            && text.baseline_y.is_finite()
+            && text.width_pt >= 0.0
+            && !text.portions.is_empty()
+            && text.portions.iter().all(|portion| {
+              match portion.kind {
+                PaintTextPortionKind::Field(kind) => {
+                  let _field_kind = kind;
+                }
+                PaintTextPortionKind::Text
+                | PaintTextPortionKind::Tab
+                | PaintTextPortionKind::Link => {}
+              }
+              portion.baseline_y.is_finite()
+                && portion.width_pt >= 0.0
+                && portion.text_range.start <= portion.text_range.end
+                && portion.text_range.end <= text.item.text.len()
+                && portion
+                  .clip
+                  .as_ref()
+                  .is_none_or(|clip| clip.width_pt >= 0.0 && clip.height_pt >= 0.0)
+                && portion
+                  .glyphs
+                  .as_ref()
+                  .is_none_or(|glyphs| glyphs.iter().all(|glyph| glyph.x_advance >= 0.0))
+                && portion
+                  .highlight
+                  .as_ref()
+                  .is_none_or(|rect| rect.width_pt >= 0.0 && rect.height_pt >= 0.0)
+                && portion
+                  .link
+                  .as_ref()
+                  .is_none_or(|link| link.width_pt >= 0.0 && link.height_pt >= 0.0)
+            })
         }
         PaintItem::Image(_) | PaintItem::Fill(_) | PaintItem::Line(_) => true,
       })
@@ -190,6 +227,10 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     for annotation in link_annotations {
       pdf_page.add_annotation(annotation);
     }
+  }
+
+  if let Some(outline) = pdf_outline_for_entries(&document.outline_entries) {
+    pdf.set_outline(outline);
   }
 
   pdf
@@ -222,6 +263,74 @@ struct PaintText {
   item: TextItem,
   source_frame_index: Option<usize>,
   source_line_index: Option<usize>,
+  baseline_y: f32,
+  width_pt: f32,
+  portions: Vec<PaintTextPortion>,
+}
+
+#[derive(Clone, Debug)]
+struct PaintTextPortion {
+  kind: PaintTextPortionKind,
+  text_range: std::ops::Range<usize>,
+  x_pt: f32,
+  baseline_y: f32,
+  width_pt: f32,
+  clip: Option<PaintClipRect>,
+  glyphs: Option<Vec<KrillaGlyph>>,
+  highlight: Option<PaintRect>,
+  underline: Option<PaintStrokeLine>,
+  strikethrough: Option<PaintStrokeLine>,
+  link: Option<PaintLink>,
+}
+
+#[derive(Clone, Debug)]
+enum PaintTextPortionKind {
+  Text,
+  Tab,
+  Field(DynamicFieldKind),
+  Link,
+}
+
+#[derive(Clone, Debug)]
+struct PaintGlyphRun {
+  width_pt: f32,
+  glyphs: Vec<KrillaGlyph>,
+}
+
+#[derive(Clone, Debug)]
+struct PaintRect {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  color: RgbColor,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PaintClipRect {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+}
+
+#[derive(Clone, Debug)]
+struct PaintStrokeLine {
+  x1_pt: f32,
+  y1_pt: f32,
+  x2_pt: f32,
+  y2_pt: f32,
+  width_pt: f32,
+  color: RgbColor,
+}
+
+#[derive(Clone, Debug)]
+struct PaintLink {
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  url: String,
 }
 
 impl PaintDocument {
@@ -239,11 +348,11 @@ impl PaintDocument {
           .map(|(item_index, item)| match item {
             PageItem::Text(text) => {
               let owner = line_owners.get(item_index).copied().flatten();
-              PaintItem::Text(PaintText {
-                item: text.clone(),
-                source_frame_index: owner.map(|owner| owner.frame_index),
-                source_line_index: owner.map(|owner| owner.line_index),
-              })
+              PaintItem::Text(PaintText::from_layout_text(
+                text,
+                owner,
+                page.setup.width_pt,
+              ))
             }
             PageItem::Image(image) => PaintItem::Image(image.clone()),
             PageItem::Fill(fill) => PaintItem::Fill(*fill),
@@ -261,10 +370,247 @@ impl PaintDocument {
   }
 }
 
+impl PaintText {
+  fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
+    let glyphs = shaped_pdf_glyphs(&text.text, text.style);
+    let width_pt = glyphs
+      .as_ref()
+      .map(|run| run.width_pt)
+      .unwrap_or_else(|| measure_text(&text.text, text.style));
+    let baseline_y = text.y_pt - text.style.baseline_shift_pt;
+    let highlight = text.style.highlight.map(|color| PaintRect {
+      x_pt: text.x_pt,
+      y_pt: baseline_y - text.style.font_size_pt,
+      width_pt,
+      height_pt: text.style.font_size_pt * 1.25,
+      color,
+    });
+    let decoration_width = (text.style.font_size_pt / 18.0).max(0.5);
+    let underline = text.style.underline.then_some(PaintStrokeLine {
+      x1_pt: text.x_pt,
+      y1_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
+      x2_pt: text.x_pt + width_pt,
+      y2_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
+      width_pt: decoration_width,
+      color: text.style.color,
+    });
+    let strikethrough = text.style.strikethrough.then_some(PaintStrokeLine {
+      x1_pt: text.x_pt,
+      y1_pt: baseline_y - (text.style.font_size_pt * 0.32),
+      x2_pt: text.x_pt + width_pt,
+      y2_pt: baseline_y - (text.style.font_size_pt * 0.32),
+      width_pt: decoration_width,
+      color: text.style.color,
+    });
+    let link = text.hyperlink_url.as_ref().map(|url| PaintLink {
+      x_pt: text.x_pt,
+      y_pt: baseline_y - text.style.font_size_pt,
+      width_pt,
+      height_pt: text.style.font_size_pt * 1.25,
+      url: url.clone(),
+    });
+
+    Self {
+      item: text.clone(),
+      source_frame_index: owner.map(|owner| owner.frame_index),
+      source_line_index: owner.map(|owner| owner.line_index),
+      baseline_y,
+      width_pt,
+      portions: text_paint_portions(PaintTextPortionSource {
+        text,
+        baseline_y,
+        width_pt,
+        page_width_pt,
+        clip: owner.map(|owner| owner.clip),
+        glyphs: glyphs.map(|run| run.glyphs),
+        highlight,
+        underline,
+        strikethrough,
+        link,
+      }),
+    }
+  }
+}
+
+struct PaintTextPortionSource<'a> {
+  text: &'a TextItem,
+  baseline_y: f32,
+  width_pt: f32,
+  page_width_pt: f32,
+  clip: Option<PaintClipRect>,
+  glyphs: Option<Vec<KrillaGlyph>>,
+  highlight: Option<PaintRect>,
+  underline: Option<PaintStrokeLine>,
+  strikethrough: Option<PaintStrokeLine>,
+  link: Option<PaintLink>,
+}
+
+fn text_paint_portions(source: PaintTextPortionSource<'_>) -> Vec<PaintTextPortion> {
+  let PaintTextPortionSource {
+    text,
+    baseline_y,
+    width_pt,
+    page_width_pt,
+    clip,
+    glyphs,
+    highlight,
+    underline,
+    strikethrough,
+    link,
+  } = source;
+  let ranges = text_portion_ranges(text);
+  let mut portions = Vec::with_capacity(ranges.len().max(1));
+  let mut x_pt = text.x_pt;
+  for (kind, range) in ranges {
+    let portion_clip = paint_clip_for_portion(clip, &kind, page_width_pt);
+    let portion_glyphs = glyphs
+      .as_ref()
+      .map(|glyphs| glyphs_for_text_range(glyphs, range.clone()));
+    let portion_width = portion_glyphs
+      .as_ref()
+      .map(|glyphs| glyph_width_pt(glyphs, text.style.font_size_pt))
+      .unwrap_or_else(|| measure_text(&text.text[range.clone()], text.style));
+    portions.push(PaintTextPortion {
+      kind,
+      text_range: range.clone(),
+      x_pt,
+      baseline_y,
+      width_pt: portion_width,
+      clip: portion_clip,
+      glyphs: portion_glyphs.filter(|glyphs| !glyphs.is_empty()),
+      highlight: highlight
+        .as_ref()
+        .map(|rect| paint_rect_for_portion(rect, x_pt, portion_width)),
+      underline: underline
+        .as_ref()
+        .map(|line| paint_line_for_portion(line, x_pt, portion_width)),
+      strikethrough: strikethrough
+        .as_ref()
+        .map(|line| paint_line_for_portion(line, x_pt, portion_width)),
+      link: link
+        .as_ref()
+        .map(|link| paint_link_for_portion(link, x_pt, portion_width)),
+    });
+    x_pt += portion_width;
+  }
+  if portions.is_empty() {
+    let portion_clip = paint_clip_for_portion(clip, &PaintTextPortionKind::Text, page_width_pt);
+    portions.push(PaintTextPortion {
+      kind: PaintTextPortionKind::Text,
+      text_range: 0..text.text.len(),
+      x_pt: text.x_pt,
+      baseline_y,
+      width_pt,
+      clip: portion_clip,
+      glyphs,
+      highlight,
+      underline,
+      strikethrough,
+      link,
+    });
+  }
+  portions
+}
+
+fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::Range<usize>)> {
+  if text.text.is_empty() {
+    return Vec::new();
+  }
+  if let Some(kind) = text.dynamic_field {
+    return vec![(PaintTextPortionKind::Field(kind), 0..text.text.len())];
+  }
+  if text.hyperlink_url.is_some() && !text.text.contains('\t') {
+    return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
+  }
+
+  let mut ranges = Vec::new();
+  let mut start = 0usize;
+  for (index, ch) in text.text.char_indices() {
+    if ch != '\t' {
+      continue;
+    }
+    if start < index {
+      let kind = if text.hyperlink_url.is_some() {
+        PaintTextPortionKind::Link
+      } else {
+        PaintTextPortionKind::Text
+      };
+      ranges.push((kind, start..index));
+    }
+    ranges.push((PaintTextPortionKind::Tab, index..index + ch.len_utf8()));
+    start = index + ch.len_utf8();
+  }
+  if start < text.text.len() {
+    let kind = if text.hyperlink_url.is_some() {
+      PaintTextPortionKind::Link
+    } else {
+      PaintTextPortionKind::Text
+    };
+    ranges.push((kind, start..text.text.len()));
+  }
+  ranges
+}
+
+fn glyphs_for_text_range(
+  glyphs: &[KrillaGlyph],
+  range: std::ops::Range<usize>,
+) -> Vec<KrillaGlyph> {
+  glyphs
+    .iter()
+    .filter(|glyph| glyph.text_range.start < range.end && glyph.text_range.end > range.start)
+    .cloned()
+    .collect()
+}
+
+fn glyph_width_pt(glyphs: &[KrillaGlyph], font_size_pt: f32) -> f32 {
+  glyphs
+    .iter()
+    .map(|glyph| glyph.x_advance * font_size_pt)
+    .sum()
+}
+
+fn paint_rect_for_portion(rect: &PaintRect, x_pt: f32, width_pt: f32) -> PaintRect {
+  PaintRect {
+    x_pt,
+    width_pt,
+    ..rect.clone()
+  }
+}
+
+fn paint_line_for_portion(line: &PaintStrokeLine, x_pt: f32, width_pt: f32) -> PaintStrokeLine {
+  PaintStrokeLine {
+    x1_pt: x_pt,
+    x2_pt: x_pt + width_pt,
+    ..line.clone()
+  }
+}
+
+fn paint_link_for_portion(link: &PaintLink, x_pt: f32, width_pt: f32) -> PaintLink {
+  PaintLink {
+    x_pt,
+    width_pt,
+    ..link.clone()
+  }
+}
+
+fn paint_clip_for_portion(
+  clip: Option<PaintClipRect>,
+  kind: &PaintTextPortionKind,
+  page_width_pt: f32,
+) -> Option<PaintClipRect> {
+  let mut clip = clip?;
+  if matches!(kind, PaintTextPortionKind::Tab) {
+    let paint_right_pt = page_width_pt.max(clip.x_pt + clip.width_pt);
+    clip.width_pt = (paint_right_pt - clip.x_pt).max(clip.width_pt);
+  }
+  Some(clip)
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PaintLineOwner {
   frame_index: usize,
   line_index: usize,
+  clip: PaintClipRect,
 }
 
 fn paint_line_owners(
@@ -287,6 +633,12 @@ fn paint_line_owners(
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
+            clip: PaintClipRect {
+              x_pt: line.x_pt,
+              y_pt: line.y_pt,
+              width_pt: line.width_pt,
+              height_pt: line.height_pt,
+            },
           });
         }
       }
@@ -318,6 +670,33 @@ fn draw_paint_item(
   }
 }
 
+fn pdf_outline_for_entries(entries: &[OutlineEntry]) -> Option<Outline> {
+  if entries.is_empty() {
+    return None;
+  }
+  let mut outline = Outline::new();
+  let mut index = 0;
+  while index < entries.len() {
+    let level = entries[index].level;
+    outline.push_child(pdf_outline_node(entries, &mut index, level));
+  }
+  Some(outline)
+}
+
+fn pdf_outline_node(entries: &[OutlineEntry], index: &mut usize, level: u8) -> OutlineNode {
+  let entry = &entries[*index];
+  *index += 1;
+  let mut node = OutlineNode::new(
+    entry.text.clone(),
+    XyzDestination::new(entry.page_index, Point::from_xy(entry.x_pt, entry.y_pt)),
+  );
+  while *index < entries.len() && entries[*index].level > level {
+    let child_level = entries[*index].level;
+    node.push_child(pdf_outline_node(entries, index, child_level));
+  }
+  node
+}
+
 fn draw_text_item(
   surface: &mut Surface<'_>,
   text: &PaintText,
@@ -325,88 +704,100 @@ fn draw_text_item(
   link_annotations: &mut Vec<Annotation>,
 ) {
   let item = &text.item;
-  let baseline_y = item.y_pt - item.style.baseline_shift_pt;
-  let text_width = measure_text(&item.text, item.style);
-  if let Some(color) = item.style.highlight {
+  for portion in &text.portions {
+    let clipped = push_paint_clip(surface, portion.clip.as_ref());
+    if let Some(highlight) = &portion.highlight {
+      draw_paint_rect(surface, highlight);
+    }
     surface.set_stroke(None);
-    surface.set_fill(Some(Fill {
-      paint: rgb::Color::new(color.r, color.g, color.b).into(),
-      opacity: NormalizedF32::ONE,
-      rule: Default::default(),
-    }));
-    let top = baseline_y - item.style.font_size_pt;
-    let mut path = PathBuilder::new();
-    path.move_to(item.x_pt, top);
-    path.line_to(item.x_pt + text_width, top);
-    path.line_to(
-      item.x_pt + text_width,
-      baseline_y + item.style.font_size_pt * 0.25,
-    );
-    path.line_to(item.x_pt, baseline_y + item.style.font_size_pt * 0.25);
-    path.close();
-    if let Some(path) = path.finish() {
-      surface.draw_path(&path);
+    surface.set_fill(Some(fill(item.style)));
+    if let Some(glyphs) = &portion.glyphs {
+      surface.draw_glyphs(
+        Point::from_xy(portion.x_pt, portion.baseline_y),
+        glyphs,
+        fonts.select(item.style).clone(),
+        &item.text,
+        item.style.font_size_pt,
+        false,
+      );
+    } else {
+      surface.draw_text(
+        Point::from_xy(portion.x_pt, portion.baseline_y),
+        fonts.select(item.style).clone(),
+        item.style.font_size_pt,
+        &item.text[portion.text_range.clone()],
+        false,
+        TextDirection::Auto,
+      );
     }
-  }
-  surface.set_stroke(None);
-  surface.set_fill(Some(fill(item.style)));
-  if let Some(glyphs) = shaped_pdf_glyphs(&item.text, item.style) {
-    surface.draw_glyphs(
-      Point::from_xy(item.x_pt, baseline_y),
-      &glyphs,
-      fonts.select(item.style).clone(),
-      &item.text,
-      item.style.font_size_pt,
-      false,
-    );
-  } else {
-    surface.draw_text(
-      Point::from_xy(item.x_pt, baseline_y),
-      fonts.select(item.style).clone(),
-      item.style.font_size_pt,
-      &item.text,
-      false,
-      TextDirection::Auto,
-    );
-  }
-  if item.style.underline {
-    surface.set_fill(None);
-    surface.set_stroke(Some(Stroke {
-      width: (item.style.font_size_pt / 18.0).max(0.5),
-      paint: rgb::Color::new(item.style.color.r, item.style.color.g, item.style.color.b).into(),
-      ..Default::default()
-    }));
-    let underline_y = baseline_y + (item.style.font_size_pt * 0.12).max(1.0);
-    let mut path = PathBuilder::new();
-    path.move_to(item.x_pt, underline_y);
-    path.line_to(item.x_pt + text_width, underline_y);
-    if let Some(path) = path.finish() {
-      surface.draw_path(&path);
+    if let Some(underline) = &portion.underline {
+      draw_paint_stroke_line(surface, underline);
     }
-  }
-  if item.style.strikethrough {
-    surface.set_fill(None);
-    surface.set_stroke(Some(Stroke {
-      width: (item.style.font_size_pt / 18.0).max(0.5),
-      paint: rgb::Color::new(item.style.color.r, item.style.color.g, item.style.color.b).into(),
-      ..Default::default()
-    }));
-    let strike_y = baseline_y - (item.style.font_size_pt * 0.32);
-    let mut path = PathBuilder::new();
-    path.move_to(item.x_pt, strike_y);
-    path.line_to(item.x_pt + text_width, strike_y);
-    if let Some(path) = path.finish() {
-      surface.draw_path(&path);
+    if let Some(strikethrough) = &portion.strikethrough {
+      draw_paint_stroke_line(surface, strikethrough);
     }
-  }
-  if let Some(url) = &item.hyperlink_url {
-    let top = baseline_y - item.style.font_size_pt;
-    let bottom = baseline_y + item.style.font_size_pt * 0.25;
-    if let Some(rect) = Rect::from_ltrb(item.x_pt, top, item.x_pt + text_width, bottom) {
-      let target = Target::Action(Action::Link(LinkAction::new(url.clone())));
+    if let Some(link) = &portion.link
+      && let Some(rect) = Rect::from_ltrb(
+        link.x_pt,
+        link.y_pt,
+        link.x_pt + link.width_pt,
+        link.y_pt + link.height_pt,
+      )
+    {
+      let target = Target::Action(Action::Link(LinkAction::new(link.url.clone())));
       let link = LinkAnnotation::new(rect, target);
       link_annotations.push(Annotation::new_link(link, None));
     }
+    if clipped {
+      surface.pop();
+    }
+  }
+}
+
+fn push_paint_clip(surface: &mut Surface<'_>, clip: Option<&PaintClipRect>) -> bool {
+  let Some(clip) = clip else {
+    return false;
+  };
+  if clip.width_pt <= 0.0 || clip.height_pt <= 0.0 {
+    return false;
+  }
+  if let Some(path) = rect_path(clip.x_pt, clip.y_pt, clip.width_pt, clip.height_pt) {
+    surface.push_clip_path(&path, &krilla::paint::FillRule::NonZero);
+    return true;
+  }
+  false
+}
+
+fn draw_paint_rect(surface: &mut Surface<'_>, rect: &PaintRect) {
+  surface.set_stroke(None);
+  surface.set_fill(Some(Fill {
+    paint: rgb::Color::new(rect.color.r, rect.color.g, rect.color.b).into(),
+    opacity: NormalizedF32::ONE,
+    rule: Default::default(),
+  }));
+  let mut path = PathBuilder::new();
+  path.move_to(rect.x_pt, rect.y_pt);
+  path.line_to(rect.x_pt + rect.width_pt, rect.y_pt);
+  path.line_to(rect.x_pt + rect.width_pt, rect.y_pt + rect.height_pt);
+  path.line_to(rect.x_pt, rect.y_pt + rect.height_pt);
+  path.close();
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
+}
+
+fn draw_paint_stroke_line(surface: &mut Surface<'_>, line: &PaintStrokeLine) {
+  surface.set_fill(None);
+  surface.set_stroke(Some(Stroke {
+    width: line.width_pt,
+    paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+    ..Default::default()
+  }));
+  let mut path = PathBuilder::new();
+  path.move_to(line.x1_pt, line.y1_pt);
+  path.line_to(line.x2_pt, line.y2_pt);
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
   }
 }
 
@@ -515,25 +906,27 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
   }
 }
 
-fn shaped_pdf_glyphs(text: &str, style: TextStyle) -> Option<Vec<KrillaGlyph>> {
+fn shaped_pdf_glyphs(text: &str, style: TextStyle) -> Option<PaintGlyphRun> {
   let shaped = shape_text(text, style)?;
-  Some(
-    shaped
-      .glyphs
-      .into_iter()
-      .map(|glyph| {
-        KrillaGlyph::new(
-          GlyphId::new(glyph.glyph_id),
-          glyph.x_advance_em,
-          glyph.x_offset_em,
-          glyph.y_offset_em,
-          glyph.y_advance_em,
-          glyph.text_range,
-          None,
-        )
-      })
-      .collect(),
-  )
+  let glyphs = shaped
+    .glyphs
+    .into_iter()
+    .map(|glyph| {
+      KrillaGlyph::new(
+        GlyphId::new(glyph.glyph_id),
+        glyph.x_advance_em,
+        glyph.x_offset_em,
+        glyph.y_offset_em,
+        glyph.y_advance_em,
+        glyph.text_range,
+        None,
+      )
+    })
+    .collect();
+  Some(PaintGlyphRun {
+    width_pt: shaped.width_pt,
+    glyphs,
+  })
 }
 
 fn image_has_crop_or_transform(image: &ImageItem) -> bool {

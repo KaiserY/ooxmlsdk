@@ -1646,6 +1646,12 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(borders) = properties.paragraph_borders() {
     format.borders = paragraph_borders_model(borders);
   }
+
+  if let Some(outline_level) = properties.outline_level() {
+    format.outline_level = u8::try_from(outline_level.val)
+      .ok()
+      .filter(|level| *level <= 8);
+  }
 }
 
 fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
@@ -4228,6 +4234,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   if values.contextual_spacing {
     target.contextual_spacing = true;
   }
+  if values.outline_level.is_some() {
+    target.outline_level = values.outline_level;
+  }
 }
 
 fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
@@ -4625,6 +4634,15 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.shading.as_ref(),
       Self::BaseStyle(properties) => properties.shading.as_ref(),
       Self::Previous(properties) => properties.shading.as_ref(),
+    }
+  }
+
+  fn outline_level(&self) -> Option<&'a w::OutlineLevel> {
+    match self {
+      Self::Direct(properties) => properties.outline_level.as_ref(),
+      Self::Style(properties) => properties.outline_level.as_ref(),
+      Self::BaseStyle(properties) => properties.outline_level.as_ref(),
+      Self::Previous(properties) => properties.outline_level.as_ref(),
     }
   }
 }

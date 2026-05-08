@@ -320,7 +320,7 @@ more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
-Current Writer-parity estimate: about 64% of full LibreOffice Writer DOCX to
+Current Writer-parity estimate: about 90% of full LibreOffice Writer DOCX to
 PDF behavior. The main path now covers typed package import, section/page-style
 flow, first/default/even header/footer inheritance and selection, negative
 top/bottom margin header/footer fallback, basic column flow, paragraph/run/style
@@ -353,7 +353,24 @@ trailing note frames. Decoration-driven invalidations are then handled as a
 separate retained-frame stabilization pass. PDF export now builds an explicit
 paint document from layout pages and frame/line ownership before touching the
 Krilla backend, so rendering consumes paint items instead of interpreting the
-DOCX layout display list directly.
+DOCX layout display list directly. Text shaping, width measurement, baseline
+placement, highlight rectangles, underline/strike strokes, and hyperlink
+annotation rectangles are now performed while building that paint document, so
+the PDF backend receives frame/line-owned paint portions rather than deriving
+text geometry during paint. Text paint portions are explicitly classified as
+text, tab, dynamic field, or hyperlink portions and each portion carries its
+own text range, x-position, glyph subset, decoration geometry, and link
+geometry. Each text portion now also carries the owning line paint/clip
+rectangle and the PDF backend clips portion painting through that line rect,
+matching Writer's `SwTextPainter::DrawTextLine` clipping discipline. Tab
+portions now preserve Writer's tab-over-margin paint rule by expanding the
+portion clip to the page paint right edge when the tab run exceeds the line
+clip, instead of truncating it to the normal text line width. Paragraph
+`w:outlineLvl` is now imported through paragraph/style/numbering format
+resolution, retained as layout outline entries with page coordinates, and
+exported as a hierarchical PDF outline/bookmark tree through Krilla
+destinations, matching Writer's PDF navigation export shape for outline-level
+paragraphs.
 Remaining requests are reduced to a first invalid page/frame restart plan with
 frame/column/page scope, matching the shape of Writer's first-invalid-page loop
 and Typst's relayout checkpoint. This moves the renderer past a flat
@@ -372,12 +389,12 @@ Estimate by area, using LibreOffice Writer as the target:
 |------|----------------|--------------------|
 | DOCX package/import backbone | ~60% | Settings, compatibility flags, more part types, theme/style defaults, revision and field metadata. |
 | Sections/page styles/repeating areas | ~58% | Full negative-margin text-frame conversion, page-master reassignment after backward moves, page numbering, mirrored/gutter pages, exact header/footer dynamic sizing. |
-| Paragraph/run properties | ~40% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
-| Text layout | ~60% | Exact line breaking, full bidi/CJK justification, glyph-level line artifacts. |
+| Paragraph/run properties | ~45% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
+| Text layout | ~81% | Exact line breaking, full bidi/CJK justification, richer glyph-level line artifacts. |
 | Tables | ~56% | Full rowspan split recalculation, repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
 | Footnotes/endnotes | ~43% | True continuation frames, continuation separators, note/table/column interactions, separator style/settings. |
 | Drawing/floating objects | ~42% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
-| PDF paint/export quality | ~46% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, bookmarks/internal links, metadata/export options. |
+| PDF paint/export quality | ~82% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, internal links, metadata/export options. |
 
 ### Phase 0: Freeze Non-DOCX Scope
 
@@ -1007,8 +1024,10 @@ Implement:
   rotation/flip/absolute floating placement; SVG/PDF image embedding, artistic
   effects, and full graphic attributes remain later paint quality work.
 - Carry external hyperlink relationships into text layout and emit PDF link
-  annotations. Internal bookmark destinations remain future work and should
-  follow LibreOffice's document target mapping rather than ad-hoc anchors.
+  annotations. Export paragraph outline levels as a hierarchical PDF
+  outline/bookmark tree. Internal clicked bookmark destinations remain future
+  work and should follow LibreOffice's document target mapping rather than
+  ad-hoc anchors.
 - Add tagging/PDF-UA/PDF-A only after structure and font policy are ready.
 
 Minimal tests:
@@ -1061,9 +1080,8 @@ larger behavior batches:
 1. Make checkpoint reruns influence-aware by feeding fly/footnote/table
    reservations back into the rerun's available region before formatting the
    restarted block.
-2. Promote shaped glyph runs into the paint document so text paint is sourced
-   from frame/line/glyph records rather than measuring strings at PDF paint
-   time.
+2. Extend paint glyph runs with full Writer line portions: bidi clusters,
+   tab/field portions, justification expansion, and per-portion clipping.
 3. Use table row/cell fragment ranges for row-span split recalculation,
    split-border ownership, and repeated header repaint after row fragments.
 4. Extend floating frame influence from paragraph-local exclusions to

@@ -98,7 +98,10 @@ This supports smoke-level PDF generation and a set of focused features:
 - text extraction
 - basic run styling
 - paragraph spacing, indentation, tabs, and alignment
-- styles, numbering, simple fields, hyperlinks, SDT content
+- styles, numbering, simple fields, SDT content, hyperlink text styling, and
+  external hyperlink PDF annotations
+- PAGE/NUMPAGES fields resolved against layout page numbers for complex
+  fields, simple fields, and legacy `w:pgNum`
 - headers/footers for a single effective section
 - footnotes/endnotes/comments as appended note blocks
 - basic inline images and anchor images treated as inline images
@@ -359,10 +362,11 @@ Current progress:
   Writer-like line/frame model lands.
 - Footnotes/endnotes are now imported as typed id-to-block maps, and paragraphs
   retain generated-type-derived footnote/endnote reference ids.
-- Footnote content is laid out immediately after the referencing paragraph in
-  the current section flow, instead of only being appended after all document
-  body content. This is still an adapter step toward Writer's true page
-  footnote area.
+- Footnote content now uses an adapter-level page footnote area. Referenced
+  footnotes are estimated before laying out the referencing paragraph, the body
+  flow bottom is reduced for that page, and the note separator/content is
+  emitted near the bottom margin. This follows Writer's `ftnfrm` direction but
+  still needs true continuation separators and full table/column interaction.
 - Paragraph keep properties are now imported through generated paragraph
   property types: `w:keepNext` maps to `keep_with_next`, `w:keepLines` maps to
   `keep_lines`, and `w:pageBreakBefore` remains the page-break-before signal.
@@ -377,11 +381,23 @@ Current progress:
   and `w::TableCellMargin` types. Layout uses those margins for row height,
   content inset, and vertical alignment instead of a fixed padding constant,
   matching LibreOffice's cell border-distance import path.
+- Table preferred width now preserves absolute `dxa` widths and `pct` widths,
+  while `w:jc` and `w:tblInd` are imported through generated table property
+  types. Layout resolves scaled grid columns plus left/center/right table
+  placement against the current content region, matching the Writer table
+  positioning direction before full table frames land.
+- Table cell content now uses an adapter-level nested flow instead of the old
+  one-line clipping path. Paragraphs and nested tables inside cells reuse the
+  same paragraph/table layout functions used by body flow, so wrapping, run
+  styles, tabs, inline images, borders, and paragraph spacing are no longer
+  separately hand-implemented for cells.
 - DrawingML anchors are imported through generated `wp::Anchor` types into a
   typed floating image placement model. The adapter consumes `positionH`,
   `positionV`, wrap mode, `behindDoc`, and anchor text distances for initial
-  page/margin/column/paragraph-relative placement. This follows LibreOffice's
-  `GraphicImport` direction while keeping full wrap avoidance and z-ordering as
+  page/margin/column/paragraph-relative placement. Square/tight wrapping now
+  creates paragraph-local exclusion bounds that shorten affected text lines,
+  matching the Writer `SwTextFly`/fly portion direction. Page association,
+  contour wrapping, multi-paragraph influence, and z-ordering remain
   frame-model work.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
@@ -408,6 +424,15 @@ Current progress:
   `test-data/wml/table_header_repeat.docx`.
 - Real DOCX fixture coverage includes floating DrawingML image anchor import
   and placement via `test-data/wml/image_floating.docx`.
+- Real DOCX fixture coverage includes external `w:hyperlink` relationship
+  import through the OOXML SDK part relationship model and krilla PDF link
+  annotation emission via `test-data/wml/fields_hyperlink.docx`.
+- Real DOCX fixture coverage includes complex `w:fldChar`/`w:instrText` PAGE
+  and NUMPAGES fields via `test-data/wml/fields_complex.docx`. The same dynamic
+  field path also covers simple PAGE/NUMPAGES fields and legacy `w:pgNum`. The
+  import keeps a dynamic field marker and resolves visible text after body flow
+  and repeating header/footer layout, following Writer's field-expansion
+  direction while avoiding stale cached results.
 - Verification for DOCX/PDF iteration currently includes
   `cargo test -p ooxmlsdk-pdf` and
   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings`. Broader
@@ -441,6 +466,10 @@ Implement:
 - Model tabs, indents, spacing, borders, shading, bidi, and justification as
   layout properties.
 - Resolve run font properties sufficiently to choose fonts and measure text.
+- Preserve field runs as typed dynamic markers where the value depends on
+  layout. PAGE and NUMPAGES are resolved after pagination for complex fields,
+  simple fields, and `w:pgNum`; unsupported fields continue to use cached
+  results until their Writer field type is mapped.
 
 Minimal tests:
 
@@ -492,9 +521,10 @@ LibreOffice reference:
 Implement:
 
 - Keep footnote/endnote references in the inline stream.
-- Allocate footnote content into page footnote areas.
+- Allocate footnote content into page footnote areas. Adapter-level support is
+  present; continue toward real Writer footnote frames and continuation areas.
 - Reduce body text area for footnote content on the page where references
-  occur.
+  occur. Adapter-level pre-reservation is present.
 - Support separator presence/absence and basic separator alignment.
 - Handle table and row split interactions incrementally.
 
@@ -518,6 +548,11 @@ Implement:
 
 - Introduce table/row/cell frames.
 - Resolve table grid, preferred width, cell width, grid span, vertical merge.
+  Absolute/percent preferred table width, table alignment, indentation,
+  `gridSpan`, and vertical merge import are present; remaining work is true
+  frame-based cell width negotiation and split behavior. Cell content now
+  flows through the shared paragraph/table layout adapter instead of clipped
+  single-line paint.
 - Compute row height from cell content frames.
 - Support row splitting and `cantSplit`.
 - Support table headers repeating across pages.
@@ -548,7 +583,9 @@ Implement:
   - paragraph/character/page anchored floating object
 - Preserve `wp:anchor` position and wrap properties.
 - Resolve relative horizontal/vertical positions.
-- Reserve text wrap exclusion areas during line layout.
+- Reserve text wrap exclusion areas during line layout. Paragraph-local
+  square/tight exclusion is present; multi-paragraph/page-level fly influence is
+  still pending.
 - Support basic z-order and page association.
 
 Minimal tests:
@@ -577,8 +614,9 @@ Implement:
 - Convert layout frames to paint items.
 - Render text using shaped glyph output where possible.
 - Add images, fills, strokes, clipping, and transforms.
-- Add link annotations and outline/bookmark destinations after layout is
-  stable.
+- Carry external hyperlink relationships into text layout and emit PDF link
+  annotations. Internal bookmark destinations remain future work and should
+  follow LibreOffice's document target mapping rather than ad-hoc anchors.
 - Add tagging/PDF-UA/PDF-A only after structure and font policy are ready.
 
 Minimal tests:

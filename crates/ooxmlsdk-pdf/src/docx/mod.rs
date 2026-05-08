@@ -2,6 +2,7 @@ mod units;
 
 use std::collections::{BTreeMap, HashMap};
 
+use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
   endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
   header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
@@ -13,6 +14,7 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
+use ooxmlsdk::sdk::SdkPart;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -109,9 +111,20 @@ pub(crate) struct Paragraph {
 pub(crate) struct Table {
   pub column_widths_pt: Vec<f32>,
   pub preferred_width_pt: Option<f32>,
+  pub preferred_width_pct: Option<f32>,
+  pub indent_left_pt: f32,
+  pub alignment: TableAlignment,
   pub borders: Option<TableBordersModel>,
   pub cell_margins: CellMargins,
   pub rows: Vec<TableRow>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TableAlignment {
+  #[default]
+  Left,
+  Center,
+  Right,
 }
 
 #[derive(Clone, Debug)]
@@ -238,6 +251,14 @@ pub(crate) enum ParagraphAlignment {
 pub(crate) struct TextRun {
   pub text: String,
   pub style: TextStyle,
+  pub hyperlink_url: Option<String>,
+  pub dynamic_field: Option<DynamicFieldKind>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DynamicFieldKind {
+  Page,
+  NumPages,
 }
 
 #[derive(Clone, Debug)]
@@ -380,13 +401,14 @@ pub(crate) fn extract(
   let styles = StylesCatalog::load(package, &main)?;
   let mut numbering = NumberingCatalog::load(package, &main)?;
   let images = ImageCatalog::load(package, &main);
+  let hyperlinks = HyperlinkCatalog::load(package, &main);
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let document = main.root_element(package)?;
   let mut sections = document
     .body
     .as_deref()
-    .map(|body| body_sections(body, &styles, &mut numbering, &images))
+    .map(|body| body_sections(body, &styles, &mut numbering, &images, &hyperlinks))
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
   resolve_section_repeating_blocks(package, &main, &styles, &mut sections);
   let page = sections
@@ -560,6 +582,7 @@ fn body_sections(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
@@ -569,7 +592,7 @@ fn body_sections(
     match choice {
       w::BodyChoice::WP(paragraph) => {
         current_blocks.push(Block::Paragraph(paragraph_model(
-          paragraph, styles, numbering, images,
+          paragraph, styles, numbering, images, hyperlinks,
         )));
         if let Some(section_properties) = paragraph
           .paragraph_properties
@@ -585,11 +608,11 @@ fn body_sections(
           );
         }
       }
-      w::BodyChoice::WTbl(table) => {
-        current_blocks.push(Block::Table(table_model(table, styles, numbering, images)))
-      }
+      w::BodyChoice::WTbl(table) => current_blocks.push(Block::Table(table_model(
+        table, styles, numbering, images, hyperlinks,
+      ))),
       w::BodyChoice::WSdt(sdt) => {
-        current_blocks.extend(sdt_block_blocks(sdt, styles, numbering, images));
+        current_blocks.extend(sdt_block_blocks(sdt, styles, numbering, images, hyperlinks));
       }
       _ => {}
     }
@@ -810,6 +833,7 @@ fn sdt_block_blocks(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) -> Vec<Block> {
   let Some(content) = sdt.sdt_content_block.as_ref() else {
     return Vec::new();
@@ -824,16 +848,22 @@ fn sdt_block_blocks(
         styles,
         numbering,
         images,
+        hyperlinks,
       ))]),
       w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
         table.as_ref(),
         styles,
         numbering,
         images,
+        hyperlinks,
       ))]),
-      w::SdtContentBlockChoice::WSdt(sdt) => {
-        Some(sdt_block_blocks(sdt.as_ref(), styles, numbering, images))
-      }
+      w::SdtContentBlockChoice::WSdt(sdt) => Some(sdt_block_blocks(
+        sdt.as_ref(),
+        styles,
+        numbering,
+        images,
+        hyperlinks,
+      )),
       _ => None,
     })
     .flatten()
@@ -863,6 +893,7 @@ fn header_blocks(
     .header_parts(package)
     .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
   let images = ImageCatalog::load_from_header(package, &header_part);
+  let hyperlinks = HyperlinkCatalog::load(package, &header_part);
   let header = header_part.root_element(package).ok()?;
   let mut numbering = NumberingCatalog::default();
   Some(
@@ -875,12 +906,14 @@ fn header_blocks(
           styles,
           &mut numbering,
           &images,
+          &hyperlinks,
         ))),
         w::HeaderChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
           styles,
           &mut numbering,
           &images,
+          &hyperlinks,
         ))),
         _ => None,
       })
@@ -921,6 +954,7 @@ fn footer_blocks(
     .footer_parts(package)
     .find(|part| main.get_id_of_part(package, part) == Some(relationship_id))?;
   let images = ImageCatalog::load_from_footer(package, &footer_part);
+  let hyperlinks = HyperlinkCatalog::load(package, &footer_part);
   let footer = footer_part.root_element(package).ok()?;
   let mut numbering = NumberingCatalog::default();
   Some(
@@ -933,12 +967,14 @@ fn footer_blocks(
           styles,
           &mut numbering,
           &images,
+          &hyperlinks,
         ))),
         w::FooterChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
           styles,
           &mut numbering,
           &images,
+          &hyperlinks,
         ))),
         _ => None,
       })
@@ -965,6 +1001,7 @@ fn footnotes(
     return Ok(BTreeMap::new());
   };
   let images = ImageCatalog::load_from_footnotes(package, &part);
+  let hyperlinks = HyperlinkCatalog::load(package, &part);
   let footnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
   let mut notes = BTreeMap::new();
@@ -992,6 +1029,7 @@ fn footnotes(
       styles,
       &mut numbering,
       &images,
+      &hyperlinks,
     );
     notes.insert(footnote.id, blocks);
   }
@@ -1008,6 +1046,7 @@ fn endnotes(
     return Ok(BTreeMap::new());
   };
   let images = ImageCatalog::load_from_endnotes(package, &part);
+  let hyperlinks = HyperlinkCatalog::load(package, &part);
   let endnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
   let mut notes = BTreeMap::new();
@@ -1035,6 +1074,7 @@ fn endnotes(
       styles,
       &mut numbering,
       &images,
+      &hyperlinks,
     );
     notes.insert(endnote.id, blocks);
   }
@@ -1058,6 +1098,7 @@ fn comment_blocks(
     return Ok(Vec::new());
   };
   let images = ImageCatalog::load_from_comments(package, &part);
+  let hyperlinks = HyperlinkCatalog::load(package, &part);
   let comments = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
   let mut blocks = Vec::new();
@@ -1076,6 +1117,7 @@ fn comment_blocks(
       styles,
       &mut numbering,
       &images,
+      &hyperlinks,
     );
   }
 
@@ -1089,11 +1131,12 @@ fn append_note_blocks<'a>(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   let mut is_first_paragraph = true;
   let label = label.into();
   for paragraph in paragraphs {
-    let mut model = paragraph_model(paragraph, styles, numbering, images);
+    let mut model = paragraph_model(paragraph, styles, numbering, images, hyperlinks);
     if is_first_paragraph {
       model.list_label = Some(label.clone());
       is_first_paragraph = false;
@@ -1107,6 +1150,7 @@ fn paragraph_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) -> Paragraph {
   let style_id = paragraph
     .paragraph_properties
@@ -1127,7 +1171,13 @@ fn paragraph_model(
     .and_then(|properties| properties.numbering_properties.as_deref())
     .and_then(|properties| numbering.next_label(properties, &mut format));
 
-  let inlines = paragraph_inlines(paragraph, styles.run_style(style_id), styles, images);
+  let inlines = paragraph_inlines(
+    paragraph,
+    styles.run_style(style_id),
+    styles,
+    images,
+    hyperlinks,
+  );
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
   #[cfg(test)]
   let runs = inlines
@@ -1155,6 +1205,7 @@ fn table_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) -> Table {
   let properties = table.w_tbl_pr.as_deref();
   let cell_margins = properties
@@ -1176,6 +1227,17 @@ fn table_model(
     preferred_width_pt: properties
       .and_then(|properties| properties.table_width.as_ref())
       .and_then(table_width_to_points),
+    preferred_width_pct: properties
+      .and_then(|properties| properties.table_width.as_ref())
+      .and_then(table_width_to_percent),
+    indent_left_pt: properties
+      .and_then(|properties| properties.table_indentation.as_ref())
+      .and_then(table_indentation_to_points)
+      .unwrap_or(0.0),
+    alignment: properties
+      .and_then(|properties| properties.table_justification.as_ref())
+      .map(table_alignment)
+      .unwrap_or_default(),
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
       .map(table_borders_model),
@@ -1189,6 +1251,7 @@ fn table_model(
           styles,
           numbering,
           images,
+          hyperlinks,
           cell_margins,
         )),
         _ => None,
@@ -1202,6 +1265,7 @@ fn table_row_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
   cell_margins: CellMargins,
 ) -> TableRow {
   let (height_pt, exact_height) = table_row_height_properties(row.table_row_properties.as_deref());
@@ -1220,6 +1284,7 @@ fn table_row_model(
           styles,
           numbering,
           images,
+          hyperlinks,
           cell_margins,
         )),
         _ => None,
@@ -1233,6 +1298,7 @@ fn table_cell_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
   default_margins: CellMargins,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
@@ -1242,11 +1308,11 @@ fn table_cell_model(
       .iter()
       .filter_map(|choice| match choice {
         w::TableCellChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model(
-          paragraph, styles, numbering, images,
+          paragraph, styles, numbering, images, hyperlinks,
         ))),
-        w::TableCellChoice::WTbl(table) => {
-          Some(Block::Table(table_model(table, styles, numbering, images)))
-        }
+        w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
+          table, styles, numbering, images, hyperlinks,
+        ))),
         _ => None,
       })
       .collect(),
@@ -1405,6 +1471,37 @@ fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
       width.width.as_deref().and_then(twips_attr_to_points)
     }
     _ => None,
+  }
+}
+
+fn table_width_to_percent(width: &w::TableWidth) -> Option<f32> {
+  if !matches!(width.r#type, Some(w::TableWidthUnitValues::Pct)) {
+    return None;
+  }
+  let value = width.width.as_deref()?;
+  if let Some(percent) = value.strip_suffix('%') {
+    return percent.parse::<f32>().ok().map(|value| value / 100.0);
+  }
+  value.parse::<f32>().ok().map(|value| value / 5000.0)
+}
+
+fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32> {
+  if !matches!(
+    indentation.r#type,
+    None | Some(w::TableWidthUnitValues::Dxa)
+  ) {
+    return None;
+  }
+  indentation
+    .width
+    .map(|width| units::twips_to_points(width as f32))
+}
+
+fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
+  match justification.val {
+    w::TableRowAlignmentValues::Center => TableAlignment::Center,
+    w::TableRowAlignmentValues::Right => TableAlignment::Right,
+    w::TableRowAlignmentValues::Left => TableAlignment::Left,
   }
 }
 
@@ -1623,37 +1720,207 @@ fn paragraph_inlines(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) -> Vec<InlineItem> {
   let mut inlines = Vec::new();
+  let mut complex_field = None;
 
   for choice in &paragraph.paragraph_choice {
     match choice {
-      w::ParagraphChoice::WR(run) => push_run(run, &mut inlines, base_style, styles, images),
+      w::ParagraphChoice::WR(run) => {
+        push_run_or_complex_field(
+          run,
+          &mut inlines,
+          base_style,
+          styles,
+          images,
+          None,
+          &mut complex_field,
+        );
+      }
       w::ParagraphChoice::WFldSimple(field) => {
-        push_simple_field(field, &mut inlines, base_style, styles, images);
+        push_simple_field(field, &mut inlines, base_style, styles, images, hyperlinks);
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
+        let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
         for item in &hyperlink.hyperlink_choice {
           if let w::HyperlinkChoice::WR(run) = item {
-            push_run(run, &mut inlines, base_style, styles, images);
+            push_run_or_complex_field(
+              run,
+              &mut inlines,
+              base_style,
+              styles,
+              images,
+              hyperlink_url.as_deref(),
+              &mut complex_field,
+            );
           }
         }
       }
       w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
         w::ParagraphChoice2::WIns(inserted) => {
-          push_inserted_run(inserted, &mut inlines, base_style, styles, images);
+          push_inserted_run(inserted, &mut inlines, base_style, styles, images, None);
         }
         w::ParagraphChoice2::WDel(_)
         | w::ParagraphChoice2::WMoveFrom(_)
         | w::ParagraphChoice2::WMoveTo(_) => {}
         _ => {}
       },
-      w::ParagraphChoice::WSdt(sdt) => push_sdt_run(sdt, &mut inlines, base_style, styles, images),
+      w::ParagraphChoice::WSdt(sdt) => push_sdt_run(
+        sdt,
+        &mut inlines,
+        base_style,
+        styles,
+        images,
+        hyperlinks,
+        None,
+      ),
       _ => {}
     }
   }
+  flush_unclosed_complex_field(&mut inlines, &mut complex_field);
 
   inlines
+}
+
+#[derive(Clone, Debug)]
+struct ComplexFieldState {
+  instr: String,
+  result: Vec<InlineItem>,
+  in_result: bool,
+  style: TextStyle,
+  hyperlink_url: Option<String>,
+}
+
+fn push_run_or_complex_field(
+  run: &w::Run,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlink_url: Option<&str>,
+  state: &mut Option<ComplexFieldState>,
+) {
+  if state.is_none() && !run_starts_complex_field(run) {
+    push_run(run, inlines, base_style, styles, images, hyperlink_url);
+    return;
+  }
+
+  let style = run_style(run.run_properties.as_deref(), base_style, styles);
+  for choice in &run.run_choice {
+    match choice {
+      w::RunChoice::WFldChar(field_char)
+        if field_char.field_char_type == w::FieldCharValues::Begin =>
+      {
+        *state = Some(ComplexFieldState {
+          instr: String::new(),
+          result: Vec::new(),
+          in_result: false,
+          style,
+          hyperlink_url: hyperlink_url.map(ToString::to_string),
+        });
+      }
+      w::RunChoice::WFldChar(field_char)
+        if field_char.field_char_type == w::FieldCharValues::Separate =>
+      {
+        if let Some(state) = state {
+          state.in_result = true;
+        }
+      }
+      w::RunChoice::WFldChar(field_char)
+        if field_char.field_char_type == w::FieldCharValues::End =>
+      {
+        flush_closed_complex_field(inlines, state);
+      }
+      w::RunChoice::WInstrText(code) => {
+        if let Some(state) = state
+          && !state.in_result
+          && let Some(content) = &code.xml_content
+        {
+          state.instr.push_str(content);
+        }
+      }
+      _ => {
+        if let Some(state) = state
+          && state.in_result
+        {
+          push_run(
+            run,
+            &mut state.result,
+            base_style,
+            styles,
+            images,
+            hyperlink_url,
+          );
+          break;
+        }
+      }
+    }
+  }
+}
+
+fn run_starts_complex_field(run: &w::Run) -> bool {
+  run.run_choice.iter().any(|choice| {
+    matches!(
+      choice,
+      w::RunChoice::WFldChar(field_char)
+        if field_char.field_char_type == w::FieldCharValues::Begin
+    )
+  })
+}
+
+fn flush_closed_complex_field(
+  inlines: &mut Vec<InlineItem>,
+  state: &mut Option<ComplexFieldState>,
+) {
+  let Some(state) = state.take() else {
+    return;
+  };
+  if let Some(kind) = dynamic_field_kind(&state.instr) {
+    push_dynamic_field(inlines, kind, state.style, state.hyperlink_url.as_deref());
+  } else {
+    inlines.extend(state.result);
+  }
+}
+
+fn flush_unclosed_complex_field(
+  inlines: &mut Vec<InlineItem>,
+  state: &mut Option<ComplexFieldState>,
+) {
+  if state.is_some() {
+    flush_closed_complex_field(inlines, state);
+  }
+}
+
+fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
+  let name = instr.split_whitespace().next()?.to_ascii_uppercase();
+  match name.as_str() {
+    "PAGE" => Some(DynamicFieldKind::Page),
+    "NUMPAGES" => Some(DynamicFieldKind::NumPages),
+    _ => None,
+  }
+}
+
+fn push_dynamic_field(
+  inlines: &mut Vec<InlineItem>,
+  kind: DynamicFieldKind,
+  style: TextStyle,
+  hyperlink_url: Option<&str>,
+) {
+  inlines.push(InlineItem::Text(TextRun {
+    text: "1".to_string(),
+    style,
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    dynamic_field: Some(kind),
+  }));
+}
+
+fn hyperlink_url(hyperlink: &w::Hyperlink, hyperlinks: &HyperlinkCatalog) -> Option<String> {
+  hyperlink
+    .id
+    .as_deref()
+    .and_then(|relationship_id| hyperlinks.target(relationship_id))
+    .map(ToString::to_string)
 }
 
 fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>) {
@@ -1717,21 +1984,37 @@ fn push_simple_field(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
+  if let Some(kind) = dynamic_field_kind(&field.instruction) {
+    push_dynamic_field(inlines, kind, base_style, None);
+    return;
+  }
+
   for choice in &field.simple_field_choice {
     match choice {
-      w::SimpleFieldChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::SimpleFieldChoice::WR(run) => push_run(run, inlines, base_style, styles, images, None),
       w::SimpleFieldChoice::WHyperlink(hyperlink) => {
+        let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
         for item in &hyperlink.hyperlink_choice {
           if let w::HyperlinkChoice::WR(run) = item {
-            push_run(run, inlines, base_style, styles, images);
+            push_run(
+              run,
+              inlines,
+              base_style,
+              styles,
+              images,
+              hyperlink_url.as_deref(),
+            );
           }
         }
       }
       w::SimpleFieldChoice::WFldSimple(field) => {
-        push_simple_field(field, inlines, base_style, styles, images);
+        push_simple_field(field, inlines, base_style, styles, images, hyperlinks);
       }
-      w::SimpleFieldChoice::WSdt(sdt) => push_sdt_run(sdt, inlines, base_style, styles, images),
+      w::SimpleFieldChoice::WSdt(sdt) => {
+        push_sdt_run(sdt, inlines, base_style, styles, images, hyperlinks, None)
+      }
       _ => {}
     }
   }
@@ -1743,6 +2026,7 @@ fn push_run(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlink_url: Option<&str>,
 ) {
   let style = run_style(run.run_properties.as_deref(), base_style, styles);
   let mut text = String::new();
@@ -1758,11 +2042,11 @@ fn push_run(
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
         Some(w::BreakValues::Page) => {
-          flush_run_text(inlines, &mut text, style);
+          flush_run_text(inlines, &mut text, style, hyperlink_url);
           inlines.push(InlineItem::PageBreak);
         }
         Some(w::BreakValues::Column) => {
-          flush_run_text(inlines, &mut text, style);
+          flush_run_text(inlines, &mut text, style, hyperlink_url);
           inlines.push(InlineItem::ColumnBreak);
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
@@ -1772,29 +2056,33 @@ fn push_run(
           text.push(symbol);
         }
       }
+      w::RunChoice::WPgNum => {
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        push_dynamic_field(inlines, DynamicFieldKind::Page, style, hyperlink_url);
+      }
       w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::WFootnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
         push_note_reference(inlines, reference.id, style);
       }
       w::RunChoice::WEndnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
         push_note_reference(inlines, reference.id, style);
       }
       w::RunChoice::WCommentReference(reference) => {
-        flush_run_text(inlines, &mut text, style);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
         push_comment_reference(inlines, &reference.id, style);
       }
       w::RunChoice::WDrawing(drawing) => {
-        flush_run_text(inlines, &mut text, style);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
         if let Some(image) = inline_image(drawing, images) {
           inlines.push(InlineItem::Image(image));
         }
         push_drawing_textboxes(drawing, inlines, style);
       }
       w::RunChoice::WPict(picture) => {
-        flush_run_text(inlines, &mut text, style);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
         if let Some(image) = pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
@@ -1802,14 +2090,14 @@ fn push_run(
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::WRuby(ruby) => {
-        flush_run_text(inlines, &mut text, style);
-        push_ruby_base(ruby, inlines, base_style, styles, images);
+        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        push_ruby_base(ruby, inlines, base_style, styles, images, hyperlink_url);
       }
       _ => {}
     }
   }
 
-  flush_run_text(inlines, &mut text, style);
+  flush_run_text(inlines, &mut text, style, hyperlink_url);
 }
 
 fn push_ruby_base(
@@ -1818,12 +2106,15 @@ fn push_ruby_base(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlink_url: Option<&str>,
 ) {
   for choice in &ruby.ruby_base.ruby_base_choice {
     match choice {
-      w::RubyBaseChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::RubyBaseChoice::WR(run) => {
+        push_run(run, inlines, base_style, styles, images, hyperlink_url)
+      }
       w::RubyBaseChoice::WIns(inserted) => {
-        push_inserted_run(inserted, inlines, base_style, styles, images);
+        push_inserted_run(inserted, inlines, base_style, styles, images, hyperlink_url);
       }
       _ => {}
     }
@@ -1836,6 +2127,8 @@ fn push_sdt_run(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  hyperlink_url: Option<&str>,
 ) {
   let Some(content) = sdt.sdt_content_run.as_ref() else {
     return;
@@ -1843,24 +2136,58 @@ fn push_sdt_run(
 
   for choice in &content.sdt_content_run_choice {
     match choice {
-      w::SdtContentRunChoice::WR(run) => {
-        push_run(run.as_ref(), inlines, base_style, styles, images)
-      }
+      w::SdtContentRunChoice::WR(run) => push_run(
+        run.as_ref(),
+        inlines,
+        base_style,
+        styles,
+        images,
+        hyperlink_url,
+      ),
       w::SdtContentRunChoice::WFldSimple(field) => {
-        push_simple_field(field.as_ref(), inlines, base_style, styles, images);
+        push_simple_field(
+          field.as_ref(),
+          inlines,
+          base_style,
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       w::SdtContentRunChoice::WHyperlink(hyperlink) => {
+        let nested_url = self::hyperlink_url(hyperlink, hyperlinks)
+          .or_else(|| hyperlink_url.map(ToString::to_string));
         for item in &hyperlink.hyperlink_choice {
           if let w::HyperlinkChoice::WR(run) = item {
-            push_run(run, inlines, base_style, styles, images);
+            push_run(
+              run,
+              inlines,
+              base_style,
+              styles,
+              images,
+              nested_url.as_deref(),
+            );
           }
         }
       }
-      w::SdtContentRunChoice::WSdt(sdt) => {
-        push_sdt_run(sdt.as_ref(), inlines, base_style, styles, images)
-      }
+      w::SdtContentRunChoice::WSdt(sdt) => push_sdt_run(
+        sdt.as_ref(),
+        inlines,
+        base_style,
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       w::SdtContentRunChoice::WIns(inserted) => {
-        push_inserted_run(inserted.as_ref(), inlines, base_style, styles, images);
+        push_inserted_run(
+          inserted.as_ref(),
+          inlines,
+          base_style,
+          styles,
+          images,
+          hyperlink_url,
+        );
       }
       w::SdtContentRunChoice::WDel(_)
       | w::SdtContentRunChoice::WMoveFrom(_)
@@ -1876,13 +2203,16 @@ fn push_inserted_run(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlink_url: Option<&str>,
 ) {
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WR(run) => push_run(run, inlines, base_style, styles, images),
+      w::InsertedRunChoice::WR(run) => {
+        push_run(run, inlines, base_style, styles, images, hyperlink_url)
+      }
       w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
         w::InsertedRunChoice2::WIns(nested) => {
-          push_inserted_run(nested, inlines, base_style, styles, images);
+          push_inserted_run(nested, inlines, base_style, styles, images, hyperlink_url);
         }
         w::InsertedRunChoice2::WDel(_)
         | w::InsertedRunChoice2::WMoveFrom(_)
@@ -1904,6 +2234,8 @@ fn push_note_reference(inlines: &mut Vec<InlineItem>, id: i64, style: TextStyle)
       font_size_pt: (style.font_size_pt * 0.75).max(1.0),
       ..style
     },
+    hyperlink_url: None,
+    dynamic_field: None,
   }));
 }
 
@@ -1919,14 +2251,23 @@ fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextSt
       },
       ..style
     },
+    hyperlink_url: None,
+    dynamic_field: None,
   }));
 }
 
-fn flush_run_text(inlines: &mut Vec<InlineItem>, text: &mut String, style: TextStyle) {
+fn flush_run_text(
+  inlines: &mut Vec<InlineItem>,
+  text: &mut String,
+  style: TextStyle,
+  hyperlink_url: Option<&str>,
+) {
   if !text.is_empty() {
     inlines.push(InlineItem::Text(TextRun {
       text: run_display_text(std::mem::take(text), style),
       style,
+      hyperlink_url: hyperlink_url.map(ToString::to_string),
+      dynamic_field: None,
     }));
   }
 }
@@ -2266,7 +2607,12 @@ fn push_drawing_textboxes(drawing: &w::Drawing, inlines: &mut Vec<InlineItem>, s
 
   for child in &graphic_data.xml_children {
     if let Some(text) = drawing_textbox_text(child) {
-      inlines.push(InlineItem::Text(TextRun { text, style }));
+      inlines.push(InlineItem::Text(TextRun {
+        text,
+        style,
+        hyperlink_url: None,
+        dynamic_field: None,
+      }));
     }
   }
 }
@@ -2472,18 +2818,21 @@ fn push_textbox_content(
   images: &ImageCatalog,
 ) {
   let mut numbering = NumberingCatalog::default();
+  let hyperlinks = HyperlinkCatalog::default();
   for choice in &content.text_box_content_choice {
     match choice {
       w::TextBoxContentChoice::WP(paragraph) => {
-        let paragraph = paragraph_model(paragraph, styles, &mut numbering, images);
+        let paragraph = paragraph_model(paragraph, styles, &mut numbering, images, &hyperlinks);
         inlines.extend(paragraph.inlines);
         inlines.push(InlineItem::Text(TextRun {
           text: "\n".into(),
           style: base_style,
+          hyperlink_url: None,
+          dynamic_field: None,
         }));
       }
       w::TextBoxContentChoice::WTbl(table) => {
-        let table = table_model(table, styles, &mut numbering, images);
+        let table = table_model(table, styles, &mut numbering, images, &hyperlinks);
         push_table_text(&table, inlines, base_style);
       }
       _ => {}
@@ -2498,6 +2847,8 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
         inlines.push(InlineItem::Text(TextRun {
           text: "\t".into(),
           style,
+          hyperlink_url: None,
+          dynamic_field: None,
         }));
       }
       for block in &cell.blocks {
@@ -2512,6 +2863,8 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
     inlines.push(InlineItem::Text(TextRun {
       text: "\n".into(),
       style,
+      hyperlink_url: None,
+      dynamic_field: None,
     }));
   }
 }
@@ -2671,6 +3024,37 @@ fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
 #[derive(Clone, Debug, Default)]
 struct ImageCatalog {
   by_relationship_id: HashMap<String, ImageResource>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct HyperlinkCatalog {
+  by_relationship_id: HashMap<String, String>,
+}
+
+impl HyperlinkCatalog {
+  fn load<P>(package: &WordprocessingDocument, part: &P) -> Self
+  where
+    P: SdkPart,
+  {
+    let by_relationship_id = part
+      .hyperlink_relationships(package)
+      .filter(|relationship| relationship.target_kind() == RelationshipTargetKind::External)
+      .map(|relationship| {
+        (
+          relationship.id().to_string(),
+          relationship.target().to_string(),
+        )
+      })
+      .collect();
+    Self { by_relationship_id }
+  }
+
+  fn target(&self, relationship_id: &str) -> Option<&str> {
+    self
+      .by_relationship_id
+      .get(relationship_id)
+      .map(String::as_str)
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -3596,9 +3980,56 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      None,
     );
 
     assert_eq!(inline_text(&inlines), "•✓©");
+  }
+
+  #[test]
+  fn simple_page_fields_emit_dynamic_markers() {
+    let mut inlines = Vec::new();
+    let field = w::SimpleField {
+      instruction: " PAGE ".into(),
+      ..Default::default()
+    };
+
+    push_simple_field(
+      &field,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+    );
+
+    let InlineItem::Text(run) = &inlines[0] else {
+      panic!("expected dynamic field text");
+    };
+    assert_eq!(run.dynamic_field, Some(DynamicFieldKind::Page));
+  }
+
+  #[test]
+  fn pgnum_runs_emit_dynamic_page_marker() {
+    let mut inlines = Vec::new();
+    let run = w::Run {
+      run_choice: vec![w::RunChoice::WPgNum],
+      ..Default::default()
+    };
+
+    push_run(
+      &run,
+      &mut inlines,
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      None,
+    );
+
+    let InlineItem::Text(run) = &inlines[0] else {
+      panic!("expected dynamic page number text");
+    };
+    assert_eq!(run.dynamic_field, Some(DynamicFieldKind::Page));
   }
 
   #[test]
@@ -3638,6 +4069,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      None,
     );
 
     assert_eq!(inline_text(&inlines), "Before 漢 after");
@@ -3676,6 +4108,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &catalog,
+      None,
     );
 
     let image = inlines
@@ -3730,6 +4163,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      None,
     );
 
     assert!(inline_text(&inlines).contains("Text inside VML box"));
@@ -3780,6 +4214,7 @@ mod tests {
       &StylesCatalog::default(),
       &mut numbering,
       &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
     );
 
     assert_eq!(sections.len(), 2);

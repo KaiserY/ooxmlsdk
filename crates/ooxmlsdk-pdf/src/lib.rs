@@ -167,10 +167,14 @@ mod tests {
         runs: vec![crate::docx::TextRun {
           text: "One Two Six".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "One Two Six".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         })],
       })],
     };
@@ -224,10 +228,14 @@ mod tests {
         runs: vec![crate::docx::TextRun {
           text: "Left\tRight".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "Left\tRight".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         })],
       })],
     };
@@ -291,10 +299,14 @@ mod tests {
         runs: vec![crate::docx::TextRun {
           text: "Title\t99".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "Title\t99".into(),
           style: crate::docx::TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         })],
       })],
     };
@@ -906,6 +918,12 @@ mod tests {
     );
     assert!(text_item(&layout, "Visit example.com").style.underline);
     assert_eq!(
+      text_item(&layout, "Visit example.com")
+        .hyperlink_url
+        .as_deref(),
+      Some("https://example.com")
+    );
+    assert_eq!(
       text_item(&layout, "Go to target section").style.color,
       crate::docx::RgbColor {
         r: 0x05,
@@ -914,6 +932,43 @@ mod tests {
       }
     );
     assert!(text_item(&layout, "Go to target section").style.underline);
+    assert_eq!(
+      text_item(&layout, "Go to target section").hyperlink_url,
+      None
+    );
+
+    let pdf = convert_docx(
+      File::open(path).unwrap(),
+      PdfOptions {
+        compress_content_streams: false,
+        ..PdfOptions::default()
+      },
+    )
+    .unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    assert!(pdf_text.contains("/Annots"));
+    assert!(pdf_text.contains("https://example.com"));
+  }
+
+  #[test]
+  fn complex_page_fields_are_resolved_from_layout_pages() {
+    let path = fixture_path("test-data/wml/fields_complex.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(text_item(&layout, "1").dynamic_field.is_some());
+    assert!(page_has_text(&layout.pages[0], "Page "));
+    assert!(page_has_text(&layout.pages[0], " of "));
+    assert_eq!(
+      layout.pages[0]
+        .items
+        .iter()
+        .filter(|item| matches!(item, crate::layout::PageItem::Text(text) if text.text == "1"))
+        .count(),
+      2
+    );
 
     let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
@@ -933,6 +988,10 @@ mod tests {
     assert!(find_text_item(&layout, "2").is_some());
     assert!(find_text_item(&layout, " First footnote content.").is_some());
     assert!(find_text_item(&layout, " Second footnote content.").is_some());
+    assert!(
+      text_item(&layout, " First footnote content.").y_pt
+        > doc.page.height_pt - doc.page.margin_bottom_pt - 120.0
+    );
 
     let path = fixture_path("test-data/wml/endnotes.docx");
     let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
@@ -1077,6 +1136,8 @@ mod tests {
       .expect("floating image layout");
     assert_eq!(laid_out_image.x_pt, 72.0);
     assert_eq!(laid_out_image.y_pt, 72.0);
+    let wrapped_text = text_item(&layout, "Text beside the floating image.");
+    assert!(wrapped_text.x_pt >= laid_out_image.x_pt + laid_out_image.width_pt);
 
     let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
@@ -1211,6 +1272,9 @@ mod tests {
     };
     assert_eq!(table.rows[0].height_pt, Some(24.0));
     assert!(table.rows[0].exact_height);
+    assert_eq!(table.preferred_width_pct, Some(0.8));
+    assert_eq!(table.indent_left_pt, 12.0);
+    assert_eq!(table.alignment, crate::docx::TableAlignment::Center);
     assert_eq!(table.cell_margins.left_pt, 9.0);
     assert_eq!(table.cell_margins.top_pt, 6.0);
     assert_eq!(table.rows[0].cells[0].margins.left_pt, 18.0);
@@ -1228,6 +1292,9 @@ mod tests {
       table.rows[2].cells[0].vertical_alignment,
       crate::docx::TableCellVerticalAlignment::Bottom
     );
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let top_cell = text_item(&layout, "Top-aligned cell.");
+    assert!(top_cell.x_pt > doc.page.margin_left_pt);
   }
 
   fn fixture_path(relative: &str) -> PathBuf {

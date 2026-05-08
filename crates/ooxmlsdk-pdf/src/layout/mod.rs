@@ -4,21 +4,23 @@ use std::collections::HashSet;
 use icu_segmenter::LineSegmenter;
 
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, FloatingImagePlacement, HorizontalImageReference,
-  ImageWrapMode, InlineItem, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
-  SectionColumns, TabStop, TabStopAlignment, TableCellVerticalAlignment, TextStyle,
-  VerticalImageReference,
+  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingImagePlacement,
+  HorizontalImageReference, ImageWrapMode, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
+  SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, TableAlignment,
+  TableCellVerticalAlignment, TextStyle, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::text_metrics::measure_text;
 
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
+const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
 const TABLE_ROW_MIN_HEIGHT_PT: f32 = 24.0;
 const TABLE_SPACING_AFTER_PT: f32 = 6.0;
 const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
+const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
 
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
@@ -46,6 +48,8 @@ pub(crate) struct TextItem {
   pub y_pt: f32,
   pub text: String,
   pub style: TextStyle,
+  pub hyperlink_url: Option<String>,
+  pub dynamic_field: Option<DynamicFieldKind>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,6 +101,14 @@ struct ResolvedTabStop {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct WrapExclusion {
+  left_pt: f32,
+  right_pt: f32,
+  top_pt: f32,
+  bottom_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct BlockArea {
   setup: PageSetup,
   section_index: usize,
@@ -129,17 +141,20 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
     );
     for (index, block) in document.blocks.iter().enumerate() {
       let next = document.blocks.get(index + 1);
-      (flow, y) = prepare_block_flow(block, next, flow, &mut current, &mut pages, y);
+      let (block_flow, footnote_top) =
+        reserve_referenced_footnote_area(block, document, &emitted_footnotes, flow);
+      (flow, y) = prepare_block_flow(block, next, block_flow, &mut current, &mut pages, y);
       y = layout_document_block(block, flow, &mut current, &mut pages, y);
-      y = layout_referenced_footnotes(
+      render_referenced_footnotes(
         block,
         document,
         &mut emitted_footnotes,
         flow,
         &mut current,
         &mut pages,
-        y,
+        footnote_top,
       );
+      flow = restore_body_content_bottom(flow);
     }
   } else {
     for (section_index, section) in document.sections.iter().enumerate() {
@@ -167,20 +182,23 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
       );
       for (index, block) in section.blocks.iter().enumerate() {
         let next = section.blocks.get(index + 1);
-        (flow, y) = prepare_block_flow(block, next, flow, &mut current, &mut pages, y);
+        let (block_flow, footnote_top) =
+          reserve_referenced_footnote_area(block, document, &emitted_footnotes, flow);
+        (flow, y) = prepare_block_flow(block, next, block_flow, &mut current, &mut pages, y);
         if y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !current.items.is_empty() {
           (flow, y) = advance_section_flow(flow, &mut current, &mut pages);
         }
         y = layout_document_block(block, flow, &mut current, &mut pages, y);
-        y = layout_referenced_footnotes(
+        render_referenced_footnotes(
           block,
           document,
           &mut emitted_footnotes,
           flow,
           &mut current,
           &mut pages,
-          y,
+          footnote_top,
         );
+        flow = restore_body_content_bottom(flow);
         if y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !current.items.is_empty() {
           (flow, y) = advance_section_flow(flow, &mut current, &mut pages);
         }
@@ -268,6 +286,7 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
 
   apply_column_separators(document, &mut pages);
   apply_headers_and_footers(document, &mut pages);
+  resolve_dynamic_fields(&mut pages);
 
   Ok(LayoutDocument { pages })
 }
@@ -568,6 +587,13 @@ fn block_area(flow: FlowContext) -> BlockArea {
   }
 }
 
+fn restore_body_content_bottom(flow: FlowContext) -> FlowContext {
+  FlowContext {
+    content_bottom: flow.setup.height_pt - flow.setup.margin_bottom_pt,
+    ..flow
+  }
+}
+
 fn layout_note_separator(
   setup: PageSetup,
   current: &mut Page,
@@ -595,19 +621,84 @@ fn layout_note_separator(
   y + 8.0
 }
 
-fn layout_referenced_footnotes(
+fn reserve_referenced_footnote_area(
+  block: &Block,
+  document: &DocxDocument,
+  emitted_footnotes: &HashSet<i64>,
+  flow: FlowContext,
+) -> (FlowContext, Option<f32>) {
+  let height = referenced_footnote_area_height(block, document, emitted_footnotes, flow);
+  if height <= 0.0 {
+    return (flow, None);
+  }
+
+  let available_height = flow.content_bottom - flow.setup.margin_top_pt;
+  let reserved_height = height.min(available_height * FOOTNOTE_AREA_MAX_FRACTION);
+  let footnote_top = flow.content_bottom - reserved_height;
+  (
+    FlowContext {
+      content_bottom: footnote_top,
+      ..flow
+    },
+    Some(footnote_top),
+  )
+}
+
+fn referenced_footnote_area_height(
+  block: &Block,
+  document: &DocxDocument,
+  emitted_footnotes: &HashSet<i64>,
+  flow: FlowContext,
+) -> f32 {
+  let Block::Paragraph(paragraph) = block else {
+    return 0.0;
+  };
+
+  let mut height = 0.0;
+  let mut has_note = false;
+  for id in &paragraph.footnote_reference_ids {
+    if emitted_footnotes.contains(id) {
+      continue;
+    }
+    let Some(blocks) = document.footnotes.get(id) else {
+      continue;
+    };
+    if !has_note {
+      height += DEFAULT_LINE_HEIGHT_PT;
+      has_note = true;
+    }
+    for block in blocks {
+      height += estimated_block_height(block, flow);
+    }
+  }
+  height
+}
+
+fn render_referenced_footnotes(
   block: &Block,
   document: &DocxDocument,
   emitted_footnotes: &mut HashSet<i64>,
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
-  mut y: f32,
-) -> f32 {
+  footnote_top: Option<f32>,
+) {
   let Block::Paragraph(paragraph) = block else {
-    return y;
+    return;
   };
+  let Some(mut y) = footnote_top else {
+    return;
+  };
+
   let mut needs_separator = true;
+  let footnote_flow = FlowContext {
+    content_left_pt: flow.setup.margin_left_pt,
+    content_width: flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
+    content_bottom: flow.setup.height_pt - flow.setup.margin_bottom_pt,
+    columns: SectionColumns::default(),
+    column_index: 0,
+    ..flow
+  };
   for id in &paragraph.footnote_reference_ids {
     if !emitted_footnotes.insert(*id) {
       continue;
@@ -616,14 +707,19 @@ fn layout_referenced_footnotes(
       continue;
     };
     if needs_separator {
-      y = layout_note_separator(flow.setup, current, pages, y, flow.content_bottom);
+      y = layout_note_separator(
+        footnote_flow.setup,
+        current,
+        pages,
+        y,
+        footnote_flow.content_bottom,
+      );
       needs_separator = false;
     }
     for block in blocks {
-      y = layout_document_block(block, flow, current, pages, y);
+      y = layout_document_block(block, footnote_flow, current, pages, y);
     }
   }
-  y
 }
 
 fn document_referenced_endnote_ids(document: &DocxDocument) -> Vec<i64> {
@@ -780,6 +876,23 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
   }
 }
 
+fn resolve_dynamic_fields(pages: &mut [Page]) {
+  let total_pages = pages.len().to_string();
+  for (page_index, page) in pages.iter_mut().enumerate() {
+    let page_number = (page_index + 1).to_string();
+    for item in &mut page.items {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      match text.dynamic_field {
+        Some(DynamicFieldKind::Page) => text.text.clone_from(&page_number),
+        Some(DynamicFieldKind::NumPages) => text.text.clone_from(&total_pages),
+        None => {}
+      }
+    }
+  }
+}
+
 fn apply_column_separators(document: &DocxDocument, pages: &mut [Page]) {
   for page in pages {
     let Some(section) = document.sections.get(page.section_index) else {
@@ -871,6 +984,8 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           y_pt: y,
           text: line,
           style: TextStyle::default(),
+          hyperlink_url: None,
+          dynamic_field: None,
         }));
       }
       y += DEFAULT_LINE_HEIGHT_PT;
@@ -906,8 +1021,10 @@ fn layout_table(
   }
 
   let column_widths = table_column_widths(table, column_count, area.content_width);
-  let table_left = area.content_left_pt;
-  let table_right = table_left + column_widths.iter().sum::<f32>();
+  let table_width = column_widths.iter().sum::<f32>();
+  let table_left =
+    table_left_position(table, area.content_left_pt, area.content_width, table_width);
+  let table_right = table_left + table_width;
   let render_area = TableRenderArea {
     block: area,
     column_widths: &column_widths,
@@ -917,11 +1034,11 @@ fn layout_table(
   let repeating_header_count = table_repeating_header_count(table);
   let repeating_header_height = table.rows[..repeating_header_count]
     .iter()
-    .map(table_row_height)
+    .map(|row| table_row_height_with_widths(row, &column_widths))
     .sum::<f32>();
 
   for (row_index, row) in table.rows.iter().enumerate() {
-    let row_height = table_row_height(row);
+    let row_height = table_row_height_with_widths(row, &column_widths);
     let row_overflows = y + row_height > area.content_bottom;
     let row_fits_empty_region = row_height <= area.content_bottom - area.setup.margin_top_pt;
     if row_overflows
@@ -970,7 +1087,7 @@ fn render_table_row(
   current: &mut Page,
   y: f32,
 ) -> f32 {
-  let row_height = table_row_height(row);
+  let row_height = table_row_height_with_widths(row, area.column_widths);
   let row_top = y;
   let row_bottom = y + row_height;
 
@@ -1146,9 +1263,10 @@ fn table_column_widths(
   column_count: usize,
   content_width: f32,
 ) -> Vec<f32> {
+  let preferred_width = table_preferred_width(table, content_width);
   if table.column_widths_pt.len() >= column_count {
     let mut widths = table.column_widths_pt[..column_count].to_vec();
-    if let Some(preferred) = table.preferred_width_pt
+    if let Some(preferred) = preferred_width
       && preferred > 0.0
     {
       let total = widths.iter().sum::<f32>();
@@ -1169,41 +1287,68 @@ fn table_column_widths(
     return widths;
   }
 
-  vec![content_width / column_count as f32; column_count]
+  let width = preferred_width.unwrap_or(content_width).min(content_width);
+  vec![width / column_count as f32; column_count]
+}
+
+fn table_preferred_width(table: &crate::docx::Table, content_width: f32) -> Option<f32> {
+  table
+    .preferred_width_pt
+    .or_else(|| table.preferred_width_pct.map(|pct| content_width * pct))
+    .map(|width| width.min(content_width).max(0.0))
+}
+
+fn table_left_position(
+  table: &crate::docx::Table,
+  content_left: f32,
+  content_width: f32,
+  table_width: f32,
+) -> f32 {
+  let available = (content_width - table_width).max(0.0);
+  match table.alignment {
+    TableAlignment::Left => content_left + table.indent_left_pt.min(available),
+    TableAlignment::Center => content_left + available / 2.0,
+    TableAlignment::Right => content_left + available,
+  }
 }
 
 fn table_row_height(row: &crate::docx::TableRow) -> f32 {
-  let content_height = row
-    .cells
-    .iter()
-    .filter(|cell| !cell.vertical_merge_continue)
-    .map(|cell| {
-      let line_count = cell
-        .blocks
-        .iter()
-        .map(|block| match block {
-          Block::Paragraph(paragraph) => paragraph
-            .inlines
-            .iter()
-            .filter(|item| match item {
-              InlineItem::Text(run) => !run.text.is_empty(),
-              InlineItem::Image(_) => true,
-              InlineItem::PageBreak | InlineItem::ColumnBreak => false,
-            })
-            .count()
-            .max(1),
-          Block::Table(table) => table.rows.len().max(1),
-        })
-        .sum::<usize>()
-        .max(1);
-      cell.margins.top_pt + cell.margins.bottom_pt + DEFAULT_LINE_HEIGHT_PT * line_count as f32
-    })
-    .fold(TABLE_ROW_MIN_HEIGHT_PT, f32::max);
+  table_row_height_with_widths(row, &[])
+}
+
+fn table_row_height_with_widths(row: &crate::docx::TableRow, column_widths: &[f32]) -> f32 {
+  let mut grid_index = 0;
+  let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
+  for cell in &row.cells {
+    let width = spanned_cell_width(cell, column_widths, &mut grid_index);
+    if !cell.vertical_merge_continue {
+      content_height = content_height.max(table_cell_content_height(cell, width));
+    }
+  }
   match (row.height_pt, row.exact_height) {
     (Some(height), true) => height,
     (Some(height), false) => content_height.max(height),
     (None, _) => content_height,
   }
+}
+
+fn spanned_cell_width(
+  cell: &crate::docx::TableCell,
+  column_widths: &[f32],
+  grid_index: &mut usize,
+) -> f32 {
+  if column_widths.is_empty() || *grid_index >= column_widths.len() {
+    return 0.0;
+  }
+  let span = cell
+    .grid_span
+    .max(1)
+    .min(column_widths.len().saturating_sub(*grid_index));
+  let width = column_widths[*grid_index..*grid_index + span]
+    .iter()
+    .sum::<f32>();
+  *grid_index += span;
+  width
 }
 
 fn layout_table_cell(
@@ -1215,7 +1360,9 @@ fn layout_table_cell(
   width: f32,
   height: f32,
 ) {
-  let content_height = table_cell_content_height(cell);
+  let content_width =
+    (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let content_height = table_cell_content_height(cell, width);
   let mut text_y = match cell.vertical_alignment {
     TableCellVerticalAlignment::Top => y + cell.margins.top_pt + DEFAULT_FONT_SIZE_PT,
     TableCellVerticalAlignment::Center => {
@@ -1227,124 +1374,64 @@ fn layout_table_cell(
     }
   };
   let text_left = x + cell.margins.left_pt;
-  let text_right = x + width - cell.margins.right_pt;
   let text_bottom = y + height - cell.margins.bottom_pt;
+  let flow = FlowContext {
+    setup,
+    section_index: page.section_index,
+    column_index: 0,
+    columns: SectionColumns::default(),
+    content_left_pt: text_left,
+    content_bottom: text_bottom,
+    content_width,
+    default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+  };
+  let mut nested_page = empty_page(setup, page.section_index);
+  let mut discarded_pages = Vec::new();
 
   for block in &cell.blocks {
-    match block {
-      Block::Paragraph(paragraph) => {
-        let mut text_x = text_left;
-        for item in &paragraph.inlines {
-          match item {
-            InlineItem::Text(run) => {
-              if run.text.is_empty() {
-                continue;
-              }
-              if text_y > text_bottom {
-                return;
-              }
-              let available = (text_right - text_x).max(DEFAULT_FONT_SIZE_PT);
-              let clipped = clip_to_width(&run.text, run.style, available);
-              if clipped.is_empty() {
-                continue;
-              }
-              let width = measure_text(&clipped, run.style);
-              page.items.push(PageItem::Text(TextItem {
-                x_pt: text_x,
-                y_pt: text_y,
-                text: clipped,
-                style: run.style,
-              }));
-              text_x += width;
-            }
-            InlineItem::Image(image) => {
-              if text_y > text_bottom {
-                return;
-              }
-              let width = image.width_pt.min((text_right - text_x).max(1.0));
-              let height = if image.width_pt > 0.0 {
-                image.height_pt * (width / image.width_pt)
-              } else {
-                image.height_pt
-              };
-              page.items.push(PageItem::Image(ImageItem {
-                x_pt: text_x,
-                y_pt: text_y - DEFAULT_FONT_SIZE_PT,
-                width_pt: width,
-                height_pt: height,
-                data: image.data.clone(),
-                content_type: image.content_type.clone(),
-                alt_text: image.alt_text.clone(),
-              }));
-              text_x += width;
-            }
-            InlineItem::PageBreak | InlineItem::ColumnBreak => {
-              text_y = text_bottom + 1.0;
-            }
-          }
-        }
-        text_y += paragraph
-          .format
-          .line_height_pt
-          .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
-      }
-      Block::Table(table) => {
-        let nested = layout_nested_table(
-          table,
-          setup,
-          page,
-          text_left,
-          text_y,
-          text_right - text_left,
-        );
-        text_y += nested;
-      }
+    if text_y > text_bottom {
+      break;
     }
+    text_y = layout_document_block(block, flow, &mut nested_page, &mut discarded_pages, text_y);
   }
+
+  page.items.extend(
+    nested_page
+      .items
+      .into_iter()
+      .filter(|item| item_y(item).is_none_or(|item_y| item_y <= text_bottom)),
+  );
+  let _overflow_pages = discarded_pages;
 }
 
-fn table_cell_content_height(cell: &crate::docx::TableCell) -> f32 {
+fn table_cell_content_height(cell: &crate::docx::TableCell, cell_width: f32) -> f32 {
+  let content_width =
+    (cell_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let flow = FlowContext {
+    setup: PageSetup::default(),
+    section_index: 0,
+    column_index: 0,
+    columns: SectionColumns::default(),
+    content_left_pt: 0.0,
+    content_bottom: f32::MAX / 4.0,
+    content_width,
+    default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+  };
   let content = cell
     .blocks
     .iter()
     .map(|block| match block {
-      Block::Paragraph(paragraph) => paragraph
-        .format
-        .line_height_pt
-        .unwrap_or(DEFAULT_LINE_HEIGHT_PT),
-      Block::Table(table) => table.rows.len().max(1) as f32 * TABLE_ROW_MIN_HEIGHT_PT,
+      Block::Paragraph(paragraph) => estimated_paragraph_height(paragraph, flow),
+      Block::Table(table) => table
+        .rows
+        .iter()
+        .map(table_row_height)
+        .sum::<f32>()
+        .max(TABLE_ROW_MIN_HEIGHT_PT),
     })
     .sum::<f32>()
     .max(DEFAULT_LINE_HEIGHT_PT);
   cell.margins.top_pt + content + cell.margins.bottom_pt
-}
-
-fn layout_nested_table(
-  table: &crate::docx::Table,
-  setup: PageSetup,
-  page: &mut Page,
-  x: f32,
-  y: f32,
-  content_width: f32,
-) -> f32 {
-  let mut nested_pages = Vec::new();
-  let mut nested_page = empty_page(setup, page.section_index);
-  let bottom = setup.height_pt;
-  let end_y = layout_table(
-    table,
-    BlockArea {
-      setup,
-      section_index: page.section_index,
-      content_left_pt: x,
-      content_bottom: bottom,
-      content_width,
-    },
-    &mut nested_page,
-    &mut nested_pages,
-    y,
-  );
-  page.items.extend(nested_page.items);
-  end_y - y
 }
 
 fn floating_image_position(
@@ -1380,16 +1467,19 @@ fn layout_paragraph(
   let start_item_index = current.items.len();
   let paragraph_top = y;
   let setup = flow.setup;
-  let line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
+  let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
   let first_line_left =
-    (line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
-  let line_right = line_left + flow.content_width;
-  let paragraph_left = line_left.min(first_line_left);
+    (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
+  let default_line_right = default_line_left + flow.content_width;
+  let mut line_left = first_line_left;
+  let mut line_right = default_line_right;
+  let paragraph_left = default_line_left.min(first_line_left);
   let base_line_height = paragraph
     .format
     .line_height_pt
     .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
   let mut line_height = base_line_height;
+  let mut wrap_exclusions = Vec::new();
   let mut emitted = paragraph.list_label.is_some();
   let mut pending_tab: Option<ResolvedTabStop> = None;
   let mut x = if let Some(label) = &paragraph.list_label {
@@ -1398,11 +1488,16 @@ fn layout_paragraph(
       y_pt: y,
       text: label.clone(),
       style: TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
     }));
-    line_left
+    default_line_left
   } else {
     first_line_left
   };
+  if paragraph.list_label.is_some() {
+    line_left = default_line_left;
+  }
 
   for item in &paragraph.inlines {
     match item {
@@ -1412,7 +1507,15 @@ fn layout_paragraph(
 
         for segment in text_segments(&run.text) {
           if segment == "\n" {
-            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            flush_text(
+              current,
+              chunk_x,
+              y,
+              &mut chunk,
+              run.style,
+              run.hyperlink_url.as_deref(),
+              run.dynamic_field,
+            );
             y = next_line(
               setup,
               current,
@@ -1421,6 +1524,13 @@ fn layout_paragraph(
               &mut line_height,
               flow.content_bottom,
             );
+            (line_left, line_right) = line_bounds_for_y(
+              default_line_left,
+              default_line_right,
+              y,
+              line_height,
+              &wrap_exclusions,
+            );
             x = line_left;
             chunk_x = x;
             pending_tab = None;
@@ -1428,7 +1538,15 @@ fn layout_paragraph(
             continue;
           }
           if segment == "\t" {
-            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            flush_text(
+              current,
+              chunk_x,
+              y,
+              &mut chunk,
+              run.style,
+              run.hyperlink_url.as_deref(),
+              run.dynamic_field,
+            );
             let mut tab_stop = next_tab_stop(
               x,
               line_left,
@@ -1444,6 +1562,13 @@ fn layout_paragraph(
                 y,
                 &mut line_height,
                 flow.content_bottom,
+              );
+              (line_left, line_right) = line_bounds_for_y(
+                default_line_left,
+                default_line_right,
+                y,
+                line_height,
+                &wrap_exclusions,
               );
               tab_stop = next_tab_stop(
                 line_left,
@@ -1471,7 +1596,15 @@ fn layout_paragraph(
           }
 
           if x + width > line_right && x > line_left {
-            flush_text(current, chunk_x, y, &mut chunk, run.style);
+            flush_text(
+              current,
+              chunk_x,
+              y,
+              &mut chunk,
+              run.style,
+              run.hyperlink_url.as_deref(),
+              run.dynamic_field,
+            );
             y = next_line(
               setup,
               current,
@@ -1479,6 +1612,13 @@ fn layout_paragraph(
               y,
               &mut line_height,
               flow.content_bottom,
+            );
+            (line_left, line_right) = line_bounds_for_y(
+              default_line_left,
+              default_line_right,
+              y,
+              line_height,
+              &wrap_exclusions,
             );
             x = line_left;
             chunk_x = x;
@@ -1499,7 +1639,15 @@ fn layout_paragraph(
                   let width = measure_text(text, run.style);
 
                   if x + width > line_right && x > line_left {
-                    flush_text(current, chunk_x, y, &mut chunk, run.style);
+                    flush_text(
+                      current,
+                      chunk_x,
+                      y,
+                      &mut chunk,
+                      run.style,
+                      run.hyperlink_url.as_deref(),
+                      run.dynamic_field,
+                    );
                     y = next_line(
                       setup,
                       current,
@@ -1507,6 +1655,13 @@ fn layout_paragraph(
                       y,
                       &mut line_height,
                       flow.content_bottom,
+                    );
+                    (line_left, line_right) = line_bounds_for_y(
+                      default_line_left,
+                      default_line_right,
+                      y,
+                      line_height,
+                      &wrap_exclusions,
                     );
                     x = line_left;
                     chunk_x = x;
@@ -1525,7 +1680,15 @@ fn layout_paragraph(
               }
 
               if x + width > line_right && x > line_left {
-                flush_text(current, chunk_x, y, &mut chunk, run.style);
+                flush_text(
+                  current,
+                  chunk_x,
+                  y,
+                  &mut chunk,
+                  run.style,
+                  run.hyperlink_url.as_deref(),
+                  run.dynamic_field,
+                );
                 y = next_line(
                   setup,
                   current,
@@ -1533,6 +1696,13 @@ fn layout_paragraph(
                   y,
                   &mut line_height,
                   flow.content_bottom,
+                );
+                (line_left, line_right) = line_bounds_for_y(
+                  default_line_left,
+                  default_line_right,
+                  y,
+                  line_height,
+                  &wrap_exclusions,
                 );
                 x = line_left;
                 chunk_x = x;
@@ -1559,7 +1729,15 @@ fn layout_paragraph(
           emitted = true;
         }
 
-        flush_text(current, chunk_x, y, &mut chunk, run.style);
+        flush_text(
+          current,
+          chunk_x,
+          y,
+          &mut chunk,
+          run.style,
+          run.hyperlink_url.as_deref(),
+          run.dynamic_field,
+        );
       }
       InlineItem::Image(image) => {
         pending_tab = None;
@@ -1579,18 +1757,31 @@ fn layout_paragraph(
           match placement.wrap {
             ImageWrapMode::TopBottom | ImageWrapMode::None => {
               y = y.max(image_y + height + placement.margin_bottom_pt);
+              (line_left, line_right) = line_bounds_for_y(
+                default_line_left,
+                default_line_right,
+                y,
+                line_height,
+                &wrap_exclusions,
+              );
               x = line_left;
               line_height = base_line_height;
             }
-            ImageWrapMode::Square | ImageWrapMode::Tight
-              if !placement.behind_text
-                && y >= image_y - placement.margin_top_pt
-                && y <= image_y + height + placement.margin_bottom_pt =>
-            {
-              let wrapped_x = image_x + width + placement.margin_right_pt;
-              if wrapped_x < line_right {
-                x = x.max(wrapped_x);
-              }
+            ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
+              wrap_exclusions.push(WrapExclusion {
+                left_pt: image_x - placement.margin_left_pt,
+                right_pt: image_x + width + placement.margin_right_pt,
+                top_pt: image_y - placement.margin_top_pt,
+                bottom_pt: image_y + height + placement.margin_bottom_pt,
+              });
+              (line_left, line_right) = line_bounds_for_y(
+                default_line_left,
+                default_line_right,
+                y,
+                line_height,
+                &wrap_exclusions,
+              );
+              x = x.max(line_left).min(line_right);
               line_height = line_height.max(height.min(base_line_height));
             }
             ImageWrapMode::Through
@@ -1610,6 +1801,13 @@ fn layout_paragraph(
             &mut line_height,
             flow.content_bottom,
           );
+          (line_left, line_right) = line_bounds_for_y(
+            default_line_left,
+            default_line_right,
+            y,
+            line_height,
+            &wrap_exclusions,
+          );
           x = line_left;
         }
         current.items.push(PageItem::Image(ImageItem {
@@ -1627,7 +1825,10 @@ fn layout_paragraph(
       }
       InlineItem::PageBreak => {
         y = force_page_break(setup, current, pages);
-        x = first_line_left;
+        wrap_exclusions.clear();
+        line_left = first_line_left;
+        line_right = default_line_right;
+        x = line_left;
         line_height = base_line_height;
         emitted = false;
         pending_tab = None;
@@ -1635,11 +1836,16 @@ fn layout_paragraph(
       InlineItem::ColumnBreak => {
         if flow.columns.count <= 1 || flow.column_index + 1 >= flow.columns.count {
           y = force_page_break(setup, current, pages);
-          x = first_line_left;
+          wrap_exclusions.clear();
+          line_left = first_line_left;
+          line_right = default_line_right;
+          x = line_left;
           line_height = base_line_height;
           emitted = false;
         } else {
           y = flow.content_bottom;
+          line_left = default_line_left;
+          line_right = default_line_right;
           x = line_left;
           emitted = true;
         }
@@ -1665,7 +1871,7 @@ fn layout_paragraph(
     align_paragraph_items(
       &mut current.items[start_item_index..],
       paragraph.format.alignment,
-      line_right,
+      default_line_right,
     );
   }
   if start_item_index <= current.items.len() {
@@ -1675,7 +1881,7 @@ fn layout_paragraph(
       paragraph,
       paragraph_left,
       paragraph_top,
-      line_right - paragraph_left,
+      default_line_right - paragraph_left,
       paragraph_bottom - paragraph_top,
     );
   }
@@ -1782,6 +1988,47 @@ fn aligned_tab_x(
     TabStopAlignment::Right => tab_stop.x_pt - text_width,
   };
   x.clamp(line_left, line_right)
+}
+
+fn line_bounds_for_y(
+  default_left: f32,
+  default_right: f32,
+  y: f32,
+  line_height: f32,
+  exclusions: &[WrapExclusion],
+) -> (f32, f32) {
+  let mut left = default_left;
+  let mut right = default_right;
+  for exclusion in exclusions {
+    if y + line_height <= exclusion.top_pt || y >= exclusion.bottom_pt {
+      continue;
+    }
+    if exclusion.right_pt <= default_left || exclusion.left_pt >= default_right {
+      continue;
+    }
+
+    let exclude_left = exclusion.left_pt.max(default_left);
+    let exclude_right = exclusion.right_pt.min(default_right);
+    if exclude_left <= default_left {
+      left = left.max(exclude_right);
+    } else if exclude_right >= default_right {
+      right = right.min(exclude_left);
+    } else {
+      let left_space = exclude_left - default_left;
+      let right_space = default_right - exclude_right;
+      if right_space >= left_space {
+        left = left.max(exclude_right);
+      } else {
+        right = right.min(exclude_left);
+      }
+    }
+  }
+
+  if right - left < DEFAULT_FONT_SIZE_PT {
+    (default_left, default_right)
+  } else {
+    (left, right)
+  }
 }
 
 fn decorate_paragraph(
@@ -1950,7 +2197,15 @@ fn force_page_break(setup: PageSetup, current: &mut Page, pages: &mut Vec<Page>)
   setup.margin_top_pt
 }
 
-fn flush_text(page: &mut Page, x: f32, y: f32, chunk: &mut String, style: TextStyle) {
+fn flush_text(
+  page: &mut Page,
+  x: f32,
+  y: f32,
+  chunk: &mut String,
+  style: TextStyle,
+  hyperlink_url: Option<&str>,
+  dynamic_field: Option<DynamicFieldKind>,
+) {
   if chunk.is_empty() {
     return;
   }
@@ -1960,6 +2215,8 @@ fn flush_text(page: &mut Page, x: f32, y: f32, chunk: &mut String, style: TextSt
     y_pt: y,
     text: std::mem::take(chunk),
     style,
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    dynamic_field,
   }));
 }
 
@@ -1972,28 +2229,6 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
     width_pt: border.width_pt,
     color: border.color,
   }));
-}
-
-fn clip_to_width(text: &str, style: TextStyle, max_width: f32) -> String {
-  let mut width = 0.0;
-  let mut clipped = String::new();
-  for ch in text.chars() {
-    let mut encoded = [0; 4];
-    let value = if ch == '\t' {
-      "    "
-    } else if ch == '\n' {
-      break;
-    } else {
-      ch.encode_utf8(&mut encoded)
-    };
-    let next = measure_text(value, style);
-    if width + next > max_width && !clipped.is_empty() {
-      break;
-    }
-    width += next;
-    clipped.push_str(value);
-  }
-  clipped
 }
 
 #[cfg(test)]

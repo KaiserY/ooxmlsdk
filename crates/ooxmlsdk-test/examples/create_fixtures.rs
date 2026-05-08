@@ -3720,14 +3720,16 @@ fn create_wml_tables_fixtures(root: &Path) {
   //   Row 0: tblHeader + trHeight exact 480 twips
   //   Column 0 cells: vAlign=top/center/bottom across rows
   //   One cell: noWrap
-  //   Table width: 5000 pct (100%)
+  //   Table width/alignment: 4000 pct (80%), centered
   {
     let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
     <w:tbl>
       <w:tblPr>
-        <w:tblW w:w="5000" w:type="pct"/>
+        <w:tblW w:w="4000" w:type="pct"/>
+        <w:jc w:val="center"/>
+        <w:tblInd w:w="240" w:type="dxa"/>
         <w:tblCellMar>
           <w:top w:w="120" w:type="dxa"/>
           <w:left w:w="180" w:type="dxa"/>

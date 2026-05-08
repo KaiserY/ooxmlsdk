@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use image::ImageFormat as RasterImageFormat;
+use krilla::action::{Action, LinkAction};
+use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
 use krilla::configure::{Configuration, PdfVersion};
-use krilla::geom::{PathBuilder, Point, Size, Transform};
+use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
@@ -29,10 +31,12 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
 
     let mut pdf_page = pdf.start_page_with(settings);
     let mut surface = pdf_page.surface();
+    let mut link_annotations = Vec::new();
     for item in &page.items {
       match item {
         PageItem::Text(text) if !text.text.is_empty() => {
           let baseline_y = text.y_pt - text.style.baseline_shift_pt;
+          let text_width = measure_text(&text.text, text.style);
           if let Some(color) = text.style.highlight {
             surface.set_stroke(None);
             surface.set_fill(Some(Fill {
@@ -40,13 +44,12 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
               opacity: NormalizedF32::ONE,
               rule: Default::default(),
             }));
-            let width = measure_text(&text.text, text.style);
             let top = baseline_y - text.style.font_size_pt;
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, top);
-            path.line_to(text.x_pt + width, top);
+            path.line_to(text.x_pt + text_width, top);
             path.line_to(
-              text.x_pt + width,
+              text.x_pt + text_width,
               baseline_y + text.style.font_size_pt * 0.25,
             );
             path.line_to(text.x_pt, baseline_y + text.style.font_size_pt * 0.25);
@@ -76,10 +79,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             let underline_y = baseline_y + (text.style.font_size_pt * 0.12).max(1.0);
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, underline_y);
-            path.line_to(
-              text.x_pt + measure_text(&text.text, text.style),
-              underline_y,
-            );
+            path.line_to(text.x_pt + text_width, underline_y);
             if let Some(path) = path.finish() {
               surface.draw_path(&path);
             }
@@ -95,9 +95,18 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             let strike_y = baseline_y - (text.style.font_size_pt * 0.32);
             let mut path = PathBuilder::new();
             path.move_to(text.x_pt, strike_y);
-            path.line_to(text.x_pt + measure_text(&text.text, text.style), strike_y);
+            path.line_to(text.x_pt + text_width, strike_y);
             if let Some(path) = path.finish() {
               surface.draw_path(&path);
+            }
+          }
+          if let Some(url) = &text.hyperlink_url {
+            let top = baseline_y - text.style.font_size_pt;
+            let bottom = baseline_y + text.style.font_size_pt * 0.25;
+            if let Some(rect) = Rect::from_ltrb(text.x_pt, top, text.x_pt + text_width, bottom) {
+              let target = Target::Action(Action::Link(LinkAction::new(url.clone())));
+              let link = LinkAnnotation::new(rect, target);
+              link_annotations.push(Annotation::new_link(link, None));
             }
           }
         }
@@ -168,6 +177,9 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       }
     }
     surface.finish();
+    for annotation in link_annotations {
+      pdf_page.add_annotation(annotation);
+    }
   }
 
   pdf

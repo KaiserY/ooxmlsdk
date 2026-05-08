@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use icu_segmenter::LineSegmenter;
 
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor, TabStop,
-  TabStopAlignment, TableCellVerticalAlignment, TextStyle,
+  Block, BorderStyle, DocxDocument, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
+  SectionBreakKind, TabStop, TabStopAlignment, TableCellVerticalAlignment, TextStyle,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -16,6 +16,7 @@ const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
 const TABLE_CELL_PADDING_PT: f32 = 4.0;
 const TABLE_ROW_MIN_HEIGHT_PT: f32 = 24.0;
 const TABLE_SPACING_AFTER_PT: f32 = 6.0;
+const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
 
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
@@ -25,6 +26,7 @@ pub(crate) struct LayoutDocument {
 #[derive(Clone, Debug)]
 pub(crate) struct Page {
   pub setup: PageSetup,
+  pub section_index: usize,
   pub items: Vec<PageItem>,
 }
 
@@ -77,6 +79,7 @@ pub(crate) struct LineItem {
 #[derive(Clone, Copy, Debug)]
 struct FlowContext {
   setup: PageSetup,
+  section_index: usize,
   content_bottom: f32,
   content_width: f32,
   default_tab_stop_pt: f32,
@@ -90,44 +93,80 @@ struct ResolvedTabStop {
 
 pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
   let mut pages = Vec::new();
-  let mut current = Page {
-    setup: document.page,
-    items: Vec::new(),
-  };
+  let mut current = empty_page(document.page, 0);
   let mut y = document.page.margin_top_pt;
-  let content_bottom = document.page.height_pt - document.page.margin_bottom_pt;
-  let content_width =
-    (document.page.width_pt - document.page.margin_left_pt - document.page.margin_right_pt)
-      .max(DEFAULT_FONT_SIZE_PT);
-  let flow = FlowContext {
-    setup: document.page,
-    content_bottom,
-    content_width,
-    default_tab_stop_pt: document.default_tab_stop_pt,
-  };
 
-  for block in &document.blocks {
-    y = layout_document_block(block, flow, &mut current, &mut pages, y);
+  if document.sections.is_empty() {
+    let flow = flow_context(document.page, 0, document.default_tab_stop_pt);
+    for block in &document.blocks {
+      y = layout_document_block(block, flow, &mut current, &mut pages, y);
+    }
+  } else {
+    for (section_index, section) in document.sections.iter().enumerate() {
+      if section_index > 0 && starts_new_page(section.break_kind) && !current.items.is_empty() {
+        pages.push(std::mem::replace(
+          &mut current,
+          empty_page(section.page, section_index),
+        ));
+        if needs_section_parity_blank(section.break_kind, pages.len() + 1) {
+          pages.push(empty_page(section.page, section_index));
+        }
+        y = section.page.margin_top_pt;
+      } else if current.items.is_empty() {
+        current.setup = section.page;
+        current.section_index = section_index;
+        y = section.page.margin_top_pt;
+      }
+
+      let flow = flow_context(section.page, section_index, document.default_tab_stop_pt);
+      for block in &section.blocks {
+        y = layout_document_block(block, flow, &mut current, &mut pages, y);
+      }
+    }
   }
 
+  let note_setup = current.setup;
+  let note_flow = flow_context(
+    note_setup,
+    current.section_index,
+    document.default_tab_stop_pt,
+  );
   if !document.footnote_blocks.is_empty() {
-    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    y = layout_note_separator(
+      note_setup,
+      &mut current,
+      &mut pages,
+      y,
+      note_flow.content_bottom,
+    );
     for block in &document.footnote_blocks {
-      y = layout_document_block(block, flow, &mut current, &mut pages, y);
+      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
     }
   }
 
   if !document.endnote_blocks.is_empty() {
-    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    y = layout_note_separator(
+      note_setup,
+      &mut current,
+      &mut pages,
+      y,
+      note_flow.content_bottom,
+    );
     for block in &document.endnote_blocks {
-      y = layout_document_block(block, flow, &mut current, &mut pages, y);
+      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
     }
   }
 
   if !document.comment_blocks.is_empty() {
-    y = layout_note_separator(document.page, &mut current, &mut pages, y, content_bottom);
+    y = layout_note_separator(
+      note_setup,
+      &mut current,
+      &mut pages,
+      y,
+      note_flow.content_bottom,
+    );
     for block in &document.comment_blocks {
-      y = layout_document_block(block, flow, &mut current, &mut pages, y);
+      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
     }
   }
 
@@ -135,9 +174,48 @@ pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<L
     pages.push(current);
   }
 
-  apply_headers_and_footers(document, &mut pages, content_width);
+  apply_headers_and_footers(document, &mut pages);
 
   Ok(LayoutDocument { pages })
+}
+
+fn empty_page(setup: PageSetup, section_index: usize) -> Page {
+  Page {
+    setup,
+    section_index,
+    items: Vec::new(),
+  }
+}
+
+fn flow_context(setup: PageSetup, section_index: usize, default_tab_stop_pt: f32) -> FlowContext {
+  FlowContext {
+    setup,
+    section_index,
+    content_bottom: setup.height_pt - setup.margin_bottom_pt,
+    content_width: (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt)
+      .max(DEFAULT_FONT_SIZE_PT),
+    default_tab_stop_pt,
+  }
+}
+
+fn starts_new_page(kind: SectionBreakKind) -> bool {
+  matches!(
+    kind,
+    SectionBreakKind::NextPage
+      | SectionBreakKind::NextColumn
+      | SectionBreakKind::EvenPage
+      | SectionBreakKind::OddPage
+  )
+}
+
+fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -> bool {
+  match kind {
+    SectionBreakKind::EvenPage => !next_page_number.is_multiple_of(2),
+    SectionBreakKind::OddPage => next_page_number.is_multiple_of(2),
+    SectionBreakKind::Continuous | SectionBreakKind::NextPage | SectionBreakKind::NextColumn => {
+      false
+    }
+  }
 }
 
 fn layout_document_block(
@@ -152,10 +230,7 @@ fn layout_document_block(
       if paragraph.format.page_break_before && !current.items.is_empty() {
         pages.push(std::mem::replace(
           current,
-          Page {
-            setup: flow.setup,
-            items: Vec::new(),
-          },
+          empty_page(flow.setup, flow.section_index),
         ));
         y = flow.setup.margin_top_pt;
       }
@@ -192,10 +267,7 @@ fn layout_note_separator(
   if y + DEFAULT_LINE_HEIGHT_PT > content_bottom && !current.items.is_empty() {
     pages.push(std::mem::replace(
       current,
-      Page {
-        setup,
-        items: Vec::new(),
-      },
+      empty_page(setup, current.section_index),
     ));
     y = setup.margin_top_pt;
   }
@@ -212,38 +284,78 @@ fn layout_note_separator(
   y + 8.0
 }
 
-fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], content_width: f32) {
-  if document.header_blocks.is_empty()
+fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
+  let document_repeating_blocks_empty = document.header_blocks.is_empty()
     && document.footer_blocks.is_empty()
     && document.first_header_blocks.is_empty()
-    && document.first_footer_blocks.is_empty()
-  {
+    && document.first_footer_blocks.is_empty();
+  let sections_have_repeating_blocks = document.sections.iter().any(|section| {
+    !section.header_blocks.is_empty()
+      || !section.footer_blocks.is_empty()
+      || !section.first_header_blocks.is_empty()
+      || !section.first_footer_blocks.is_empty()
+      || !section.even_header_blocks.is_empty()
+      || !section.even_footer_blocks.is_empty()
+  });
+  if document_repeating_blocks_empty && !sections_have_repeating_blocks {
     return;
   }
 
+  let mut previous_section_index = None;
   for (index, page) in pages.iter_mut().enumerate() {
-    let header_blocks =
-      if index == 0 && document.title_page && !document.first_header_blocks.is_empty() {
-        &document.first_header_blocks
-      } else {
-        &document.header_blocks
-      };
-    let footer_blocks =
-      if index == 0 && document.title_page && !document.first_footer_blocks.is_empty() {
-        &document.first_footer_blocks
-      } else {
-        &document.footer_blocks
-      };
-    let mut adornment = Page {
-      setup: page.setup,
-      items: Vec::new(),
+    let first_page_in_section = previous_section_index != Some(page.section_index);
+    previous_section_index = Some(page.section_index);
+    let section = document.sections.get(page.section_index);
+    let title_page = section
+      .map(|section| section.title_page)
+      .unwrap_or(document.title_page);
+    let (default_header, default_footer, first_header, first_footer, even_header, even_footer) =
+      section
+        .map(|section| {
+          (
+            &section.header_blocks,
+            &section.footer_blocks,
+            &section.first_header_blocks,
+            &section.first_footer_blocks,
+            &section.even_header_blocks,
+            &section.even_footer_blocks,
+          )
+        })
+        .unwrap_or((
+          &document.header_blocks,
+          &document.footer_blocks,
+          &document.first_header_blocks,
+          &document.first_footer_blocks,
+          &document.header_blocks,
+          &document.footer_blocks,
+        ));
+    let use_even_slot = document.even_and_odd_headers && (index + 1) % 2 == 0;
+    let header_blocks = if first_page_in_section && title_page && !first_header.is_empty() {
+      first_header
+    } else if use_even_slot && !even_header.is_empty() {
+      even_header
+    } else {
+      default_header
     };
+    let footer_blocks = if first_page_in_section && title_page && !first_footer.is_empty() {
+      first_footer
+    } else if use_even_slot && !even_footer.is_empty() {
+      even_footer
+    } else {
+      default_footer
+    };
+
+    if header_blocks.is_empty() && footer_blocks.is_empty() {
+      continue;
+    }
+
+    let content_width =
+      (page.setup.width_pt - page.setup.margin_left_pt - page.setup.margin_right_pt)
+        .max(DEFAULT_FONT_SIZE_PT);
+    let mut adornment = empty_page(page.setup, page.section_index);
     let mut discarded_pages = Vec::new();
-    let header_bottom = page
-      .setup
-      .margin_top_pt
-      .max(page.setup.header_distance_pt + 1.0);
-    let mut y = page.setup.header_distance_pt;
+    let header_area = header_area(page.setup);
+    let mut y = header_area.top_pt;
     for block in header_blocks {
       y = layout_repeating_block(
         block,
@@ -252,16 +364,16 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
         y,
         FlowContext {
           setup: page.setup,
-          content_bottom: header_bottom,
+          section_index: page.section_index,
+          content_bottom: header_area.bottom_pt,
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
         },
       );
     }
 
-    let mut y =
-      (page.setup.height_pt - page.setup.footer_distance_pt - DEFAULT_LINE_HEIGHT_PT).max(0.0);
-    let footer_bottom = page.setup.height_pt - 1.0;
+    let footer_area = footer_area(page.setup);
+    let mut y = footer_area.top_pt;
     for block in footer_blocks {
       y = layout_repeating_block(
         block,
@@ -270,7 +382,8 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
         y,
         FlowContext {
           setup: page.setup,
-          content_bottom: footer_bottom,
+          section_index: page.section_index,
+          content_bottom: footer_area.bottom_pt,
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
         },
@@ -278,6 +391,35 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page], conten
     }
 
     page.items.extend(adornment.items);
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RepeatingArea {
+  top_pt: f32,
+  bottom_pt: f32,
+}
+
+fn header_area(setup: PageSetup) -> RepeatingArea {
+  let top = setup.header_distance_pt.max(0.0);
+  let bottom = setup.margin_top_pt.max(top + MIN_HEADER_FOOTER_HEIGHT_PT);
+  RepeatingArea {
+    top_pt: top,
+    bottom_pt: bottom.min(setup.height_pt),
+  }
+}
+
+fn footer_area(setup: PageSetup) -> RepeatingArea {
+  let bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
+    .max(0.0)
+    .min(setup.height_pt);
+  let margin_top = (setup.height_pt - setup.margin_bottom_pt).max(0.0);
+  let top = margin_top.min((bottom - MIN_HEADER_FOOTER_HEIGHT_PT).max(0.0));
+  RepeatingArea {
+    top_pt: top,
+    bottom_pt: bottom
+      .max(top + MIN_HEADER_FOOTER_HEIGHT_PT)
+      .min(setup.height_pt),
   }
 }
 
@@ -311,19 +453,13 @@ fn layout_repeating_block(
 pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument {
   let mut output_pages = Vec::new();
   for (setup, lines) in pages {
-    let mut page = Page {
-      setup,
-      items: Vec::new(),
-    };
+    let mut page = empty_page(setup, 0);
     let mut y = setup.margin_top_pt;
     let content_bottom = setup.height_pt - setup.margin_bottom_pt;
     for line in lines {
       if y + DEFAULT_LINE_HEIGHT_PT > content_bottom {
         output_pages.push(page);
-        page = Page {
-          setup,
-          items: Vec::new(),
-        };
+        page = empty_page(setup, 0);
         y = setup.margin_top_pt;
       }
       if !line.is_empty() {
@@ -340,10 +476,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
   }
 
   if output_pages.is_empty() {
-    output_pages.push(Page {
-      setup: PageSetup::default(),
-      items: Vec::new(),
-    });
+    output_pages.push(empty_page(PageSetup::default(), 0));
   }
 
   LayoutDocument {
@@ -379,10 +512,7 @@ fn layout_table(
     if y + row_height > content_bottom && !current.items.is_empty() {
       pages.push(std::mem::replace(
         current,
-        Page {
-          setup,
-          items: Vec::new(),
-        },
+        empty_page(setup, current.section_index),
       ));
       y = setup.margin_top_pt;
     }
@@ -731,10 +861,7 @@ fn layout_nested_table(
   content_width: f32,
 ) -> f32 {
   let mut nested_pages = Vec::new();
-  let mut nested_page = Page {
-    setup,
-    items: Vec::new(),
-  };
+  let mut nested_page = empty_page(setup, page.section_index);
   let bottom = setup.height_pt;
   let end_y = layout_table(
     table,
@@ -1269,10 +1396,7 @@ fn next_line(
   if next_y + *line_height > content_bottom && !current.items.is_empty() {
     pages.push(std::mem::replace(
       current,
-      Page {
-        setup,
-        items: Vec::new(),
-      },
+      empty_page(setup, current.section_index),
     ));
     next_y = setup.margin_top_pt;
   }
@@ -1283,10 +1407,7 @@ fn force_page_break(setup: PageSetup, current: &mut Page, pages: &mut Vec<Page>)
   if !current.items.is_empty() {
     pages.push(std::mem::replace(
       current,
-      Page {
-        setup,
-        items: Vec::new(),
-      },
+      empty_page(setup, current.section_index),
     ));
   }
   setup.margin_top_pt
@@ -1336,4 +1457,48 @@ fn clip_to_width(text: &str, style: TextStyle, max_width: f32) -> String {
     clipped.push_str(value);
   }
   clipped
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn repeating_areas_follow_word_margin_distances() {
+    let setup = PageSetup::default();
+
+    let header = header_area(setup);
+    let footer = footer_area(setup);
+
+    assert_eq!(header.top_pt, 36.0);
+    assert_eq!(header.bottom_pt, 72.0);
+    assert_eq!(footer.top_pt, 720.0);
+    assert_eq!(footer.bottom_pt, 756.0);
+  }
+
+  #[test]
+  fn repeating_areas_keep_minimum_height_when_distances_overlap_margins() {
+    let setup = PageSetup {
+      margin_top_pt: 20.0,
+      margin_bottom_pt: 20.0,
+      header_distance_pt: 30.0,
+      footer_distance_pt: 30.0,
+      ..Default::default()
+    };
+
+    let header = header_area(setup);
+    let footer = footer_area(setup);
+
+    assert!(header.bottom_pt - header.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
+    assert!(footer.bottom_pt - footer.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
+  }
+
+  #[test]
+  fn even_odd_section_breaks_insert_blank_pages_for_page_parity() {
+    assert!(needs_section_parity_blank(SectionBreakKind::EvenPage, 3));
+    assert!(!needs_section_parity_blank(SectionBreakKind::EvenPage, 4));
+    assert!(needs_section_parity_blank(SectionBreakKind::OddPage, 2));
+    assert!(!needs_section_parity_blank(SectionBreakKind::OddPage, 3));
+    assert!(!needs_section_parity_blank(SectionBreakKind::NextPage, 3));
+  }
 }

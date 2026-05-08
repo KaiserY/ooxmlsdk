@@ -23,6 +23,8 @@ const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub default_tab_stop_pt: f32,
+  pub even_and_odd_headers: bool,
+  pub sections: Vec<ImportedSection>,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
   pub first_header_blocks: Vec<Block>,
@@ -32,6 +34,30 @@ pub(crate) struct DocxDocument {
   pub comment_blocks: Vec<Block>,
   pub title_page: bool,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ImportedSection {
+  pub break_kind: SectionBreakKind,
+  pub section_properties: Option<w::SectionProperties>,
+  pub page: PageSetup,
+  pub title_page: bool,
+  pub header_blocks: Vec<Block>,
+  pub footer_blocks: Vec<Block>,
+  pub first_header_blocks: Vec<Block>,
+  pub first_footer_blocks: Vec<Block>,
+  pub even_header_blocks: Vec<Block>,
+  pub even_footer_blocks: Vec<Block>,
+  pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SectionBreakKind {
+  Continuous,
+  NextPage,
+  NextColumn,
+  EvenPage,
+  OddPage,
 }
 
 #[derive(Clone, Debug)]
@@ -248,78 +274,51 @@ pub(crate) fn extract(
   let mut numbering = NumberingCatalog::load(package, &main)?;
   let images = ImageCatalog::load(package, &main);
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
+  let even_and_odd_headers = even_and_odd_headers(package, &main);
   let document = main.root_element(package)?;
-  let section = document
+  let mut sections = document
     .body
     .as_deref()
-    .and_then(|body| body.w_sect_pr.as_deref())
-    .cloned();
-  let page = section.as_ref().map(page_setup).unwrap_or_default();
-  let blocks = document
-    .body
-    .as_deref()
-    .map(|body| body_blocks(body, &styles, &mut numbering, &images))
+    .map(|body| body_sections(body, &styles, &mut numbering, &images))
+    .unwrap_or_else(|| vec![default_section(Vec::new())]);
+  resolve_section_repeating_blocks(package, &main, &styles, &mut sections);
+  let page = sections
+    .first()
+    .map(|section| section.page)
     .unwrap_or_default();
-  let header_blocks = section
-    .as_ref()
-    .and_then(|section| {
-      referenced_header_blocks(
-        package,
-        &main,
-        section,
-        &styles,
-        w::HeaderFooterValues::Default,
-      )
-    })
+  let blocks = sections
+    .iter()
+    .flat_map(|section| section.blocks.iter().cloned())
+    .collect();
+  let header_blocks = sections
+    .first()
+    .map(|section| section.header_blocks.clone())
     .unwrap_or_default();
-  let footer_blocks = section
-    .as_ref()
-    .and_then(|section| {
-      referenced_footer_blocks(
-        package,
-        &main,
-        section,
-        &styles,
-        w::HeaderFooterValues::Default,
-      )
-    })
+  let footer_blocks = sections
+    .first()
+    .map(|section| section.footer_blocks.clone())
     .unwrap_or_default();
-  let first_header_blocks = section
-    .as_ref()
-    .and_then(|section| {
-      referenced_header_blocks(
-        package,
-        &main,
-        section,
-        &styles,
-        w::HeaderFooterValues::First,
-      )
-    })
+  let first_header_blocks = sections
+    .first()
+    .map(|section| section.first_header_blocks.clone())
     .unwrap_or_default();
-  let first_footer_blocks = section
-    .as_ref()
-    .and_then(|section| {
-      referenced_footer_blocks(
-        package,
-        &main,
-        section,
-        &styles,
-        w::HeaderFooterValues::First,
-      )
-    })
+  let first_footer_blocks = sections
+    .first()
+    .map(|section| section.first_footer_blocks.clone())
     .unwrap_or_default();
   let footnote_blocks = footnote_blocks(package, &main, &styles)?;
   let endnote_blocks = endnote_blocks(package, &main, &styles)?;
   let comment_blocks = comment_blocks(package, &main, &styles)?;
-  let title_page = section
-    .as_ref()
-    .and_then(|section| section.w_title_pg.as_ref())
-    .map(|title_page| title_page.val.unwrap_or(true))
+  let title_page = sections
+    .first()
+    .map(|section| section.title_page)
     .unwrap_or(false);
 
   Ok(DocxDocument {
     page,
     default_tab_stop_pt,
+    even_and_odd_headers,
+    sections,
     header_blocks,
     footer_blocks,
     first_header_blocks,
@@ -346,27 +345,275 @@ fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocument
     .unwrap_or(DEFAULT_TAB_STOP_PT)
 }
 
-fn body_blocks(
+fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .w_even_and_odd_headers
+        .as_ref()
+        .map(|setting| setting.val.unwrap_or(true))
+    })
+    .unwrap_or(false)
+}
+
+fn resolve_section_repeating_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+  sections: &mut [ImportedSection],
+) {
+  let mut previous_default_header = Vec::new();
+  let mut previous_default_footer = Vec::new();
+  let mut previous_first_header = Vec::new();
+  let mut previous_first_footer = Vec::new();
+  let mut previous_even_header = Vec::new();
+  let mut previous_even_footer = Vec::new();
+
+  for section in sections {
+    let Some(section_properties) = section.section_properties.as_ref() else {
+      section.header_blocks.clone_from(&previous_default_header);
+      section.footer_blocks.clone_from(&previous_default_footer);
+      section
+        .first_header_blocks
+        .clone_from(&previous_first_header);
+      section
+        .first_footer_blocks
+        .clone_from(&previous_first_footer);
+      section.even_header_blocks.clone_from(&previous_even_header);
+      section.even_footer_blocks.clone_from(&previous_even_footer);
+      continue;
+    };
+
+    section.header_blocks = referenced_header_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::Default,
+    )
+    .unwrap_or_else(|| previous_default_header.clone());
+    section.footer_blocks = referenced_footer_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::Default,
+    )
+    .unwrap_or_else(|| previous_default_footer.clone());
+    section.first_header_blocks = referenced_header_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::First,
+    )
+    .unwrap_or_else(|| previous_first_header.clone());
+    section.first_footer_blocks = referenced_footer_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::First,
+    )
+    .unwrap_or_else(|| previous_first_footer.clone());
+    section.even_header_blocks = referenced_header_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::Even,
+    )
+    .unwrap_or_else(|| previous_even_header.clone());
+    section.even_footer_blocks = referenced_footer_blocks(
+      package,
+      main,
+      section_properties,
+      styles,
+      w::HeaderFooterValues::Even,
+    )
+    .unwrap_or_else(|| previous_even_footer.clone());
+
+    previous_default_header.clone_from(&section.header_blocks);
+    previous_default_footer.clone_from(&section.footer_blocks);
+    previous_first_header.clone_from(&section.first_header_blocks);
+    previous_first_footer.clone_from(&section.first_footer_blocks);
+    previous_even_header.clone_from(&section.even_header_blocks);
+    previous_even_footer.clone_from(&section.even_footer_blocks);
+  }
+}
+
+fn body_sections(
   body: &w::Body,
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
-) -> Vec<Block> {
-  body
-    .body_choice
-    .iter()
-    .filter_map(|choice| match choice {
-      w::BodyChoice::WP(paragraph) => Some(vec![Block::Paragraph(paragraph_model(
-        paragraph, styles, numbering, images,
-      ))]),
-      w::BodyChoice::WTbl(table) => Some(vec![Block::Table(table_model(
-        table, styles, numbering, images,
-      ))]),
-      w::BodyChoice::WSdt(sdt) => Some(sdt_block_blocks(sdt, styles, numbering, images)),
-      _ => None,
+) -> Vec<ImportedSection> {
+  let mut sections = Vec::new();
+  let mut current_blocks = Vec::new();
+  let mut previous_properties = None;
+
+  for choice in &body.body_choice {
+    match choice {
+      w::BodyChoice::WP(paragraph) => {
+        current_blocks.push(Block::Paragraph(paragraph_model(
+          paragraph, styles, numbering, images,
+        )));
+        if let Some(section_properties) = paragraph
+          .paragraph_properties
+          .as_deref()
+          .and_then(|properties| properties.section_properties.as_deref())
+          .cloned()
+        {
+          close_section(
+            &mut sections,
+            &mut current_blocks,
+            Some(section_properties),
+            &mut previous_properties,
+          );
+        }
+      }
+      w::BodyChoice::WTbl(table) => {
+        current_blocks.push(Block::Table(table_model(table, styles, numbering, images)))
+      }
+      w::BodyChoice::WSdt(sdt) => {
+        current_blocks.extend(sdt_block_blocks(sdt, styles, numbering, images));
+      }
+      _ => {}
+    }
+  }
+
+  if body.w_sect_pr.is_some() || sections.is_empty() || !current_blocks.is_empty() {
+    close_section(
+      &mut sections,
+      &mut current_blocks,
+      body.w_sect_pr.as_deref().cloned(),
+      &mut previous_properties,
+    );
+  }
+
+  sections
+}
+
+fn close_section(
+  sections: &mut Vec<ImportedSection>,
+  current_blocks: &mut Vec<Block>,
+  section_properties: Option<w::SectionProperties>,
+  previous_properties: &mut Option<w::SectionProperties>,
+) {
+  let break_kind =
+    normalized_section_break(section_properties.as_ref(), previous_properties.as_ref());
+  let page = section_properties
+    .as_ref()
+    .map(page_setup)
+    .unwrap_or_default();
+  let title_page = section_properties
+    .as_ref()
+    .and_then(|section| section.w_title_pg.as_ref())
+    .map(|title_page| title_page.val.unwrap_or(true))
+    .unwrap_or(false);
+
+  sections.push(ImportedSection {
+    break_kind,
+    section_properties: section_properties.clone(),
+    page,
+    title_page,
+    header_blocks: Vec::new(),
+    footer_blocks: Vec::new(),
+    first_header_blocks: Vec::new(),
+    first_footer_blocks: Vec::new(),
+    even_header_blocks: Vec::new(),
+    even_footer_blocks: Vec::new(),
+    blocks: std::mem::take(current_blocks),
+  });
+
+  if let Some(section_properties) = section_properties {
+    *previous_properties = Some(section_properties);
+  }
+}
+
+fn default_section(blocks: Vec<Block>) -> ImportedSection {
+  ImportedSection {
+    break_kind: SectionBreakKind::NextPage,
+    section_properties: None,
+    page: PageSetup::default(),
+    title_page: false,
+    header_blocks: Vec::new(),
+    footer_blocks: Vec::new(),
+    first_header_blocks: Vec::new(),
+    first_footer_blocks: Vec::new(),
+    even_header_blocks: Vec::new(),
+    even_footer_blocks: Vec::new(),
+    blocks,
+  }
+}
+
+fn normalized_section_break(
+  section: Option<&w::SectionProperties>,
+  previous: Option<&w::SectionProperties>,
+) -> SectionBreakKind {
+  let Some(section) = section else {
+    return SectionBreakKind::NextPage;
+  };
+
+  let kind = section
+    .w_type
+    .as_ref()
+    .map(|section_type| match section_type.val {
+      w::SectionMarkValues::Continuous => SectionBreakKind::Continuous,
+      w::SectionMarkValues::NextColumn => SectionBreakKind::NextColumn,
+      w::SectionMarkValues::EvenPage => SectionBreakKind::EvenPage,
+      w::SectionMarkValues::OddPage => SectionBreakKind::OddPage,
+      w::SectionMarkValues::NextPage => SectionBreakKind::NextPage,
     })
-    .flatten()
-    .collect()
+    .unwrap_or(SectionBreakKind::NextPage);
+
+  match kind {
+    SectionBreakKind::Continuous
+      if previous
+        .map(|previous| section_orientation(previous) != section_orientation(section))
+        .unwrap_or(false) =>
+    {
+      SectionBreakKind::NextPage
+    }
+    SectionBreakKind::NextColumn
+      if previous
+        .map(|previous| {
+          section_column_count(section) <= 1
+            || section_column_count(previous) != section_column_count(section)
+        })
+        .unwrap_or(true) =>
+    {
+      SectionBreakKind::NextPage
+    }
+    _ => kind,
+  }
+}
+
+fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValues {
+  section
+    .w_pg_sz
+    .as_ref()
+    .and_then(|size| size.orient)
+    .or_else(|| {
+      let size = section.w_pg_sz.as_ref()?;
+      Some(if size.width.unwrap_or(0) > size.height.unwrap_or(0) {
+        w::PageOrientationValues::Landscape
+      } else {
+        w::PageOrientationValues::Portrait
+      })
+    })
+    .unwrap_or_default()
+}
+
+fn section_column_count(section: &w::SectionProperties) -> i16 {
+  section
+    .w_cols
+    .as_ref()
+    .and_then(|columns| columns.column_count)
+    .unwrap_or(1)
+    .max(1)
 }
 
 fn sdt_block_blocks(
@@ -2983,6 +3230,125 @@ mod tests {
       drawing_textbox_text(xml).as_deref(),
       Some("Modern text box\nSecond line\n")
     );
+  }
+
+  #[test]
+  fn body_sections_split_paragraph_and_body_section_properties() {
+    let body = w::Body {
+      body_choice: vec![
+        w::BodyChoice::WP(Box::new(paragraph())),
+        w::BodyChoice::WP(Box::new(paragraph_with_section(section(
+          12240,
+          15840,
+          w::PageOrientationValues::Portrait,
+          None,
+        )))),
+        w::BodyChoice::WP(Box::new(paragraph())),
+      ],
+      w_sect_pr: Some(Box::new(section(
+        15840,
+        12240,
+        w::PageOrientationValues::Landscape,
+        Some(w::SectionMarkValues::Continuous),
+      ))),
+      ..Default::default()
+    };
+    let mut numbering = NumberingCatalog::default();
+
+    let sections = body_sections(
+      &body,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+    );
+
+    assert_eq!(sections.len(), 2);
+    assert_eq!(sections[0].blocks.len(), 2);
+    assert_eq!(sections[0].break_kind, SectionBreakKind::NextPage);
+    assert_eq!(sections[0].page.width_pt, 612.0);
+    assert_eq!(sections[0].page.height_pt, 792.0);
+    assert_eq!(sections[1].blocks.len(), 1);
+    assert_eq!(sections[1].break_kind, SectionBreakKind::NextPage);
+    assert_eq!(sections[1].page.width_pt, 792.0);
+    assert_eq!(sections[1].page.height_pt, 612.0);
+  }
+
+  #[test]
+  fn continuous_section_keeps_continuous_when_orientation_matches() {
+    let previous = section(
+      12240,
+      15840,
+      w::PageOrientationValues::Portrait,
+      Some(w::SectionMarkValues::NextPage),
+    );
+    let current = section(
+      12240,
+      15840,
+      w::PageOrientationValues::Portrait,
+      Some(w::SectionMarkValues::Continuous),
+    );
+
+    assert_eq!(
+      normalized_section_break(Some(&current), Some(&previous)),
+      SectionBreakKind::Continuous
+    );
+  }
+
+  #[test]
+  fn next_column_section_normalizes_to_next_page_without_matching_columns() {
+    let previous = section_with_columns(w::SectionMarkValues::NextPage, 2);
+    let current = section_with_columns(w::SectionMarkValues::NextColumn, 1);
+
+    assert_eq!(
+      normalized_section_break(Some(&current), Some(&previous)),
+      SectionBreakKind::NextPage
+    );
+  }
+
+  fn paragraph() -> w::Paragraph {
+    w::Paragraph::default()
+  }
+
+  fn paragraph_with_section(section_properties: w::SectionProperties) -> w::Paragraph {
+    w::Paragraph {
+      paragraph_properties: Some(Box::new(w::ParagraphProperties {
+        section_properties: Some(Box::new(section_properties)),
+        ..Default::default()
+      })),
+      ..Default::default()
+    }
+  }
+
+  fn section(
+    width: u32,
+    height: u32,
+    orient: w::PageOrientationValues,
+    break_type: Option<w::SectionMarkValues>,
+  ) -> w::SectionProperties {
+    w::SectionProperties {
+      w_type: break_type.map(|val| w::SectionType { val }),
+      w_pg_sz: Some(w::PageSize {
+        width: Some(width),
+        height: Some(height),
+        orient: Some(orient),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
+  fn section_with_columns(
+    break_type: w::SectionMarkValues,
+    column_count: i16,
+  ) -> w::SectionProperties {
+    w::SectionProperties {
+      w_type: Some(w::SectionType { val: break_type }),
+      w_cols: Some(w::Columns {
+        column_count: Some(column_count),
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
   }
 
   fn inline_text(inlines: &[InlineItem]) -> String {

@@ -1,3 +1,5 @@
+mod model;
+mod table;
 mod units;
 
 use std::collections::{BTreeMap, HashMap};
@@ -21,444 +23,10 @@ use quick_xml::events::Event;
 use crate::error::Result;
 use crate::options::PdfOptions;
 
+pub(crate) use model::*;
+use table::{TableConditionalStyleMask, TableLookModel};
+
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
-
-#[derive(Clone, Debug)]
-pub(crate) struct DocxDocument {
-  pub page: PageSetup,
-  pub default_tab_stop_pt: f32,
-  pub even_and_odd_headers: bool,
-  pub sections: Vec<ImportedSection>,
-  pub header_blocks: Vec<Block>,
-  pub footer_blocks: Vec<Block>,
-  pub first_header_blocks: Vec<Block>,
-  pub first_footer_blocks: Vec<Block>,
-  pub footnote_blocks: Vec<Block>,
-  pub footnotes: BTreeMap<i64, Vec<Block>>,
-  pub endnote_blocks: Vec<Block>,
-  pub endnotes: BTreeMap<i64, Vec<Block>>,
-  pub comment_blocks: Vec<Block>,
-  pub title_page: bool,
-  pub blocks: Vec<Block>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct ImportedSection {
-  pub break_kind: SectionBreakKind,
-  pub section_properties: Option<w::SectionProperties>,
-  pub page: PageSetup,
-  pub columns: SectionColumns,
-  pub title_page: bool,
-  pub header_blocks: Vec<Block>,
-  pub footer_blocks: Vec<Block>,
-  pub first_header_blocks: Vec<Block>,
-  pub first_footer_blocks: Vec<Block>,
-  pub even_header_blocks: Vec<Block>,
-  pub even_footer_blocks: Vec<Block>,
-  pub blocks: Vec<Block>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct SectionColumns {
-  pub count: usize,
-  pub gap_pt: f32,
-  pub separator: bool,
-  pub explicit_count: usize,
-  pub explicit_widths_pt: [f32; 45],
-  pub explicit_gaps_pt: [f32; 44],
-}
-
-impl Default for SectionColumns {
-  fn default() -> Self {
-    Self {
-      count: 1,
-      gap_pt: 36.0,
-      separator: false,
-      explicit_count: 0,
-      explicit_widths_pt: [0.0; 45],
-      explicit_gaps_pt: [0.0; 44],
-    }
-  }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum SectionBreakKind {
-  Continuous,
-  NextPage,
-  NextColumn,
-  EvenPage,
-  OddPage,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum Block {
-  Paragraph(Paragraph),
-  Table(Table),
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Paragraph {
-  pub inlines: Vec<InlineItem>,
-  pub footnote_reference_ids: Vec<i64>,
-  pub endnote_reference_ids: Vec<i64>,
-  #[cfg(test)]
-  pub runs: Vec<TextRun>,
-  pub format: ParagraphFormat,
-  pub list_label: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Table {
-  pub column_widths_pt: Vec<f32>,
-  pub preferred_width_pt: Option<f32>,
-  pub preferred_width_pct: Option<f32>,
-  pub indent_left_pt: f32,
-  pub alignment: TableAlignment,
-  pub borders: Option<TableBordersModel>,
-  pub cell_spacing_pt: f32,
-  pub rows: Vec<TableRow>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum TableAlignment {
-  #[default]
-  Left,
-  Center,
-  Right,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct TableRow {
-  pub cells: Vec<TableCell>,
-  pub height_pt: Option<f32>,
-  pub exact_height: bool,
-  pub repeat_header: bool,
-  pub cant_split: bool,
-  pub cell_spacing_pt: Option<f32>,
-  pub grid_before: usize,
-  pub grid_after: usize,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct TableCell {
-  pub blocks: Vec<Block>,
-  pub shading: Option<RgbColor>,
-  pub borders: CellBordersModel,
-  pub margins: CellMargins,
-  pub preferred_width_pt: Option<f32>,
-  pub preferred_width_pct: Option<f32>,
-  pub grid_span: usize,
-  pub vertical_merge_continue: bool,
-  pub vertical_alignment: TableCellVerticalAlignment,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct CellMargins {
-  pub top_pt: f32,
-  pub right_pt: f32,
-  pub bottom_pt: f32,
-  pub left_pt: f32,
-}
-
-const DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS: f32 = 108.0;
-
-impl Default for CellMargins {
-  fn default() -> Self {
-    Self {
-      top_pt: 0.0,
-      right_pt: units::twips_to_points(DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS),
-      bottom_pt: 0.0,
-      left_pt: units::twips_to_points(DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS),
-    }
-  }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum TableCellVerticalAlignment {
-  #[default]
-  Top,
-  Center,
-  Bottom,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct TableBordersModel {
-  pub top: Option<BorderStyle>,
-  pub right: Option<BorderStyle>,
-  pub bottom: Option<BorderStyle>,
-  pub left: Option<BorderStyle>,
-  pub inside_horizontal: Option<BorderStyle>,
-  pub inside_vertical: Option<BorderStyle>,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct CellBordersModel {
-  pub top: Option<BorderStyle>,
-  pub right: Option<BorderStyle>,
-  pub bottom: Option<BorderStyle>,
-  pub left: Option<BorderStyle>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct BorderStyle {
-  pub width_pt: f32,
-  pub spacing_pt: f32,
-  pub color: RgbColor,
-}
-
-impl Default for BorderStyle {
-  fn default() -> Self {
-    Self {
-      width_pt: 0.5,
-      spacing_pt: 0.0,
-      color: RgbColor { r: 0, g: 0, b: 0 },
-    }
-  }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct ParagraphFormat {
-  pub spacing_before_pt: f32,
-  pub spacing_after_pt: f32,
-  pub line_height_pt: Option<f32>,
-  pub line_height_rule: LineHeightRule,
-  pub indent_left_pt: f32,
-  pub indent_right_pt: f32,
-  pub first_line_indent_pt: f32,
-  pub tab_stops: Vec<TabStop>,
-  pub alignment: ParagraphAlignment,
-  pub shading: Option<RgbColor>,
-  pub borders: CellBordersModel,
-  pub page_break_before: bool,
-  pub keep_with_next: bool,
-  pub keep_lines: bool,
-  pub contextual_spacing: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum LineHeightRule {
-  #[default]
-  Auto,
-  AtLeast,
-  Exact,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct TabStop {
-  pub position_pt: f32,
-  pub alignment: TabStopAlignment,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum TabStopAlignment {
-  #[default]
-  Left,
-  Center,
-  Right,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum ParagraphAlignment {
-  #[default]
-  Left,
-  Center,
-  Right,
-  Justify,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct TextRun {
-  pub text: String,
-  pub style: TextStyle,
-  pub hyperlink_url: Option<String>,
-  pub dynamic_field: Option<DynamicFieldKind>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum DynamicFieldKind {
-  Page,
-  NumPages,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum InlineItem {
-  Text(TextRun),
-  Image(InlineImage),
-  PageBreak,
-  ColumnBreak,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct InlineImage {
-  pub data: Vec<u8>,
-  pub content_type: Option<String>,
-  pub width_pt: f32,
-  pub height_pt: f32,
-  pub effect_left_pt: f32,
-  pub effect_top_pt: f32,
-  pub effect_right_pt: f32,
-  pub effect_bottom_pt: f32,
-  pub crop: ImageCrop,
-  pub rotation_deg: f32,
-  pub flip_horizontal: bool,
-  pub flip_vertical: bool,
-  pub alt_text: Option<String>,
-  pub placement: ImagePlacement,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct ImageCrop {
-  pub left: f32,
-  pub top: f32,
-  pub right: f32,
-  pub bottom: f32,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) enum ImagePlacement {
-  #[default]
-  Inline,
-  Floating(FloatingImagePlacement),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct FloatingImagePlacement {
-  pub horizontal_relative_to: HorizontalImageReference,
-  pub vertical_relative_to: VerticalImageReference,
-  pub horizontal_alignment: Option<HorizontalImageAlignment>,
-  pub vertical_alignment: Option<VerticalImageAlignment>,
-  pub horizontal_offset_pt: f32,
-  pub vertical_offset_pt: f32,
-  pub wrap: ImageWrapMode,
-  pub wrap_side: ImageWrapSide,
-  pub behind_text: bool,
-  pub margin_top_pt: f32,
-  pub margin_right_pt: f32,
-  pub margin_bottom_pt: f32,
-  pub margin_left_pt: f32,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum ImageWrapSide {
-  #[default]
-  BothSides,
-  Left,
-  Right,
-  Largest,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum HorizontalImageAlignment {
-  Left,
-  Center,
-  Right,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum VerticalImageAlignment {
-  Top,
-  Center,
-  Bottom,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum HorizontalImageReference {
-  Page,
-  #[default]
-  Margin,
-  Column,
-  Character,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum VerticalImageReference {
-  Page,
-  #[default]
-  Margin,
-  Paragraph,
-  Line,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum ImageWrapMode {
-  #[default]
-  Inline,
-  Square,
-  Tight,
-  Through,
-  TopBottom,
-  None,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct TextStyle {
-  pub font_size_pt: f32,
-  pub baseline_shift_pt: f32,
-  pub bold: bool,
-  pub italic: bool,
-  pub underline: bool,
-  pub strikethrough: bool,
-  pub uppercase: bool,
-  pub color: RgbColor,
-  pub highlight: Option<RgbColor>,
-}
-
-impl Default for TextStyle {
-  fn default() -> Self {
-    Self {
-      font_size_pt: 11.0,
-      baseline_shift_pt: 0.0,
-      bold: false,
-      italic: false,
-      underline: false,
-      strikethrough: false,
-      uppercase: false,
-      color: RgbColor { r: 0, g: 0, b: 0 },
-      highlight: None,
-    }
-  }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) struct RgbColor {
-  pub r: u8,
-  pub g: u8,
-  pub b: u8,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct PageSetup {
-  pub width_pt: f32,
-  pub height_pt: f32,
-  pub margin_top_pt: f32,
-  pub margin_right_pt: f32,
-  pub margin_bottom_pt: f32,
-  pub margin_left_pt: f32,
-  pub header_distance_pt: f32,
-  pub footer_distance_pt: f32,
-  pub background: Option<RgbColor>,
-  pub borders: CellBordersModel,
-  pub borders_offset_from_text: bool,
-}
-
-impl Default for PageSetup {
-  fn default() -> Self {
-    // Word's default Letter page with one-inch margins.
-    Self {
-      width_pt: 612.0,
-      height_pt: 792.0,
-      margin_top_pt: 72.0,
-      margin_right_pt: 72.0,
-      margin_bottom_pt: 72.0,
-      margin_left_pt: 72.0,
-      header_distance_pt: 36.0,
-      footer_distance_pt: 36.0,
-      background: None,
-      borders: CellBordersModel::default(),
-      borders_offset_from_text: false,
-    }
-  }
-}
 
 pub(crate) fn extract(
   package: &mut WordprocessingDocument,
@@ -1350,10 +918,12 @@ fn table_model(
     indent_left_pt: properties
       .and_then(|properties| properties.table_indentation.as_ref())
       .and_then(table_indentation_to_points)
+      .or(table_style.indent_left_pt)
       .unwrap_or(0.0),
     alignment: properties
       .and_then(|properties| properties.table_justification.as_ref())
       .map(table_alignment)
+      .or(table_style.alignment)
       .unwrap_or_default(),
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
@@ -1390,11 +960,16 @@ fn table_row_model(
   row_index: usize,
 ) -> TableRow {
   let (grid_before, grid_after) = table_row_grid_properties(row.table_row_properties.as_deref());
+  let row_condition = table_row_conditional_style(row.table_row_properties.as_deref())
+    .unwrap_or_else(|| {
+      TableConditionalStyleMask::from_row_position(context.table_look, row_index, context.row_count)
+    });
   let mut row_style = table_row_style_for(
     context.table_style,
     context.table_look,
     row_index,
     context.row_count,
+    row_condition,
   );
   merge_table_row_style(
     &mut row_style,
@@ -1431,11 +1006,18 @@ fn table_row_model(
             context.cell_margins,
             table_cell_style_for(
               context.table_style,
-              context.table_look,
-              row_index,
-              context.row_count,
-              cell_index,
-              cell_count,
+              TableCellStyleContext {
+                look: context.table_look,
+                row_index,
+                row_count: context.row_count,
+                cell_index,
+                cell_count,
+                row_condition,
+                cell_condition: cell
+                  .table_cell_properties
+                  .as_deref()
+                  .and_then(table_cell_conditional_style),
+              },
             ),
           )
         })
@@ -1449,80 +1031,64 @@ fn table_row_style_for(
   look: TableLookModel,
   row_index: usize,
   row_count: usize,
+  condition_mask: TableConditionalStyleMask,
 ) -> TableRowStyle {
   let mut style = table_style.whole_row;
   for (condition, conditional_style) in &table_style.conditional_rows {
-    if table_row_style_condition_applies(*condition, look, row_index, row_count) {
+    let applies = table::row_style_condition_applies(*condition, look, row_index, row_count)
+      || condition_mask.row_condition_applies(*condition);
+    if applies {
       merge_table_row_style(&mut style, conditional_style);
     }
   }
   style
 }
 
-fn table_row_style_condition_applies(
-  condition: w::TableStyleOverrideValues,
-  look: TableLookModel,
-  row_index: usize,
-  row_count: usize,
-) -> bool {
-  match condition {
-    w::TableStyleOverrideValues::WholeTable => true,
-    w::TableStyleOverrideValues::FirstRow => look.first_row && row_index == 0,
-    w::TableStyleOverrideValues::LastRow => look.last_row && row_index + 1 == row_count,
-    w::TableStyleOverrideValues::Band1Horizontal => {
-      look.horizontal_banding && row_index > 0 && row_index % 2 == 1
-    }
-    w::TableStyleOverrideValues::Band2Horizontal => {
-      look.horizontal_banding && row_index > 0 && row_index.is_multiple_of(2)
-    }
-    _ => false,
-  }
-}
-
-fn table_cell_style_for(
-  table_style: &TableStyleModel,
+#[derive(Clone, Copy, Debug)]
+struct TableCellStyleContext {
   look: TableLookModel,
   row_index: usize,
   row_count: usize,
   cell_index: usize,
   cell_count: usize,
+  row_condition: TableConditionalStyleMask,
+  cell_condition: Option<TableConditionalStyleMask>,
+}
+
+fn table_cell_style_for(
+  table_style: &TableStyleModel,
+  context: TableCellStyleContext,
 ) -> TableCellStyle {
   let mut style = table_style.whole_table.clone();
+  let position_mask = TableConditionalStyleMask::from_row_position(
+    context.look,
+    context.row_index,
+    context.row_count,
+  )
+  .with_cell_mask(TableConditionalStyleMask::from_cell_position(
+    context.look,
+    context.cell_index,
+    context.cell_count,
+  ));
+  let condition_mask = context
+    .row_condition
+    .with_cell_mask(context.cell_condition.unwrap_or_else(|| {
+      TableConditionalStyleMask::from_cell_position(
+        context.look,
+        context.cell_index,
+        context.cell_count,
+      )
+    }));
   for (condition, conditional_style) in &table_style.conditional {
-    let applies = match condition {
-      w::TableStyleOverrideValues::WholeTable => true,
-      w::TableStyleOverrideValues::FirstRow => look.first_row && row_index == 0,
-      w::TableStyleOverrideValues::LastRow => look.last_row && row_index + 1 == row_count,
-      w::TableStyleOverrideValues::FirstColumn => look.first_column && cell_index == 0,
-      w::TableStyleOverrideValues::LastColumn => look.last_column && cell_index + 1 == cell_count,
-      w::TableStyleOverrideValues::Band1Horizontal => {
-        look.horizontal_banding && row_index > 0 && row_index % 2 == 1
-      }
-      w::TableStyleOverrideValues::Band2Horizontal => {
-        look.horizontal_banding && row_index > 0 && row_index.is_multiple_of(2)
-      }
-      w::TableStyleOverrideValues::Band1Vertical => {
-        look.vertical_banding && cell_index > 0 && cell_index % 2 == 1
-      }
-      w::TableStyleOverrideValues::Band2Vertical => {
-        look.vertical_banding && cell_index > 0 && cell_index.is_multiple_of(2)
-      }
-      w::TableStyleOverrideValues::NorthWestCell => {
-        look.first_row && look.first_column && row_index == 0 && cell_index == 0
-      }
-      w::TableStyleOverrideValues::NorthEastCell => {
-        look.first_row && look.last_column && row_index == 0 && cell_index + 1 == cell_count
-      }
-      w::TableStyleOverrideValues::SouthWestCell => {
-        look.last_row && look.first_column && row_index + 1 == row_count && cell_index == 0
-      }
-      w::TableStyleOverrideValues::SouthEastCell => {
-        look.last_row
-          && look.last_column
-          && row_index + 1 == row_count
-          && cell_index + 1 == cell_count
-      }
-    };
+    let applies = table::cell_style_condition_applies(
+      *condition,
+      context.look,
+      context.row_index,
+      context.row_count,
+      context.cell_index,
+      context.cell_count,
+    ) || position_mask.cell_condition_applies(*condition)
+      || condition_mask.cell_condition_applies(*condition);
     if applies {
       merge_table_cell_style(&mut style, conditional_style);
     }
@@ -1570,7 +1136,7 @@ fn table_cell_model(
       .or(style.shading),
     borders: properties
       .and_then(|properties| properties.table_cell_borders.as_deref())
-      .map(cell_borders_model)
+      .map(|borders| direct_cell_borders_model(style.borders, borders))
       .unwrap_or(style.borders),
     margins: properties
       .and_then(|properties| properties.table_cell_margin.as_deref())
@@ -1617,6 +1183,32 @@ fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usi
     }
   }
   (grid_before, grid_after)
+}
+
+fn table_row_conditional_style(
+  properties: Option<&w::TableRowProperties>,
+) -> Option<TableConditionalStyleMask> {
+  properties.and_then(|properties| {
+    properties
+      .table_row_properties_choice1
+      .iter()
+      .find_map(|choice| {
+        if let w::TableRowPropertiesChoice::WCnfStyle(style) = choice {
+          Some(TableConditionalStyleMask::from_cnf_style(style))
+        } else {
+          None
+        }
+      })
+  })
+}
+
+fn table_cell_conditional_style(
+  properties: &w::TableCellProperties,
+) -> Option<TableConditionalStyleMask> {
+  properties
+    .conditional_format_style
+    .as_ref()
+    .map(TableConditionalStyleMask::from_cnf_style)
 }
 
 fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
@@ -1821,6 +1413,35 @@ fn cell_borders_model(borders: &w::TableCellBorders) -> CellBordersModel {
   }
 }
 
+fn direct_cell_borders_model(
+  mut base: CellBordersModel,
+  borders: &w::TableCellBorders,
+) -> CellBordersModel {
+  if let Some(top) = borders.top_border.as_ref().map(top_border_override) {
+    base.top = top;
+  }
+  if let Some(right) = borders
+    .end_border
+    .as_ref()
+    .map(end_border_override)
+    .or_else(|| borders.right_border.as_ref().map(right_border_override))
+  {
+    base.right = right;
+  }
+  if let Some(bottom) = borders.bottom_border.as_ref().map(bottom_border_override) {
+    base.bottom = bottom;
+  }
+  if let Some(left) = borders
+    .start_border
+    .as_ref()
+    .map(start_border_override)
+    .or_else(|| borders.left_border.as_ref().map(left_border_override))
+  {
+    base.left = left;
+  }
+  base
+}
+
 fn paragraph_borders_model(borders: &w::ParagraphBorders) -> CellBordersModel {
   CellBordersModel {
     top: borders.top_border.as_ref().and_then(top_border_style),
@@ -1852,6 +1473,19 @@ macro_rules! border_style_fn {
   };
 }
 
+macro_rules! border_override_fn {
+  ($name:ident, $ty:ty) => {
+    fn $name(border: &$ty) -> Option<BorderStyle> {
+      border_style(
+        border.val,
+        border.size,
+        border.space,
+        border.color.as_deref(),
+      )
+    }
+  };
+}
+
 border_style_fn!(top_border_style, w::TopBorder);
 border_style_fn!(right_border_style, w::RightBorder);
 border_style_fn!(bottom_border_style, w::BottomBorder);
@@ -1860,6 +1494,12 @@ border_style_fn!(start_border_style, w::StartBorder);
 border_style_fn!(end_border_style, w::EndBorder);
 border_style_fn!(inside_horizontal_border_style, w::InsideHorizontalBorder);
 border_style_fn!(inside_vertical_border_style, w::InsideVerticalBorder);
+border_override_fn!(top_border_override, w::TopBorder);
+border_override_fn!(right_border_override, w::RightBorder);
+border_override_fn!(bottom_border_override, w::BottomBorder);
+border_override_fn!(left_border_override, w::LeftBorder);
+border_override_fn!(start_border_override, w::StartBorder);
+border_override_fn!(end_border_override, w::EndBorder);
 
 fn border_style(
   value: w::BorderValues,
@@ -1878,7 +1518,26 @@ fn border_style(
       .max(0.25),
     spacing_pt: space.unwrap_or(0) as f32,
     color: color.and_then(parse_hex_color).unwrap_or_default(),
+    compound: border_value_is_compound(value),
   })
+}
+
+fn border_value_is_compound(value: w::BorderValues) -> bool {
+  matches!(
+    value,
+    w::BorderValues::Double
+      | w::BorderValues::Triple
+      | w::BorderValues::ThinThickSmallGap
+      | w::BorderValues::ThickThinSmallGap
+      | w::BorderValues::ThinThickThinSmallGap
+      | w::BorderValues::ThinThickMediumGap
+      | w::BorderValues::ThickThinMediumGap
+      | w::BorderValues::ThinThickThinMediumGap
+      | w::BorderValues::ThinThickLargeGap
+      | w::BorderValues::ThickThinLargeGap
+      | w::BorderValues::ThinThickThinLargeGap
+      | w::BorderValues::DoubleWave
+  )
 }
 
 fn document_background_color(background: &w::DocumentBackground) -> Option<RgbColor> {
@@ -3962,6 +3621,8 @@ struct TableStyleModel {
   table_borders: Option<TableBordersModel>,
   cell_margins: Option<CellMargins>,
   cell_spacing_pt: Option<f32>,
+  indent_left_pt: Option<f32>,
+  alignment: Option<TableAlignment>,
   whole_row: TableRowStyle,
   conditional_rows: Vec<(w::TableStyleOverrideValues, TableRowStyle)>,
   whole_table: TableCellStyle,
@@ -3986,29 +3647,6 @@ struct TableCellStyle {
   paragraph_format: ParagraphFormat,
   run_style: TextStyle,
   run_overrides: RunStyleOverrides,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct TableLookModel {
-  first_row: bool,
-  last_row: bool,
-  first_column: bool,
-  last_column: bool,
-  horizontal_banding: bool,
-  vertical_banding: bool,
-}
-
-impl Default for TableLookModel {
-  fn default() -> Self {
-    Self {
-      first_row: true,
-      last_row: false,
-      first_column: true,
-      last_column: false,
-      horizontal_banding: true,
-      vertical_banding: true,
-    }
-  }
 }
 
 struct TableImportContext<'a> {
@@ -4176,15 +3814,16 @@ impl StylesCatalog {
 fn table_style_model(style: &w::Style) -> TableStyleModel {
   let mut model = TableStyleModel::default();
   if let Some(properties) = style.style_table_properties.as_deref() {
-    model.table_borders = properties.table_borders.as_deref().map(table_borders_model);
-    model.cell_margins = properties
-      .table_cell_margin_default
-      .as_deref()
-      .map(table_cell_margin_default);
-    model.cell_spacing_pt = properties
-      .table_cell_spacing
-      .as_ref()
-      .and_then(table_cell_spacing_to_points);
+    merge_table_level_style(
+      &mut model,
+      &style_table_level_style(
+        properties.table_borders.as_deref(),
+        properties.table_cell_margin_default.as_deref(),
+        properties.table_cell_spacing.as_ref(),
+        properties.table_indentation.as_ref(),
+        properties.table_justification.as_ref(),
+      ),
+    );
   }
   if let Some(properties) = style.style_table_cell_properties.as_deref() {
     model.whole_table = style_table_cell_style(properties);
@@ -4230,6 +3869,12 @@ fn table_style_model(style: &w::Style) -> TableStyleModel {
         .as_deref()
         .map(RunProps::BaseStyle),
     );
+    if let Some(properties) = conditional
+      .table_style_conditional_formatting_table_properties
+      .as_deref()
+    {
+      merge_table_level_style(&mut model, &conditional_table_level_style(properties));
+    }
     if let Some(properties) = conditional
       .table_style_conditional_formatting_table_row_properties
       .as_ref()
@@ -4288,6 +3933,47 @@ fn conditional_table_cell_style(
 }
 
 fn merge_table_style_model(target: &mut TableStyleModel, source: &TableStyleModel) {
+  merge_table_level_style(target, source);
+  merge_table_row_style(&mut target.whole_row, &source.whole_row);
+  target
+    .conditional_rows
+    .extend(source.conditional_rows.iter().copied());
+  merge_table_cell_style(&mut target.whole_table, &source.whole_table);
+  target
+    .conditional
+    .extend(source.conditional.iter().cloned());
+}
+
+fn style_table_level_style(
+  borders: Option<&w::TableBorders>,
+  margins: Option<&w::TableCellMarginDefault>,
+  spacing: Option<&w::TableCellSpacing>,
+  indentation: Option<&w::TableIndentation>,
+  justification: Option<&w::TableJustification>,
+) -> TableStyleModel {
+  TableStyleModel {
+    table_borders: borders.map(table_borders_model),
+    cell_margins: margins.map(table_cell_margin_default),
+    cell_spacing_pt: spacing.and_then(table_cell_spacing_to_points),
+    indent_left_pt: indentation.and_then(table_indentation_to_points),
+    alignment: justification.map(table_alignment),
+    ..Default::default()
+  }
+}
+
+fn conditional_table_level_style(
+  properties: &w::TableStyleConditionalFormattingTableProperties,
+) -> TableStyleModel {
+  style_table_level_style(
+    properties.table_borders.as_deref(),
+    properties.table_cell_margin_default.as_deref(),
+    properties.table_cell_spacing.as_ref(),
+    properties.table_indentation.as_ref(),
+    properties.table_justification.as_ref(),
+  )
+}
+
+fn merge_table_level_style(target: &mut TableStyleModel, source: &TableStyleModel) {
   if source.table_borders.is_some() {
     target.table_borders = source.table_borders;
   }
@@ -4297,14 +3983,12 @@ fn merge_table_style_model(target: &mut TableStyleModel, source: &TableStyleMode
   if source.cell_spacing_pt.is_some() {
     target.cell_spacing_pt = source.cell_spacing_pt;
   }
-  merge_table_row_style(&mut target.whole_row, &source.whole_row);
-  target
-    .conditional_rows
-    .extend(source.conditional_rows.iter().copied());
-  merge_table_cell_style(&mut target.whole_table, &source.whole_table);
-  target
-    .conditional
-    .extend(source.conditional.iter().cloned());
+  if source.indent_left_pt.is_some() {
+    target.indent_left_pt = source.indent_left_pt;
+  }
+  if source.alignment.is_some() {
+    target.alignment = source.alignment;
+  }
 }
 
 fn direct_table_row_style(properties: Option<&w::TableRowProperties>) -> TableRowStyle {
@@ -5257,8 +4941,38 @@ mod tests {
       ..Default::default()
     });
 
-    let first_row = table_cell_style_for(&style, TableLookModel::default(), 0, 2, 0, 1);
-    let body_row = table_cell_style_for(&style, TableLookModel::default(), 1, 2, 0, 1);
+    let first_row = table_cell_style_for(
+      &style,
+      TableCellStyleContext {
+        look: TableLookModel::default(),
+        row_index: 0,
+        row_count: 2,
+        cell_index: 0,
+        cell_count: 1,
+        row_condition: TableConditionalStyleMask::from_row_position(
+          TableLookModel::default(),
+          0,
+          2,
+        ),
+        cell_condition: None,
+      },
+    );
+    let body_row = table_cell_style_for(
+      &style,
+      TableCellStyleContext {
+        look: TableLookModel::default(),
+        row_index: 1,
+        row_count: 2,
+        cell_index: 0,
+        cell_count: 1,
+        row_condition: TableConditionalStyleMask::from_row_position(
+          TableLookModel::default(),
+          1,
+          2,
+        ),
+        cell_condition: None,
+      },
+    );
 
     assert_eq!(
       first_row.shading,
@@ -5312,8 +5026,30 @@ mod tests {
       ..Default::default()
     };
 
-    let top_right = table_cell_style_for(&table_style, look, 0, 2, 2, 3);
-    let body_right = table_cell_style_for(&table_style, look, 1, 2, 2, 3);
+    let top_right = table_cell_style_for(
+      &table_style,
+      TableCellStyleContext {
+        look,
+        row_index: 0,
+        row_count: 2,
+        cell_index: 2,
+        cell_count: 3,
+        row_condition: TableConditionalStyleMask::from_row_position(look, 0, 2),
+        cell_condition: None,
+      },
+    );
+    let body_right = table_cell_style_for(
+      &table_style,
+      TableCellStyleContext {
+        look,
+        row_index: 1,
+        row_count: 2,
+        cell_index: 2,
+        cell_count: 3,
+        row_condition: TableConditionalStyleMask::from_row_position(look, 1, 2),
+        cell_condition: None,
+      },
+    );
 
     assert_eq!(
       top_right.shading,
@@ -5328,6 +5064,101 @@ mod tests {
       Some(RgbColor {
         r: 0x00,
         g: 0xFF,
+        b: 0x00
+      })
+    );
+  }
+
+  #[test]
+  fn direct_cell_borders_overlay_style_borders_per_side() {
+    fn border(width_pt: f32) -> BorderStyle {
+      BorderStyle {
+        width_pt,
+        ..Default::default()
+      }
+    }
+
+    let base = CellBordersModel {
+      top: Some(border(1.0)),
+      right: Some(border(1.5)),
+      bottom: Some(border(2.0)),
+      left: Some(border(2.5)),
+    };
+    let merged = direct_cell_borders_model(
+      base,
+      &w::TableCellBorders {
+        top_border: Some(w::TopBorder {
+          val: w::BorderValues::None,
+          ..Default::default()
+        }),
+        right_border: Some(w::RightBorder {
+          val: w::BorderValues::Single,
+          size: Some(24),
+          ..Default::default()
+        }),
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(merged.top, None);
+    assert_eq!(merged.right.unwrap().width_pt, 3.0);
+    assert_eq!(merged.bottom, Some(border(2.0)));
+    assert_eq!(merged.left, Some(border(2.5)));
+  }
+
+  #[test]
+  fn table_cell_cnf_style_masks_apply_writer_corner_conditions() {
+    fn style(fill: &str) -> TableCellStyle {
+      TableCellStyle {
+        shading: Some(parse_hex_color(fill).unwrap()),
+        ..Default::default()
+      }
+    }
+
+    let table_style = TableStyleModel {
+      conditional: vec![
+        (w::TableStyleOverrideValues::FirstRow, style("4472C4")),
+        (w::TableStyleOverrideValues::LastColumn, style("00FF00")),
+        (w::TableStyleOverrideValues::NorthEastCell, style("FF0000")),
+      ],
+      ..Default::default()
+    };
+    let look = TableLookModel {
+      first_row: false,
+      first_column: false,
+      horizontal_banding: false,
+      vertical_banding: false,
+      ..Default::default()
+    };
+    let row_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
+      val: "100000000000".into(),
+      first_row: Some(true),
+      ..Default::default()
+    });
+    let cell_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
+      val: "000100000000".into(),
+      last_column: Some(true),
+      ..Default::default()
+    });
+
+    let styled = table_cell_style_for(
+      &table_style,
+      TableCellStyleContext {
+        look,
+        row_index: 1,
+        row_count: 3,
+        cell_index: 0,
+        cell_count: 2,
+        row_condition,
+        cell_condition: Some(cell_condition),
+      },
+    );
+
+    assert_eq!(
+      styled.shading,
+      Some(RgbColor {
+        r: 0xFF,
+        g: 0x00,
         b: 0x00
       })
     );
@@ -5362,8 +5193,20 @@ mod tests {
       ..Default::default()
     });
 
-    let mut first_row = table_row_style_for(&style, TableLookModel::default(), 0, 2);
-    let body_row = table_row_style_for(&style, TableLookModel::default(), 1, 2);
+    let mut first_row = table_row_style_for(
+      &style,
+      TableLookModel::default(),
+      0,
+      2,
+      TableConditionalStyleMask::from_row_position(TableLookModel::default(), 0, 2),
+    );
+    let body_row = table_row_style_for(
+      &style,
+      TableLookModel::default(),
+      1,
+      2,
+      TableConditionalStyleMask::from_row_position(TableLookModel::default(), 1, 2),
+    );
     merge_table_row_style(
       &mut first_row,
       &direct_table_row_style(Some(&w::TableRowProperties {
@@ -5386,6 +5229,38 @@ mod tests {
     assert_eq!(body_row.repeat_header, None);
     assert_eq!(body_row.cant_split, None);
     assert_eq!(body_row.cell_spacing_pt, None);
+  }
+
+  #[test]
+  fn table_style_conditional_table_properties_apply_to_table_level_model() {
+    let style = table_style_model(&w::Style {
+      r#type: Some(w::StyleValues::Table),
+      w_tbl_style_pr: vec![w::TableStyleProperties {
+        r#type: w::TableStyleOverrideValues::WholeTable,
+        table_style_conditional_formatting_table_properties: Some(Box::new(
+          w::TableStyleConditionalFormattingTableProperties {
+            table_justification: Some(w::TableJustification {
+              val: w::TableRowAlignmentValues::Center,
+            }),
+            table_indentation: Some(w::TableIndentation {
+              width: Some(720),
+              r#type: Some(w::TableWidthUnitValues::Dxa),
+            }),
+            table_cell_spacing: Some(w::TableCellSpacing {
+              width: Some("120".into()),
+              r#type: Some(w::TableWidthUnitValues::Dxa),
+            }),
+            ..Default::default()
+          },
+        )),
+        ..Default::default()
+      }],
+      ..Default::default()
+    });
+
+    assert_eq!(style.alignment, Some(TableAlignment::Center));
+    assert_eq!(style.indent_left_pt, Some(36.0));
+    assert_eq!(style.cell_spacing_pt, Some(6.0));
   }
 
   #[test]

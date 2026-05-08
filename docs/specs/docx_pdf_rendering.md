@@ -25,6 +25,30 @@ The current `ooxmlsdk-pdf` implementation proves that typed OOXML input can
 produce PDF bytes, but its layout logic is too simplified to grow into a
 complete renderer without drifting away from Word/LibreOffice behavior.
 
+### 1.1 Module Boundary Plan
+
+The DOCX renderer should stop accumulating behavior in `docx/mod.rs`. Split
+the implementation along the same major responsibilities that appear in
+LibreOffice and Typst:
+
+- `docx/model.rs`: Writer-like imported document, section, paragraph, table,
+  image, and style value carriers. This mirrors LibreOffice's property-bearing
+  document/layout objects and Typst's resolved layout data structures.
+- `docx/properties.rs`: typed OOXML property resolution for `pPr`, `rPr`,
+  `tblPr`, `trPr`, and `tcPr`, following `writerfilter/dmapper` overlay order.
+- `docx/text.rs`: paragraph/run import, fields, notes, numbering labels,
+  symbols, tabs, and inline split markers, aligned with Writer text-frame input.
+- `docx/table.rs`: table import and table style resolution, aligned with
+  `DomainMapperTableManager`, `TblStylePrHandler`, and `SwTabFrame`.
+- `docx/drawing.rs`: DrawingML/VML image, textbox, wrap, anchor, crop, and
+  transform import, aligned with Writer fly-frame import and text-wrap data.
+- `docx/package.rs`: package-part traversal for headers, footers, notes,
+  comments, images, hyperlinks, styles, numbering, and settings.
+
+Keep each split behavior-preserving unless the same patch intentionally adds a
+documented Writer-aligned behavior. This avoids hiding layout regressions inside
+file moves.
+
 ## 2. Authorities
 
 ### 2.1 Primary Behavior Reference
@@ -280,6 +304,13 @@ more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
+Current Writer-parity estimate: about 27% of full LibreOffice Writer DOCX to
+PDF behavior. The main path now covers typed package import, core body flow,
+page/section basics, headers/footers, notes, images, floating anchors, and a
+Writer-shaped table/frame path, but full parity still depends on deeper
+Writer table split/border conflict behavior, exact text layout, complex
+drawing wrap, fields, revisions, compatibility modes, and print/PDF edge cases.
+
 ### Phase 0: Freeze Non-DOCX Scope
 
 - Keep `xlsx.rs` and `pptx.rs` compiling.
@@ -447,10 +478,20 @@ Current progress:
   paragraph style, character style, and direct `pPr/rPr`, matching Writer's
   property stack direction and Typst's inner-value-wins fold model. `tblStylePr`
   currently applies `wholeTable`, first/last row, first/last column, horizontal
-  and vertical band, and corner-cell formatting. Conditional `trPr` is imported
-  into a row-style model for row header repetition, cant-split behavior, and
-  row-level cell spacing, with direct row properties applied after the table
-  style. This follows
+  and vertical band, and corner-cell formatting. Conditional `tblPr` now feeds
+  table alignment, indentation, and cell spacing into the same table-level style
+  cascade; conditional `trPr` is imported into a row-style model for row header
+  repetition, cant-split behavior, and row-level cell spacing, with direct
+  table/row properties applied after the table style. Explicit row/cell
+  `cnfStyle` masks are parsed from generated OOXML types and combined like
+  LibreOffice's row mask plus cell mask before corner conditions are applied.
+  Collapsed adjacent border selection now carries enough style information to
+  apply LibreOffice's width-first, simple-over-compound tie breaker instead of
+  comparing only numeric widths. Direct `tcBorders` now overlays table-style
+  cell borders per side, so an unspecified direct side keeps the style side
+  while an explicit `none` clears only that side, matching the property-map
+  fold direction in Writer and Typst's per-side stroke fold.
+  This follows
   LibreOffice's `StyleSheetTable` / `TblStylePrHandler` split while keeping the
   final resolved row/cell properties in the Typst-like grid style shape.
 - Table cell content now uses nested cell flow instead of the old one-line
@@ -767,13 +808,27 @@ Implement:
   paint, adjacent internal borders prefer the stronger visible stroke, and
   missing `tblCellMar` uses the Word/Writer `108` twip left/right default
   instead of synthetic equal padding. `tblCellSpacing` is present as a gutter
-  between cells/rows; remaining work is row-level spacing exceptions and exact
-  compatibility-mode border-distance adjustment. Row `gridBefore/gridAfter`
+  between cells/rows, including row-level spacing overrides; remaining work is
+  exact compatibility-mode border-distance adjustment. Row `gridBefore/gridAfter`
   skipped columns are included in the table grid and cell placement. Table style
-  `wholeTable`, `firstRow`, `lastRow`, and horizontal band cell formatting is
-  wired for shading/borders/margins/vertical alignment, including first/last
-  column, vertical banding, and corner cells. Remaining work is full Word
-  priority/exception handling for conflicting direct and style borders.
+  `wholeTable`, `firstRow`, `lastRow`, and horizontal band formatting is wired
+  for table alignment/indent/spacing, row header/cantSplit/spacing, and cell
+  shading/borders/margins/vertical alignment, including first/last column,
+  vertical banding, and corner cells. Row/cell `w:cnfStyle` is imported through
+  generated `ConditionalFormatStyle` and folded into the same Writer-style row
+  mask plus cell mask that LibreOffice uses before resolving corner conditions.
+  Adjacent collapsed borders now follow LibreOffice's `SvxBorderLine`
+  priority shape by comparing rendered width first, then preferring a simple
+  line over a compound line when widths tie. Direct cell borders are resolved
+  side-by-side instead of replacing the full style border set whenever
+  `tcBorders` is present. Multi-row vertical merge continuations now walk past
+  intermediate continuation cells to find the real origin cell, matching
+  Writer's row-span lookup direction for shading and border ownership. The
+  origin cell's content layout height now spans continuous `vMerge`
+  continuation rows, including row spacing, which moves the implementation
+  closer to Writer and Typst rowspan layout semantics.
+  Remaining work is full Word priority/exception handling for conflicting
+  direct and style borders.
 - Table row overflow now advances through section leaves and returns the
   destination flow to subsequent body blocks. Rows with `cantSplit=false` can
   emit basic follow-flow-line fragments across leaves: the current fragment is

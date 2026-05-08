@@ -1029,6 +1029,7 @@ mod tests {
         width_pt,
         spacing_pt: 0.0,
         color: crate::docx::RgbColor { r: 0, g: 0, b: 0 },
+        compound: false,
       }
     }
 

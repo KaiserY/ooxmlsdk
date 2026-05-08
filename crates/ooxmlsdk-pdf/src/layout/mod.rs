@@ -1741,6 +1741,8 @@ impl RowFrame<'_, '_> {
       table_frame: self.table_frame,
       row: self.row,
       cell,
+      row_index: self.row_index,
+      grid_start: *grid_index - span,
       cell_index,
       left_pt,
       width_pt,
@@ -1749,14 +1751,7 @@ impl RowFrame<'_, '_> {
   }
 
   fn vertical_merge_origin_cell(&self, grid_start: usize) -> Option<&TableCell> {
-    self
-      .table
-      .rows
-      .iter()
-      .take(self.row_index)
-      .rev()
-      .find_map(|row| row_cell_at_grid(row, grid_start))
-      .filter(|cell| !cell.vertical_merge_continue)
+    vertical_merge_origin_cell(self.table, self.row_index, grid_start)
   }
 
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
@@ -1835,6 +1830,8 @@ struct CellFrame<'a, 'f> {
   table_frame: &'f TableFrame,
   row: &'a TableRow,
   cell: &'a TableCell,
+  row_index: usize,
+  grid_start: usize,
   cell_index: usize,
   left_pt: f32,
   width_pt: f32,
@@ -1853,7 +1850,7 @@ impl CellFrame<'_, '_> {
       x: self.left_pt,
       y: row_top,
       width: self.width_pt,
-      height: self.height_pt,
+      height: self.content_height(),
       content_offset,
     });
   }
@@ -1933,6 +1930,17 @@ impl CellFrame<'_, '_> {
       );
     }
   }
+
+  fn content_height(&self) -> f32 {
+    vertical_merge_content_height(
+      self.table,
+      &self.table_frame.column_widths,
+      self.row_index,
+      self.grid_start,
+      self.height_pt,
+    )
+    .unwrap_or(self.height_pt)
+  }
 }
 
 fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
@@ -1945,6 +1953,45 @@ fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
     current_grid += span;
   }
   None
+}
+
+fn vertical_merge_origin_cell(
+  table: &Table,
+  row_index: usize,
+  grid_start: usize,
+) -> Option<&TableCell> {
+  table
+    .rows
+    .iter()
+    .take(row_index)
+    .rev()
+    .filter_map(|row| row_cell_at_grid(row, grid_start))
+    .find(|cell| !cell.vertical_merge_continue)
+}
+
+fn vertical_merge_content_height(
+  table: &Table,
+  column_widths: &[f32],
+  row_index: usize,
+  grid_start: usize,
+  current_row_height: f32,
+) -> Option<f32> {
+  let mut height = current_row_height;
+  let mut previous_row = table.rows.get(row_index)?;
+  let mut has_continuation = false;
+  for row in table.rows.iter().skip(row_index + 1) {
+    let Some(cell) = row_cell_at_grid(row, grid_start) else {
+      break;
+    };
+    if !cell.vertical_merge_continue {
+      break;
+    }
+    height += row_cell_spacing_pt(table, previous_row);
+    height += table_row_height_with_widths(row, column_widths);
+    previous_row = row;
+    has_continuation = true;
+  }
+  has_continuation.then_some(height)
 }
 
 fn row_cell_spacing_pt(table: &Table, row: &TableRow) -> f32 {
@@ -2084,12 +2131,17 @@ fn vertical_border(
 
 fn stronger_border(first: Option<BorderStyle>, second: Option<BorderStyle>) -> Option<BorderStyle> {
   match (first, second) {
-    (Some(first), Some(second)) if second.width_pt > first.width_pt => Some(second),
+    (Some(first), Some(second)) if border_has_priority(second, first) => Some(second),
     (Some(first), Some(_)) => Some(first),
     (None, Some(second)) => Some(second),
     (Some(first), None) => Some(first),
     (None, None) => None,
   }
+}
+
+fn border_has_priority(candidate: BorderStyle, current: BorderStyle) -> bool {
+  candidate.width_pt > current.width_pt
+    || (candidate.width_pt == current.width_pt && current.compound && !candidate.compound)
 }
 
 fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -> Vec<f32> {
@@ -3813,6 +3865,7 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::docx::{CellBordersModel, CellMargins};
 
   #[test]
   fn repeating_areas_follow_word_margin_distances() {
@@ -3851,6 +3904,149 @@ mod tests {
     assert!(needs_section_parity_blank(SectionBreakKind::OddPage, 2));
     assert!(!needs_section_parity_blank(SectionBreakKind::OddPage, 3));
     assert!(!needs_section_parity_blank(SectionBreakKind::NextPage, 3));
+  }
+
+  #[test]
+  fn adjacent_border_priority_matches_writer_width_then_compound_rule() {
+    fn border(width_pt: f32, compound: bool) -> BorderStyle {
+      BorderStyle {
+        width_pt,
+        compound,
+        ..Default::default()
+      }
+    }
+
+    assert_eq!(
+      stronger_border(Some(border(0.5, false)), Some(border(2.0, true))).unwrap(),
+      border(2.0, true)
+    );
+    assert_eq!(
+      stronger_border(Some(border(1.0, true)), Some(border(1.0, false))).unwrap(),
+      border(1.0, false)
+    );
+    assert_eq!(
+      stronger_border(Some(border(1.0, false)), Some(border(1.0, true))).unwrap(),
+      border(1.0, false)
+    );
+  }
+
+  #[test]
+  fn vertical_merge_origin_skips_intermediate_continuations() {
+    fn cell(continue_merge: bool, color: Option<RgbColor>) -> TableCell {
+      TableCell {
+        blocks: Vec::new(),
+        shading: color,
+        borders: CellBordersModel::default(),
+        margins: CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: continue_merge,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+      }
+    }
+
+    let origin_color = RgbColor {
+      r: 0xAA,
+      g: 0xBB,
+      b: 0xCC,
+    };
+    let table = Table {
+      column_widths_pt: vec![72.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![
+        TableRow {
+          cells: vec![cell(false, Some(origin_color))],
+          height_pt: None,
+          exact_height: false,
+          repeat_header: false,
+          cant_split: false,
+          cell_spacing_pt: None,
+          grid_before: 0,
+          grid_after: 0,
+        },
+        TableRow {
+          cells: vec![cell(true, None)],
+          height_pt: None,
+          exact_height: false,
+          repeat_header: false,
+          cant_split: false,
+          cell_spacing_pt: None,
+          grid_before: 0,
+          grid_after: 0,
+        },
+        TableRow {
+          cells: vec![cell(true, None)],
+          height_pt: None,
+          exact_height: false,
+          repeat_header: false,
+          cant_split: false,
+          cell_spacing_pt: None,
+          grid_before: 0,
+          grid_after: 0,
+        },
+      ],
+    };
+
+    assert_eq!(
+      vertical_merge_origin_cell(&table, 2, 0).and_then(|cell| cell.shading),
+      Some(origin_color)
+    );
+  }
+
+  #[test]
+  fn vertical_merge_origin_content_height_spans_continuation_rows() {
+    fn cell(continue_merge: bool) -> TableCell {
+      TableCell {
+        blocks: Vec::new(),
+        shading: None,
+        borders: CellBordersModel::default(),
+        margins: CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: continue_merge,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+      }
+    }
+
+    fn row(continue_merge: bool, height_pt: f32, spacing_pt: Option<f32>) -> TableRow {
+      TableRow {
+        cells: vec![cell(continue_merge)],
+        height_pt: Some(height_pt),
+        exact_height: true,
+        repeat_header: false,
+        cant_split: false,
+        cell_spacing_pt: spacing_pt,
+        grid_before: 0,
+        grid_after: 0,
+      }
+    }
+
+    let table = Table {
+      column_widths_pt: vec![72.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: TableAlignment::Left,
+      borders: None,
+      cell_spacing_pt: 2.0,
+      rows: vec![
+        row(false, 10.0, Some(3.0)),
+        row(true, 11.0, None),
+        row(true, 12.0, None),
+      ],
+    };
+
+    assert_eq!(
+      vertical_merge_content_height(&table, &[72.0], 0, 0, 10.0),
+      Some(38.0)
+    );
   }
 
   #[test]

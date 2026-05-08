@@ -416,11 +416,34 @@ Current progress:
   paint, and nested content formatting. Vertical merge continuation cells now
   retain the origin cell shading in the display list and row horizontal borders
   are segmented so the border does not cut through the merged column.
+- Internal table borders now resolve competing adjacent cell borders before
+  painting the shared edge. The current rule prefers the stronger stroke width
+  and paints internal horizontal edges once from the preceding row, following
+  Writer's collapsed table-edge direction and Typst's resolved-grid stroke
+  priority model instead of blindly overpainting both neighboring edges.
+- Table cell margins now use the Word/Writer default shape when `tblCellMar`
+  is absent: left/right side padding defaults to `108` twips and top/bottom to
+  zero, while table-level `tblCellMar` and cell-level `tcMar` continue to
+  override only the sides they specify through generated OOXML SDK types.
+- Table cell spacing now imports `w:tblCellSpacing` through the generated
+  `TableCellSpacing` type and treats it as table gutter. This follows the OOXML
+  table-property entry LibreOffice receives and the same separation model Typst
+  uses for grid/table gutter: nonzero spacing separates cell frames and paints
+  per-cell edges instead of collapsed shared borders.
+- Table rows now import `w:gridBefore` and `w:gridAfter` through generated row
+  property types and carry those skipped grid columns into layout. Cell
+  placement, preferred-width negotiation, row height estimation, vertical-merge
+  lookup, and adjacent-border lookup now operate on the row's real grid
+  coordinates, matching LibreOffice's `TableManager` row grid bookkeeping and
+  Typst's grid-coordinate resolution direction.
 - Table cell content now uses nested cell flow instead of the old one-line
   clipping path. Paragraphs and nested tables inside cells reuse the same
   paragraph/table layout functions used by body flow, so wrapping, run styles,
   tabs, inline images, borders, and paragraph spacing are no longer separately
-  hand-implemented for cells.
+  hand-implemented for cells. The nested cell flow now formats against an
+  unbounded content bottom and clips emitted items to the current cell fragment,
+  matching Writer's cell-frame direction and avoiding body-style page follow
+  reflow inside ordinary table cells.
 - Paragraph layout ownership now enters through `TextFrameLayout`, with a
   `TextFrame` carrying paragraph geometry and `LineFrame` carrying current line
   bounds, height, baseline y, and cursor x. `TextFrameLayout` now owns line
@@ -484,6 +507,22 @@ Current progress:
   clipping to the image frame, then painting an expanded source image for crop.
   This matches LibreOffice's direction of preserving DrawingML graphic geometry
   on the frame instead of dropping the picture or guessing a new layout size.
+- VML `v:imagedata` crop attributes (`cropleft`, `croptop`, `cropright`,
+  `cropbottom`) now feed the same image frame crop path. This follows
+  LibreOffice's VML import path in `vmlshapecontext.cxx`, where the crop strings
+  are copied onto the graphic type model before Writer's graphic frame paint
+  resolves the visible rectangle.
+- VML shape/image style `rotation` and `flip` now feed the same image transform
+  path used by DrawingML. The import mirrors LibreOffice's `setStyle()` and
+  `decodeRotation()` behavior, including fixed-degree `fd` rotation values and
+  the VML convention that the decoded angle is negated before paint.
+- VML absolute-positioned image styles now map into the floating image frame
+  path instead of being forced into inline flow. `position:absolute`,
+  `left`/`top` or `margin-left`/`margin-top`, `mso-position-*-relative`,
+  `mso-wrap-style`, `mso-wrap-distance-*`, and negative `z-index` are carried
+  into the existing placement/wrap/behind-text fields. This follows the
+  LibreOffice VML style model and `GraphicZOrderHelper` direction while still
+  using the same Typst-style stable image display-list paint path.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
   - missing `w:type` is treated as `nextPage`
@@ -697,9 +736,14 @@ Implement:
   `tcW` cell preferred widths including spanned cells, `gridSpan`, vertical
   merge import/continuation shading, and table/row/cell frame ownership are
   present; remaining work is full grid conflict resolution, rowspan-aware split
-  recalculation, and exact border conflict handling. Cell content now flows
+  recalculation, and full Word border-style precedence. Cell content now flows
   through the shared paragraph/table layout path instead of clipped single-line
-  paint.
+  paint, adjacent internal borders prefer the stronger visible stroke, and
+  missing `tblCellMar` uses the Word/Writer `108` twip left/right default
+  instead of synthetic equal padding. `tblCellSpacing` is present as a gutter
+  between cells/rows; remaining work is row-level spacing exceptions and exact
+  compatibility-mode border-distance adjustment. Row `gridBefore/gridAfter`
+  skipped columns are included in the table grid and cell placement.
 - Table row overflow now advances through section leaves and returns the
   destination flow to subsequent body blocks. Rows with `cantSplit=false` can
   emit basic follow-flow-line fragments across leaves: the current fragment is
@@ -780,8 +824,9 @@ Implement:
 - Raster image output is active for inline/floating DOCX images. Current scope
   covers JPEG direct output and decoded sampled-image output for PNG/GIF/WebP
   style raster inputs, plus DrawingML `srcRect` crop and basic `xfrm`
-  rotation/flip paint transforms; SVG/PDF image embedding, artistic effects,
-  and full graphic attributes remain later paint quality work.
+  rotation/flip paint transforms, VML `v:imagedata` crop, and VML style
+  rotation/flip/absolute floating placement; SVG/PDF image embedding, artistic
+  effects, and full graphic attributes remain later paint quality work.
 - Carry external hyperlink relationships into text layout and emit PDF link
   annotations. Internal bookmark destinations remain future work and should
   follow LibreOffice's document target mapping rather than ad-hoc anchors.

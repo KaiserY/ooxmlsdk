@@ -1494,14 +1494,17 @@ struct TableFrameLayout<'a> {
 
 impl<'a> TableFrameLayout<'a> {
   fn new(table: &'a Table, area: BlockArea) -> Option<Self> {
-    let _table_cell_margins = table.cell_margins;
     let column_count = table_column_count(table);
     if column_count == 0 {
       return None;
     }
 
-    let column_widths = table_column_widths(table, column_count, area.content_width);
-    let table_width = column_widths.iter().sum::<f32>();
+    let available_width = (area.content_width
+      - table.cell_spacing_pt * column_count.saturating_sub(1) as f32)
+      .max(DEFAULT_FONT_SIZE_PT);
+    let column_widths = table_column_widths(table, column_count, available_width);
+    let table_width = column_widths.iter().sum::<f32>()
+      + table.cell_spacing_pt * column_count.saturating_sub(1) as f32;
     let left_pt = table_left_position(table, area.content_left_pt, area.content_width, table_width);
     let repeating_header_count = table_repeating_header_count(table);
     let repeating_header_height = table.rows[..repeating_header_count]
@@ -1576,6 +1579,9 @@ impl<'a> TableFrameLayout<'a> {
       }
 
       y = row_frame.format(current);
+      if row_index + 1 < self.table.rows.len() {
+        y += self.table.cell_spacing_pt;
+      }
     }
 
     (flow, y + TABLE_SPACING_AFTER_PT)
@@ -1678,8 +1684,8 @@ impl RowFrame<'_, '_> {
     row_bottom: f32,
     content_offset: f32,
   ) {
-    let mut cell_left = self.table_frame.left_pt;
-    let mut grid_index = 0;
+    let mut cell_left = row_grid_left(self.table_frame, self.row, self.table.cell_spacing_pt);
+    let mut grid_index = self.row.grid_before;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
       let grid_start = grid_index;
       let cell_frame = match self.cell_frame(
@@ -1698,7 +1704,7 @@ impl RowFrame<'_, '_> {
       } else {
         cell_frame.format(current, row_top, row_bottom, content_offset);
       }
-      cell_left += cell_frame.width_pt;
+      cell_left += cell_frame.width_pt + self.table.cell_spacing_pt;
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
@@ -1752,8 +1758,8 @@ impl RowFrame<'_, '_> {
   }
 
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
-    let mut left_pt = self.table_frame.left_pt;
-    let mut grid_index = 0;
+    let mut left_pt = row_grid_left(self.table_frame, self.row, self.table.cell_spacing_pt);
+    let mut grid_index = self.row.grid_before;
     for cell in &self.row.cells {
       if grid_index >= self.table_frame.column_widths.len() {
         break;
@@ -1770,8 +1776,10 @@ impl RowFrame<'_, '_> {
         .sum::<f32>();
       let right_pt = left_pt + width_pt;
 
-      if !cell.vertical_merge_continue
-        && let Some(border) = cell_horizontal_border(self.table, self.row_index, cell, true)
+      if (self.row_index == 0 || self.table.cell_spacing_pt > 0.0)
+        && !cell.vertical_merge_continue
+        && let Some(border) =
+          cell_horizontal_border(self.table, self.row_index, grid_index, cell, true)
       {
         push_styled_line(current, left_pt, row_top, right_pt, row_top, border);
       }
@@ -1783,12 +1791,13 @@ impl RowFrame<'_, '_> {
         .and_then(|row| row_cell_at_grid(row, grid_index))
         .is_some_and(|next_cell| next_cell.vertical_merge_continue);
       if !continues_into_next
-        && let Some(border) = cell_horizontal_border(self.table, self.row_index, cell, false)
+        && let Some(border) =
+          cell_horizontal_border(self.table, self.row_index, grid_index, cell, false)
       {
         push_styled_line(current, left_pt, row_bottom, right_pt, row_bottom, border);
       }
 
-      left_pt = right_pt;
+      left_pt = right_pt + self.table.cell_spacing_pt;
       grid_index += span;
     }
   }
@@ -1829,6 +1838,7 @@ impl CellFrame<'_, '_> {
   fn format(&self, current: &mut Page, row_top: f32, row_bottom: f32, content_offset: f32) {
     self.paint_background(current, row_top);
     self.paint_leading_border(current, row_top, row_bottom);
+    self.paint_trailing_border(current, row_top, row_bottom);
     layout_table_cell(TableCellLayout {
       cell: self.cell,
       setup: self.table_frame.block.setup,
@@ -1873,6 +1883,22 @@ impl CellFrame<'_, '_> {
     self.paint_leading_border_for_cell(current, row_top, row_bottom, self.cell);
   }
 
+  fn paint_trailing_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    if self.table.cell_spacing_pt <= 0.0 {
+      return;
+    }
+    if let Some(border) = vertical_border(self.table, self.row, self.cell_index, false) {
+      push_styled_line(
+        current,
+        self.left_pt + self.width_pt,
+        row_top,
+        self.left_pt + self.width_pt,
+        row_bottom,
+        border,
+      );
+    }
+  }
+
   fn paint_leading_border_for_cell(
     &self,
     current: &mut Page,
@@ -1903,7 +1929,7 @@ impl CellFrame<'_, '_> {
 }
 
 fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
-  let mut current_grid = 0;
+  let mut current_grid = row.grid_before;
   for cell in &row.cells {
     let span = cell.grid_span.max(1);
     if grid_index >= current_grid && grid_index < current_grid + span {
@@ -1914,11 +1940,23 @@ fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
   None
 }
 
+fn row_grid_left(table: &TableFrame, row: &TableRow, cell_spacing_pt: f32) -> f32 {
+  table.left_pt
+    + table
+      .column_widths
+      .iter()
+      .take(row.grid_before)
+      .sum::<f32>()
+    + cell_spacing_pt * row.grid_before as f32
+}
+
 fn table_column_count(table: &Table) -> usize {
   table
     .rows
     .iter()
-    .map(|row| row.cells.iter().map(|cell| cell.grid_span).sum::<usize>())
+    .map(|row| {
+      row.grid_before + row.cells.iter().map(|cell| cell.grid_span).sum::<usize>() + row.grid_after
+    })
     .max()
     .unwrap_or(0)
 }
@@ -1939,38 +1977,44 @@ fn table_repeating_header_count(table: &Table) -> usize {
 fn cell_horizontal_border(
   table: &Table,
   row_index: usize,
+  grid_index: usize,
   cell: &TableCell,
   top_edge: bool,
 ) -> Option<BorderStyle> {
   let borders = table.borders;
   if top_edge {
-    cell
-      .borders
-      .top
-      .or_else(|| {
-        borders.and_then(|borders| {
-          if row_index == 0 {
-            borders.top
-          } else {
-            borders.inside_horizontal
-          }
+    stronger_border(
+      cell.borders.top,
+      row_index
+        .checked_sub(1)
+        .and_then(|previous| {
+          table
+            .rows
+            .get(previous)
+            .and_then(|row| row_cell_at_grid(row, grid_index))
+            .and_then(|previous_cell| previous_cell.borders.bottom)
         })
-      })
-      .or(Some(BorderStyle::default()))
+        .or_else(|| borders.and_then(|borders| borders.top)),
+    )
+    .or(Some(BorderStyle::default()))
   } else {
-    cell
-      .borders
-      .bottom
-      .or_else(|| {
-        borders.and_then(|borders| {
-          if row_index + 1 == table.rows.len() {
-            borders.bottom
-          } else {
-            borders.inside_horizontal
-          }
-        })
-      })
-      .or(Some(BorderStyle::default()))
+    let table_border = borders.and_then(|borders| {
+      if row_index + 1 == table.rows.len() {
+        borders.bottom
+      } else {
+        borders.inside_horizontal
+      }
+    });
+    stronger_border(
+      cell.borders.bottom,
+      table
+        .rows
+        .get(row_index + 1)
+        .and_then(|row| row_cell_at_grid(row, grid_index))
+        .and_then(|next_cell| next_cell.borders.top),
+    )
+    .or(table_border)
+    .or(Some(BorderStyle::default()))
   }
 }
 
@@ -1983,22 +2027,18 @@ fn vertical_border(
   let borders = table.borders;
   let cell = row.cells.get(cell_index)?;
   if left_edge {
-    cell
-      .borders
-      .left
-      .or_else(|| {
-        if cell_index > 0 {
-          row
-            .cells
-            .get(cell_index - 1)
-            .and_then(|previous| previous.borders.right)
-        } else {
-          None
-        }
-      })
+    let neighbor = if cell_index > 0 {
+      row
+        .cells
+        .get(cell_index - 1)
+        .and_then(|previous| previous.borders.right)
+    } else {
+      None
+    };
+    stronger_border(cell.borders.left, neighbor)
       .or_else(|| {
         borders.and_then(|borders| {
-          if cell_index == 0 {
+          if cell_index == 0 && row.grid_before == 0 {
             borders.left
           } else {
             borders.inside_vertical
@@ -2012,7 +2052,7 @@ fn vertical_border(
       .right
       .or_else(|| {
         borders.and_then(|borders| {
-          if cell_index + 1 == row.cells.len() {
+          if cell_index + 1 == row.cells.len() && row.grid_after == 0 {
             borders.right
           } else {
             borders.inside_vertical
@@ -2020,6 +2060,16 @@ fn vertical_border(
         })
       })
       .or(Some(BorderStyle::default()))
+  }
+}
+
+fn stronger_border(first: Option<BorderStyle>, second: Option<BorderStyle>) -> Option<BorderStyle> {
+  match (first, second) {
+    (Some(first), Some(second)) if second.width_pt > first.width_pt => Some(second),
+    (Some(first), Some(_)) => Some(first),
+    (None, Some(second)) => Some(second),
+    (Some(first), None) => Some(first),
+    (None, None) => None,
   }
 }
 
@@ -2057,7 +2107,7 @@ fn table_cell_preferred_column_widths(
   let mut saw_preferred_width = false;
 
   for row in &table.rows {
-    let mut grid_index = 0;
+    let mut grid_index = row.grid_before;
     for cell in &row.cells {
       if grid_index >= column_count {
         break;
@@ -2165,7 +2215,7 @@ fn table_row_height(row: &TableRow) -> f32 {
 }
 
 fn table_row_height_with_widths(row: &TableRow, column_widths: &[f32]) -> f32 {
-  let mut grid_index = 0;
+  let mut grid_index = row.grid_before;
   let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
   for cell in &row.cells {
     let width = spanned_cell_width(cell, column_widths, &mut grid_index);
@@ -2241,8 +2291,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     columns: SectionColumns::default(),
     content_top_pt: text_y,
     content_left_pt: text_left,
-    content_bottom: text_bottom,
-    body_content_bottom_pt: text_bottom,
+    content_bottom: f32::MAX / 4.0,
+    body_content_bottom_pt: f32::MAX / 4.0,
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
@@ -2275,8 +2325,19 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     visible_page
       .items
       .into_iter()
-      .filter(|item| item_y(item).is_none_or(|item_y| item_y >= y && item_y <= text_bottom)),
+      .filter(|item| table_cell_item_intersects_vertical_bounds(item, y, text_bottom)),
   );
+}
+
+fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
+  match item {
+    PageItem::Text(text) => {
+      let text_top = text.y_pt - text.style.font_size_pt;
+      text.y_pt >= top && text_top <= bottom
+    }
+    PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
+    PageItem::Fill(_) | PageItem::Line(_) => true,
+  }
 }
 
 fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {

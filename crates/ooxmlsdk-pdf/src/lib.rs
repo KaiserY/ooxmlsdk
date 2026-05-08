@@ -747,6 +747,8 @@ mod tests {
         exact_height: true,
         repeat_header: false,
         cant_split: false,
+        grid_before: 0,
+        grid_after: 0,
       }
     }
 
@@ -771,7 +773,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![row("R1"), row("R2"), row("R3")],
     });
     let after_block = crate::docx::Block::Paragraph(paragraph("After table"));
@@ -862,13 +864,15 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
         cells: vec![cell("Narrow", 50.0), cell("Wide", 100.0)],
         height_pt: Some(24.0),
         exact_height: true,
         repeat_header: false,
         cant_split: false,
+        grid_before: 0,
+        grid_after: 0,
       }],
     };
     let doc = crate::docx::DocxDocument {
@@ -941,7 +945,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![
         crate::docx::TableRow {
           cells: vec![
@@ -952,6 +956,8 @@ mod tests {
           exact_height: true,
           repeat_header: false,
           cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
         },
         crate::docx::TableRow {
           cells: vec![
@@ -963,6 +969,8 @@ mod tests {
           exact_height: true,
           repeat_header: false,
           cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
         },
       ],
     };
@@ -991,6 +999,286 @@ mod tests {
 
     assert!((col_2.x_pt - col_1.x_pt - 90.0).abs() < 0.1);
     assert!((col_3.x_pt - col_2.x_pt - 90.0).abs() < 0.1);
+  }
+
+  #[test]
+  fn table_internal_borders_prefer_stronger_adjacent_border() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    fn border(width_pt: f32) -> crate::docx::BorderStyle {
+      crate::docx::BorderStyle {
+        width_pt,
+        spacing_pt: 0.0,
+        color: crate::docx::RgbColor { r: 0, g: 0, b: 0 },
+      }
+    }
+
+    fn cell(text: &str, borders: crate::docx::CellBordersModel) -> crate::docx::TableCell {
+      crate::docx::TableCell {
+        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        shading: None,
+        borders,
+        margins: crate::docx::CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
+      }
+    }
+
+    let table = crate::docx::Table {
+      column_widths_pt: vec![60.0, 60.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: crate::docx::TableAlignment::Left,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![
+        crate::docx::TableRow {
+          cells: vec![
+            cell(
+              "A",
+              crate::docx::CellBordersModel {
+                right: Some(border(0.5)),
+                bottom: Some(border(0.5)),
+                ..Default::default()
+              },
+            ),
+            cell(
+              "B",
+              crate::docx::CellBordersModel {
+                left: Some(border(3.0)),
+                bottom: Some(border(0.5)),
+                ..Default::default()
+              },
+            ),
+          ],
+          height_pt: Some(24.0),
+          exact_height: true,
+          repeat_header: false,
+          cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
+        },
+        crate::docx::TableRow {
+          cells: vec![
+            cell(
+              "C",
+              crate::docx::CellBordersModel {
+                top: Some(border(2.5)),
+                ..Default::default()
+              },
+            ),
+            cell("D", crate::docx::CellBordersModel::default()),
+          ],
+          height_pt: Some(24.0),
+          exact_height: true,
+          repeat_header: false,
+          cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
+        },
+      ],
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Table(table)],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let line_widths = layout.pages[0]
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        crate::layout::PageItem::Line(line) => Some(line.width_pt),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+
+    assert!(line_widths.iter().any(|width| (*width - 3.0).abs() < 0.001));
+    assert!(line_widths.iter().any(|width| (*width - 2.5).abs() < 0.001));
+  }
+
+  #[test]
+  fn table_cell_spacing_separates_cell_frames() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    fn cell(text: &str) -> crate::docx::TableCell {
+      crate::docx::TableCell {
+        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        shading: None,
+        borders: crate::docx::CellBordersModel::default(),
+        margins: crate::docx::CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
+      }
+    }
+
+    let table = crate::docx::Table {
+      column_widths_pt: vec![40.0, 40.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: crate::docx::TableAlignment::Left,
+      borders: Some(crate::docx::TableBordersModel::default()),
+      cell_spacing_pt: 12.0,
+      rows: vec![crate::docx::TableRow {
+        cells: vec![cell("A"), cell("B")],
+        height_pt: Some(24.0),
+        exact_height: true,
+        repeat_header: false,
+        cant_split: false,
+        grid_before: 0,
+        grid_after: 0,
+      }],
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Table(table)],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let a = text_item(&layout, "A");
+    let b = text_item(&layout, "B");
+    assert!((b.x_pt - a.x_pt - 52.0).abs() < 0.001);
+    assert!(layout.pages[0].items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Line(line)
+          if (line.x1_pt - (doc.page.margin_left_pt + 40.0)).abs() < 0.001
+      )
+    }));
+  }
+
+  #[test]
+  fn table_row_grid_before_offsets_visible_cells() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    let table = crate::docx::Table {
+      column_widths_pt: vec![40.0, 40.0, 40.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: crate::docx::TableAlignment::Left,
+      borders: None,
+      cell_spacing_pt: 0.0,
+      rows: vec![crate::docx::TableRow {
+        cells: vec![crate::docx::TableCell {
+          blocks: vec![crate::docx::Block::Paragraph(paragraph("B"))],
+          shading: None,
+          borders: crate::docx::CellBordersModel::default(),
+          margins: crate::docx::CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
+        }],
+        height_pt: Some(24.0),
+        exact_height: true,
+        repeat_header: false,
+        cant_split: false,
+        grid_before: 1,
+        grid_after: 1,
+      }],
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Table(table)],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let item = text_item(&layout, "B");
+    assert!((item.x_pt - (doc.page.margin_left_pt + 40.0 + 5.4)).abs() < 0.001);
   }
 
   #[test]
@@ -1042,7 +1330,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![
         crate::docx::TableRow {
           cells: vec![
@@ -1053,6 +1341,8 @@ mod tests {
           exact_height: true,
           repeat_header: false,
           cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
         },
         crate::docx::TableRow {
           cells: vec![cell("", None, true), cell("B", None, false)],
@@ -1060,6 +1350,8 @@ mod tests {
           exact_height: true,
           repeat_header: false,
           cant_split: false,
+          grid_before: 0,
+          grid_after: 0,
         },
       ],
     };
@@ -1134,6 +1426,8 @@ mod tests {
         exact_height: true,
         repeat_header: false,
         cant_split,
+        grid_before: 0,
+        grid_after: 0,
       }
     }
 
@@ -1158,7 +1452,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![row("Before row", 50.0, false), row("Keep row", 50.0, true)],
     });
     let doc = crate::docx::DocxDocument {
@@ -1231,7 +1525,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       borders: None,
-      cell_margins: crate::docx::CellMargins::default(),
+      cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
         cells: vec![crate::docx::TableCell {
           blocks: line_blocks,
@@ -1248,6 +1542,8 @@ mod tests {
         exact_height: true,
         repeat_header: false,
         cant_split: false,
+        grid_before: 0,
+        grid_after: 0,
       }],
     };
     let doc = crate::docx::DocxDocument {
@@ -3045,7 +3341,7 @@ mod tests {
 
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
     assert!(find_text_item(&layout, "A1+A2 (horizontal merge, gridSpan=2)").is_some());
-    assert!(find_text_item(&layout, "A3 top of vertical merge").is_some());
+    assert!(layout_contains_text(&layout, "A3 top of vertical merge"));
 
     let path = fixture_path("test-data/wml/table_props.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -3059,11 +3355,10 @@ mod tests {
     assert_eq!(table.preferred_width_pct, Some(0.8));
     assert_eq!(table.indent_left_pt, 12.0);
     assert_eq!(table.alignment, crate::docx::TableAlignment::Center);
-    assert_eq!(table.cell_margins.left_pt, 9.0);
-    assert_eq!(table.cell_margins.top_pt, 6.0);
     assert_eq!(table.rows[0].cells[0].margins.left_pt, 18.0);
     assert_eq!(table.rows[0].cells[0].margins.top_pt, 12.0);
     assert_eq!(table.rows[0].cells[1].margins.left_pt, 9.0);
+    assert_eq!(table.rows[0].cells[1].margins.top_pt, 6.0);
     assert_eq!(
       table.rows[0].cells[0].vertical_alignment,
       crate::docx::TableCellVerticalAlignment::Center
@@ -3146,6 +3441,20 @@ mod tests {
         crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
       })
+  }
+
+  fn layout_contains_text(layout: &crate::layout::LayoutDocument, text: &str) -> bool {
+    layout_texts(layout).contains(text)
+  }
+
+  fn layout_texts(layout: &crate::layout::LayoutDocument) -> String {
+    let mut flattened = String::new();
+    for item in layout.pages.iter().flat_map(|page| &page.items) {
+      if let crate::layout::PageItem::Text(item) = item {
+        flattened.push_str(&item.text);
+      }
+    }
+    flattened
   }
 
   fn pdf_contains_image_xobject(pdf: &[u8]) -> bool {

@@ -115,7 +115,7 @@ pub(crate) struct Table {
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
   pub borders: Option<TableBordersModel>,
-  pub cell_margins: CellMargins,
+  pub cell_spacing_pt: f32,
   pub rows: Vec<TableRow>,
 }
 
@@ -134,6 +134,8 @@ pub(crate) struct TableRow {
   pub exact_height: bool,
   pub repeat_header: bool,
   pub cant_split: bool,
+  pub grid_before: usize,
+  pub grid_after: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -157,13 +159,15 @@ pub(crate) struct CellMargins {
   pub left_pt: f32,
 }
 
+const DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS: f32 = 108.0;
+
 impl Default for CellMargins {
   fn default() -> Self {
     Self {
-      top_pt: 4.0,
-      right_pt: 4.0,
-      bottom_pt: 4.0,
-      left_pt: 4.0,
+      top_pt: 0.0,
+      right_pt: units::twips_to_points(DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS),
+      bottom_pt: 0.0,
+      left_pt: units::twips_to_points(DEFAULT_TABLE_CELL_SIDE_MARGIN_TWIPS),
     }
   }
 }
@@ -1310,7 +1314,10 @@ fn table_model(
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
       .map(table_borders_model),
-    cell_margins,
+    cell_spacing_pt: properties
+      .and_then(|properties| properties.table_cell_spacing.as_ref())
+      .and_then(table_cell_spacing_to_points)
+      .unwrap_or(0.0),
     rows: table
       .table_choice2
       .iter()
@@ -1339,11 +1346,14 @@ fn table_row_model(
 ) -> TableRow {
   let (height_pt, exact_height) = table_row_height_properties(row.table_row_properties.as_deref());
   let (repeat_header, cant_split) = table_row_keep_properties(row.table_row_properties.as_deref());
+  let (grid_before, grid_after) = table_row_grid_properties(row.table_row_properties.as_deref());
   TableRow {
     height_pt,
     exact_height,
     repeat_header,
     cant_split,
+    grid_before,
+    grid_after,
     cells: row
       .table_row_choice
       .iter()
@@ -1419,6 +1429,26 @@ fn table_cell_model(
       })
       .unwrap_or_default(),
   }
+}
+
+fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usize, usize) {
+  let Some(properties) = properties else {
+    return (0, 0);
+  };
+  let mut grid_before = 0;
+  let mut grid_after = 0;
+  for choice in &properties.table_row_properties_choice1 {
+    match choice {
+      w::TableRowPropertiesChoice::WGridBefore(before) => {
+        grid_before = before.val.max(0) as usize;
+      }
+      w::TableRowPropertiesChoice::WGridAfter(after) => {
+        grid_after = after.val.max(0) as usize;
+      }
+      _ => {}
+    }
+  }
+  (grid_before, grid_after)
 }
 
 fn table_row_keep_properties(properties: Option<&w::TableRowProperties>) -> (bool, bool) {
@@ -1547,6 +1577,13 @@ fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
     }
     _ => None,
   }
+}
+
+fn table_cell_spacing_to_points(spacing: &w::TableCellSpacing) -> Option<f32> {
+  if !matches!(spacing.r#type, None | Some(w::TableWidthUnitValues::Dxa)) {
+    return None;
+  }
+  spacing.width.as_deref().and_then(twips_attr_to_points)
 }
 
 fn table_width_to_percent(width: &w::TableWidth) -> Option<f32> {
@@ -3150,7 +3187,8 @@ fn vml_image_data(
 ) -> Option<InlineImage> {
   let relationship_id = data.relationship_id.as_ref().or(data.rel_id.as_ref())?;
   let resource = images.by_relationship_id.get(relationship_id)?;
-  let (width_pt, height_pt) = vml_style_size(style).unwrap_or((72.0, 72.0));
+  let style = vml_image_style(style);
+  let (width_pt, height_pt) = style.size_pt.unwrap_or((72.0, 72.0));
 
   Some(InlineImage {
     data: resource.data.clone(),
@@ -3161,37 +3199,228 @@ fn vml_image_data(
     effect_top_pt: 0.0,
     effect_right_pt: 0.0,
     effect_bottom_pt: 0.0,
-    crop: ImageCrop::default(),
-    rotation_deg: 0.0,
-    flip_horizontal: false,
-    flip_vertical: false,
+    crop: vml_image_crop(data),
+    rotation_deg: style.rotation_deg,
+    flip_horizontal: style.flip_horizontal,
+    flip_vertical: style.flip_vertical,
     alt_text: alt_text.or_else(|| data.title.clone()),
-    placement: ImagePlacement::Inline,
+    placement: style.placement(),
   })
 }
 
-fn vml_style_size(style: Option<&str>) -> Option<(f32, f32)> {
+#[derive(Clone, Copy, Debug)]
+struct VmlImageStyle {
+  size_pt: Option<(f32, f32)>,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+  absolute_position: bool,
+  horizontal_relative_to: HorizontalImageReference,
+  vertical_relative_to: VerticalImageReference,
+  horizontal_offset_pt: f32,
+  vertical_offset_pt: f32,
+  wrap: ImageWrapMode,
+  behind_text: bool,
+  margin_top_pt: f32,
+  margin_right_pt: f32,
+  margin_bottom_pt: f32,
+  margin_left_pt: f32,
+}
+
+impl Default for VmlImageStyle {
+  fn default() -> Self {
+    Self {
+      size_pt: None,
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      absolute_position: false,
+      horizontal_relative_to: HorizontalImageReference::Column,
+      vertical_relative_to: VerticalImageReference::Paragraph,
+      horizontal_offset_pt: 0.0,
+      vertical_offset_pt: 0.0,
+      wrap: ImageWrapMode::Square,
+      behind_text: false,
+      margin_top_pt: 0.0,
+      margin_right_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 0.0,
+    }
+  }
+}
+
+impl VmlImageStyle {
+  fn placement(self) -> ImagePlacement {
+    if self.absolute_position {
+      ImagePlacement::Floating(FloatingImagePlacement {
+        horizontal_relative_to: self.horizontal_relative_to,
+        vertical_relative_to: self.vertical_relative_to,
+        horizontal_alignment: None,
+        vertical_alignment: None,
+        horizontal_offset_pt: self.horizontal_offset_pt,
+        vertical_offset_pt: self.vertical_offset_pt,
+        wrap: self.wrap,
+        wrap_side: ImageWrapSide::BothSides,
+        behind_text: self.behind_text,
+        margin_top_pt: self.margin_top_pt,
+        margin_right_pt: self.margin_right_pt,
+        margin_bottom_pt: self.margin_bottom_pt,
+        margin_left_pt: self.margin_left_pt,
+      })
+    } else {
+      ImagePlacement::Inline
+    }
+  }
+}
+
+fn vml_image_crop(data: &v::ImageData) -> ImageCrop {
+  ImageCrop {
+    left: vml_crop_fraction(data.crop_left.as_deref()),
+    top: vml_crop_fraction(data.crop_top.as_deref()),
+    right: vml_crop_fraction(data.crop_right.as_deref()),
+    bottom: vml_crop_fraction(data.crop_bottom.as_deref()),
+  }
+}
+
+fn vml_crop_fraction(value: Option<&str>) -> f32 {
+  let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+    return 0.0;
+  };
+
+  let fraction = if let Some(percent) = value.strip_suffix('%') {
+    percent
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value / 100.0)
+  } else if let Some(fixed) = value.strip_suffix('f') {
+    fixed
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value / 65536.0)
+  } else {
+    value.trim().parse::<f32>().ok()
+  };
+
+  fraction.unwrap_or(0.0).clamp(0.0, 0.999)
+}
+
+fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
   let mut width = None;
   let mut height = None;
+  let mut output = VmlImageStyle::default();
 
-  for declaration in style?.split(';') {
+  let Some(style) = style else {
+    return output;
+  };
+
+  for declaration in style.split(';') {
     let Some((name, value)) = declaration.split_once(':') else {
       continue;
     };
     match name.trim().to_ascii_lowercase().as_str() {
+      "position" if value.trim().eq_ignore_ascii_case("absolute") => {
+        output.absolute_position = true;
+      }
+      "left" | "margin-left" => {
+        output.horizontal_offset_pt = vml_measure_to_points(value).unwrap_or(0.0);
+        output.absolute_position = true;
+      }
+      "top" | "margin-top" => {
+        output.vertical_offset_pt = vml_measure_to_points(value).unwrap_or(0.0);
+        output.absolute_position = true;
+      }
       "width" => width = vml_measure_to_points(value),
       "height" => height = vml_measure_to_points(value),
+      "z-index" => {
+        output.behind_text = value.trim().parse::<i32>().is_ok_and(|value| value < 0);
+        output.absolute_position = true;
+      }
+      "mso-position-horizontal-relative" => {
+        output.horizontal_relative_to = vml_horizontal_reference(value);
+        output.absolute_position = true;
+      }
+      "mso-position-vertical-relative" => {
+        output.vertical_relative_to = vml_vertical_reference(value);
+        output.absolute_position = true;
+      }
+      "mso-wrap-style" => output.wrap = vml_wrap_mode(value),
+      "mso-wrap-distance-left" => {
+        output.margin_left_pt = vml_measure_to_points(value).unwrap_or(0.0);
+      }
+      "mso-wrap-distance-right" => {
+        output.margin_right_pt = vml_measure_to_points(value).unwrap_or(0.0);
+      }
+      "mso-wrap-distance-top" => {
+        output.margin_top_pt = vml_measure_to_points(value).unwrap_or(0.0);
+      }
+      "mso-wrap-distance-bottom" => {
+        output.margin_bottom_pt = vml_measure_to_points(value).unwrap_or(0.0);
+      }
+      "rotation" => output.rotation_deg = vml_rotation_degrees(value),
+      "flip" => {
+        let value = value.to_ascii_lowercase();
+        output.flip_horizontal = value.split_whitespace().any(|token| token == "x");
+        output.flip_vertical = value.split_whitespace().any(|token| token == "y");
+      }
       _ => {}
     }
   }
 
-  Some((width?, height?))
+  output.size_pt = width.zip(height);
+  output
+}
+
+fn vml_horizontal_reference(value: &str) -> HorizontalImageReference {
+  match value.trim().to_ascii_lowercase().as_str() {
+    "page" => HorizontalImageReference::Page,
+    "margin" => HorizontalImageReference::Margin,
+    "char" | "character" => HorizontalImageReference::Character,
+    _ => HorizontalImageReference::Column,
+  }
+}
+
+fn vml_vertical_reference(value: &str) -> VerticalImageReference {
+  match value.trim().to_ascii_lowercase().as_str() {
+    "page" => VerticalImageReference::Page,
+    "margin" => VerticalImageReference::Margin,
+    "line" => VerticalImageReference::Line,
+    _ => VerticalImageReference::Paragraph,
+  }
+}
+
+fn vml_wrap_mode(value: &str) -> ImageWrapMode {
+  match value.trim().to_ascii_lowercase().as_str() {
+    "topandbottom" | "top-bottom" | "top_bottom" => ImageWrapMode::TopBottom,
+    "none" | "through" => ImageWrapMode::Through,
+    "inline" => ImageWrapMode::Inline,
+    _ => ImageWrapMode::Square,
+  }
+}
+
+fn vml_rotation_degrees(value: &str) -> f32 {
+  let value = value.trim();
+  let rotation = if let Some(fixed) = value.strip_suffix("fd") {
+    fixed
+      .trim()
+      .parse::<f32>()
+      .ok()
+      .map(|value| value / 65536.0)
+  } else {
+    value.parse::<f32>().ok()
+  };
+  -rotation.unwrap_or(0.0)
 }
 
 fn vml_measure_to_points(value: &str) -> Option<f32> {
   let value = value.trim();
   if value.is_empty() {
     return None;
+  }
+
+  if let Some(hex) = value.strip_prefix("0x") {
+    return i64::from_str_radix(hex, 16).ok().map(units::emu_to_points);
   }
 
   let (number, multiplier) = if let Some(number) = value.strip_suffix("pt") {
@@ -4431,6 +4660,58 @@ mod tests {
   }
 
   #[test]
+  fn table_cell_margins_default_to_word_side_padding() {
+    let margins = CellMargins::default();
+
+    assert_eq!(margins.top_pt, 0.0);
+    assert_eq!(margins.bottom_pt, 0.0);
+    assert!((margins.left_pt - 5.4).abs() < 0.001);
+    assert!((margins.right_pt - 5.4).abs() < 0.001);
+  }
+
+  #[test]
+  fn table_cell_margin_overrides_inherit_unspecified_defaults() {
+    let margins = table_cell_margin(
+      &w::TableCellMargin {
+        left_margin: Some(w::LeftMargin {
+          width: Some("240".into()),
+          r#type: Some(w::TableWidthUnitValues::Dxa),
+        }),
+        ..Default::default()
+      },
+      CellMargins::default(),
+    );
+
+    assert_eq!(margins.left_pt, 12.0);
+    assert!((margins.right_pt - 5.4).abs() < 0.001);
+    assert_eq!(margins.top_pt, 0.0);
+    assert_eq!(margins.bottom_pt, 0.0);
+  }
+
+  #[test]
+  fn table_cell_spacing_uses_dxa_widths() {
+    let spacing = w::TableCellSpacing {
+      width: Some("240".into()),
+      r#type: Some(w::TableWidthUnitValues::Dxa),
+    };
+
+    assert_eq!(table_cell_spacing_to_points(&spacing), Some(12.0));
+  }
+
+  #[test]
+  fn table_row_grid_properties_preserve_skipped_grid_columns() {
+    let properties = w::TableRowProperties {
+      table_row_properties_choice1: vec![
+        w::TableRowPropertiesChoice::WGridBefore(Box::new(w::GridBefore { val: 1 })),
+        w::TableRowPropertiesChoice::WGridAfter(Box::new(w::GridAfter { val: 2 })),
+      ],
+      ..Default::default()
+    };
+
+    assert_eq!(table_row_grid_properties(Some(&properties)), (1, 2));
+  }
+
+  #[test]
   fn simple_page_fields_emit_dynamic_markers() {
     let mut inlines = Vec::new();
     let field = w::SimpleField {
@@ -4532,10 +4813,14 @@ mod tests {
     let run = w::Run {
       run_choice: vec![w::RunChoice::WPict(Box::new(w::Picture {
         picture_choice: vec![w::PictureChoice::VShape(Box::new(v::Shape {
-          style: Some("width:1in;height:24pt".into()),
+          style: Some("width:1in;height:24pt;rotation:90;flip:x y".into()),
           alternate: Some("VML image".into()),
           shape_choice: vec![v::ShapeChoice::VImagedata(Box::new(v::ImageData {
             relationship_id: Some("rId1".into()),
+            crop_left: Some("10%".into()),
+            crop_top: Some("13107f".into()),
+            crop_right: Some("0.3".into()),
+            crop_bottom: Some("-1".into()),
             ..Default::default()
           }))],
           ..Default::default()
@@ -4565,7 +4850,50 @@ mod tests {
     assert_eq!(image.content_type.as_deref(), Some("image/png"));
     assert_eq!(image.width_pt, 72.0);
     assert_eq!(image.height_pt, 24.0);
+    assert!((image.crop.left - 0.1).abs() < 0.001);
+    assert!((image.crop.top - 0.2).abs() < 0.001);
+    assert!((image.crop.right - 0.3).abs() < 0.001);
+    assert_eq!(image.crop.bottom, 0.0);
+    assert!((image.rotation_deg + 90.0).abs() < 0.001);
+    assert!(image.flip_horizontal);
+    assert!(image.flip_vertical);
     assert_eq!(image.alt_text.as_deref(), Some("VML image"));
+  }
+
+  #[test]
+  fn vml_style_rotation_accepts_fixed_degrees() {
+    let style = vml_image_style(Some("width:20pt;height:10pt;rotation:5898240fd;flip:x"));
+
+    assert_eq!(style.size_pt, Some((20.0, 10.0)));
+    assert!((style.rotation_deg + 90.0).abs() < 0.001);
+    assert!(style.flip_horizontal);
+    assert!(!style.flip_vertical);
+  }
+
+  #[test]
+  fn vml_absolute_style_maps_to_floating_placement() {
+    let style = vml_image_style(Some(
+      "position:absolute;margin-left:12pt;margin-top:18pt;z-index:-2;\
+       mso-position-horizontal-relative:page;mso-position-vertical-relative:margin;\
+       mso-wrap-style:square;mso-wrap-distance-left:0x0001BE7C",
+    ));
+
+    let ImagePlacement::Floating(placement) = style.placement() else {
+      panic!("floating placement");
+    };
+    assert_eq!(
+      placement.horizontal_relative_to,
+      HorizontalImageReference::Page
+    );
+    assert_eq!(
+      placement.vertical_relative_to,
+      VerticalImageReference::Margin
+    );
+    assert_eq!(placement.wrap, ImageWrapMode::Square);
+    assert!(placement.behind_text);
+    assert!((placement.horizontal_offset_pt - 12.0).abs() < 0.001);
+    assert!((placement.vertical_offset_pt - 18.0).abs() < 0.001);
+    assert!((placement.margin_left_pt - 9.0).abs() < 0.001);
   }
 
   #[test]

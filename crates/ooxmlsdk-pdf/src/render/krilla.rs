@@ -24,6 +24,34 @@ use crate::options::PdfOptions;
 use crate::text_metrics::{measure_text, shape_text};
 
 pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
+  debug_assert!(
+    document
+      .follows
+      .iter()
+      .all(|follow| follow.to_page_index < document.pages.len())
+  );
+  debug_assert!(document.frames.iter().all(|frame| {
+    let _kind = frame.kind;
+    let _block_index = frame.block_index;
+    frame.page_index < document.pages.len()
+      && frame.section_index == document.pages[frame.page_index].section_index
+      && frame.section_page_index == document.pages[frame.page_index].section_page_index
+      && frame.item_start < frame.item_end
+      && frame.items.len() == frame.item_end - frame.item_start
+      && frame.column_index < 64
+      && frame
+        .bounds
+        .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+      && frame.lines.iter().all(|line| {
+        line.item_start >= frame.item_start
+          && line.item_end <= frame.item_end
+          && line.item_start < line.item_end
+          && line.width_pt >= 0.0
+          && line.height_pt >= 0.0
+          && line.x_pt.is_finite()
+          && line.y_pt.is_finite()
+      })
+  }));
   let mut pdf = Document::new_with(serialize_settings(options));
   let fonts = FontSet::load()?;
 

@@ -1503,6 +1503,12 @@ mod tests {
     let kept = text_item(&layout, "Keep row");
 
     assert_eq!(layout.pages.len(), 1);
+    assert!(layout.follows.iter().any(|follow| {
+      follow.kind == crate::layout::FollowFrameKind::Table
+        && follow.reason == crate::layout::FollowReason::Overflow
+        && follow.from_column_index == 0
+        && follow.to_column_index == 1
+    }));
     assert!(before.x_pt < page.margin_left_pt + 100.0);
     assert!(kept.x_pt > page.margin_left_pt + 100.0);
     assert!(kept.y_pt <= page.margin_top_pt + crate::docx::CellMargins::default().top_pt + 12.0);
@@ -1594,6 +1600,11 @@ mod tests {
 
     assert_eq!(line_01_page, 0);
     assert!(line_04_page > line_01_page);
+    assert!(layout.follows.iter().any(|follow| {
+      follow.kind == crate::layout::FollowFrameKind::Table
+        && follow.reason == crate::layout::FollowReason::Overflow
+        && follow.to_page_index > follow.from_page_index
+    }));
   }
 
   #[test]
@@ -3501,10 +3512,266 @@ mod tests {
     assert!(top_cell.x_pt > doc.page.margin_left_pt);
   }
 
+  #[test]
+  fn docx_pdf_sections_cluster_snapshot() {
+    let layout = docx_layout_from_fixture("test-data/wml/docx_pdf_sections_cluster.docx");
+    let snapshot = layout_snapshot(&layout);
+
+    assert_snapshot_contains(
+      &snapshot,
+      &[
+        "pages=",
+        "frames=",
+        "frame kind=Paragraph block=Some(0)",
+        "Cluster section header",
+        "Cluster sections first body",
+        "Cluster section footer",
+        "Cluster sections forced column",
+        "L x1=",
+      ],
+    );
+  }
+
+  #[test]
+  fn docx_pdf_paragraph_flow_cluster_snapshot() {
+    let layout = docx_layout_from_fixture("test-data/wml/docx_pdf_paragraph_flow_cluster.docx");
+    let snapshot = layout_snapshot(&layout);
+
+    assert_snapshot_contains(
+      &snapshot,
+      &[
+        "pages=2",
+        "follows=1",
+        "frames=3",
+        "frame kind=Paragraph block=Some(0)",
+        "follow kind=Paragraph reason=ExplicitBreak block=Some(2) from=0:0/0 to=1:1/0",
+        "\"Cluster\"",
+        "\"paragraph\"",
+        "\"indented\"",
+        "F x=",
+        "L x1=",
+        "Cluster paragraph page break target",
+      ],
+    );
+  }
+
+  #[test]
+  fn docx_pdf_table_layout_cluster_snapshot() {
+    let layout = docx_layout_from_fixture("test-data/wml/docx_pdf_table_layout_cluster.docx");
+    let snapshot = layout_snapshot(&layout);
+
+    assert_snapshot_contains(
+      &snapshot,
+      &[
+        "frames=3",
+        "frame kind=Table block=Some(1)",
+        "Cluster table before",
+        "\"head 1\"",
+        "\"rowspan \"",
+        "Cluster table horizontal ",
+        "Cluster table after",
+        "F x=",
+        "L x1=",
+      ],
+    );
+  }
+
+  #[test]
+  fn docx_pdf_drawing_flow_cluster_snapshot() {
+    let layout = docx_layout_from_fixture("test-data/wml/docx_pdf_drawing_flow_cluster.docx");
+    let snapshot = layout_snapshot(&layout);
+
+    let image = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .find_map(|item| match item {
+        crate::layout::PageItem::Image(image) if image.floating => Some(image),
+        crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .expect("cluster floating image");
+    let following =
+      find_text_item_containing(&layout, "following").expect("following paragraph text");
+
+    assert!(image.floating);
+    assert!(following.x_pt >= image.x_pt + image.width_pt);
+    assert_snapshot_contains(
+      &snapshot,
+      &[
+        "frame kind=Paragraph block=Some(0)",
+        "frame kind=Paragraph block=Some(1)",
+        "Cluster drawing before floating",
+        "I x=36.0 y=",
+        "floating=true",
+        "Cluster drawing ",
+        "anchored paragraph ",
+        "following",
+      ],
+    );
+  }
+
+  #[test]
+  fn docx_pdf_notes_cluster_snapshot() {
+    let layout = docx_layout_from_fixture("test-data/wml/docx_pdf_notes_cluster.docx");
+    let snapshot = layout_snapshot(&layout);
+
+    let body = text_item(&layout, "Cluster notes body with footnote");
+    let footnote =
+      find_text_item_containing(&layout, "Cluster footnote").expect("cluster footnote text");
+
+    assert!(footnote.y_pt > body.y_pt);
+    assert_snapshot_contains(
+      &snapshot,
+      &[
+        "frames=",
+        "frame kind=Paragraph block=Some(0)",
+        "frame kind=Notes block=Some(0)",
+        "Cluster notes body with footnote",
+        "Cluster notes following body text",
+        "Cluster footnote",
+        "Cluster endnote entry.",
+        "L x1=",
+      ],
+    );
+  }
+
   fn fixture_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../..")
       .join(relative)
+  }
+
+  fn docx_layout_from_fixture(relative: &str) -> crate::layout::LayoutDocument {
+    let path = fixture_path(relative);
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    crate::layout::layout(&doc, &PdfOptions::default()).unwrap()
+  }
+
+  fn layout_snapshot(layout: &crate::layout::LayoutDocument) -> String {
+    let mut snapshot = String::new();
+    snapshot.push_str(&format!("pages={}\n", layout.pages.len()));
+    snapshot.push_str(&format!("follows={}\n", layout.follows.len()));
+    snapshot.push_str(&format!("frames={}\n", layout.frames.len()));
+    for follow in &layout.follows {
+      snapshot.push_str(&format!(
+        "follow kind={:?} reason={:?} block={:?} from={}:{}{}{} to={}:{}{}{}\n",
+        follow.kind,
+        follow.reason,
+        follow.block_index,
+        follow.from_page_index,
+        follow.from_section_page_index,
+        "/",
+        follow.from_column_index,
+        follow.to_page_index,
+        follow.to_section_page_index,
+        "/",
+        follow.to_column_index
+      ));
+    }
+    for frame in &layout.frames {
+      let bounds = frame
+        .bounds
+        .map(|bounds| {
+          format!(
+            "{:.1},{:.1} {:.1}x{:.1}",
+            bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt
+          )
+        })
+        .unwrap_or_else(|| "none".to_string());
+      snapshot.push_str(&format!(
+        "frame kind={:?} block={:?} page={} section={} section_page={} column={} items={}..{} retained={} bounds={} lines={}\n",
+        frame.kind,
+        frame.block_index,
+        frame.page_index,
+        frame.section_index,
+        frame.section_page_index,
+        frame.column_index,
+        frame.item_start,
+        frame.item_end,
+        frame.items.len(),
+        bounds,
+        frame.lines.len()
+      ));
+      for line in frame.lines.iter().take(6) {
+        snapshot.push_str(&format!(
+          "  line x={:.1} y={:.1} w={:.1} h={:.1} items={}..{}\n",
+          line.x_pt, line.y_pt, line.width_pt, line.height_pt, line.item_start, line.item_end
+        ));
+      }
+    }
+    for (page_index, page) in layout.pages.iter().enumerate() {
+      snapshot.push_str(&format!(
+        "page={} section={} section_page={} size={:.1}x{:.1} items={}\n",
+        page_index + 1,
+        page.section_index,
+        page.section_page_index,
+        page.setup.width_pt,
+        page.setup.height_pt,
+        page.items.len()
+      ));
+      for item in &page.items {
+        match item {
+          crate::layout::PageItem::Text(text) => {
+            snapshot.push_str(&format!(
+              "T x={:.1} y={:.1} \"{}\"\n",
+              text.x_pt,
+              text.y_pt,
+              text.text.replace('\n', "\\n")
+            ));
+          }
+          crate::layout::PageItem::Image(image) => {
+            snapshot.push_str(&format!(
+              "I x={:.1} y={:.1} w={:.1} h={:.1} floating={} behind={}\n",
+              image.x_pt,
+              image.y_pt,
+              image.width_pt,
+              image.height_pt,
+              image.floating,
+              image.behind_text
+            ));
+          }
+          crate::layout::PageItem::Fill(fill) => {
+            snapshot.push_str(&format!(
+              "F x={:.1} y={:.1} w={:.1} h={:.1} rgb={:02X}{:02X}{:02X}\n",
+              fill.x_pt,
+              fill.y_pt,
+              fill.width_pt,
+              fill.height_pt,
+              fill.color.r,
+              fill.color.g,
+              fill.color.b
+            ));
+          }
+          crate::layout::PageItem::Line(line) => {
+            snapshot.push_str(&format!(
+              "L x1={:.1} y1={:.1} x2={:.1} y2={:.1} w={:.1} rgb={:02X}{:02X}{:02X}\n",
+              line.x1_pt,
+              line.y1_pt,
+              line.x2_pt,
+              line.y2_pt,
+              line.width_pt,
+              line.color.r,
+              line.color.g,
+              line.color.b
+            ));
+          }
+        }
+      }
+    }
+    snapshot
+  }
+
+  fn assert_snapshot_contains(snapshot: &str, expected: &[&str]) {
+    for needle in expected {
+      assert!(
+        snapshot.contains(needle),
+        "layout snapshot missing {needle:?}\n{snapshot}"
+      );
+    }
   }
 
   fn paragraph_at(doc: &crate::docx::DocxDocument, index: usize) -> &crate::docx::Paragraph {
@@ -3565,6 +3832,23 @@ mod tests {
         crate::layout::PageItem::Image(_) => None,
         crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
+      })
+  }
+
+  fn find_text_item_containing<'a>(
+    layout: &'a crate::layout::LayoutDocument,
+    text: &str,
+  ) -> Option<&'a crate::layout::TextItem> {
+    layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .find_map(|item| match item {
+        crate::layout::PageItem::Text(item) if item.text.contains(text) => Some(item),
+        crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
       })
   }
 

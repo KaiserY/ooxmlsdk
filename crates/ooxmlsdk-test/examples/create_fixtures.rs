@@ -2491,6 +2491,7 @@ fn main() {
   create_wml_numbering_fixtures(&root);
   create_wml_tables_fixtures(&root);
   create_wml_drawing_fixtures(&root, &png);
+  create_wml_docx_pdf_cluster_fixtures(&root, &png);
   create_wml_headers_fixtures(&root);
   create_wml_sections_fixtures(&root);
   create_wml_fields_fixtures(&root);
@@ -4022,6 +4023,289 @@ fn create_wml_drawing_fixtures(root: &Path, png: &[u8]) {
       ("word/media/image1.png", png),
     ]);
     save(root, "test-data/wml/image_floating.docx", &data);
+  }
+}
+
+fn create_wml_docx_pdf_cluster_fixtures(root: &Path, png: &[u8]) {
+  // DOCX→PDF fixture clusters intentionally combine related Writer layout
+  // features so snapshot tests exercise interactions, not only isolated XML.
+
+  // ── WML-PDF-01: sections cluster ─────────────────────────────────────────
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p><w:r><w:t>Cluster sections first body</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Cluster sections first follow</w:t></w:r></w:p>
+    <w:p>
+      <w:pPr>
+        <w:sectPr>
+          <w:pgSz w:w="11906" w:h="16838"/>
+          <w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="360" w:footer="360" w:gutter="0"/>
+          <w:cols w:num="1" w:space="720"/>
+        </w:sectPr>
+      </w:pPr>
+    </w:p>
+    <w:p><w:r><w:t>Cluster sections two column A</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Cluster sections two column B</w:t></w:r></w:p>
+    <w:p><w:r><w:br w:type="column"/></w:r><w:r><w:t>Cluster sections forced column</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Cluster sections after column</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId1"/>
+      <w:footerReference w:type="default" r:id="rId2"/>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="900" w:right="900" w:bottom="900" w:left="900" w:header="360" w:footer="360" w:gutter="0"/>
+      <w:cols w:num="2" w:space="360" w:sep="1"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let header = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p><w:r><w:t>Cluster section header</w:t></w:r></w:p>
+</w:hdr>"#;
+    let footer = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p><w:r><w:t>Cluster section footer</w:t></w:r></w:p>
+</w:ftr>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header),
+      ("word/footer1.xml", footer),
+    ]);
+    save(root, "test-data/wml/docx_pdf_sections_cluster.docx", &data);
+  }
+
+  // ── WML-PDF-02: paragraph flow cluster ───────────────────────────────────
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="240" w:after="360" w:line="360" w:lineRule="auto"/>
+        <w:ind w:left="720" w:firstLine="360" w:right="360"/>
+        <w:jc w:val="both"/>
+        <w:tabs><w:tab w:val="right" w:pos="3600"/><w:tab w:val="decimal" w:pos="5400"/></w:tabs>
+      </w:pPr>
+      <w:r><w:t>Cluster paragraph indented lead with enough words to wrap across multiple measured line boxes.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:keepNext/>
+        <w:keepLines/>
+        <w:pBdr><w:bottom w:val="single" w:sz="8" w:space="4" w:color="4472C4"/></w:pBdr>
+        <w:shd w:val="clear" w:fill="E2F0D9"/>
+      </w:pPr>
+      <w:r><w:t>Cluster paragraph keep block</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr><w:pageBreakBefore/></w:pPr>
+      <w:r><w:t>Cluster paragraph page break target</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(
+      root,
+      "test-data/wml/docx_pdf_paragraph_flow_cluster.docx",
+      &data,
+    );
+  }
+
+  // ── WML-PDF-03: table layout cluster ─────────────────────────────────────
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Cluster table before</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="4320" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="1440"/><w:gridCol w:w="1440"/><w:gridCol w:w="1440"/></w:tblGrid>
+      <w:tr>
+        <w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9EAF7"/></w:tcPr><w:p><w:r><w:t>Cluster table head 1</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9EAF7"/></w:tcPr><w:p><w:r><w:t>Cluster table head 2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="D9EAF7"/></w:tcPr><w:p><w:r><w:t>Cluster table head 3</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>Cluster table rowspan origin with wrapped cell text</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cluster table row 1 col 2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cluster table row 1 col 3</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:vMerge/></w:tcPr><w:p/></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>Cluster table horizontal span</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cluster table after rowspan</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cluster table final 2</w:t></w:r></w:p></w:tc>
+        <w:tc><w:tcPr><w:tcW w:w="1440" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Cluster table final 3</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:p><w:r><w:t>Cluster table after</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(
+      root,
+      "test-data/wml/docx_pdf_table_layout_cluster.docx",
+      &data,
+    );
+  }
+
+  // ── WML-PDF-04: drawing flow cluster ─────────────────────────────────────
+  {
+    let img_ct = "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>";
+    let img_rel = r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p><w:r><w:t>Cluster drawing before floating</w:t></w:r></w:p>
+    <w:p>
+      <w:r>
+        <w:drawing>
+          <wp:anchor relativeHeight="251658240" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"
+                     distT="114300" distB="114300" distL="114300" distR="114300">
+            <wp:simplePos x="0" y="0"/>
+            <wp:positionH relativeFrom="column"><wp:align>left</wp:align></wp:positionH>
+            <wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>
+            <wp:extent cx="1371600" cy="914400"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:wrapSquare wrapText="bothSides" distT="114300" distB="114300" distL="114300" distR="114300"/>
+            <wp:docPr id="11" name="Cluster floating image"/>
+            <wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr><pic:cNvPr id="0" name="image1.png"/><pic:cNvPicPr/></pic:nvPicPr>
+                  <pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>
+                  <pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1371600" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:anchor>
+        </w:drawing>
+      </w:r>
+      <w:r><w:t>Cluster drawing anchored paragraph text</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:t>Cluster drawing following paragraph should wrap around retained page fly exclusion.</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", img_ct)),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &docx_doc_rels(img_rel)),
+      ("word/media/image1.png", png),
+    ]);
+    save(
+      root,
+      "test-data/wml/docx_pdf_drawing_flow_cluster.docx",
+      &data,
+    );
+  }
+
+  // ── WML-PDF-05: notes cluster ────────────────────────────────────────────
+  {
+    let footnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+  <w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
+  <w:footnote w:id="1"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> Cluster footnote wraps with enough text to reserve a measured multi-line note block.</w:t></w:r></w:p></w:footnote>
+</w:footnotes>"#;
+    let endnotes = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:endnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:endnote>
+  <w:endnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:endnote>
+  <w:endnote w:id="1"><w:p><w:r><w:endnoteRef/></w:r><w:r><w:t xml:space="preserve"> Cluster endnote entry.</w:t></w:r></w:p></w:endnote>
+</w:endnotes>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Cluster notes body with footnote</w:t></w:r>
+      <w:r><w:footnoteReference w:id="1"/></w:r>
+      <w:r><w:t xml:space="preserve"> and endnote</w:t></w:r>
+      <w:r><w:endnoteReference w:id="1"/></w:r>
+      <w:r><w:t>.</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:t>Cluster notes following body text</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" Target="endnotes.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>
+  <Override PartName="/word/endnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/footnotes.xml", footnotes),
+      ("word/endnotes.xml", endnotes),
+    ]);
+    save(root, "test-data/wml/docx_pdf_notes_cluster.docx", &data);
   }
 }
 

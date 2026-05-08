@@ -39,6 +39,68 @@ fn include_text_height(line_height: f32, text_frame: TextFrame, style: TextStyle
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
   pub pages: Vec<Page>,
+  pub follows: Vec<FrameFollow>,
+  pub frames: Vec<LayoutFrame>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FollowFrameKind {
+  Paragraph,
+  Table,
+  Notes,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FollowReason {
+  KeepTogether,
+  Overflow,
+  ExplicitBreak,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FrameFollow {
+  pub kind: FollowFrameKind,
+  pub reason: FollowReason,
+  pub block_index: Option<usize>,
+  pub from_page_index: usize,
+  pub to_page_index: usize,
+  pub from_section_page_index: usize,
+  pub to_section_page_index: usize,
+  pub from_column_index: usize,
+  pub to_column_index: usize,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct LayoutFrame {
+  pub kind: FollowFrameKind,
+  pub block_index: Option<usize>,
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub column_index: usize,
+  pub items: Vec<PageItem>,
+  pub item_start: usize,
+  pub item_end: usize,
+  pub bounds: Option<FrameBounds>,
+  pub lines: Vec<LineBox>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FrameBounds {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LineBox {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub item_start: usize,
+  pub item_end: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -173,6 +235,8 @@ struct RootFrameLayout<'a> {
   current: Page,
   y: f32,
   emitted_footnotes: HashSet<i64>,
+  follows: Vec<FrameFollow>,
+  frames: Vec<LayoutFrame>,
 }
 
 impl<'a> RootFrameLayout<'a> {
@@ -183,6 +247,8 @@ impl<'a> RootFrameLayout<'a> {
       current: empty_page(document.page, 0),
       y: document.page.margin_top_pt,
       emitted_footnotes: HashSet::new(),
+      follows: Vec::new(),
+      frames: Vec::new(),
     }
   }
 
@@ -198,7 +264,11 @@ impl<'a> RootFrameLayout<'a> {
     apply_page_borders(&mut self.pages);
     resolve_dynamic_fields(&mut self.pages);
 
-    LayoutDocument { pages: self.pages }
+    LayoutDocument {
+      pages: self.pages,
+      follows: self.follows,
+      frames: self.frames,
+    }
   }
 
   fn format_body_frames(&mut self) {
@@ -278,19 +348,22 @@ impl<'a> RootFrameLayout<'a> {
     for (index, block) in blocks.iter().enumerate() {
       let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
-      self.format_block(previous, block, next, &mut flow);
+      self.format_block(index, previous, block, next, &mut flow);
     }
   }
 
   fn format_block(
     &mut self,
+    block_index: usize,
     previous: Option<&Block>,
     block: &Block,
     next: Option<&Block>,
     flow: &mut FlowContext,
   ) {
+    let kind = follow_kind_for_block(block);
     let (block_flow, footnote_top) =
       footnote_boss_reserve(block, self.document, &self.emitted_footnotes, *flow);
+    let transition = self.follow_transition_start(*flow);
     (*flow, self.y) = prepare_block_flow(
       block,
       next,
@@ -299,7 +372,16 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.pages,
       self.y,
     );
+    self.record_follow_transition(
+      transition,
+      *flow,
+      kind,
+      FollowReason::KeepTogether,
+      Some(block_index),
+    );
     *flow = self.advance_if_past_body(*flow);
+    let transition = self.follow_transition_start(*flow);
+    let frame_start = self.frame_segment_start(*flow);
     (*flow, self.y) = layout_document_block(
       previous,
       block,
@@ -308,6 +390,14 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.current,
       &mut self.pages,
       self.y,
+    );
+    self.record_layout_frame_segments(frame_start, *flow, kind, Some(block_index));
+    self.record_follow_transition(
+      transition,
+      *flow,
+      kind,
+      layout_follow_reason_for_block(block),
+      Some(block_index),
     );
     footnote_boss_format(
       block,
@@ -324,8 +414,16 @@ impl<'a> RootFrameLayout<'a> {
 
   fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
     if self.y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !self.current.items.is_empty() {
+      let transition = self.follow_transition_start(flow);
       let (next_flow, next_y) = advance_section_flow(flow, &mut self.current, &mut self.pages);
       self.y = next_y;
+      self.record_follow_transition(
+        transition,
+        next_flow,
+        FollowFrameKind::Paragraph,
+        FollowReason::Overflow,
+        None,
+      );
       next_flow
     } else {
       flow
@@ -392,6 +490,8 @@ impl<'a> RootFrameLayout<'a> {
     for (index, block) in blocks.iter().enumerate() {
       let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
+      let transition = self.follow_transition_start(flow);
+      let frame_start = self.frame_segment_start(flow);
       let (_, y) = layout_document_block(
         previous,
         block,
@@ -402,6 +502,14 @@ impl<'a> RootFrameLayout<'a> {
         self.y,
       );
       self.y = y;
+      self.record_layout_frame_segments(frame_start, flow, FollowFrameKind::Notes, Some(index));
+      self.record_follow_transition(
+        transition,
+        flow,
+        FollowFrameKind::Notes,
+        FollowReason::Overflow,
+        Some(index),
+      );
     }
   }
 
@@ -416,6 +524,245 @@ impl<'a> RootFrameLayout<'a> {
 
   fn push_current_page(&mut self, next: Page) {
     self.pages.push(std::mem::replace(&mut self.current, next));
+  }
+
+  fn follow_transition_start(&self, flow: FlowContext) -> FollowTransitionStart {
+    FollowTransitionStart {
+      page_index: self.pages.len(),
+      section_page_index: flow.section_page_index,
+      column_index: flow.column_index,
+    }
+  }
+
+  fn record_follow_transition(
+    &mut self,
+    start: FollowTransitionStart,
+    flow: FlowContext,
+    kind: FollowFrameKind,
+    reason: FollowReason,
+    block_index: Option<usize>,
+  ) {
+    let to_page_index = self.pages.len();
+    if start.page_index == to_page_index
+      && start.section_page_index == flow.section_page_index
+      && start.column_index == flow.column_index
+    {
+      return;
+    }
+    if self.follows.last().is_some_and(|follow| {
+      follow.kind == kind
+        && follow.reason == reason
+        && follow.block_index == block_index
+        && follow.from_page_index == start.page_index
+        && follow.to_page_index == to_page_index
+        && follow.from_section_page_index == start.section_page_index
+        && follow.to_section_page_index == flow.section_page_index
+        && follow.from_column_index == start.column_index
+        && follow.to_column_index == flow.column_index
+    }) {
+      return;
+    }
+    self.follows.push(FrameFollow {
+      kind,
+      reason,
+      block_index,
+      from_page_index: start.page_index,
+      to_page_index,
+      from_section_page_index: start.section_page_index,
+      to_section_page_index: flow.section_page_index,
+      from_column_index: start.column_index,
+      to_column_index: flow.column_index,
+    });
+  }
+
+  fn frame_segment_start(&self, flow: FlowContext) -> FrameSegmentStart {
+    FrameSegmentStart {
+      page_index: self.pages.len(),
+      item_index: self.current.items.len(),
+      column_index: flow.column_index,
+    }
+  }
+
+  fn record_layout_frame_segments(
+    &mut self,
+    start: FrameSegmentStart,
+    flow: FlowContext,
+    kind: FollowFrameKind,
+    block_index: Option<usize>,
+  ) {
+    let end_page_index = self.pages.len();
+    for page_index in start.page_index..=end_page_index {
+      let page = if page_index < self.pages.len() {
+        &self.pages[page_index]
+      } else {
+        &self.current
+      };
+      let item_start = if page_index == start.page_index {
+        start.item_index
+      } else {
+        0
+      };
+      let item_end = page.items.len();
+      if item_start >= item_end {
+        continue;
+      }
+      let items = page.items[item_start..item_end].to_vec();
+      let bounds = frame_bounds_for_items(&items);
+      let lines = line_boxes_for_items(&page.items, item_start, item_end);
+      self.frames.push(LayoutFrame {
+        kind,
+        block_index,
+        page_index,
+        section_index: page.section_index,
+        section_page_index: page.section_page_index,
+        column_index: if page_index == start.page_index {
+          start.column_index
+        } else {
+          flow.column_index
+        },
+        items,
+        item_start,
+        item_end,
+        bounds,
+        lines,
+      });
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FollowTransitionStart {
+  page_index: usize,
+  section_page_index: usize,
+  column_index: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FrameSegmentStart {
+  page_index: usize,
+  item_index: usize,
+  column_index: usize,
+}
+
+fn follow_kind_for_block(block: &Block) -> FollowFrameKind {
+  match block {
+    Block::Paragraph(_) => FollowFrameKind::Paragraph,
+    Block::Table(_) => FollowFrameKind::Table,
+  }
+}
+
+fn frame_bounds_for_items(items: &[PageItem]) -> Option<FrameBounds> {
+  let mut bounds: Option<(f32, f32, f32, f32)> = None;
+  for item in items {
+    let Some((x1, y1, x2, y2)) = item_bounds(item) else {
+      continue;
+    };
+    bounds = Some(match bounds {
+      Some((min_x, min_y, max_x, max_y)) => {
+        (min_x.min(x1), min_y.min(y1), max_x.max(x2), max_y.max(y2))
+      }
+      None => (x1, y1, x2, y2),
+    });
+  }
+  bounds.map(|(x1, y1, x2, y2)| FrameBounds {
+    x_pt: x1,
+    y_pt: y1,
+    width_pt: (x2 - x1).max(0.0),
+    height_pt: (y2 - y1).max(0.0),
+  })
+}
+
+fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) -> Vec<LineBox> {
+  let mut lines = Vec::new();
+  let mut index = item_start;
+  while index < item_end {
+    let Some(y) = item_line_y(&items[index]) else {
+      index += 1;
+      continue;
+    };
+    let line_start = index;
+    let mut line_end = index + 1;
+    let mut bounds = item_bounds(&items[index]);
+    while line_end < item_end
+      && item_line_y(&items[line_end]).is_some_and(|next_y| (next_y - y).abs() < 0.1)
+    {
+      if let Some((x1, y1, x2, y2)) = item_bounds(&items[line_end]) {
+        bounds = Some(match bounds {
+          Some((min_x, min_y, max_x, max_y)) => {
+            (min_x.min(x1), min_y.min(y1), max_x.max(x2), max_y.max(y2))
+          }
+          None => (x1, y1, x2, y2),
+        });
+      }
+      line_end += 1;
+    }
+    if let Some((x1, y1, x2, y2)) = bounds {
+      lines.push(LineBox {
+        x_pt: x1,
+        y_pt: y1,
+        width_pt: (x2 - x1).max(0.0),
+        height_pt: (y2 - y1).max(0.0),
+        item_start: line_start,
+        item_end: line_end,
+      });
+    }
+    index = line_end;
+  }
+  lines
+}
+
+fn item_line_y(item: &PageItem) -> Option<f32> {
+  match item {
+    PageItem::Text(text) => Some(text.y_pt),
+    PageItem::Image(image) if !image.floating => Some(image.y_pt),
+    PageItem::Image(_) | PageItem::Fill(_) | PageItem::Line(_) => None,
+  }
+}
+
+fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
+  match item {
+    PageItem::Text(text) => {
+      let width = measure_text(&text.text, text.style);
+      let height = inline_text_height(text.style);
+      Some((text.x_pt, text.y_pt, text.x_pt + width, text.y_pt + height))
+    }
+    PageItem::Image(image) => Some((
+      image.x_pt,
+      image.y_pt,
+      image.x_pt + image.width_pt,
+      image.y_pt + image.height_pt,
+    )),
+    PageItem::Fill(fill) => Some((
+      fill.x_pt,
+      fill.y_pt,
+      fill.x_pt + fill.width_pt,
+      fill.y_pt + fill.height_pt,
+    )),
+    PageItem::Line(line) => {
+      let half_width = line.width_pt / 2.0;
+      Some((
+        line.x1_pt.min(line.x2_pt) - half_width,
+        line.y1_pt.min(line.y2_pt) - half_width,
+        line.x1_pt.max(line.x2_pt) + half_width,
+        line.y1_pt.max(line.y2_pt) + half_width,
+      ))
+    }
+  }
+}
+
+fn layout_follow_reason_for_block(block: &Block) -> FollowReason {
+  let Block::Paragraph(paragraph) = block else {
+    return FollowReason::Overflow;
+  };
+  if paragraph.format.page_break_before
+    || paragraph
+      .inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::PageBreak | InlineItem::ColumnBreak))
+  {
+    FollowReason::ExplicitBreak
+  } else {
+    FollowReason::Overflow
   }
 }
 
@@ -1517,6 +1864,8 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
 
   LayoutDocument {
     pages: output_pages,
+    follows: Vec::new(),
+    frames: Vec::new(),
   }
 }
 
@@ -1553,10 +1902,8 @@ impl<'a> TableFrameLayout<'a> {
       + max_cell_spacing_pt * column_count.saturating_sub(1) as f32;
     let left_pt = table_left_position(table, area.content_left_pt, area.content_width, table_width);
     let repeating_header_count = table_repeating_header_count(table);
-    let repeating_header_height = table.rows[..repeating_header_count]
-      .iter()
-      .map(|row| table_row_height_with_widths(row, &column_widths))
-      .sum::<f32>();
+    let repeating_header_height =
+      table_repeating_header_height(table, repeating_header_count, &column_widths);
 
     Some(Self {
       table,
@@ -1684,6 +2031,9 @@ impl<'a> TableFrameLayout<'a> {
       .enumerate()
     {
       y = self.row_frame(header, header_index, y).format(current);
+      if header_index + 1 < self.frame.repeating_header_count || row_height > 0.0 {
+        y += row_cell_spacing_pt(self.table, header);
+      }
     }
     y
   }
@@ -2107,6 +2457,19 @@ fn table_repeating_header_count(table: &Table) -> usize {
   } else {
     count
   }
+}
+
+fn table_repeating_header_height(
+  table: &Table,
+  repeating_header_count: usize,
+  column_widths: &[f32],
+) -> f32 {
+  table
+    .rows
+    .iter()
+    .take(repeating_header_count)
+    .map(|row| table_row_height_with_widths(row, column_widths) + row_cell_spacing_pt(table, row))
+    .sum()
 }
 
 fn cell_horizontal_border(
@@ -4191,6 +4554,106 @@ mod tests {
     assert!(row_has_vertical_merge_context(&table, 0));
     assert!(row_has_vertical_merge_context(&table, 1));
     assert!(row_has_vertical_merge_context(&table, 2));
+  }
+
+  #[test]
+  fn repeated_table_header_fit_includes_following_cell_spacing() {
+    fn paragraph(text: &str) -> Block {
+      let run = crate::docx::TextRun {
+        text: text.to_string(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      })
+    }
+
+    fn cell(text: &str) -> TableCell {
+      TableCell {
+        blocks: vec![paragraph(text)],
+        shading: None,
+        borders: crate::docx::CellBordersModel::default(),
+        margins: crate::docx::CellMargins::default(),
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        vertical_alignment: TableCellVerticalAlignment::Top,
+      }
+    }
+
+    fn row(text: &str, height_pt: f32, repeat_header: bool) -> TableRow {
+      TableRow {
+        cells: vec![cell(text)],
+        height_pt: Some(height_pt),
+        exact_height: true,
+        repeat_header,
+        cant_split: false,
+        cell_spacing_pt: Some(6.0),
+        grid_before: 0,
+        grid_after: 0,
+      }
+    }
+
+    let document = DocxDocument {
+      page: PageSetup {
+        width_pt: 120.0,
+        height_pt: 110.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![Block::Table(Table {
+        column_widths_pt: vec![80.0],
+        preferred_width_pt: None,
+        preferred_width_pct: None,
+        indent_left_pt: 0.0,
+        alignment: TableAlignment::Left,
+        borders: None,
+        cell_spacing_pt: 0.0,
+        rows: vec![row("Header", 20.0, true), row("Body", 70.0, false)],
+      })],
+    };
+
+    let layout = layout(&document, &PdfOptions::default()).unwrap();
+    let header_count = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .filter(|item| matches!(item, PageItem::Text(text) if text.text == "Header"))
+      .count();
+    let body_page = layout.pages.iter().position(|page| {
+      page
+        .items
+        .iter()
+        .any(|item| matches!(item, PageItem::Text(text) if text.text == "Body"))
+    });
+
+    assert_eq!(layout.pages.len(), 2);
+    assert_eq!(header_count, 1);
+    assert_eq!(body_page, Some(1));
   }
 
   #[test]

@@ -113,7 +113,7 @@ The current `crates/ooxmlsdk-pdf` DOCX path is:
 docx::extract
   -> DocxDocument { page, blocks, headers, footers, notes }
   -> layout::layout
-  -> LayoutDocument { pages: Vec<Page { items: Vec<PageItem> }> }
+  -> LayoutDocument { pages, frames, follows }
   -> render::krilla::render
 ```
 
@@ -128,7 +128,8 @@ This supports smoke-level PDF generation and a set of focused features:
   fields, simple fields, and legacy `w:pgNum`
 - document page background color and section page borders
 - headers/footers for a single effective section
-- footnotes/endnotes/comments as appended note blocks
+- footnotes as reserved bottom note areas, with endnotes/comments still emitted
+  through simplified trailing note blocks
 - basic inline images and typed floating DrawingML anchors
 - basic table rows/cells/borders/shading
 - VML and DrawingML textbox text extraction in limited cases
@@ -139,15 +140,25 @@ Known architectural drift:
 - Mid-document section breaks are not modeled as section boundaries.
 - Header/footer link-to-previous and even/odd variants are not modeled.
 - Header/footer dimensions are not computed like Writer page styles.
-- Footnotes do not reserve space on the current page.
+- Footnotes reserve measured space on the current page, but do not yet have
+  true Writer continuation frames.
 - Anchored/floating drawings now keep a typed floating placement model, but
   page-level fly influence is still partial.
 - Tables now have table/row/cell frame ownership, but row splitting and
   follow-flow-line continuation are still simplified.
 - Paragraph layout now enters through `TextFrameLayout`, `TextFrame`, and
   `LineFrame`; column continuation, page follow recording, and the minimum
-  widow/orphan/keepLines split policy now live in the text frame state. Full
-  follow-frame repaint/reflow remains incremental work.
+  widow/orphan/keepLines split policy now live in the text frame state. The
+  final `LayoutDocument` also has frame records with display-list ranges and
+  synthesized line boxes, so line layout can now be snapshotted independently
+  from PDF paint. Full follow-frame repaint/reflow remains incremental work.
+- The public internal `LayoutDocument` now records `LayoutFrame` and
+  `FrameFollow` data for paragraph, table, and note blocks. Frame records carry
+  source block id, page/section-page/column, display-list item range, bounds,
+  and line boxes; follow records carry source block, reason, source
+  page/section-page/column, and destination page/section-page/column. This is
+  the first concrete master/follow substrate; PDF paint still consumes the
+  display list.
 
 ## 4. Target Internal Model
 
@@ -208,6 +219,8 @@ The layout model should represent Writer-like frames:
 ```text
 LayoutDocument
   pages: Vec<PageFrame>
+  frames: Vec<LayoutFrame>
+  follows: Vec<FrameFollow>
 
 PageFrame
   page_style
@@ -275,18 +288,18 @@ feature-cluster fixtures that exercise a whole Writer behavior area at once.
 
 Default fixture groups:
 
-- `docx_sections_layout.docx`: section breaks, page size/orientation, page
+- `docx_pdf_sections_cluster.docx`: section breaks, page size/orientation, page
   parity, first/default/even header/footer inheritance, columns, hard column
   breaks, and explicit non-equal column definitions.
-- `docx_paragraph_flow.docx`: spacing, indents, tabs, borders/shading,
+- `docx_pdf_paragraph_flow_cluster.docx`: spacing, indents, tabs, borders/shading,
   page-break-before, keep-next, keep-lines, widow/orphan scenarios, numbering,
   and common run properties.
-- `docx_tables_layout.docx`: table width/indent/alignment, grid/span/merge,
+- `docx_pdf_table_layout_cluster.docx`: table width/indent/alignment, grid/span/merge,
   cell margins, row height, cantSplit, repeated header rows, row/page splitting,
   borders, shading, and nested tables.
-- `docx_drawing_flow.docx`: inline drawings, anchors, relative positioning,
+- `docx_pdf_drawing_flow_cluster.docx`: inline drawings, anchors, relative positioning,
   wrap modes, behind/in-front state, VML fallback, and text boxes.
-- `docx_notes_layout.docx`: footnote/endnote references, separators,
+- `docx_pdf_notes_cluster.docx`: footnote/endnote references, separators,
   continuation separators, bottom note areas, notes in columns/tables, and
   fallback ordering.
 
@@ -304,7 +317,7 @@ more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
-Current Writer-parity estimate: about 43% of full LibreOffice Writer DOCX to
+Current Writer-parity estimate: about 50% of full LibreOffice Writer DOCX to
 PDF behavior. The main path now covers typed package import, section/page-style
 flow, first/default/even header/footer inheritance and selection, negative
 top/bottom margin header/footer fallback, basic column flow, paragraph/run/style
@@ -313,7 +326,15 @@ refresh, page backgrounds/borders, measured footnote reservation, raster images,
 floating anchors with paragraph-local and page-level square/tight wrap
 influence, and a Writer-shaped table/frame path with row follows, repeated
 header rows, cell margins/spacing, vertical merge, rowspan-aware split
-guarding, and table-style cascades.
+guarding, repeated-header fit checks that account for cell spacing, and
+table-style cascades. Cluster DOCX layout snapshots now cover the section,
+paragraph, table, drawing, and notes lanes so broad regressions are easier to
+catch before pixel/PDF-byte comparison exists. `LayoutDocument` now carries
+concrete frame records and block-level follow metadata for paragraph, table,
+and note frame transitions: each frame has a page/column owner, display-list
+range, bounds, and synthesized line boxes. This moves the renderer past a
+flat display-list-only model and gives the next Writer-style rollback and
+backward invalidation work something concrete to operate on.
 The remaining gap is still large because LibreOffice parity depends on durable
 Writer master/follow frame state, exact line breaking and full bidi/CJK
 justification, full footnote/table/fly interaction, compatibility-mode quirks,
@@ -328,9 +349,9 @@ Estimate by area, using LibreOffice Writer as the target:
 | DOCX package/import backbone | ~60% | Settings, compatibility flags, more part types, theme/style defaults, revision and field metadata. |
 | Sections/page styles/repeating areas | ~58% | Full negative-margin text-frame conversion, page-master reassignment after backward moves, page numbering, mirrored/gutter pages, exact header/footer dynamic sizing. |
 | Paragraph/run properties | ~40% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
-| Text layout | ~34% | Persistent master/follow frames, backward reflow, exact line breaking, full bidi/CJK justification. |
-| Tables | ~40% | Full rowspan split recalculation, backward move/repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
-| Footnotes/endnotes | ~30% | True footnote frames, continuation separators, note/table/column interactions, separator style/settings. |
+| Text layout | ~44% | Backward reflow, exact line breaking, full bidi/CJK justification, line-box-driven paint. |
+| Tables | ~48% | Full rowspan split recalculation, backward move/repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
+| Footnotes/endnotes | ~35% | True continuation frames, continuation separators, note/table/column interactions, separator style/settings. |
 | Drawing/floating objects | ~34% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
 | PDF paint/export quality | ~36% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, bookmarks/internal links, metadata/export options. |
 
@@ -454,7 +475,10 @@ Current progress:
   `w:tblHeader` marks consecutive leading repeated header rows and
   `w:cantSplit` is retained on the row model. Layout repeats valid table header
   rows after page breaks, following LibreOffice's constraints that all-row
-  headers and more than 10 header rows do not repeat.
+  headers and more than 10 header rows do not repeat. Repeated header fit
+  checks include the following cell-spacing gutter so a headline is not
+  repainted when the header plus the next row cannot actually fit in the follow
+  region.
 - Table and cell margins are imported through generated `w::TableCellMarginDefault`
   and `w::TableCellMargin` types. Layout uses those margins for row height,
   content inset, and vertical alignment instead of a fixed padding constant,
@@ -1006,24 +1030,25 @@ Avoid relying only on "PDF starts with `%PDF-`" once layout behavior exists.
 
 ## 8. Immediate Next Step
 
-The section/page-style backbone is now in place. Continue with Writer-frame
-alignment in small, behavior-oriented batches:
+The section/page-style backbone, DOCX/PDF cluster snapshots, and concrete
+layout frame records are now in place. Continue with Writer-frame alignment in
+larger behavior batches:
 
-1. Preserve raw top/bottom page-margin state for sections and implement the
-   negative margin header/footer fallback described by LibreOffice
-   `SectionPropertyMap::HandleMarginsHeaderFooter()` and
-   `ConvertHeaderFooterToTextFrame()`.
-2. Replace the current one-shot paragraph/table move-forward logic with durable
-   master/follow frame state so later footnote, table, and fly-frame changes can
-   move content backward as well as forward.
-3. Promote text layout from direct `PageItem` emission to a stable line-box
-   model. PDF paint now consumes shaped glyph positions, but line boxes still
-   need to become the primary layout artifact.
-4. Extend table follow behavior around row spans, split-border ownership, and
-   repeated header repaint after row fragments.
-5. Extend floating frame influence from paragraph-local exclusions to
+1. Extend `LayoutFrame`/`FrameFollow` with split start/end cursors and
+   invalidation state, then use those records for the first backward move when
+   footnotes or fly frames shrink the usable region after initial placement.
+2. Promote line boxes from synthesized metadata to the primary text layout
+   artifact, so PDF paint consumes frame/line/glyph records instead of scanning
+   `PageItem::Text`.
+3. Extend table frame records with row and cell fragment ranges, then use them
+   for row-span split recalculation, split-border ownership, and repeated
+   header repaint after row fragments.
+4. Extend floating frame influence from paragraph-local exclusions to
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.
+5. Start comparing the cluster fixture snapshots against LibreOffice-generated
+   PDF/layout observations, then split only the failing cases into focused
+   regression fixtures.
 
 The fastest route toward LibreOffice parity is to keep each batch anchored to a
 specific LibreOffice function or fixture group, then assert import/layout

@@ -2440,6 +2440,35 @@ fn create_wml_paragraphs_fixtures(root: &Path) {
     ]);
     save(root, "test-data/wml/para_keep.docx", &data);
   }
+
+  // ── WML-P-06: para_keep_flow ─────────────────────────────────────────────
+  // Small page where a keepNext heading would fit alone at the bottom, but the
+  // heading plus following body paragraph must move together to the next page.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Filler 1</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Filler 2</w:t></w:r></w:p>
+    <w:p>
+      <w:pPr><w:keepNext/></w:pPr>
+      <w:r><w:t>Kept heading</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:t>Kept body</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="4320" w:h="2160"/>
+      <w:pgMar w:top="360" w:right="360" w:bottom="360"
+               w:left="360" w:header="180" w:footer="180" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/para_keep_flow.docx", &data);
+  }
 }
 
 fn main() {
@@ -2613,6 +2642,199 @@ fn create_wml_headers_fixtures(root: &Path) {
       ("word/footer1.xml", footer1),
     ]);
     save(root, "test-data/wml/header_first_page.docx", &data);
+  }
+
+  // ── WML-H-03: header_section_inheritance ─────────────────────────────────
+  // First section defines default/even header and default footer. Second
+  // section has no header/footer references and should inherit the slots.
+  // Settings enables even/odd headers so the second page uses the even header.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Inherited Default Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let header2 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Inherited Even Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Inherited Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let settings = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:evenAndOddHeaders/>
+</w:settings>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>First section body.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:sectPr>
+          <w:headerReference w:type="default" r:id="rId2"/>
+          <w:headerReference w:type="even" r:id="rId3"/>
+          <w:footerReference w:type="default" r:id="rId4"/>
+          <w:type w:val="nextPage"/>
+          <w:pgSz w:w="12240" w:h="15840"/>
+          <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+                   w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+        </w:sectPr>
+      </w:pPr>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second section body.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:type w:val="nextPage"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/header2.xml", header2),
+      ("word/footer1.xml", footer1),
+      ("word/settings.xml", settings),
+    ]);
+    save(root, "test-data/wml/header_section_inheritance.docx", &data);
+  }
+
+  // ── WML-H-04: header_section_first_page ──────────────────────────────────
+  // Later section defines titlePg with default/first headers and footers.
+  // Its first page should use the first-page slots, not the default slots.
+  {
+    let header1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Opening Section Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let header2 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Second Section Default Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let header3 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Second Section First Header</w:t></w:r>
+  </w:p>
+</w:hdr>"#;
+    let footer1 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Second Section Default Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let footer2 = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr><w:jc w:val="center"/></w:pPr>
+    <w:r><w:t>Second Section First Footer</w:t></w:r>
+  </w:p>
+</w:ftr>"#;
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Opening section body.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:sectPr>
+          <w:headerReference w:type="default" r:id="rId2"/>
+          <w:type w:val="nextPage"/>
+          <w:pgSz w:w="12240" w:h="15840"/>
+          <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+                   w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+        </w:sectPr>
+      </w:pPr>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Second section body.</w:t></w:r>
+    </w:p>
+    <w:sectPr>
+      <w:headerReference w:type="default" r:id="rId3"/>
+      <w:headerReference w:type="first" r:id="rId4"/>
+      <w:footerReference w:type="default" r:id="rId5"/>
+      <w:footerReference w:type="first" r:id="rId6"/>
+      <w:type w:val="nextPage"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+      <w:titlePg/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header3.xml"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+  <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>"#,
+    );
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/header3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+  <Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>"#,
+      "",
+    );
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/header1.xml", header1),
+      ("word/header2.xml", header2),
+      ("word/header3.xml", header3),
+      ("word/footer1.xml", footer1),
+      ("word/footer2.xml", footer2),
+    ]);
+    save(root, "test-data/wml/header_section_first_page.docx", &data);
   }
 }
 
@@ -3246,6 +3468,94 @@ fn create_wml_sections_fixtures(root: &Path) {
     ]);
     save(root, "test-data/wml/section_props.docx", &data);
   }
+
+  // ── WML-S-03: section_columns_flow ────────────────────────────────────────
+  // Small page with two equal columns and enough paragraphs to force block
+  // flow into the second column.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Item 01</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 02</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 03</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 04</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 05</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 06</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 07</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 08</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Item 09</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="3600" w:h="2880"/>
+      <w:pgMar w:top="360" w:right="360" w:bottom="360"
+               w:left="360" w:header="180" w:footer="180" w:gutter="0"/>
+      <w:cols w:num="2" w:space="360" w:sep="1"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/section_columns_flow.docx", &data);
+  }
+
+  // ── WML-S-04: section_column_break ───────────────────────────────────────
+  // A hard run-level column break in a two-column section. LibreOffice imports
+  // this as a deferred paragraph COLUMN_BEFORE break; single-column or final
+  // column cases fall back to a page break.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Before break.</w:t></w:r></w:p>
+    <w:p><w:r><w:br w:type="column"/></w:r></w:p>
+    <w:p><w:r><w:t>After break.</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720"
+               w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+      <w:cols w:num="2" w:space="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/section_column_break.docx", &data);
+  }
+
+  // ── WML-S-05: section_columns_explicit ───────────────────────────────────
+  // Non-equal column widths and spacing. LibreOffice uses the explicit
+  // w:col width/space values when equalWidth is off and the list is complete.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Narrow</w:t></w:r></w:p>
+    <w:p><w:r><w:br w:type="column"/></w:r></w:p>
+    <w:p><w:r><w:t>Wide</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720"
+               w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+      <w:cols w:equalWidth="0" w:sep="1">
+        <w:col w:w="1440" w:space="720"/>
+        <w:col w:w="2880"/>
+      </w:cols>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/section_columns_explicit.docx", &data);
+  }
 }
 
 fn create_wml_tables_fixtures(root: &Path) {
@@ -3418,6 +3728,12 @@ fn create_wml_tables_fixtures(root: &Path) {
     <w:tbl>
       <w:tblPr>
         <w:tblW w:w="5000" w:type="pct"/>
+        <w:tblCellMar>
+          <w:top w:w="120" w:type="dxa"/>
+          <w:left w:w="180" w:type="dxa"/>
+          <w:bottom w:w="120" w:type="dxa"/>
+          <w:right w:w="180" w:type="dxa"/>
+        </w:tblCellMar>
       </w:tblPr>
       <w:tblGrid>
         <w:gridCol w:w="4320"/>
@@ -3432,6 +3748,12 @@ fn create_wml_tables_fixtures(root: &Path) {
           <w:tcPr>
             <w:tcW w:w="4320" w:type="dxa"/>
             <w:vAlign w:val="center"/>
+            <w:tcMar>
+              <w:top w:w="240" w:type="dxa"/>
+              <w:left w:w="360" w:type="dxa"/>
+              <w:bottom w:w="240" w:type="dxa"/>
+              <w:right w:w="360" w:type="dxa"/>
+            </w:tcMar>
           </w:tcPr>
           <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Left (center valign)</w:t></w:r></w:p>
         </w:tc>
@@ -3483,6 +3805,50 @@ fn create_wml_tables_fixtures(root: &Path) {
       ("word/document.xml", doc),
     ]);
     save(root, "test-data/wml/table_props.docx", &data);
+  }
+
+  // ── WML-T-04: table_header_repeat ────────────────────────────────────────
+  // Repeating header row on a small page so the table spans pages.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="2880" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="2880"/></w:tblGrid>
+      <w:tr>
+        <w:trPr><w:tblHeader/></w:trPr>
+        <w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>Repeat Header</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>Row 1</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>Row 2</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>Row 3</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>Row 4</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>Row 5</w:t></w:r></w:p></w:tc></w:tr>
+    </w:tbl>
+    <w:sectPr>
+      <w:pgSz w:w="4320" w:h="2160"/>
+      <w:pgMar w:top="360" w:right="360" w:bottom="360"
+               w:left="360" w:header="180" w:footer="180" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/table_header_repeat.docx", &data);
   }
 }
 

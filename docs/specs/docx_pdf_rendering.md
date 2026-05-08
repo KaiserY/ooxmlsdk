@@ -235,6 +235,43 @@ decisions.
 
 ## 5. Implementation Phases
 
+### Fixture and Verification Strategy
+
+The DOCX/PDF lane should optimize for large LibreOffice-aligned coverage
+increments, not one fixture per tiny property. New coverage should prefer
+feature-cluster fixtures that exercise a whole Writer behavior area at once.
+
+Default fixture groups:
+
+- `docx_sections_layout.docx`: section breaks, page size/orientation, page
+  parity, first/default/even header/footer inheritance, columns, hard column
+  breaks, and explicit non-equal column definitions.
+- `docx_paragraph_flow.docx`: spacing, indents, tabs, borders/shading,
+  page-break-before, keep-next, keep-lines, widow/orphan scenarios, numbering,
+  and common run properties.
+- `docx_tables_layout.docx`: table width/indent/alignment, grid/span/merge,
+  cell margins, row height, cantSplit, repeated header rows, row/page splitting,
+  borders, shading, and nested tables.
+- `docx_drawing_flow.docx`: inline drawings, anchors, relative positioning,
+  wrap modes, behind/in-front state, VML fallback, and text boxes.
+- `docx_notes_layout.docx`: footnote/endnote references, separators,
+  continuation separators, bottom note areas, notes in columns/tables, and
+  fallback ordering.
+
+Small single-purpose DOCX fixtures are reserved for bug regressions or cases
+where a minimal isolated document is necessary to expose an import/layout
+failure. Existing small fixtures can remain while behavior is unstable, but new
+coverage should be added to the clustered fixtures first. Tests should assert a
+layout snapshot for the cluster: page count, key text positions, repeated
+content counts, line/fill/image counts, and note/header/table placement. This
+keeps verification broad enough for rapid development while preserving the path
+to precise LibreOffice parity.
+
+Implementation work should also happen in feature batches. A batch may import
+more properties than layout consumes immediately, provided the model fields are
+typed, source-backed by generated `ooxmlsdk` types, documented in this file,
+and marked as pending layout consumption in the matrix/status text.
+
 ### Phase 0: Freeze Non-DOCX Scope
 
 - Keep `xlsx.rs` and `pptx.rs` compiling.
@@ -308,15 +345,69 @@ Current progress:
   `PrepareHeaderFooterProperties`: header starts at `w:pgMar/@header` and ends
   at the top body margin, footer starts at the bottom body margin and ends at
   `w:pgMar/@footer`, with a 1mm minimum area height.
+- Section `w:cols` is now imported through generated `w::Columns` into
+  `SectionColumns`, including count, gap, separator flag, and explicit
+  non-equal `w:col` width/space definitions when `equalWidth` is off.
+- Layout has an adapter-level equal-column flow at block boundaries, plus
+  separator painting when `w:cols/@sep` is enabled. Paragraph-internal and
+  table-internal column splitting remain frame-model work.
+- Run-level `w:br w:type="column"` is imported as a distinct typed
+  `InlineItem::ColumnBreak`. In multi-column sections it advances following
+  block content to the next column; in single-column or final-column contexts
+  it follows the LibreOffice/Typst fallback shape and behaves like a page
+  break. Inline continuation after the break is still deferred until the
+  Writer-like line/frame model lands.
+- Footnotes/endnotes are now imported as typed id-to-block maps, and paragraphs
+  retain generated-type-derived footnote/endnote reference ids.
+- Footnote content is laid out immediately after the referencing paragraph in
+  the current section flow, instead of only being appended after all document
+  body content. This is still an adapter step toward Writer's true page
+  footnote area.
+- Paragraph keep properties are now imported through generated paragraph
+  property types: `w:keepNext` maps to `keep_with_next`, `w:keepLines` maps to
+  `keep_lines`, and `w:pageBreakBefore` remains the page-break-before signal.
+  Layout has an adapter-level preflight that advances to the next column/page
+  when a keep group does not fit in the current flow region.
+- Table row properties are imported through generated `w::TableRowProperties`:
+  `w:tblHeader` marks consecutive leading repeated header rows and
+  `w:cantSplit` is retained on the row model. Layout repeats valid table header
+  rows after page breaks, following LibreOffice's constraints that all-row
+  headers and more than 10 header rows do not repeat.
+- Table and cell margins are imported through generated `w::TableCellMarginDefault`
+  and `w::TableCellMargin` types. Layout uses those margins for row height,
+  content inset, and vertical alignment instead of a fixed padding constant,
+  matching LibreOffice's cell border-distance import path.
+- DrawingML anchors are imported through generated `wp::Anchor` types into a
+  typed floating image placement model. The adapter consumes `positionH`,
+  `positionV`, wrap mode, `behindDoc`, and anchor text distances for initial
+  page/margin/column/paragraph-relative placement. This follows LibreOffice's
+  `GraphicImport` direction while keeping full wrap avoidance and z-ordering as
+  frame-model work.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
   - missing `w:type` is treated as `nextPage`
   - `continuous` with changed page orientation is treated as `nextPage`
   - `nextColumn` without a valid matching multi-column context is treated as
-    `nextPage`
+    `nextPage`; the matching-column check also uses explicit non-equal `w:col`
+    definitions when present
 - Tests cover paragraph-level/body-level section collection, continuous
   same-orientation behavior, orientation-change normalization, and next-column
   normalization.
+- Real DOCX fixture coverage includes section header/footer inheritance and
+  even-page header selection via `test-data/wml/header_section_inheritance.docx`.
+- Real DOCX fixture coverage includes first-page header/footer selection on a later
+  section via `test-data/wml/header_section_first_page.docx`.
+- Real DOCX fixture coverage includes block-level section column flow, a hard
+  column break, and explicit non-equal column definitions via
+  `test-data/wml/section_columns_flow.docx`,
+  `test-data/wml/section_column_break.docx`, and
+  `test-data/wml/section_columns_explicit.docx`.
+- Real DOCX fixture coverage includes keep-next page migration via
+  `test-data/wml/para_keep_flow.docx`.
+- Real DOCX fixture coverage includes repeated table headers across pages via
+  `test-data/wml/table_header_repeat.docx`.
+- Real DOCX fixture coverage includes floating DrawingML image anchor import
+  and placement via `test-data/wml/image_floating.docx`.
 - Verification for DOCX/PDF iteration currently includes
   `cargo test -p ooxmlsdk-pdf` and
   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings`. Broader
@@ -324,12 +415,11 @@ Current progress:
 
 Remaining Phase 1 work:
 
-- Add tests backed by real DOCX fixtures for section header/footer inheritance,
-  first-page slots per section, and even-page slots.
 - Handle negative header/footer margins using LibreOffice's text-frame fallback
   direction from `HandleMarginsHeaderFooter`.
 - Replace the adapter with a Writer-like page/frame layout that can enforce
-  section columns, footnote space, and floating frames.
+  paragraph-internal column splitting and inline continuation after column
+  breaks, bottom footnote areas, and floating frames.
 
 ### Phase 2: Paragraph and Run Property Mapping
 
@@ -345,10 +435,8 @@ Implement:
 - Move extraction toward a typed property resolver rather than ad hoc merging.
 - Preserve direct, paragraph style, character style, doc default, and numbering
   precedence.
-- Model paragraph keep behavior:
-  - `keepNext`
-  - `keepLines`
-  - `pageBreakBefore`
+- Finish paragraph keep behavior beyond the current adapter preflight:
+  - line-accurate `keepLines`
   - widow/orphan control
 - Model tabs, indents, spacing, borders, shading, bidi, and justification as
   layout properties.

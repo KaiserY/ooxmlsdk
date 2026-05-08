@@ -1,6 +1,6 @@
 mod units;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use ooxmlsdk::parts::{
   endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
@@ -9,7 +9,9 @@ use ooxmlsdk::parts::{
   wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
-  schemas_microsoft_com_vml as v, schemas_openxmlformats_org_wordprocessingml_2006_main as w,
+  schemas_microsoft_com_vml as v,
+  schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
+  schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -30,7 +32,9 @@ pub(crate) struct DocxDocument {
   pub first_header_blocks: Vec<Block>,
   pub first_footer_blocks: Vec<Block>,
   pub footnote_blocks: Vec<Block>,
+  pub footnotes: BTreeMap<i64, Vec<Block>>,
   pub endnote_blocks: Vec<Block>,
+  pub endnotes: BTreeMap<i64, Vec<Block>>,
   pub comment_blocks: Vec<Block>,
   pub title_page: bool,
   pub blocks: Vec<Block>,
@@ -41,6 +45,7 @@ pub(crate) struct ImportedSection {
   pub break_kind: SectionBreakKind,
   pub section_properties: Option<w::SectionProperties>,
   pub page: PageSetup,
+  pub columns: SectionColumns,
   pub title_page: bool,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
@@ -49,6 +54,29 @@ pub(crate) struct ImportedSection {
   pub even_header_blocks: Vec<Block>,
   pub even_footer_blocks: Vec<Block>,
   pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SectionColumns {
+  pub count: usize,
+  pub gap_pt: f32,
+  pub separator: bool,
+  pub explicit_count: usize,
+  pub explicit_widths_pt: [f32; 45],
+  pub explicit_gaps_pt: [f32; 44],
+}
+
+impl Default for SectionColumns {
+  fn default() -> Self {
+    Self {
+      count: 1,
+      gap_pt: 36.0,
+      separator: false,
+      explicit_count: 0,
+      explicit_widths_pt: [0.0; 45],
+      explicit_gaps_pt: [0.0; 44],
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -69,6 +97,8 @@ pub(crate) enum Block {
 #[derive(Clone, Debug)]
 pub(crate) struct Paragraph {
   pub inlines: Vec<InlineItem>,
+  pub footnote_reference_ids: Vec<i64>,
+  pub endnote_reference_ids: Vec<i64>,
   #[cfg(test)]
   pub runs: Vec<TextRun>,
   pub format: ParagraphFormat,
@@ -80,6 +110,7 @@ pub(crate) struct Table {
   pub column_widths_pt: Vec<f32>,
   pub preferred_width_pt: Option<f32>,
   pub borders: Option<TableBordersModel>,
+  pub cell_margins: CellMargins,
   pub rows: Vec<TableRow>,
 }
 
@@ -88,6 +119,8 @@ pub(crate) struct TableRow {
   pub cells: Vec<TableCell>,
   pub height_pt: Option<f32>,
   pub exact_height: bool,
+  pub repeat_header: bool,
+  pub cant_split: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -95,9 +128,29 @@ pub(crate) struct TableCell {
   pub blocks: Vec<Block>,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
+  pub margins: CellMargins,
   pub grid_span: usize,
   pub vertical_merge_continue: bool,
   pub vertical_alignment: TableCellVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CellMargins {
+  pub top_pt: f32,
+  pub right_pt: f32,
+  pub bottom_pt: f32,
+  pub left_pt: f32,
+}
+
+impl Default for CellMargins {
+  fn default() -> Self {
+    Self {
+      top_pt: 4.0,
+      right_pt: 4.0,
+      bottom_pt: 4.0,
+      left_pt: 4.0,
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -154,6 +207,8 @@ pub(crate) struct ParagraphFormat {
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub page_break_before: bool,
+  pub keep_with_next: bool,
+  pub keep_lines: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -190,6 +245,7 @@ pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
   PageBreak,
+  ColumnBreak,
 }
 
 #[derive(Clone, Debug)]
@@ -199,6 +255,57 @@ pub(crate) struct InlineImage {
   pub width_pt: f32,
   pub height_pt: f32,
   pub alt_text: Option<String>,
+  pub placement: ImagePlacement,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) enum ImagePlacement {
+  #[default]
+  Inline,
+  Floating(FloatingImagePlacement),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FloatingImagePlacement {
+  pub horizontal_relative_to: HorizontalImageReference,
+  pub vertical_relative_to: VerticalImageReference,
+  pub horizontal_offset_pt: f32,
+  pub vertical_offset_pt: f32,
+  pub wrap: ImageWrapMode,
+  pub behind_text: bool,
+  pub margin_top_pt: f32,
+  pub margin_right_pt: f32,
+  pub margin_bottom_pt: f32,
+  pub margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum HorizontalImageReference {
+  Page,
+  #[default]
+  Margin,
+  Column,
+  Character,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum VerticalImageReference {
+  Page,
+  #[default]
+  Margin,
+  Paragraph,
+  Line,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum ImageWrapMode {
+  #[default]
+  Inline,
+  Square,
+  Tight,
+  Through,
+  TopBottom,
+  None,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -306,8 +413,10 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.first_footer_blocks.clone())
     .unwrap_or_default();
-  let footnote_blocks = footnote_blocks(package, &main, &styles)?;
-  let endnote_blocks = endnote_blocks(package, &main, &styles)?;
+  let footnotes = footnotes(package, &main, &styles)?;
+  let footnote_blocks = flatten_note_blocks(&footnotes);
+  let endnotes = endnotes(package, &main, &styles)?;
+  let endnote_blocks = flatten_note_blocks(&endnotes);
   let comment_blocks = comment_blocks(package, &main, &styles)?;
   let title_page = sections
     .first()
@@ -324,7 +433,9 @@ pub(crate) fn extract(
     first_header_blocks,
     first_footer_blocks,
     footnote_blocks,
+    footnotes,
     endnote_blocks,
+    endnotes,
     comment_blocks,
     title_page,
     blocks,
@@ -508,6 +619,10 @@ fn close_section(
     .as_ref()
     .map(page_setup)
     .unwrap_or_default();
+  let columns = section_properties
+    .as_ref()
+    .map(section_columns)
+    .unwrap_or_default();
   let title_page = section_properties
     .as_ref()
     .and_then(|section| section.w_title_pg.as_ref())
@@ -518,6 +633,7 @@ fn close_section(
     break_kind,
     section_properties: section_properties.clone(),
     page,
+    columns,
     title_page,
     header_blocks: Vec::new(),
     footer_blocks: Vec::new(),
@@ -538,6 +654,7 @@ fn default_section(blocks: Vec<Block>) -> ImportedSection {
     break_kind: SectionBreakKind::NextPage,
     section_properties: None,
     page: PageSetup::default(),
+    columns: SectionColumns::default(),
     title_page: false,
     header_blocks: Vec::new(),
     footer_blocks: Vec::new(),
@@ -608,12 +725,84 @@ fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValu
 }
 
 fn section_column_count(section: &w::SectionProperties) -> i16 {
-  section
-    .w_cols
-    .as_ref()
-    .and_then(|columns| columns.column_count)
-    .unwrap_or(1)
-    .max(1)
+  let Some(columns) = section.w_cols.as_ref() else {
+    return 1;
+  };
+  if !columns.equal_width.unwrap_or(true) && !columns.w_col.is_empty() {
+    return (columns.w_col.len() as i16).max(1);
+  }
+  columns.column_count.unwrap_or(1).max(1)
+}
+
+fn section_columns(section: &w::SectionProperties) -> SectionColumns {
+  let Some(columns) = section.w_cols.as_ref() else {
+    return SectionColumns::default();
+  };
+  let equal_width = columns.equal_width.unwrap_or(true);
+  let gap_pt = columns
+    .space
+    .as_deref()
+    .and_then(twips_attr_to_points)
+    .filter(|gap| gap.is_finite() && *gap >= 0.0)
+    .unwrap_or(36.0);
+  if !equal_width && !columns.w_col.is_empty() {
+    let explicit_widths_pt = columns
+      .w_col
+      .iter()
+      .filter_map(|column| {
+        column
+          .width
+          .as_deref()
+          .and_then(twips_attr_to_points)
+          .filter(|width| width.is_finite() && *width > 0.0)
+      })
+      .collect::<Vec<_>>();
+    if explicit_widths_pt.len() == columns.w_col.len() {
+      let explicit_gaps_pt = columns
+        .w_col
+        .iter()
+        .take(columns.w_col.len().saturating_sub(1))
+        .map(|column| {
+          column
+            .space
+            .as_deref()
+            .and_then(twips_attr_to_points)
+            .filter(|gap| gap.is_finite() && *gap >= 0.0)
+            .unwrap_or(gap_pt)
+        })
+        .collect::<Vec<_>>();
+      let explicit_count = explicit_widths_pt.len().min(45);
+      let mut widths = [0.0; 45];
+      let mut gaps = [0.0; 44];
+      for (index, width) in explicit_widths_pt.iter().copied().take(45).enumerate() {
+        widths[index] = width;
+      }
+      for (index, gap) in explicit_gaps_pt.iter().copied().take(44).enumerate() {
+        gaps[index] = gap;
+      }
+      return SectionColumns {
+        count: explicit_count.max(1),
+        gap_pt,
+        separator: columns.separator.unwrap_or(false),
+        explicit_count,
+        explicit_widths_pt: widths,
+        explicit_gaps_pt: gaps,
+      };
+    }
+  }
+
+  let count = columns
+    .column_count
+    .map(|count| count.max(1) as usize)
+    .unwrap_or(1);
+  SectionColumns {
+    count,
+    gap_pt,
+    separator: columns.separator.unwrap_or(false),
+    explicit_count: 0,
+    explicit_widths_pt: [0.0; 45],
+    explicit_gaps_pt: [0.0; 44],
+  }
 }
 
 fn sdt_block_blocks(
@@ -767,18 +956,18 @@ fn referenced_footer_blocks(
   footer_blocks(package, main, section, styles, footer_type)
 }
 
-fn footnote_blocks(
+fn footnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
-) -> Result<Vec<Block>> {
+) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.footnotes_part(package) else {
-    return Ok(Vec::new());
+    return Ok(BTreeMap::new());
   };
   let images = ImageCatalog::load_from_footnotes(package, &part);
   let footnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
-  let mut blocks = Vec::new();
+  let mut notes = BTreeMap::new();
 
   for footnote in &footnotes.w_footnote {
     if footnote.id < 1
@@ -789,6 +978,7 @@ fn footnote_blocks(
     {
       continue;
     }
+    let mut blocks = Vec::new();
     append_note_blocks(
       &mut blocks,
       format!("{} ", footnote.id),
@@ -803,23 +993,24 @@ fn footnote_blocks(
       &mut numbering,
       &images,
     );
+    notes.insert(footnote.id, blocks);
   }
 
-  Ok(blocks)
+  Ok(notes)
 }
 
-fn endnote_blocks(
+fn endnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
-) -> Result<Vec<Block>> {
+) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.endnotes_part(package) else {
-    return Ok(Vec::new());
+    return Ok(BTreeMap::new());
   };
   let images = ImageCatalog::load_from_endnotes(package, &part);
   let endnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
-  let mut blocks = Vec::new();
+  let mut notes = BTreeMap::new();
 
   for endnote in &endnotes.w_endnote {
     if endnote.id < 1
@@ -830,6 +1021,7 @@ fn endnote_blocks(
     {
       continue;
     }
+    let mut blocks = Vec::new();
     append_note_blocks(
       &mut blocks,
       format!("{} ", endnote.id),
@@ -844,9 +1036,17 @@ fn endnote_blocks(
       &mut numbering,
       &images,
     );
+    notes.insert(endnote.id, blocks);
   }
 
-  Ok(blocks)
+  Ok(notes)
+}
+
+fn flatten_note_blocks(notes: &BTreeMap<i64, Vec<Block>>) -> Vec<Block> {
+  notes
+    .values()
+    .flat_map(|blocks| blocks.iter().cloned())
+    .collect()
 }
 
 fn comment_blocks(
@@ -928,18 +1128,21 @@ fn paragraph_model(
     .and_then(|properties| numbering.next_label(properties, &mut format));
 
   let inlines = paragraph_inlines(paragraph, styles.run_style(style_id), styles, images);
+  let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
   #[cfg(test)]
   let runs = inlines
     .iter()
     .filter_map(|item| match item {
       InlineItem::Text(run) => Some(run.clone()),
       InlineItem::Image(_) => None,
-      InlineItem::PageBreak => None,
+      InlineItem::PageBreak | InlineItem::ColumnBreak => None,
     })
     .collect();
 
   Paragraph {
     inlines,
+    footnote_reference_ids,
+    endnote_reference_ids,
     #[cfg(test)]
     runs,
     format,
@@ -954,6 +1157,10 @@ fn table_model(
   images: &ImageCatalog,
 ) -> Table {
   let properties = table.w_tbl_pr.as_deref();
+  let cell_margins = properties
+    .and_then(|properties| properties.table_cell_margin_default.as_deref())
+    .map(table_cell_margin_default)
+    .unwrap_or_default();
   Table {
     column_widths_pt: table
       .w_tbl_grid
@@ -972,11 +1179,18 @@ fn table_model(
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
       .map(table_borders_model),
+    cell_margins,
     rows: table
       .table_choice2
       .iter()
       .filter_map(|choice| match choice {
-        w::TableChoice2::WTr(row) => Some(table_row_model(row, styles, numbering, images)),
+        w::TableChoice2::WTr(row) => Some(table_row_model(
+          row,
+          styles,
+          numbering,
+          images,
+          cell_margins,
+        )),
         _ => None,
       })
       .collect(),
@@ -988,16 +1202,26 @@ fn table_row_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  cell_margins: CellMargins,
 ) -> TableRow {
   let (height_pt, exact_height) = table_row_height_properties(row.table_row_properties.as_deref());
+  let (repeat_header, cant_split) = table_row_keep_properties(row.table_row_properties.as_deref());
   TableRow {
     height_pt,
     exact_height,
+    repeat_header,
+    cant_split,
     cells: row
       .table_row_choice
       .iter()
       .filter_map(|choice| match choice {
-        w::TableRowChoice::WTc(cell) => Some(table_cell_model(cell, styles, numbering, images)),
+        w::TableRowChoice::WTc(cell) => Some(table_cell_model(
+          cell,
+          styles,
+          numbering,
+          images,
+          cell_margins,
+        )),
         _ => None,
       })
       .collect(),
@@ -1009,6 +1233,7 @@ fn table_cell_model(
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
+  default_margins: CellMargins,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
   TableCell {
@@ -1032,6 +1257,10 @@ fn table_cell_model(
       .and_then(|properties| properties.table_cell_borders.as_deref())
       .map(cell_borders_model)
       .unwrap_or_default(),
+    margins: properties
+      .and_then(|properties| properties.table_cell_margin.as_deref())
+      .map(|margins| table_cell_margin(margins, default_margins))
+      .unwrap_or(default_margins),
     grid_span: properties
       .and_then(|properties| properties.grid_span.as_ref())
       .map(|span| span.val.max(1) as usize)
@@ -1049,6 +1278,105 @@ fn table_cell_model(
       })
       .unwrap_or_default(),
   }
+}
+
+fn table_row_keep_properties(properties: Option<&w::TableRowProperties>) -> (bool, bool) {
+  let Some(properties) = properties else {
+    return (false, false);
+  };
+  let mut repeat_header = false;
+  let mut cant_split = false;
+  for choice in &properties.table_row_properties_choice1 {
+    match choice {
+      w::TableRowPropertiesChoice::WTblHeader(header) => {
+        repeat_header = !matches!(header.val, Some(w::OnOffOnlyValues::Off));
+      }
+      w::TableRowPropertiesChoice::WCantSplit(cant_split_property) => {
+        cant_split = !matches!(cant_split_property.val, Some(w::OnOffOnlyValues::Off));
+      }
+      _ => {}
+    }
+  }
+  (repeat_header, cant_split)
+}
+
+fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
+  let mut model = CellMargins::default();
+  if let Some(top) = &margins.top_margin
+    && let Some(value) = margin_width_to_points(top.width.as_deref(), top.r#type)
+  {
+    model.top_pt = value;
+  }
+  if let Some(bottom) = &margins.bottom_margin
+    && let Some(value) = margin_width_to_points(bottom.width.as_deref(), bottom.r#type)
+  {
+    model.bottom_pt = value;
+  }
+  if let Some(left) = &margins.table_cell_left_margin
+    && matches!(left.r#type, w::TableWidthValues::Dxa)
+  {
+    model.left_pt = units::twips_to_points(left.width as f32);
+  }
+  if let Some(start) = &margins.start_margin
+    && let Some(value) = margin_width_to_points(start.width.as_deref(), start.r#type)
+  {
+    model.left_pt = value;
+  }
+  if let Some(right) = &margins.table_cell_right_margin
+    && matches!(right.r#type, w::TableWidthValues::Dxa)
+  {
+    model.right_pt = units::twips_to_points(right.width as f32);
+  }
+  if let Some(end) = &margins.end_margin
+    && let Some(value) = margin_width_to_points(end.width.as_deref(), end.r#type)
+  {
+    model.right_pt = value;
+  }
+  model
+}
+
+fn table_cell_margin(margins: &w::TableCellMargin, mut model: CellMargins) -> CellMargins {
+  if let Some(top) = &margins.top_margin
+    && let Some(value) = margin_width_to_points(top.width.as_deref(), top.r#type)
+  {
+    model.top_pt = value;
+  }
+  if let Some(bottom) = &margins.bottom_margin
+    && let Some(value) = margin_width_to_points(bottom.width.as_deref(), bottom.r#type)
+  {
+    model.bottom_pt = value;
+  }
+  if let Some(left) = &margins.left_margin
+    && let Some(value) = margin_width_to_points(left.width.as_deref(), left.r#type)
+  {
+    model.left_pt = value;
+  }
+  if let Some(start) = &margins.start_margin
+    && let Some(value) = margin_width_to_points(start.width.as_deref(), start.r#type)
+  {
+    model.left_pt = value;
+  }
+  if let Some(right) = &margins.right_margin
+    && let Some(value) = margin_width_to_points(right.width.as_deref(), right.r#type)
+  {
+    model.right_pt = value;
+  }
+  if let Some(end) = &margins.end_margin
+    && let Some(value) = margin_width_to_points(end.width.as_deref(), end.r#type)
+  {
+    model.right_pt = value;
+  }
+  model
+}
+
+fn margin_width_to_points(
+  width: Option<&str>,
+  width_type: Option<w::TableWidthUnitValues>,
+) -> Option<f32> {
+  if !matches!(width_type, None | Some(w::TableWidthUnitValues::Dxa)) {
+    return None;
+  }
+  width.and_then(twips_attr_to_points)
 }
 
 fn table_row_height_properties(properties: Option<&w::TableRowProperties>) -> (Option<f32>, bool) {
@@ -1177,6 +1505,12 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
 
   if let Some(page_break_before) = properties.page_break_before() {
     format.page_break_before = page_break_before.val.unwrap_or(true);
+  }
+  if let Some(keep_next) = properties.keep_next() {
+    format.keep_with_next = keep_next.val.unwrap_or(true);
+  }
+  if let Some(keep_lines) = properties.keep_lines() {
+    format.keep_lines = keep_lines.val.unwrap_or(true);
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
@@ -1322,6 +1656,61 @@ fn paragraph_inlines(
   inlines
 }
 
+fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>) {
+  let mut footnotes = Vec::new();
+  let mut endnotes = Vec::new();
+  for choice in &paragraph.paragraph_choice {
+    match choice {
+      w::ParagraphChoice::WR(run) => {
+        collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes)
+      }
+      w::ParagraphChoice::WFldSimple(field) => {
+        for choice in &field.simple_field_choice {
+          if let w::SimpleFieldChoice::WR(run) = choice {
+            collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
+          }
+        }
+      }
+      w::ParagraphChoice::WHyperlink(hyperlink) => {
+        for choice in &hyperlink.hyperlink_choice {
+          if let w::HyperlinkChoice::WR(run) = choice {
+            collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
+          }
+        }
+      }
+      w::ParagraphChoice::Choice(choice) => {
+        if let w::ParagraphChoice2::WIns(inserted) = choice.as_ref() {
+          for choice in &inserted.inserted_run_choice {
+            if let w::InsertedRunChoice::WR(run) = choice {
+              collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
+            }
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+  footnotes.sort_unstable();
+  footnotes.dedup();
+  endnotes.sort_unstable();
+  endnotes.dedup();
+  (footnotes, endnotes)
+}
+
+fn collect_run_note_reference_ids(run: &w::Run, footnotes: &mut Vec<i64>, endnotes: &mut Vec<i64>) {
+  for choice in &run.run_choice {
+    match choice {
+      w::RunChoice::WFootnoteReference(reference) if reference.id > 0 => {
+        footnotes.push(reference.id);
+      }
+      w::RunChoice::WEndnoteReference(reference) if reference.id > 0 => {
+        endnotes.push(reference.id);
+      }
+      _ => {}
+    }
+  }
+}
+
 fn push_simple_field(
   field: &w::SimpleField,
   inlines: &mut Vec<InlineItem>,
@@ -1368,9 +1757,13 @@ fn push_run(
       w::RunChoice::WTab => text.push('\t'),
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
-        Some(w::BreakValues::Page) | Some(w::BreakValues::Column) => {
+        Some(w::BreakValues::Page) => {
           flush_run_text(inlines, &mut text, style);
           inlines.push(InlineItem::PageBreak);
+        }
+        Some(w::BreakValues::Column) => {
+          flush_run_text(inlines, &mut text, style);
+          inlines.push(InlineItem::ColumnBreak);
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
@@ -1743,6 +2136,7 @@ fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineIma
         width_pt: units::emu_to_points(inline.extent.cx),
         height_pt: units::emu_to_points(inline.extent.cy),
         alt_text: inline.doc_properties.description.clone(),
+        placement: ImagePlacement::Inline,
       })
     }
     w::DrawingChoice::WpAnchor(anchor) => {
@@ -1759,8 +2153,109 @@ fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineIma
           .wp_doc_pr
           .as_ref()
           .and_then(|properties| properties.description.clone()),
+        placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
     }
+  }
+}
+
+fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
+  FloatingImagePlacement {
+    horizontal_relative_to: anchor
+      .horizontal_position
+      .as_deref()
+      .map(horizontal_image_reference)
+      .unwrap_or_default(),
+    vertical_relative_to: anchor
+      .vertical_position
+      .as_deref()
+      .map(vertical_image_reference)
+      .unwrap_or_default(),
+    horizontal_offset_pt: anchor
+      .horizontal_position
+      .as_deref()
+      .and_then(horizontal_position_offset)
+      .unwrap_or(0.0),
+    vertical_offset_pt: anchor
+      .vertical_position
+      .as_deref()
+      .and_then(vertical_position_offset)
+      .unwrap_or(0.0),
+    wrap: anchor
+      .anchor_choice
+      .as_ref()
+      .map(image_wrap_mode)
+      .unwrap_or(ImageWrapMode::None),
+    behind_text: anchor.behind_doc,
+    margin_top_pt: anchor
+      .distance_from_top
+      .map(|value| units::emu_to_points(value as i64))
+      .unwrap_or(0.0),
+    margin_right_pt: anchor
+      .distance_from_right
+      .map(|value| units::emu_to_points(value as i64))
+      .unwrap_or(0.0),
+    margin_bottom_pt: anchor
+      .distance_from_bottom
+      .map(|value| units::emu_to_points(value as i64))
+      .unwrap_or(0.0),
+    margin_left_pt: anchor
+      .distance_from_left
+      .map(|value| units::emu_to_points(value as i64))
+      .unwrap_or(0.0),
+  }
+}
+
+fn horizontal_image_reference(position: &wp::HorizontalPosition) -> HorizontalImageReference {
+  match position.relative_from {
+    wp::HorizontalRelativePositionValues::Page => HorizontalImageReference::Page,
+    wp::HorizontalRelativePositionValues::Column => HorizontalImageReference::Column,
+    wp::HorizontalRelativePositionValues::Character => HorizontalImageReference::Character,
+    wp::HorizontalRelativePositionValues::Margin
+    | wp::HorizontalRelativePositionValues::LeftMargin
+    | wp::HorizontalRelativePositionValues::RightMargin
+    | wp::HorizontalRelativePositionValues::InsideMargin
+    | wp::HorizontalRelativePositionValues::OutsideMargin => HorizontalImageReference::Margin,
+  }
+}
+
+fn vertical_image_reference(position: &wp::VerticalPosition) -> VerticalImageReference {
+  match position.relative_from {
+    wp::VerticalRelativePositionValues::Page => VerticalImageReference::Page,
+    wp::VerticalRelativePositionValues::Paragraph => VerticalImageReference::Paragraph,
+    wp::VerticalRelativePositionValues::Line => VerticalImageReference::Line,
+    wp::VerticalRelativePositionValues::Margin
+    | wp::VerticalRelativePositionValues::TopMargin
+    | wp::VerticalRelativePositionValues::BottomMargin
+    | wp::VerticalRelativePositionValues::InsideMargin
+    | wp::VerticalRelativePositionValues::OutsideMargin => VerticalImageReference::Margin,
+  }
+}
+
+fn horizontal_position_offset(position: &wp::HorizontalPosition) -> Option<f32> {
+  match position.horizontal_position_choice.as_ref()? {
+    wp::HorizontalPositionChoice::WpPosOffset(offset) => Some(units::emu_to_points(*offset as i64)),
+    wp::HorizontalPositionChoice::WpAlign(_)
+    | wp::HorizontalPositionChoice::Wp14PctPosHOffset(_) => None,
+  }
+}
+
+fn vertical_position_offset(position: &wp::VerticalPosition) -> Option<f32> {
+  match position.vertical_position_choice.as_ref()? {
+    wp::VerticalPositionChoice::WpPosOffset(offset) => Some(units::emu_to_points(*offset as i64)),
+    wp::VerticalPositionChoice::WpAlign(_) | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => {
+      None
+    }
+  }
+}
+
+fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
+  match choice {
+    wp::AnchorChoice::WpWrapNone => ImageWrapMode::Through,
+    wp::AnchorChoice::WpWrapSquare(_) => ImageWrapMode::Square,
+    wp::AnchorChoice::WpWrapTight(_) => ImageWrapMode::Tight,
+    wp::AnchorChoice::WpWrapThrough(_) => ImageWrapMode::Through,
+    wp::AnchorChoice::WpWrapTopAndBottom(_) => ImageWrapMode::TopBottom,
   }
 }
 
@@ -2037,6 +2532,7 @@ fn vml_image_data(
     width_pt,
     height_pt,
     alt_text: alt_text.or_else(|| data.title.clone()),
+    placement: ImagePlacement::Inline,
   })
 }
 
@@ -2512,6 +3008,12 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   if values.page_break_before {
     target.page_break_before = true;
   }
+  if values.keep_with_next {
+    target.keep_with_next = true;
+  }
+  if values.keep_lines {
+    target.keep_lines = true;
+  }
 }
 
 fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
@@ -2828,6 +3330,24 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.page_break_before.as_ref(),
       Self::BaseStyle(properties) => properties.page_break_before.as_ref(),
       Self::Previous(properties) => properties.page_break_before.as_ref(),
+    }
+  }
+
+  fn keep_next(&self) -> Option<&'a w::KeepNext> {
+    match self {
+      Self::Direct(properties) => properties.keep_next.as_ref(),
+      Self::Style(properties) => properties.keep_next.as_ref(),
+      Self::BaseStyle(properties) => properties.keep_next.as_ref(),
+      Self::Previous(properties) => properties.keep_next.as_ref(),
+    }
+  }
+
+  fn keep_lines(&self) -> Option<&'a w::KeepLines> {
+    match self {
+      Self::Direct(properties) => properties.keep_lines.as_ref(),
+      Self::Style(properties) => properties.keep_lines.as_ref(),
+      Self::BaseStyle(properties) => properties.keep_lines.as_ref(),
+      Self::Previous(properties) => properties.keep_lines.as_ref(),
     }
   }
 
@@ -3162,7 +3682,7 @@ mod tests {
       .iter()
       .find_map(|item| match item {
         InlineItem::Image(image) => Some(image),
-        InlineItem::Text(_) | InlineItem::PageBreak => None,
+        InlineItem::Text(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
       })
       .expect("VML image");
     assert_eq!(image.content_type.as_deref(), Some("image/png"));
@@ -3305,6 +3825,17 @@ mod tests {
     );
   }
 
+  #[test]
+  fn next_column_section_uses_explicit_column_list_count() {
+    let previous = explicit_columns_section(w::SectionMarkValues::NextPage);
+    let current = explicit_columns_section(w::SectionMarkValues::NextColumn);
+
+    assert_eq!(
+      normalized_section_break(Some(&current), Some(&previous)),
+      SectionBreakKind::NextColumn
+    );
+  }
+
   fn paragraph() -> w::Paragraph {
     w::Paragraph::default()
   }
@@ -3351,12 +3882,33 @@ mod tests {
     }
   }
 
+  fn explicit_columns_section(break_type: w::SectionMarkValues) -> w::SectionProperties {
+    w::SectionProperties {
+      w_type: Some(w::SectionType { val: break_type }),
+      w_cols: Some(w::Columns {
+        equal_width: Some(false),
+        w_col: vec![
+          w::Column {
+            width: Some("1440".into()),
+            space: Some("720".into()),
+          },
+          w::Column {
+            width: Some("2880".into()),
+            ..Default::default()
+          },
+        ],
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
+
   fn inline_text(inlines: &[InlineItem]) -> String {
     inlines
       .iter()
       .filter_map(|item| match item {
         InlineItem::Text(run) => Some(run.text.as_str()),
-        InlineItem::Image(_) | InlineItem::PageBreak => None,
+        InlineItem::Image(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
       })
       .collect()
   }

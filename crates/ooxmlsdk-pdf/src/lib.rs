@@ -155,11 +155,15 @@ mod tests {
       footer_blocks: Vec::new(),
       first_footer_blocks: Vec::new(),
       footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
       endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
           text: "One Two Six".into(),
           style: crate::docx::TextStyle::default(),
@@ -208,11 +212,15 @@ mod tests {
       footer_blocks: Vec::new(),
       first_footer_blocks: Vec::new(),
       footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
       endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
           text: "Left\tRight".into(),
           style: crate::docx::TextStyle::default(),
@@ -271,11 +279,15 @@ mod tests {
       footer_blocks: Vec::new(),
       first_footer_blocks: Vec::new(),
       footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
       endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format,
         list_label: None,
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
           text: "Title\t99".into(),
           style: crate::docx::TextStyle::default(),
@@ -427,6 +439,31 @@ mod tests {
 
     let double_spaced = paragraph_at(&doc, 3);
     assert_eq!(double_spaced.format.line_height_pt, Some(28.0));
+  }
+
+  #[test]
+  fn paragraph_keep_properties_are_extracted_and_applied() {
+    let path = fixture_path("test-data/wml/para_keep.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert!(paragraph_at(&doc, 0).format.keep_with_next);
+    assert!(paragraph_at(&doc, 2).format.keep_lines);
+    assert!(paragraph_at(&doc, 3).format.page_break_before);
+
+    let path = fixture_path("test-data/wml/para_keep_flow.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(layout.pages.len() >= 2);
+    assert!(page_has_text(&layout.pages[0], "Filler 1"));
+    assert!(!page_has_text(&layout.pages[0], "Kept heading"));
+    assert!(page_has_text(&layout.pages[1], "Kept heading"));
+    assert!(page_has_text(&layout.pages[1], "Kept body"));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -657,6 +694,169 @@ mod tests {
   }
 
   #[test]
+  fn section_headers_inherit_and_even_headers_are_selected() {
+    let path = fixture_path("test-data/wml/header_section_inheritance.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert!(doc.even_and_odd_headers);
+    assert_eq!(doc.sections.len(), 2);
+    assert_eq!(doc.sections[0].header_blocks.len(), 1);
+    assert_eq!(doc.sections[0].even_header_blocks.len(), 1);
+    assert_eq!(doc.sections[0].footer_blocks.len(), 1);
+    assert_eq!(doc.sections[1].header_blocks.len(), 1);
+    assert_eq!(doc.sections[1].even_header_blocks.len(), 1);
+    assert_eq!(doc.sections[1].footer_blocks.len(), 1);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.len() >= 2);
+    assert!(page_has_text(&layout.pages[0], "Inherited Default Header"));
+    assert!(page_has_text(&layout.pages[1], "Inherited Even Header"));
+    assert!(page_has_text(&layout.pages[1], "Inherited Footer"));
+    assert!(!page_has_text(&layout.pages[1], "Inherited Default Header"));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn later_section_first_page_header_and_footer_are_selected() {
+    let path = fixture_path("test-data/wml/header_section_first_page.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.sections.len(), 2);
+    assert!(!doc.sections[0].title_page);
+    assert!(doc.sections[1].title_page);
+    assert_eq!(doc.sections[1].header_blocks.len(), 1);
+    assert_eq!(doc.sections[1].first_header_blocks.len(), 1);
+    assert_eq!(doc.sections[1].footer_blocks.len(), 1);
+    assert_eq!(doc.sections[1].first_footer_blocks.len(), 1);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.len() >= 2);
+    assert!(page_has_text(&layout.pages[0], "Opening Section Header"));
+    assert!(page_has_text(
+      &layout.pages[1],
+      "Second Section First Header"
+    ));
+    assert!(page_has_text(
+      &layout.pages[1],
+      "Second Section First Footer"
+    ));
+    assert!(!page_has_text(
+      &layout.pages[1],
+      "Second Section Default Header"
+    ));
+    assert!(!page_has_text(
+      &layout.pages[1],
+      "Second Section Default Footer"
+    ));
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn section_columns_flow_blocks_into_next_column() {
+    let path = fixture_path("test-data/wml/section_columns_flow.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.sections.len(), 1);
+    assert_eq!(doc.sections[0].columns.count, 2);
+    assert_eq!(doc.sections[0].columns.gap_pt, 18.0);
+    assert!(doc.sections[0].columns.separator);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let first_column = text_item(&layout, "Item 01");
+    let second_column = text_item(&layout, "Item 06");
+
+    assert!(second_column.x_pt > first_column.x_pt + 50.0);
+    assert!(
+      layout.pages[0]
+        .items
+        .iter()
+        .any(|item| matches!(item, crate::layout::PageItem::Line(_)))
+    );
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn hard_column_break_advances_to_next_section_column() {
+    let path = fixture_path("test-data/wml/section_column_break.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.sections.len(), 1);
+    assert_eq!(doc.sections[0].columns.count, 2);
+    assert!(doc.sections[0].blocks.iter().any(|block| {
+      matches!(
+        block,
+        crate::docx::Block::Paragraph(paragraph)
+          if paragraph
+            .inlines
+            .iter()
+            .any(|item| matches!(item, crate::docx::InlineItem::ColumnBreak))
+      )
+    }));
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let before = text_item(&layout, "Before break.");
+    let after = text_item(&layout, "After break.");
+    let before_page = layout
+      .pages
+      .iter()
+      .position(|page| page_has_text(page, "Before break."))
+      .expect("before page");
+    let after_page = layout
+      .pages
+      .iter()
+      .position(|page| page_has_text(page, "After break."))
+      .expect("after page");
+
+    assert_eq!(before_page, after_page);
+    assert!(after.x_pt > before.x_pt + 100.0);
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn explicit_section_column_widths_are_imported_and_used() {
+    let path = fixture_path("test-data/wml/section_columns_explicit.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(doc.sections.len(), 1);
+    assert_eq!(doc.sections[0].columns.count, 2);
+    assert_eq!(doc.sections[0].columns.explicit_count, 2);
+    assert_eq!(
+      &doc.sections[0].columns.explicit_widths_pt[..2],
+      [72.0, 144.0]
+    );
+    assert_eq!(&doc.sections[0].columns.explicit_gaps_pt[..1], [36.0]);
+    assert!(doc.sections[0].columns.separator);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let narrow = text_item(&layout, "Narrow");
+    let wide = text_item(&layout, "Wide");
+
+    assert!(wide.x_pt > narrow.x_pt + 90.0);
+    assert!(
+      layout.pages[0]
+        .items
+        .iter()
+        .any(|item| matches!(item, crate::layout::PageItem::Line(_)))
+    );
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
   fn explicit_page_break_splits_layout_pages() {
     let path = fixture_path("test-data/wml/breaks.docx");
     let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
@@ -726,6 +926,8 @@ mod tests {
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
 
+    assert_eq!(paragraph_at(&doc, 0).footnote_reference_ids, [1, 2]);
+    assert_eq!(doc.footnotes.len(), 2);
     assert_eq!(doc.footnote_blocks.len(), 2);
     assert!(find_text_item(&layout, "1").is_some());
     assert!(find_text_item(&layout, "2").is_some());
@@ -736,6 +938,8 @@ mod tests {
     let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert_eq!(paragraph_at(&doc, 0).endnote_reference_ids, [1]);
+    assert_eq!(doc.endnotes.len(), 1);
     assert_eq!(doc.endnote_blocks.len(), 1);
     assert!(find_text_item(&layout, "1").is_some());
     assert!(find_text_item(&layout, " Endnote content.").is_some());
@@ -794,7 +998,7 @@ mod tests {
       .find_map(|item| match item {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_) => None,
-        crate::docx::InlineItem::PageBreak => None,
+        crate::docx::InlineItem::PageBreak | crate::docx::InlineItem::ColumnBreak => None,
       })
       .expect("inline image");
 
@@ -832,19 +1036,47 @@ mod tests {
       .iter()
       .find_map(|item| match item {
         crate::docx::InlineItem::Image(image) => Some(image),
-        crate::docx::InlineItem::Text(_) | crate::docx::InlineItem::PageBreak => None,
+        crate::docx::InlineItem::Text(_)
+        | crate::docx::InlineItem::PageBreak
+        | crate::docx::InlineItem::ColumnBreak => None,
       })
       .expect("floating image");
 
     assert_eq!(image.content_type.as_deref(), Some("image/png"));
     assert_eq!(image.width_pt, 72.0);
     assert_eq!(image.height_pt, 72.0);
+    let crate::docx::ImagePlacement::Floating(placement) = image.placement else {
+      panic!("floating placement");
+    };
+    assert_eq!(
+      placement.horizontal_relative_to,
+      crate::docx::HorizontalImageReference::Column
+    );
+    assert_eq!(
+      placement.vertical_relative_to,
+      crate::docx::VerticalImageReference::Paragraph
+    );
+    assert_eq!(placement.wrap, crate::docx::ImageWrapMode::Square);
+    assert!(!placement.behind_text);
     assert!(
       paragraph
         .runs
         .iter()
         .any(|run| run.text == "Text beside the floating image.")
     );
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let laid_out_image = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .find_map(|item| match item {
+        crate::layout::PageItem::Image(image) => Some(image),
+        _ => None,
+      })
+      .expect("floating image layout");
+    assert_eq!(laid_out_image.x_pt, 72.0);
+    assert_eq!(laid_out_image.y_pt, 72.0);
 
     let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
@@ -931,6 +1163,29 @@ mod tests {
   }
 
   #[test]
+  fn table_header_rows_repeat_after_page_breaks() {
+    let path = fixture_path("test-data/wml/table_header_repeat.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let table = match &doc.blocks[0] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected table"),
+    };
+
+    assert!(table.rows[0].repeat_header);
+    assert!(!table.rows[1].repeat_header);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages.len() >= 2);
+    assert!(page_has_text(&layout.pages[0], "Repeat Header"));
+    assert!(page_has_text(&layout.pages[1], "Repeat Header"));
+    assert!(text_occurrence_count(&layout, "Repeat Header") >= 2);
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
   fn table_spans_and_row_heights_are_extracted() {
     let path = fixture_path("test-data/wml/table_merged.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -956,6 +1211,11 @@ mod tests {
     };
     assert_eq!(table.rows[0].height_pt, Some(24.0));
     assert!(table.rows[0].exact_height);
+    assert_eq!(table.cell_margins.left_pt, 9.0);
+    assert_eq!(table.cell_margins.top_pt, 6.0);
+    assert_eq!(table.rows[0].cells[0].margins.left_pt, 18.0);
+    assert_eq!(table.rows[0].cells[0].margins.top_pt, 12.0);
+    assert_eq!(table.rows[0].cells[1].margins.left_pt, 9.0);
     assert_eq!(
       table.rows[0].cells[0].vertical_alignment,
       crate::docx::TableCellVerticalAlignment::Center
@@ -988,6 +1248,29 @@ mod tests {
     text: &str,
   ) -> &'a crate::layout::TextItem {
     find_text_item(layout, text).unwrap_or_else(|| panic!("text item {text:?}"))
+  }
+
+  fn page_has_text(page: &crate::layout::Page, text: &str) -> bool {
+    page.items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Text(item) if item.text == text
+      )
+    })
+  }
+
+  fn text_occurrence_count(layout: &crate::layout::LayoutDocument, text: &str) -> usize {
+    layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .filter(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Text(item) if item.text == text
+        )
+      })
+      .count()
   }
 
   fn find_text_item<'a>(

@@ -436,6 +436,23 @@ Current progress:
   lookup, and adjacent-border lookup now operate on the row's real grid
   coordinates, matching LibreOffice's `TableManager` row grid bookkeeping and
   Typst's grid-coordinate resolution direction.
+- Table style import now has a first-pass style bus for generated OOXML table
+  style types. `tblStyle` resolves through the style chain, style-level
+  `tblPr/tcPr` can provide table borders, default cell margins, cell spacing,
+  cell shading, cell margins, and vertical alignment. Style-level and
+  conditional `pPr/rPr` are also merged into the paragraph and run styles used
+  by table-cell content, so header-row alignment, bold, and text color come
+  from the same table-style cascade as borders and shading. Those table-style
+  `pPr/rPr` values are applied as the base for cell paragraph/run import before
+  paragraph style, character style, and direct `pPr/rPr`, matching Writer's
+  property stack direction and Typst's inner-value-wins fold model. `tblStylePr`
+  currently applies `wholeTable`, first/last row, first/last column, horizontal
+  and vertical band, and corner-cell formatting. Conditional `trPr` is imported
+  into a row-style model for row header repetition, cant-split behavior, and
+  row-level cell spacing, with direct row properties applied after the table
+  style. This follows
+  LibreOffice's `StyleSheetTable` / `TblStylePrHandler` split while keeping the
+  final resolved row/cell properties in the Typst-like grid style shape.
 - Table cell content now uses nested cell flow instead of the old one-line
   clipping path. Paragraphs and nested tables inside cells reuse the same
   paragraph/table layout functions used by body flow, so wrapping, run styles,
@@ -601,6 +618,15 @@ Implement:
 - Move extraction toward a typed property resolver rather than ad hoc merging.
 - Preserve direct, paragraph style, character style, doc default, and numbering
   precedence.
+- Table-cell paragraph/run import now takes resolved table-style `pPr/rPr` as a
+  base, so direct paragraph and run properties still override table formatting
+  instead of being overwritten by a post-import table-style pass.
+- Table-style `trPr` now participates in row import for conditional
+  `tblHeader` and `cantSplit`, and direct row properties override those values.
+  Row-level `tblCellSpacing` also flows into layout as a row gutter override,
+  following Writer's row/table spacing path and Typst's resolved grid gutter
+  direction. Remaining row-style work is exact row-height propagation for
+  conditional styles and row-level justification exceptions.
 - Style-chain run property resolution now keeps explicit boolean overrides
   separate from the concrete `TextStyle`, so derived paragraph/character styles
   can turn off base-style values such as bold and underline. This matches the
@@ -743,7 +769,11 @@ Implement:
   instead of synthetic equal padding. `tblCellSpacing` is present as a gutter
   between cells/rows; remaining work is row-level spacing exceptions and exact
   compatibility-mode border-distance adjustment. Row `gridBefore/gridAfter`
-  skipped columns are included in the table grid and cell placement.
+  skipped columns are included in the table grid and cell placement. Table style
+  `wholeTable`, `firstRow`, `lastRow`, and horizontal band cell formatting is
+  wired for shading/borders/margins/vertical alignment, including first/last
+  column, vertical banding, and corner cells. Remaining work is full Word
+  priority/exception handling for conflicting direct and style borders.
 - Table row overflow now advances through section leaves and returns the
   destination flow to subsequent body blocks. Rows with `cantSplit=false` can
   emit basic follow-flow-line fragments across leaves: the current fragment is

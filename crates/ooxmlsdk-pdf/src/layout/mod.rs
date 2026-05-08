@@ -1499,12 +1499,13 @@ impl<'a> TableFrameLayout<'a> {
       return None;
     }
 
+    let max_cell_spacing_pt = table_max_cell_spacing_pt(table);
     let available_width = (area.content_width
-      - table.cell_spacing_pt * column_count.saturating_sub(1) as f32)
+      - max_cell_spacing_pt * column_count.saturating_sub(1) as f32)
       .max(DEFAULT_FONT_SIZE_PT);
     let column_widths = table_column_widths(table, column_count, available_width);
     let table_width = column_widths.iter().sum::<f32>()
-      + table.cell_spacing_pt * column_count.saturating_sub(1) as f32;
+      + max_cell_spacing_pt * column_count.saturating_sub(1) as f32;
     let left_pt = table_left_position(table, area.content_left_pt, area.content_width, table_width);
     let repeating_header_count = table_repeating_header_count(table);
     let repeating_header_height = table.rows[..repeating_header_count]
@@ -1580,7 +1581,7 @@ impl<'a> TableFrameLayout<'a> {
 
       y = row_frame.format(current);
       if row_index + 1 < self.table.rows.len() {
-        y += self.table.cell_spacing_pt;
+        y += row_cell_spacing_pt(self.table, row);
       }
     }
 
@@ -1684,7 +1685,8 @@ impl RowFrame<'_, '_> {
     row_bottom: f32,
     content_offset: f32,
   ) {
-    let mut cell_left = row_grid_left(self.table_frame, self.row, self.table.cell_spacing_pt);
+    let cell_spacing_pt = self.cell_spacing_pt();
+    let mut cell_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     let mut grid_index = self.row.grid_before;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
       let grid_start = grid_index;
@@ -1704,7 +1706,7 @@ impl RowFrame<'_, '_> {
       } else {
         cell_frame.format(current, row_top, row_bottom, content_offset);
       }
-      cell_left += cell_frame.width_pt + self.table.cell_spacing_pt;
+      cell_left += cell_frame.width_pt + cell_spacing_pt;
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
@@ -1758,7 +1760,8 @@ impl RowFrame<'_, '_> {
   }
 
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
-    let mut left_pt = row_grid_left(self.table_frame, self.row, self.table.cell_spacing_pt);
+    let cell_spacing_pt = self.cell_spacing_pt();
+    let mut left_pt = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     let mut grid_index = self.row.grid_before;
     for cell in &self.row.cells {
       if grid_index >= self.table_frame.column_widths.len() {
@@ -1776,7 +1779,7 @@ impl RowFrame<'_, '_> {
         .sum::<f32>();
       let right_pt = left_pt + width_pt;
 
-      if (self.row_index == 0 || self.table.cell_spacing_pt > 0.0)
+      if (self.row_index == 0 || cell_spacing_pt > 0.0)
         && !cell.vertical_merge_continue
         && let Some(border) =
           cell_horizontal_border(self.table, self.row_index, grid_index, cell, true)
@@ -1797,7 +1800,7 @@ impl RowFrame<'_, '_> {
         push_styled_line(current, left_pt, row_bottom, right_pt, row_bottom, border);
       }
 
-      left_pt = right_pt + self.table.cell_spacing_pt;
+      left_pt = right_pt + cell_spacing_pt;
       grid_index += span;
     }
   }
@@ -1820,6 +1823,10 @@ impl RowFrame<'_, '_> {
         border,
       );
     }
+  }
+
+  fn cell_spacing_pt(&self) -> f32 {
+    row_cell_spacing_pt(self.table, self.row)
   }
 }
 
@@ -1884,7 +1891,7 @@ impl CellFrame<'_, '_> {
   }
 
   fn paint_trailing_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
-    if self.table.cell_spacing_pt <= 0.0 {
+    if row_cell_spacing_pt(self.table, self.row) <= 0.0 {
       return;
     }
     if let Some(border) = vertical_border(self.table, self.row, self.cell_index, false) {
@@ -1938,6 +1945,18 @@ fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
     current_grid += span;
   }
   None
+}
+
+fn row_cell_spacing_pt(table: &Table, row: &TableRow) -> f32 {
+  row.cell_spacing_pt.unwrap_or(table.cell_spacing_pt)
+}
+
+fn table_max_cell_spacing_pt(table: &Table) -> f32 {
+  table
+    .rows
+    .iter()
+    .map(|row| row_cell_spacing_pt(table, row))
+    .fold(table.cell_spacing_pt, f32::max)
 }
 
 fn row_grid_left(table: &TableFrame, row: &TableRow, cell_spacing_pt: f32) -> f32 {

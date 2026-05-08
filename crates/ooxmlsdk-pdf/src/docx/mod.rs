@@ -134,6 +134,7 @@ pub(crate) struct TableRow {
   pub exact_height: bool,
   pub repeat_header: bool,
   pub cant_split: bool,
+  pub cell_spacing_pt: Option<f32>,
   pub grid_before: usize,
   pub grid_after: usize,
 }
@@ -1225,12 +1226,37 @@ fn paragraph_model(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Paragraph {
+  paragraph_model_with_base(
+    paragraph,
+    styles,
+    numbering,
+    images,
+    hyperlinks,
+    ParagraphImportBase::default(),
+  )
+}
+
+#[derive(Clone, Debug, Default)]
+struct ParagraphImportBase {
+  format: ParagraphFormat,
+  run_style: TextStyle,
+  run_overrides: RunStyleOverrides,
+}
+
+fn paragraph_model_with_base(
+  paragraph: &w::Paragraph,
+  styles: &StylesCatalog,
+  numbering: &mut NumberingCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  base: ParagraphImportBase,
+) -> Paragraph {
   let style_id = paragraph
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_style_id.as_ref())
     .map(|style| style.val.as_str());
-  let mut format = styles.paragraph_format(style_id);
+  let mut format = styles.paragraph_format_with_base(style_id, base.format);
   merge_paragraph_format(
     &mut format,
     paragraph
@@ -1246,7 +1272,7 @@ fn paragraph_model(
 
   let inlines = paragraph_inlines(
     paragraph,
-    styles.run_style(style_id),
+    styles.run_style_with_base(style_id, base.run_style, base.run_overrides),
     styles,
     images,
     hyperlinks,
@@ -1281,10 +1307,28 @@ fn table_model(
   hyperlinks: &HyperlinkCatalog,
 ) -> Table {
   let properties = table.w_tbl_pr.as_deref();
+  let table_style_id = properties
+    .and_then(|properties| properties.table_style.as_ref())
+    .map(|style| style.val.as_str());
+  let table_style = styles.table_style(table_style_id);
+  let table_look = properties
+    .and_then(|properties| properties.table_look.as_ref())
+    .map(table_look_model)
+    .unwrap_or_default();
   let cell_margins = properties
     .and_then(|properties| properties.table_cell_margin_default.as_deref())
     .map(table_cell_margin_default)
+    .or(table_style.cell_margins)
     .unwrap_or_default();
+  let rows = table
+    .table_choice2
+    .iter()
+    .filter_map(|choice| match choice {
+      w::TableChoice2::WTr(row) => Some(row.as_ref()),
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let row_count = rows.len();
   Table {
     column_widths_pt: table
       .w_tbl_grid
@@ -1313,63 +1357,177 @@ fn table_model(
       .unwrap_or_default(),
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
-      .map(table_borders_model),
+      .map(table_borders_model)
+      .or(table_style.table_borders),
     cell_spacing_pt: properties
       .and_then(|properties| properties.table_cell_spacing.as_ref())
       .and_then(table_cell_spacing_to_points)
+      .or(table_style.cell_spacing_pt)
       .unwrap_or(0.0),
-    rows: table
-      .table_choice2
-      .iter()
-      .filter_map(|choice| match choice {
-        w::TableChoice2::WTr(row) => Some(table_row_model(
-          row,
-          styles,
-          numbering,
-          images,
-          hyperlinks,
-          cell_margins,
-        )),
-        _ => None,
-      })
-      .collect(),
+    rows: {
+      let mut context = TableImportContext {
+        styles,
+        numbering,
+        images,
+        hyperlinks,
+        cell_margins,
+        table_style: &table_style,
+        table_look,
+        row_count,
+      };
+      rows
+        .iter()
+        .enumerate()
+        .map(|(row_index, row)| table_row_model(row, &mut context, row_index))
+        .collect()
+    },
   }
 }
 
 fn table_row_model(
   row: &w::TableRow,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  cell_margins: CellMargins,
+  context: &mut TableImportContext<'_>,
+  row_index: usize,
 ) -> TableRow {
-  let (height_pt, exact_height) = table_row_height_properties(row.table_row_properties.as_deref());
-  let (repeat_header, cant_split) = table_row_keep_properties(row.table_row_properties.as_deref());
   let (grid_before, grid_after) = table_row_grid_properties(row.table_row_properties.as_deref());
+  let mut row_style = table_row_style_for(
+    context.table_style,
+    context.table_look,
+    row_index,
+    context.row_count,
+  );
+  merge_table_row_style(
+    &mut row_style,
+    &direct_table_row_style(row.table_row_properties.as_deref()),
+  );
   TableRow {
-    height_pt,
-    exact_height,
-    repeat_header,
-    cant_split,
+    height_pt: row_style.height_pt,
+    exact_height: row_style.exact_height.unwrap_or(false),
+    repeat_header: row_style.repeat_header.unwrap_or(false),
+    cant_split: row_style.cant_split.unwrap_or(false),
+    cell_spacing_pt: row_style.cell_spacing_pt,
     grid_before,
     grid_after,
-    cells: row
-      .table_row_choice
-      .iter()
-      .filter_map(|choice| match choice {
-        w::TableRowChoice::WTc(cell) => Some(table_cell_model(
-          cell,
-          styles,
-          numbering,
-          images,
-          hyperlinks,
-          cell_margins,
-        )),
-        _ => None,
-      })
-      .collect(),
+    cells: {
+      let cells = row
+        .table_row_choice
+        .iter()
+        .filter_map(|choice| match choice {
+          w::TableRowChoice::WTc(cell) => Some(cell.as_ref()),
+          _ => None,
+        })
+        .collect::<Vec<_>>();
+      let cell_count = cells.len();
+      cells
+        .iter()
+        .enumerate()
+        .map(|(cell_index, cell)| {
+          table_cell_model(
+            cell,
+            context.styles,
+            context.numbering,
+            context.images,
+            context.hyperlinks,
+            context.cell_margins,
+            table_cell_style_for(
+              context.table_style,
+              context.table_look,
+              row_index,
+              context.row_count,
+              cell_index,
+              cell_count,
+            ),
+          )
+        })
+        .collect()
+    },
   }
+}
+
+fn table_row_style_for(
+  table_style: &TableStyleModel,
+  look: TableLookModel,
+  row_index: usize,
+  row_count: usize,
+) -> TableRowStyle {
+  let mut style = table_style.whole_row;
+  for (condition, conditional_style) in &table_style.conditional_rows {
+    if table_row_style_condition_applies(*condition, look, row_index, row_count) {
+      merge_table_row_style(&mut style, conditional_style);
+    }
+  }
+  style
+}
+
+fn table_row_style_condition_applies(
+  condition: w::TableStyleOverrideValues,
+  look: TableLookModel,
+  row_index: usize,
+  row_count: usize,
+) -> bool {
+  match condition {
+    w::TableStyleOverrideValues::WholeTable => true,
+    w::TableStyleOverrideValues::FirstRow => look.first_row && row_index == 0,
+    w::TableStyleOverrideValues::LastRow => look.last_row && row_index + 1 == row_count,
+    w::TableStyleOverrideValues::Band1Horizontal => {
+      look.horizontal_banding && row_index > 0 && row_index % 2 == 1
+    }
+    w::TableStyleOverrideValues::Band2Horizontal => {
+      look.horizontal_banding && row_index > 0 && row_index.is_multiple_of(2)
+    }
+    _ => false,
+  }
+}
+
+fn table_cell_style_for(
+  table_style: &TableStyleModel,
+  look: TableLookModel,
+  row_index: usize,
+  row_count: usize,
+  cell_index: usize,
+  cell_count: usize,
+) -> TableCellStyle {
+  let mut style = table_style.whole_table.clone();
+  for (condition, conditional_style) in &table_style.conditional {
+    let applies = match condition {
+      w::TableStyleOverrideValues::WholeTable => true,
+      w::TableStyleOverrideValues::FirstRow => look.first_row && row_index == 0,
+      w::TableStyleOverrideValues::LastRow => look.last_row && row_index + 1 == row_count,
+      w::TableStyleOverrideValues::FirstColumn => look.first_column && cell_index == 0,
+      w::TableStyleOverrideValues::LastColumn => look.last_column && cell_index + 1 == cell_count,
+      w::TableStyleOverrideValues::Band1Horizontal => {
+        look.horizontal_banding && row_index > 0 && row_index % 2 == 1
+      }
+      w::TableStyleOverrideValues::Band2Horizontal => {
+        look.horizontal_banding && row_index > 0 && row_index.is_multiple_of(2)
+      }
+      w::TableStyleOverrideValues::Band1Vertical => {
+        look.vertical_banding && cell_index > 0 && cell_index % 2 == 1
+      }
+      w::TableStyleOverrideValues::Band2Vertical => {
+        look.vertical_banding && cell_index > 0 && cell_index.is_multiple_of(2)
+      }
+      w::TableStyleOverrideValues::NorthWestCell => {
+        look.first_row && look.first_column && row_index == 0 && cell_index == 0
+      }
+      w::TableStyleOverrideValues::NorthEastCell => {
+        look.first_row && look.last_column && row_index == 0 && cell_index + 1 == cell_count
+      }
+      w::TableStyleOverrideValues::SouthWestCell => {
+        look.last_row && look.first_column && row_index + 1 == row_count && cell_index == 0
+      }
+      w::TableStyleOverrideValues::SouthEastCell => {
+        look.last_row
+          && look.last_column
+          && row_index + 1 == row_count
+          && cell_index + 1 == cell_count
+      }
+    };
+    if applies {
+      merge_table_cell_style(&mut style, conditional_style);
+    }
+  }
+  style
 }
 
 fn table_cell_model(
@@ -1379,32 +1537,45 @@ fn table_cell_model(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
   default_margins: CellMargins,
+  style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
+  let blocks = cell
+    .table_cell_choice
+    .iter()
+    .filter_map(|choice| match choice {
+      w::TableCellChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model_with_base(
+        paragraph,
+        styles,
+        numbering,
+        images,
+        hyperlinks,
+        ParagraphImportBase {
+          format: style.paragraph_format.clone(),
+          run_style: style.run_style,
+          run_overrides: style.run_overrides,
+        },
+      ))),
+      w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
+        table, styles, numbering, images, hyperlinks,
+      ))),
+      _ => None,
+    })
+    .collect();
   TableCell {
-    blocks: cell
-      .table_cell_choice
-      .iter()
-      .filter_map(|choice| match choice {
-        w::TableCellChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model(
-          paragraph, styles, numbering, images, hyperlinks,
-        ))),
-        w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
-          table, styles, numbering, images, hyperlinks,
-        ))),
-        _ => None,
-      })
-      .collect(),
+    blocks,
     shading: properties
       .and_then(|properties| properties.shading.as_ref())
-      .and_then(shading_fill),
+      .and_then(shading_fill)
+      .or(style.shading),
     borders: properties
       .and_then(|properties| properties.table_cell_borders.as_deref())
       .map(cell_borders_model)
-      .unwrap_or_default(),
+      .unwrap_or(style.borders),
     margins: properties
       .and_then(|properties| properties.table_cell_margin.as_deref())
       .map(|margins| table_cell_margin(margins, default_margins))
+      .or(style.margins)
       .unwrap_or(default_margins),
     preferred_width_pt: properties
       .and_then(|properties| properties.table_cell_width.as_ref())
@@ -1422,11 +1593,8 @@ fn table_cell_model(
       .unwrap_or(false),
     vertical_alignment: properties
       .and_then(|properties| properties.table_cell_vertical_alignment.as_ref())
-      .map(|alignment| match alignment.val {
-        w::TableVerticalAlignmentValues::Center => TableCellVerticalAlignment::Center,
-        w::TableVerticalAlignmentValues::Bottom => TableCellVerticalAlignment::Bottom,
-        w::TableVerticalAlignmentValues::Top => TableCellVerticalAlignment::Top,
-      })
+      .map(table_cell_vertical_alignment)
+      .or(style.vertical_alignment)
       .unwrap_or_default(),
   }
 }
@@ -1449,26 +1617,6 @@ fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usi
     }
   }
   (grid_before, grid_after)
-}
-
-fn table_row_keep_properties(properties: Option<&w::TableRowProperties>) -> (bool, bool) {
-  let Some(properties) = properties else {
-    return (false, false);
-  };
-  let mut repeat_header = false;
-  let mut cant_split = false;
-  for choice in &properties.table_row_properties_choice1 {
-    match choice {
-      w::TableRowPropertiesChoice::WTblHeader(header) => {
-        repeat_header = !matches!(header.val, Some(w::OnOffOnlyValues::Off));
-      }
-      w::TableRowPropertiesChoice::WCantSplit(cant_split_property) => {
-        cant_split = !matches!(cant_split_property.val, Some(w::OnOffOnlyValues::Off));
-      }
-      _ => {}
-    }
-  }
-  (repeat_header, cant_split)
 }
 
 fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
@@ -1550,26 +1698,6 @@ fn margin_width_to_points(
   width.and_then(twips_attr_to_points)
 }
 
-fn table_row_height_properties(properties: Option<&w::TableRowProperties>) -> (Option<f32>, bool) {
-  let Some(properties) = properties else {
-    return (None, false);
-  };
-  properties
-    .table_row_properties_choice1
-    .iter()
-    .find_map(|choice| match choice {
-      w::TableRowPropertiesChoice::WTrHeight(height) => {
-        let height_pt = height.val.map(|value| units::twips_to_points(value as f32));
-        Some((
-          height_pt,
-          matches!(height.height_type, Some(w::HeightRuleValues::Exact)),
-        ))
-      }
-      _ => None,
-    })
-    .unwrap_or((None, false))
-}
-
 fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
   match width.r#type {
     Some(w::TableWidthUnitValues::Dxa) | None => {
@@ -1639,6 +1767,16 @@ fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
 
 fn shading_fill(shading: &w::Shading) -> Option<RgbColor> {
   shading.fill.as_deref().and_then(parse_hex_color)
+}
+
+fn table_cell_vertical_alignment(
+  alignment: &w::TableCellVerticalAlignment,
+) -> TableCellVerticalAlignment {
+  match alignment.val {
+    w::TableVerticalAlignmentValues::Center => TableCellVerticalAlignment::Center,
+    w::TableVerticalAlignmentValues::Bottom => TableCellVerticalAlignment::Bottom,
+    w::TableVerticalAlignmentValues::Top => TableCellVerticalAlignment::Top,
+  }
 }
 
 fn table_borders_model(borders: &w::TableBorders) -> TableBordersModel {
@@ -3807,6 +3945,7 @@ struct StyleEntry {
   paragraph_format: ParagraphFormat,
   run_style: TextStyle,
   run_overrides: RunStyleOverrides,
+  table_style: TableStyleModel,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -3816,6 +3955,71 @@ struct RunStyleOverrides {
   underline: Option<bool>,
   strikethrough: Option<bool>,
   uppercase: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct TableStyleModel {
+  table_borders: Option<TableBordersModel>,
+  cell_margins: Option<CellMargins>,
+  cell_spacing_pt: Option<f32>,
+  whole_row: TableRowStyle,
+  conditional_rows: Vec<(w::TableStyleOverrideValues, TableRowStyle)>,
+  whole_table: TableCellStyle,
+  conditional: Vec<(w::TableStyleOverrideValues, TableCellStyle)>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct TableRowStyle {
+  height_pt: Option<f32>,
+  exact_height: Option<bool>,
+  repeat_header: Option<bool>,
+  cant_split: Option<bool>,
+  cell_spacing_pt: Option<f32>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct TableCellStyle {
+  shading: Option<RgbColor>,
+  borders: CellBordersModel,
+  margins: Option<CellMargins>,
+  vertical_alignment: Option<TableCellVerticalAlignment>,
+  paragraph_format: ParagraphFormat,
+  run_style: TextStyle,
+  run_overrides: RunStyleOverrides,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TableLookModel {
+  first_row: bool,
+  last_row: bool,
+  first_column: bool,
+  last_column: bool,
+  horizontal_banding: bool,
+  vertical_banding: bool,
+}
+
+impl Default for TableLookModel {
+  fn default() -> Self {
+    Self {
+      first_row: true,
+      last_row: false,
+      first_column: true,
+      last_column: false,
+      horizontal_banding: true,
+      vertical_banding: true,
+    }
+  }
+}
+
+struct TableImportContext<'a> {
+  styles: &'a StylesCatalog,
+  numbering: &'a mut NumberingCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  cell_margins: CellMargins,
+  table_style: &'a TableStyleModel,
+  table_look: TableLookModel,
+  row_count: usize,
 }
 
 impl StylesCatalog {
@@ -3861,6 +4065,7 @@ impl StylesCatalog {
         paragraph_format: ParagraphFormat::default(),
         run_style: TextStyle::default(),
         run_overrides: RunStyleOverrides::default(),
+        table_style: TableStyleModel::default(),
       };
       merge_paragraph_format(
         &mut entry.paragraph_format,
@@ -3875,14 +4080,20 @@ impl StylesCatalog {
       );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
+      entry.table_style = table_style_model(style);
       catalog.styles.insert(style_id.to_string(), entry);
     }
 
     Ok(catalog)
   }
 
-  fn paragraph_format(&self, style_id: Option<&str>) -> ParagraphFormat {
+  fn paragraph_format_with_base(
+    &self,
+    style_id: Option<&str>,
+    base_format: ParagraphFormat,
+  ) -> ParagraphFormat {
     let mut format = self.doc_default_paragraph.clone();
+    merge_format_values(&mut format, base_format);
     let style_id = style_id
       .map(str::to_string)
       .or_else(|| self.default_paragraph_style_id.clone());
@@ -3892,8 +4103,15 @@ impl StylesCatalog {
     format
   }
 
-  fn run_style(&self, style_id: Option<&str>) -> TextStyle {
+  fn run_style_with_base(
+    &self,
+    style_id: Option<&str>,
+    base_style: TextStyle,
+    base_overrides: RunStyleOverrides,
+  ) -> TextStyle {
     let mut style = self.doc_default_run;
+    merge_style_values(&mut style, base_style);
+    apply_run_style_overrides(&mut style, base_overrides);
     let style_id = style_id
       .map(str::to_string)
       .or_else(|| self.default_paragraph_style_id.clone());
@@ -3923,6 +4141,16 @@ impl StylesCatalog {
     style
   }
 
+  fn table_style(&self, style_id: Option<&str>) -> TableStyleModel {
+    let mut style = TableStyleModel::default();
+    for entry in self.style_chain(style_id) {
+      if matches!(entry.style_type, Some(w::StyleValues::Table)) {
+        merge_table_style_model(&mut style, &entry.table_style);
+      }
+    }
+    style
+  }
+
   fn style_chain(&self, style_id: Option<&str>) -> Vec<&StyleEntry> {
     let mut ids = Vec::new();
     let mut current = style_id;
@@ -3943,6 +4171,282 @@ impl StylesCatalog {
       .filter_map(|id| self.styles.get(id))
       .collect()
   }
+}
+
+fn table_style_model(style: &w::Style) -> TableStyleModel {
+  let mut model = TableStyleModel::default();
+  if let Some(properties) = style.style_table_properties.as_deref() {
+    model.table_borders = properties.table_borders.as_deref().map(table_borders_model);
+    model.cell_margins = properties
+      .table_cell_margin_default
+      .as_deref()
+      .map(table_cell_margin_default);
+    model.cell_spacing_pt = properties
+      .table_cell_spacing
+      .as_ref()
+      .and_then(table_cell_spacing_to_points);
+  }
+  if let Some(properties) = style.style_table_cell_properties.as_deref() {
+    model.whole_table = style_table_cell_style(properties);
+  }
+  if let Some(properties) = style
+    .table_style_conditional_formatting_table_row_properties
+    .as_ref()
+  {
+    model.whole_row = style_table_row_style(properties);
+  }
+  merge_paragraph_format(
+    &mut model.whole_table.paragraph_format,
+    style
+      .style_paragraph_properties
+      .as_deref()
+      .map(ParagraphProps::Style),
+  );
+  merge_run_style(
+    &mut model.whole_table.run_style,
+    style.style_run_properties.as_deref().map(RunProps::Style),
+  );
+  model.whole_table.run_overrides =
+    run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
+  for conditional in &style.w_tbl_style_pr {
+    let mut cell_style = TableCellStyle::default();
+    merge_paragraph_format(
+      &mut cell_style.paragraph_format,
+      conditional
+        .style_paragraph_properties
+        .as_deref()
+        .map(ParagraphProps::Style),
+    );
+    merge_run_style(
+      &mut cell_style.run_style,
+      conditional
+        .run_properties_base_style
+        .as_deref()
+        .map(RunProps::BaseStyle),
+    );
+    cell_style.run_overrides = run_style_overrides(
+      conditional
+        .run_properties_base_style
+        .as_deref()
+        .map(RunProps::BaseStyle),
+    );
+    if let Some(properties) = conditional
+      .table_style_conditional_formatting_table_row_properties
+      .as_ref()
+    {
+      model
+        .conditional_rows
+        .push((conditional.r#type, style_table_row_style(properties)));
+    }
+    if let Some(properties) = conditional
+      .table_style_conditional_formatting_table_cell_properties
+      .as_deref()
+    {
+      merge_table_cell_style(&mut cell_style, &conditional_table_cell_style(properties));
+    }
+    model.conditional.push((conditional.r#type, cell_style));
+  }
+  model
+}
+
+fn style_table_cell_style(properties: &w::StyleTableCellProperties) -> TableCellStyle {
+  TableCellStyle {
+    shading: properties.shading.as_ref().and_then(shading_fill),
+    borders: CellBordersModel::default(),
+    margins: properties
+      .table_cell_margin
+      .as_deref()
+      .map(|margins| table_cell_margin(margins, CellMargins::default())),
+    vertical_alignment: properties
+      .table_cell_vertical_alignment
+      .as_ref()
+      .map(table_cell_vertical_alignment),
+    ..Default::default()
+  }
+}
+
+fn conditional_table_cell_style(
+  properties: &w::TableStyleConditionalFormattingTableCellProperties,
+) -> TableCellStyle {
+  TableCellStyle {
+    shading: properties.shading.as_ref().and_then(shading_fill),
+    borders: properties
+      .table_cell_borders
+      .as_deref()
+      .map(cell_borders_model)
+      .unwrap_or_default(),
+    margins: properties
+      .table_cell_margin
+      .as_deref()
+      .map(|margins| table_cell_margin(margins, CellMargins::default())),
+    vertical_alignment: properties
+      .table_cell_vertical_alignment
+      .as_ref()
+      .map(table_cell_vertical_alignment),
+    ..Default::default()
+  }
+}
+
+fn merge_table_style_model(target: &mut TableStyleModel, source: &TableStyleModel) {
+  if source.table_borders.is_some() {
+    target.table_borders = source.table_borders;
+  }
+  if source.cell_margins.is_some() {
+    target.cell_margins = source.cell_margins;
+  }
+  if source.cell_spacing_pt.is_some() {
+    target.cell_spacing_pt = source.cell_spacing_pt;
+  }
+  merge_table_row_style(&mut target.whole_row, &source.whole_row);
+  target
+    .conditional_rows
+    .extend(source.conditional_rows.iter().copied());
+  merge_table_cell_style(&mut target.whole_table, &source.whole_table);
+  target
+    .conditional
+    .extend(source.conditional.iter().cloned());
+}
+
+fn direct_table_row_style(properties: Option<&w::TableRowProperties>) -> TableRowStyle {
+  let Some(properties) = properties else {
+    return TableRowStyle::default();
+  };
+  let mut style = TableRowStyle::default();
+  for choice in &properties.table_row_properties_choice1 {
+    match choice {
+      w::TableRowPropertiesChoice::WTrHeight(height) => {
+        apply_table_row_height(&mut style, height);
+      }
+      w::TableRowPropertiesChoice::WTblHeader(header) => {
+        style.repeat_header = Some(on_off_only_value(header.val));
+      }
+      w::TableRowPropertiesChoice::WCantSplit(cant_split) => {
+        style.cant_split = Some(on_off_only_value(cant_split.val));
+      }
+      w::TableRowPropertiesChoice::WTblCellSpacing(spacing) => {
+        style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
+      }
+      _ => {}
+    }
+  }
+  style
+}
+
+fn style_table_row_style(
+  properties: &w::TableStyleConditionalFormattingTableRowProperties,
+) -> TableRowStyle {
+  let mut style = TableRowStyle::default();
+  for choice in &properties.table_style_conditional_formatting_table_row_properties_choice {
+    match choice {
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(header) => {
+        style.repeat_header = Some(on_off_only_value(header.val));
+      }
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(cant_split) => {
+        style.cant_split = Some(on_off_only_value(cant_split.val));
+      }
+      w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(spacing) => {
+        style.cell_spacing_pt = table_cell_spacing_to_points(spacing);
+      }
+      _ => {}
+    }
+  }
+  style
+}
+
+fn apply_table_row_height(style: &mut TableRowStyle, height: &w::TableRowHeight) {
+  style.height_pt = height.val.map(|value| units::twips_to_points(value as f32));
+  style.exact_height = Some(matches!(
+    height.height_type,
+    Some(w::HeightRuleValues::Exact)
+  ));
+}
+
+fn on_off_only_value(value: Option<w::OnOffOnlyValues>) -> bool {
+  !matches!(value, Some(w::OnOffOnlyValues::Off))
+}
+
+fn merge_table_row_style(target: &mut TableRowStyle, source: &TableRowStyle) {
+  if source.height_pt.is_some() {
+    target.height_pt = source.height_pt;
+  }
+  if source.exact_height.is_some() {
+    target.exact_height = source.exact_height;
+  }
+  if source.repeat_header.is_some() {
+    target.repeat_header = source.repeat_header;
+  }
+  if source.cant_split.is_some() {
+    target.cant_split = source.cant_split;
+  }
+  if source.cell_spacing_pt.is_some() {
+    target.cell_spacing_pt = source.cell_spacing_pt;
+  }
+}
+
+fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) {
+  if source.shading.is_some() {
+    target.shading = source.shading;
+  }
+  if source.borders != CellBordersModel::default() {
+    target.borders = source.borders;
+  }
+  if source.margins.is_some() {
+    target.margins = source.margins;
+  }
+  if source.vertical_alignment.is_some() {
+    target.vertical_alignment = source.vertical_alignment;
+  }
+  merge_format_values(
+    &mut target.paragraph_format,
+    source.paragraph_format.clone(),
+  );
+  merge_style_values(&mut target.run_style, source.run_style);
+  target.run_overrides = merge_run_style_overrides(target.run_overrides, source.run_overrides);
+}
+
+fn merge_run_style_overrides(
+  mut target: RunStyleOverrides,
+  source: RunStyleOverrides,
+) -> RunStyleOverrides {
+  if source.bold.is_some() {
+    target.bold = source.bold;
+  }
+  if source.italic.is_some() {
+    target.italic = source.italic;
+  }
+  if source.underline.is_some() {
+    target.underline = source.underline;
+  }
+  if source.strikethrough.is_some() {
+    target.strikethrough = source.strikethrough;
+  }
+  if source.uppercase.is_some() {
+    target.uppercase = source.uppercase;
+  }
+  target
+}
+
+fn table_look_model(look: &w::TableLook) -> TableLookModel {
+  let mut model = TableLookModel::default();
+  if let Some(value) = look.first_row {
+    model.first_row = value;
+  }
+  if let Some(value) = look.last_row {
+    model.last_row = value;
+  }
+  if let Some(value) = look.first_column {
+    model.first_column = value;
+  }
+  if let Some(value) = look.last_column {
+    model.last_column = value;
+  }
+  if let Some(value) = look.no_horizontal_band {
+    model.horizontal_banding = !value;
+  }
+  if let Some(value) = look.no_vertical_band {
+    model.vertical_banding = !value;
+  }
+  model
 }
 
 fn merge_builtin_character_style(style: &mut TextStyle, style_id: &str) {
@@ -4712,6 +5216,320 @@ mod tests {
   }
 
   #[test]
+  fn table_style_first_row_overrides_whole_table_cell_style() {
+    fn shading(fill: &str) -> w::Shading {
+      w::Shading {
+        fill: Some(fill.into()),
+        ..Default::default()
+      }
+    }
+
+    let style = table_style_model(&w::Style {
+      r#type: Some(w::StyleValues::Table),
+      style_table_cell_properties: Some(Box::new(w::StyleTableCellProperties {
+        shading: Some(shading("EEEEEE")),
+        ..Default::default()
+      })),
+      w_tbl_style_pr: vec![w::TableStyleProperties {
+        r#type: w::TableStyleOverrideValues::FirstRow,
+        style_paragraph_properties: Some(Box::new(w::StyleParagraphProperties {
+          justification: Some(w::Justification {
+            val: w::JustificationValues::Center,
+          }),
+          ..Default::default()
+        })),
+        run_properties_base_style: Some(Box::new(w::RunPropertiesBaseStyle {
+          bold: Some(w::Bold { val: None }),
+          color: Some(w::Color {
+            val: "FFFFFF".into(),
+            ..Default::default()
+          }),
+          ..Default::default()
+        })),
+        table_style_conditional_formatting_table_cell_properties: Some(Box::new(
+          w::TableStyleConditionalFormattingTableCellProperties {
+            shading: Some(shading("4472C4")),
+            ..Default::default()
+          },
+        )),
+        ..Default::default()
+      }],
+      ..Default::default()
+    });
+
+    let first_row = table_cell_style_for(&style, TableLookModel::default(), 0, 2, 0, 1);
+    let body_row = table_cell_style_for(&style, TableLookModel::default(), 1, 2, 0, 1);
+
+    assert_eq!(
+      first_row.shading,
+      Some(RgbColor {
+        r: 0x44,
+        g: 0x72,
+        b: 0xC4
+      })
+    );
+    assert_eq!(
+      first_row.paragraph_format.alignment,
+      ParagraphAlignment::Center
+    );
+    assert!(first_row.run_style.bold);
+    assert_eq!(
+      first_row.run_style.color,
+      RgbColor {
+        r: 0xFF,
+        g: 0xFF,
+        b: 0xFF
+      }
+    );
+    assert_eq!(
+      body_row.shading,
+      Some(RgbColor {
+        r: 0xEE,
+        g: 0xEE,
+        b: 0xEE
+      })
+    );
+  }
+
+  #[test]
+  fn table_style_column_and_corner_conditions_apply_by_cell_position() {
+    fn style(fill: &str) -> TableCellStyle {
+      TableCellStyle {
+        shading: Some(parse_hex_color(fill).unwrap()),
+        ..Default::default()
+      }
+    }
+
+    let table_style = TableStyleModel {
+      conditional: vec![
+        (w::TableStyleOverrideValues::LastColumn, style("00FF00")),
+        (w::TableStyleOverrideValues::NorthEastCell, style("FF0000")),
+      ],
+      ..Default::default()
+    };
+    let look = TableLookModel {
+      last_column: true,
+      ..Default::default()
+    };
+
+    let top_right = table_cell_style_for(&table_style, look, 0, 2, 2, 3);
+    let body_right = table_cell_style_for(&table_style, look, 1, 2, 2, 3);
+
+    assert_eq!(
+      top_right.shading,
+      Some(RgbColor {
+        r: 0xFF,
+        g: 0x00,
+        b: 0x00
+      })
+    );
+    assert_eq!(
+      body_right.shading,
+      Some(RgbColor {
+        r: 0x00,
+        g: 0xFF,
+        b: 0x00
+      })
+    );
+  }
+
+  #[test]
+  fn table_style_row_properties_apply_and_direct_row_properties_override() {
+    let style = table_style_model(&w::Style {
+      r#type: Some(w::StyleValues::Table),
+      w_tbl_style_pr: vec![w::TableStyleProperties {
+        r#type: w::TableStyleOverrideValues::FirstRow,
+        table_style_conditional_formatting_table_row_properties: Some(
+          w::TableStyleConditionalFormattingTableRowProperties {
+            table_style_conditional_formatting_table_row_properties_choice: vec![
+              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(Box::new(
+                w::TableHeader { val: None },
+              )),
+              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(Box::new(
+                w::CantSplit { val: None },
+              )),
+              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(
+                Box::new(w::TableCellSpacing {
+                  width: Some("240".into()),
+                  r#type: Some(w::TableWidthUnitValues::Dxa),
+                }),
+              ),
+            ],
+          },
+        ),
+        ..Default::default()
+      }],
+      ..Default::default()
+    });
+
+    let mut first_row = table_row_style_for(&style, TableLookModel::default(), 0, 2);
+    let body_row = table_row_style_for(&style, TableLookModel::default(), 1, 2);
+    merge_table_row_style(
+      &mut first_row,
+      &direct_table_row_style(Some(&w::TableRowProperties {
+        table_row_properties_choice1: vec![
+          w::TableRowPropertiesChoice::WTblHeader(Box::new(w::TableHeader {
+            val: Some(w::OnOffOnlyValues::Off),
+          })),
+          w::TableRowPropertiesChoice::WTblCellSpacing(Box::new(w::TableCellSpacing {
+            width: Some("120".into()),
+            r#type: Some(w::TableWidthUnitValues::Dxa),
+          })),
+        ],
+        ..Default::default()
+      })),
+    );
+
+    assert_eq!(first_row.repeat_header, Some(false));
+    assert_eq!(first_row.cant_split, Some(true));
+    assert_eq!(first_row.cell_spacing_pt, Some(6.0));
+    assert_eq!(body_row.repeat_header, None);
+    assert_eq!(body_row.cant_split, None);
+    assert_eq!(body_row.cell_spacing_pt, None);
+  }
+
+  #[test]
+  fn table_style_text_properties_are_base_for_direct_paragraph_and_run_properties() {
+    let base_format = ParagraphFormat {
+      alignment: ParagraphAlignment::Center,
+      ..Default::default()
+    };
+    let base_run_style = TextStyle {
+      color: RgbColor {
+        r: 0xFF,
+        g: 0xFF,
+        b: 0xFF,
+      },
+      ..Default::default()
+    };
+    let base_run_overrides = RunStyleOverrides {
+      bold: Some(true),
+      ..Default::default()
+    };
+
+    let paragraph = w::Paragraph {
+      paragraph_properties: Some(Box::new(w::ParagraphProperties {
+        justification: Some(w::Justification {
+          val: w::JustificationValues::Left,
+        }),
+        ..Default::default()
+      })),
+      paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
+        run_properties: Some(Box::new(w::RunProperties {
+          bold: Some(w::Bold { val: Some(false) }),
+          color: Some(w::Color {
+            val: "0000FF".into(),
+            ..Default::default()
+          }),
+          ..Default::default()
+        })),
+        run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
+          xml_content: Some("Header".into()),
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut numbering = NumberingCatalog::default();
+
+    let paragraph = paragraph_model_with_base(
+      &paragraph,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      ParagraphImportBase {
+        format: base_format,
+        run_style: base_run_style,
+        run_overrides: base_run_overrides,
+      },
+    );
+
+    assert_eq!(paragraph.format.alignment, ParagraphAlignment::Left);
+    let InlineItem::Text(run) = &paragraph.inlines[0] else {
+      panic!("expected text run");
+    };
+    assert!(!run.style.bold);
+    assert_eq!(
+      run.style.color,
+      RgbColor {
+        r: 0x00,
+        g: 0x00,
+        b: 0xFF
+      }
+    );
+    assert_eq!(paragraph.runs[0].style, run.style);
+  }
+
+  #[test]
+  fn table_style_text_properties_apply_to_cell_paragraph_runs() {
+    let style = TableCellStyle {
+      paragraph_format: ParagraphFormat {
+        alignment: ParagraphAlignment::Center,
+        ..Default::default()
+      },
+      run_style: TextStyle {
+        color: RgbColor {
+          r: 0xFF,
+          g: 0xFF,
+          b: 0xFF,
+        },
+        ..Default::default()
+      },
+      run_overrides: RunStyleOverrides {
+        bold: Some(true),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+
+    let cell = w::TableCell {
+      table_cell_choice: vec![w::TableCellChoice::WP(Box::new(w::Paragraph {
+        paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
+          run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
+            xml_content: Some("Header".into()),
+            ..Default::default()
+          }))],
+          ..Default::default()
+        }))],
+        ..Default::default()
+      }))],
+      ..Default::default()
+    };
+    let mut numbering = NumberingCatalog::default();
+
+    let cell = table_cell_model(
+      &cell,
+      &StylesCatalog::default(),
+      &mut numbering,
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+      CellMargins::default(),
+      style,
+    );
+
+    let Block::Paragraph(paragraph) = &cell.blocks[0] else {
+      panic!("expected paragraph");
+    };
+    assert_eq!(paragraph.format.alignment, ParagraphAlignment::Center);
+    let InlineItem::Text(inline_run) = &paragraph.inlines[0] else {
+      panic!("expected text run");
+    };
+    assert!(inline_run.style.bold);
+    assert_eq!(
+      inline_run.style.color,
+      RgbColor {
+        r: 0xFF,
+        g: 0xFF,
+        b: 0xFF
+      }
+    );
+    assert!(paragraph.runs[0].style.bold);
+    assert_eq!(paragraph.runs[0].style.color, inline_run.style.color);
+  }
+
+  #[test]
   fn simple_page_fields_emit_dynamic_markers() {
     let mut inlines = Vec::new();
     let field = w::SimpleField {
@@ -4988,7 +5806,11 @@ mod tests {
       },
     );
 
-    let style = catalog.run_style(Some("Derived"));
+    let style = catalog.run_style_with_base(
+      Some("Derived"),
+      TextStyle::default(),
+      RunStyleOverrides::default(),
+    );
 
     assert!(!style.bold);
     assert!(style.italic);

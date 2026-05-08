@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use icu_segmenter::LineSegmenter;
 
@@ -24,6 +24,7 @@ const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
 const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
+const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
 
 fn inline_text_height(style: TextStyle) -> f32 {
   style.font_size_pt * 1.25 + style.baseline_shift_pt.abs()
@@ -41,6 +42,10 @@ pub(crate) struct LayoutDocument {
   pub pages: Vec<Page>,
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
+  pub page_replays: Vec<PageReplay>,
+  pub page_replay_applications: Vec<PageReplayApplication>,
+  pub backward_moves: Vec<BackwardMove>,
+  pub layout_reruns: Vec<LayoutRerun>,
   pub page_invalidations: Vec<PageInvalidation>,
   pub reflow_executions: Vec<ReflowExecution>,
   pub reflow_requests: Vec<ReflowRequest>,
@@ -90,6 +95,7 @@ pub(crate) struct LayoutFrame {
   pub bounds: Option<FrameBounds>,
   pub lines: Vec<LineBox>,
   pub fragments: Vec<FrameFragment>,
+  pub influences: Vec<FrameInfluence>,
   pub invalidation: FrameInvalidation,
 }
 
@@ -123,9 +129,35 @@ pub(crate) enum FrameFragmentKind {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FrameFragment {
   pub kind: FrameFragmentKind,
+  pub split: FragmentSplitKind,
   pub index: usize,
   pub row_index: usize,
   pub cell_index: Option<usize>,
+  pub item_start: usize,
+  pub item_end: usize,
+  pub bounds: Option<FrameBounds>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FragmentSplitKind {
+  Complete,
+  Master,
+  Follow,
+  RepeatedHeader,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameInfluenceKind {
+  FootnoteReservation,
+  FlyWrap,
+  TableSplit,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FrameInfluence {
+  pub kind: FrameInfluenceKind,
+  pub count: usize,
+  pub block_index: Option<usize>,
   pub item_start: usize,
   pub item_end: usize,
   pub bounds: Option<FrameBounds>,
@@ -143,16 +175,26 @@ pub(crate) struct ReflowRequest {
   pub frame_index: usize,
   pub kind: FollowFrameKind,
   pub reason: ReflowReason,
+  pub scope: ReflowScope,
   pub restart: FrameCursor,
   pub page_index: usize,
   pub section_page_index: usize,
   pub column_index: usize,
+  pub influence_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReflowReason {
   DecorationChangedItems,
+  InsertionInfluenceChanged,
   InvalidBounds,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub(crate) enum ReflowScope {
+  Frame,
+  Column,
+  Page,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -161,6 +203,7 @@ pub(crate) struct PageInvalidation {
   pub section_page_index: usize,
   pub first_frame_index: usize,
   pub reason: ReflowReason,
+  pub scope: ReflowScope,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -168,11 +211,81 @@ pub(crate) struct ReflowExecution {
   pub first_page_index: usize,
   pub request_count: usize,
   pub action: ReflowAction,
+  pub scope: ReflowScope,
+  pub suppressed_moves: usize,
+  pub backward_moves: usize,
+  pub page_replacements: usize,
+  pub replayed_frames: usize,
+  pub replayed_items: usize,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PageReplay {
+  pub page_index: usize,
+  pub section_page_index: usize,
+  pub column_index: usize,
+  pub scope: ReflowScope,
+  pub item_start: usize,
+  pub item_end: usize,
+  pub replacement_items: Vec<PageItem>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PageReplayApplication {
+  pub page_index: usize,
+  pub section_page_index: usize,
+  pub column_index: usize,
+  pub scope: ReflowScope,
+  pub item_start: usize,
+  pub item_end: usize,
+  pub replacement_count: usize,
+  pub applied: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct BackwardMove {
+  pub frame_index: usize,
+  pub replay_start_frame_index: usize,
+  pub from_page_index: usize,
+  pub to_page_index: usize,
+  pub from_section_page_index: usize,
+  pub to_section_page_index: usize,
+  pub scope: ReflowScope,
+  pub reason: ReflowReason,
+  pub suppressed: bool,
+  pub replayed_frames: usize,
+  pub replayed_items: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LayoutRerun {
+  pub checkpoint_index: usize,
+  pub section_index: usize,
+  pub block_index: usize,
+  pub page_index: usize,
+  pub frame_index: usize,
+  pub reason: ReflowReason,
+  pub scope: ReflowScope,
+  pub replaced_pages: usize,
+  pub produced_pages: usize,
+  pub produced_frames: usize,
+  pub constraints: Vec<LayoutRerunConstraint>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LayoutRerunConstraint {
+  pub kind: FrameInfluenceKind,
+  pub scope: ReflowScope,
+  pub bounds: Option<FrameBounds>,
+  pub content_left_pt: f32,
+  pub content_width: f32,
+  pub content_bottom: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReflowAction {
   StabilizedRetainedDecorationItems,
+  StabilizedInsertionInfluences,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -182,6 +295,16 @@ pub(crate) struct RestartPlan {
   pub block_index: Option<usize>,
   pub cursor: FrameCursor,
   pub reason: ReflowReason,
+  pub scope: ReflowScope,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct MoveBackwardKey {
+  frame_index: usize,
+  page_index: usize,
+  section_page_index: usize,
+  column_index: usize,
+  scope: ReflowScope,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -209,6 +332,7 @@ pub(crate) struct Page {
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
   frame_fragments: Vec<FrameFragment>,
+  frame_influences: Vec<FrameInfluence>,
   wrap_exclusions: Vec<WrapExclusion>,
 }
 
@@ -337,6 +461,21 @@ struct RootFrameLayout<'a> {
   emitted_footnotes: HashSet<i64>,
   follows: Vec<FrameFollow>,
   frames: Vec<LayoutFrame>,
+  checkpoints: Vec<LayoutCheckpoint>,
+}
+
+#[derive(Clone, Debug)]
+struct LayoutCheckpoint {
+  section_index: usize,
+  block_index: usize,
+  page_index: usize,
+  y: f32,
+  flow: FlowContext,
+  pages: Vec<Page>,
+  current: Page,
+  emitted_footnotes: HashSet<i64>,
+  follows: Vec<FrameFollow>,
+  frames: Vec<LayoutFrame>,
 }
 
 impl<'a> RootFrameLayout<'a> {
@@ -349,6 +488,7 @@ impl<'a> RootFrameLayout<'a> {
       emitted_footnotes: HashSet::new(),
       follows: Vec::new(),
       frames: Vec::new(),
+      checkpoints: Vec::new(),
     }
   }
 
@@ -356,6 +496,22 @@ impl<'a> RootFrameLayout<'a> {
     self.format_body_frames();
     self.format_trailing_note_frames();
     self.finish_current_page();
+
+    let mut layout_reruns = Vec::new();
+    let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
+    let (mut reflow_requests, mut reflow_executions, mut page_replays, mut backward_moves) =
+      execute_reflow_requests(&mut self.frames, influence_reflow_requests);
+    if let Some(rerun) = self.apply_checkpoint_rerun(&backward_moves) {
+      layout_reruns.push(rerun);
+      let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
+      (
+        reflow_requests,
+        reflow_executions,
+        page_replays,
+        backward_moves,
+      ) = execute_reflow_requests(&mut self.frames, influence_reflow_requests);
+    }
+    let mut page_replay_applications = apply_page_replays(&mut self.pages, &page_replays);
 
     let page_item_counts_before_decoration = self
       .pages
@@ -373,9 +529,21 @@ impl<'a> RootFrameLayout<'a> {
       &self.pages,
       &page_item_counts_before_decoration,
     );
-    let reflow_requests = reflow_requests_for_frames(&self.frames);
-    let (reflow_requests, reflow_executions) =
-      execute_reflow_requests(&mut self.frames, reflow_requests);
+    let decoration_reflow_requests = reflow_requests_for_frames(&self.frames, false);
+    let (
+      remaining_decoration_reflow_requests,
+      decoration_reflow_executions,
+      decoration_page_replays,
+      decoration_backward_moves,
+    ) = execute_reflow_requests(&mut self.frames, decoration_reflow_requests);
+    page_replay_applications.extend(apply_page_replays(
+      &mut self.pages,
+      &decoration_page_replays,
+    ));
+    page_replays.extend(decoration_page_replays);
+    backward_moves.extend(decoration_backward_moves);
+    reflow_executions.extend(decoration_reflow_executions);
+    reflow_requests.extend(remaining_decoration_reflow_requests);
     let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
     let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
 
@@ -383,6 +551,10 @@ impl<'a> RootFrameLayout<'a> {
       pages: self.pages,
       follows: self.follows,
       frames: self.frames,
+      page_replays,
+      page_replay_applications,
+      backward_moves,
+      layout_reruns,
       page_invalidations,
       reflow_executions,
       reflow_requests,
@@ -465,10 +637,36 @@ impl<'a> RootFrameLayout<'a> {
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
     for (index, block) in blocks.iter().enumerate() {
+      self.record_layout_checkpoint(index, flow);
       let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
       self.format_block(index, previous, block, next, &mut flow);
     }
+  }
+
+  fn format_block_range(&mut self, blocks: &[Block], start_index: usize, mut flow: FlowContext) {
+    for index in start_index..blocks.len() {
+      let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
+      let block = &blocks[index];
+      let next = blocks.get(index + 1);
+      self.record_layout_checkpoint(index, flow);
+      self.format_block(index, previous, block, next, &mut flow);
+    }
+  }
+
+  fn record_layout_checkpoint(&mut self, block_index: usize, flow: FlowContext) {
+    self.checkpoints.push(LayoutCheckpoint {
+      section_index: flow.section_index,
+      block_index,
+      page_index: self.pages.len(),
+      y: self.y,
+      flow,
+      pages: self.pages.clone(),
+      current: self.current.clone(),
+      emitted_footnotes: self.emitted_footnotes.clone(),
+      follows: self.follows.clone(),
+      frames: self.frames.clone(),
+    });
   }
 
   fn format_block(
@@ -501,6 +699,13 @@ impl<'a> RootFrameLayout<'a> {
     *flow = self.advance_if_past_body(*flow);
     let transition = self.follow_transition_start(*flow);
     let frame_start = self.frame_segment_start(*flow);
+    let frame_influences = block_frame_influences(
+      block,
+      self.document,
+      &self.emitted_footnotes,
+      *flow,
+      Some(block_index),
+    );
     (*flow, self.y) = layout_document_block(
       previous,
       block,
@@ -510,7 +715,13 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.pages,
       self.y,
     );
-    self.record_layout_frame_segments(frame_start, *flow, kind, Some(block_index));
+    self.record_layout_frame_segments(
+      frame_start,
+      *flow,
+      kind,
+      Some(block_index),
+      &frame_influences,
+    );
     self.record_follow_transition(
       transition,
       *flow,
@@ -611,6 +822,13 @@ impl<'a> RootFrameLayout<'a> {
       let next = blocks.get(index + 1);
       let transition = self.follow_transition_start(flow);
       let frame_start = self.frame_segment_start(flow);
+      let frame_influences = block_frame_influences(
+        block,
+        self.document,
+        &self.emitted_footnotes,
+        flow,
+        Some(index),
+      );
       let (_, y) = layout_document_block(
         previous,
         block,
@@ -621,7 +839,13 @@ impl<'a> RootFrameLayout<'a> {
         self.y,
       );
       self.y = y;
-      self.record_layout_frame_segments(frame_start, flow, FollowFrameKind::Notes, Some(index));
+      self.record_layout_frame_segments(
+        frame_start,
+        flow,
+        FollowFrameKind::Notes,
+        Some(index),
+        &frame_influences,
+      );
       self.record_follow_transition(
         transition,
         flow,
@@ -629,6 +853,93 @@ impl<'a> RootFrameLayout<'a> {
         FollowReason::Overflow,
         Some(index),
       );
+    }
+  }
+
+  fn apply_checkpoint_rerun(&mut self, backward_moves: &[BackwardMove]) -> Option<LayoutRerun> {
+    let move_back = backward_moves
+      .iter()
+      .filter(|move_back| !move_back.suppressed)
+      .min_by_key(|move_back| move_back.replay_start_frame_index)?;
+    let start_frame = self.frames.get(move_back.replay_start_frame_index)?;
+    let block_index = start_frame.block_index?;
+    let constraints = rerun_constraints_for_frame(start_frame, move_back.scope);
+    let (checkpoint_index, checkpoint) =
+      self
+        .checkpoints
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, checkpoint)| {
+          checkpoint.section_index == start_frame.section_index
+            && checkpoint.block_index <= block_index
+        })?;
+    let checkpoint = checkpoint.clone();
+    let replaced_pages = self.pages.len().saturating_sub(checkpoint.page_index);
+    let mut rerun = RootFrameLayout {
+      document: self.document,
+      pages: checkpoint.pages.clone(),
+      current: checkpoint.current.clone(),
+      y: checkpoint.y,
+      emitted_footnotes: checkpoint.emitted_footnotes.clone(),
+      follows: checkpoint.follows.clone(),
+      frames: checkpoint.frames.clone(),
+      checkpoints: self.checkpoints[..=checkpoint_index].to_vec(),
+    };
+    rerun.format_body_from_checkpoint(&checkpoint, &constraints);
+    rerun.format_trailing_note_frames();
+    rerun.finish_current_page();
+
+    self.pages = rerun.pages;
+    self.current = rerun.current;
+    self.y = rerun.y;
+    self.emitted_footnotes = rerun.emitted_footnotes;
+    self.follows = rerun.follows;
+    self.frames = rerun.frames;
+    self.checkpoints = rerun.checkpoints;
+
+    Some(LayoutRerun {
+      checkpoint_index,
+      section_index: checkpoint.section_index,
+      block_index: checkpoint.block_index,
+      page_index: checkpoint.page_index,
+      frame_index: move_back.replay_start_frame_index,
+      reason: move_back.reason,
+      scope: move_back.scope,
+      replaced_pages,
+      produced_pages: self.pages.len().saturating_sub(checkpoint.page_index),
+      produced_frames: self.frames.len().saturating_sub(checkpoint.frames.len()),
+      constraints,
+    })
+  }
+
+  fn format_body_from_checkpoint(
+    &mut self,
+    checkpoint: &LayoutCheckpoint,
+    constraints: &[LayoutRerunConstraint],
+  ) {
+    let checkpoint_flow = constrained_rerun_flow(checkpoint.flow, constraints);
+    self.y = self.y.min(checkpoint_flow.content_bottom);
+    if self.document.sections.is_empty() {
+      let blocks = self.document.blocks.clone();
+      self.format_block_range(&blocks, checkpoint.block_index, checkpoint_flow);
+      return;
+    }
+
+    for section_index in checkpoint.section_index..self.document.sections.len() {
+      let section = self.document.sections[section_index].clone();
+      if section_index == checkpoint.section_index {
+        self.format_block_range(&section.blocks, checkpoint.block_index, checkpoint_flow);
+      } else {
+        self.start_section_frame(section_index, &section);
+        let flow = self.body_flow(document_page_frame(
+          section.page,
+          section_index,
+          section.columns,
+        ));
+        self.y = self.y.max(flow.content_top_pt);
+        self.format_block_sequence(&section.blocks, flow);
+      }
     }
   }
 
@@ -708,6 +1019,7 @@ impl<'a> RootFrameLayout<'a> {
     flow: FlowContext,
     kind: FollowFrameKind,
     block_index: Option<usize>,
+    influences: &[FrameInfluence],
   ) {
     let end_page_index = self.pages.len();
     for page_index in start.page_index..=end_page_index {
@@ -732,6 +1044,14 @@ impl<'a> RootFrameLayout<'a> {
       if fragments.is_empty() {
         fragments = frame_fragments_for(kind, &lines);
       }
+      let bounds = bounds.or_else(|| frame_bounds_for_items(&items));
+      let mut frame_influences = frame_influences_for_segment(influences, block_index, bounds);
+      frame_influences.extend(page_frame_influences(
+        &page.frame_influences,
+        item_start,
+        item_end,
+        block_index,
+      ));
       self.frames.push(LayoutFrame {
         kind,
         block_index,
@@ -751,10 +1071,102 @@ impl<'a> RootFrameLayout<'a> {
         bounds,
         lines,
         fragments,
+        influences: frame_influences,
         invalidation: FrameInvalidation::Clean,
       });
     }
   }
+}
+
+fn rerun_constraints_for_frame(
+  frame: &LayoutFrame,
+  scope: ReflowScope,
+) -> Vec<LayoutRerunConstraint> {
+  let mut constraints = Vec::new();
+  for influence in &frame.influences {
+    let Some(bounds) = influence.bounds else {
+      continue;
+    };
+    let (content_left_pt, content_width, content_bottom) = match influence.kind {
+      FrameInfluenceKind::FootnoteReservation | FrameInfluenceKind::TableSplit => (
+        frame
+          .bounds
+          .map(|bounds| bounds.x_pt)
+          .unwrap_or(bounds.x_pt),
+        frame
+          .bounds
+          .map(|bounds| bounds.width_pt)
+          .unwrap_or(bounds.width_pt),
+        bounds.y_pt,
+      ),
+      FrameInfluenceKind::FlyWrap => {
+        let frame_bounds = frame.bounds.unwrap_or(bounds);
+        if bounds.x_pt <= frame_bounds.x_pt {
+          let left = bounds.x_pt + bounds.width_pt;
+          let right = frame_bounds.x_pt + frame_bounds.width_pt;
+          (
+            left,
+            (right - left).max(DEFAULT_FONT_SIZE_PT),
+            frame_bounds.y_pt + frame_bounds.height_pt,
+          )
+        } else {
+          (
+            frame_bounds.x_pt,
+            (bounds.x_pt - frame_bounds.x_pt).max(DEFAULT_FONT_SIZE_PT),
+            frame_bounds.y_pt + frame_bounds.height_pt,
+          )
+        }
+      }
+    };
+    constraints.push(LayoutRerunConstraint {
+      kind: influence.kind,
+      scope,
+      bounds: Some(bounds),
+      content_left_pt,
+      content_width,
+      content_bottom,
+    });
+  }
+  constraints
+}
+
+fn constrained_rerun_flow(
+  mut flow: FlowContext,
+  constraints: &[LayoutRerunConstraint],
+) -> FlowContext {
+  for constraint in constraints {
+    if !constraint_applies_to_flow(constraint, flow) {
+      continue;
+    }
+    match constraint.kind {
+      FrameInfluenceKind::FootnoteReservation | FrameInfluenceKind::TableSplit => {
+        flow.content_bottom = flow
+          .content_bottom
+          .min(constraint.content_bottom)
+          .max(flow.content_top_pt + DEFAULT_LINE_HEIGHT_PT);
+        flow.body_content_bottom_pt = flow.body_content_bottom_pt.min(flow.content_bottom);
+      }
+      FrameInfluenceKind::FlyWrap => {
+        flow.content_left_pt = constraint.content_left_pt;
+        flow.content_width = constraint.content_width.max(DEFAULT_FONT_SIZE_PT);
+      }
+    }
+  }
+  flow
+}
+
+fn constraint_applies_to_flow(constraint: &LayoutRerunConstraint, flow: FlowContext) -> bool {
+  let Some(bounds) = constraint.bounds else {
+    return false;
+  };
+  let vertical_overlap =
+    bounds.y_pt < flow.content_bottom && bounds.y_pt + bounds.height_pt > flow.content_top_pt;
+  vertical_overlap
+    && match constraint.scope {
+      ReflowScope::Frame => true,
+      ReflowScope::Column => true,
+      ReflowScope::Page => true,
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -848,6 +1260,7 @@ fn frame_fragments_for(kind: FollowFrameKind, lines: &[LineBox]) -> Vec<FrameFra
         FollowFrameKind::Table => FrameFragmentKind::TableRow,
         FollowFrameKind::Notes => FrameFragmentKind::NoteLine,
       },
+      split: FragmentSplitKind::Complete,
       index,
       row_index: index,
       cell_index: None,
@@ -859,6 +1272,129 @@ fn frame_fragments_for(kind: FollowFrameKind, lines: &[LineBox]) -> Vec<FrameFra
         width_pt: line.width_pt,
         height_pt: line.height_pt,
       }),
+    })
+    .collect()
+}
+
+fn block_frame_influences(
+  block: &Block,
+  document: &DocxDocument,
+  emitted_footnotes: &HashSet<i64>,
+  flow: FlowContext,
+  block_index: Option<usize>,
+) -> Vec<FrameInfluence> {
+  let mut influences = Vec::new();
+  match block {
+    Block::Paragraph(paragraph) => {
+      let footnote_count = paragraph
+        .footnote_reference_ids
+        .iter()
+        .filter(|id| !emitted_footnotes.contains(id) && document.footnotes.contains_key(id))
+        .count();
+      if footnote_count > 0 {
+        let height =
+          referenced_footnote_area_height(block, document, emitted_footnotes, flow).max(0.0);
+        influences.push(FrameInfluence {
+          kind: FrameInfluenceKind::FootnoteReservation,
+          count: footnote_count,
+          block_index,
+          item_start: 0,
+          item_end: usize::MAX,
+          bounds: Some(FrameBounds {
+            x_pt: flow.setup.margin_left_pt,
+            y_pt: (flow.content_bottom - height).max(flow.content_top_pt),
+            width_pt: (flow.setup.width_pt
+              - flow.setup.margin_left_pt
+              - flow.setup.margin_right_pt)
+              .max(DEFAULT_FONT_SIZE_PT),
+            height_pt: height,
+          }),
+        });
+      }
+
+      let fly_count = paragraph
+        .inlines
+        .iter()
+        .filter(|inline| {
+          matches!(
+            inline,
+            InlineItem::Image(image)
+              if matches!(
+                image.placement,
+                crate::docx::ImagePlacement::Floating(placement)
+                  if !placement.behind_text
+                    && !matches!(placement.wrap, ImageWrapMode::Through | ImageWrapMode::Inline)
+              )
+          )
+        })
+        .count();
+      if fly_count > 0 {
+        influences.push(FrameInfluence {
+          kind: FrameInfluenceKind::FlyWrap,
+          count: fly_count,
+          block_index,
+          item_start: 0,
+          item_end: usize::MAX,
+          bounds: None,
+        });
+      }
+    }
+    Block::Table(table) => {
+      let split_sensitive_rows = table
+        .rows
+        .iter()
+        .filter(|row| {
+          row.cant_split || row.repeat_header || row.cells.iter().any(|cell| cell.grid_span > 1)
+        })
+        .count();
+      if split_sensitive_rows > 0 {
+        influences.push(FrameInfluence {
+          kind: FrameInfluenceKind::TableSplit,
+          count: split_sensitive_rows,
+          block_index,
+          item_start: 0,
+          item_end: usize::MAX,
+          bounds: None,
+        });
+      }
+    }
+  }
+  influences
+}
+
+fn frame_influences_for_segment(
+  influences: &[FrameInfluence],
+  block_index: Option<usize>,
+  bounds: Option<FrameBounds>,
+) -> Vec<FrameInfluence> {
+  influences
+    .iter()
+    .cloned()
+    .map(|mut influence| {
+      influence.block_index = influence.block_index.or(block_index);
+      if influence.bounds.is_none() {
+        influence.bounds = bounds;
+      }
+      influence.item_start = 0;
+      influence.item_end = usize::MAX;
+      influence
+    })
+    .collect()
+}
+
+fn page_frame_influences(
+  influences: &[FrameInfluence],
+  item_start: usize,
+  item_end: usize,
+  block_index: Option<usize>,
+) -> Vec<FrameInfluence> {
+  influences
+    .iter()
+    .filter(|influence| influence.item_start < item_end && influence.item_end > item_start)
+    .cloned()
+    .map(|mut influence| {
+      influence.block_index = influence.block_index.or(block_index);
+      influence
     })
     .collect()
 }
@@ -884,24 +1420,56 @@ fn page_frame_fragments(
     .collect()
 }
 
-fn push_page_fragment(
-  page: &mut Page,
-  kind: FrameFragmentKind,
-  index: usize,
-  row_index: usize,
-  cell_index: Option<usize>,
-  item_start: usize,
-  item_end: usize,
-) {
+fn push_page_fragment(page: &mut Page, fragment: PageFragmentRecord) {
+  let PageFragmentRecord {
+    kind,
+    split,
+    index,
+    row_index,
+    cell_index,
+    item_start,
+    item_end,
+  } = fragment;
   if item_start >= item_end {
     return;
   }
   let bounds = frame_bounds_for_items(&page.items[item_start..item_end]);
   page.frame_fragments.push(FrameFragment {
     kind,
+    split,
     index,
     row_index,
     cell_index,
+    item_start,
+    item_end,
+    bounds,
+  });
+}
+
+struct PageFragmentRecord {
+  kind: FrameFragmentKind,
+  split: FragmentSplitKind,
+  index: usize,
+  row_index: usize,
+  cell_index: Option<usize>,
+  item_start: usize,
+  item_end: usize,
+}
+
+fn push_page_influence(
+  page: &mut Page,
+  kind: FrameInfluenceKind,
+  item_start: usize,
+  item_end: usize,
+  bounds: Option<FrameBounds>,
+) {
+  if item_start >= item_end {
+    return;
+  }
+  page.frame_influences.push(FrameInfluence {
+    kind,
+    count: 1,
+    block_index: None,
     item_start,
     item_end,
     bounds,
@@ -992,13 +1560,18 @@ fn mark_decorated_frame_invalidations(
   }
 }
 
-fn reflow_requests_for_frames(frames: &[LayoutFrame]) -> Vec<ReflowRequest> {
+fn reflow_requests_for_frames(
+  frames: &[LayoutFrame],
+  include_insertion_influences: bool,
+) -> Vec<ReflowRequest> {
   frames
     .iter()
     .enumerate()
     .filter_map(|(frame_index, frame)| {
       let reason = match frame.invalidation {
-        FrameInvalidation::Clean => return None,
+        FrameInvalidation::Clean if frame.influences.is_empty() => return None,
+        FrameInvalidation::Clean if !include_insertion_influences => return None,
+        FrameInvalidation::Clean => ReflowReason::InsertionInfluenceChanged,
         FrameInvalidation::PageItemsDecorated => ReflowReason::DecorationChangedItems,
         FrameInvalidation::NeedsReflow => ReflowReason::InvalidBounds,
       };
@@ -1006,22 +1579,51 @@ fn reflow_requests_for_frames(frames: &[LayoutFrame]) -> Vec<ReflowRequest> {
         frame_index,
         kind: frame.kind,
         reason,
+        scope: reflow_scope_for_frame(frame),
         restart: frame.split_start,
         page_index: frame.page_index,
         section_page_index: frame.section_page_index,
         column_index: frame.column_index,
+        influence_count: frame.influences.len(),
       })
     })
     .collect()
 }
 
+fn reflow_scope_for_frame(frame: &LayoutFrame) -> ReflowScope {
+  frame
+    .influences
+    .iter()
+    .fold(ReflowScope::Frame, |scope, influence| {
+      scope.max(match influence.kind {
+        FrameInfluenceKind::FootnoteReservation => ReflowScope::Page,
+        FrameInfluenceKind::FlyWrap => ReflowScope::Column,
+        FrameInfluenceKind::TableSplit => ReflowScope::Frame,
+      })
+    })
+}
+
 fn execute_reflow_requests(
   frames: &mut [LayoutFrame],
   requests: Vec<ReflowRequest>,
-) -> (Vec<ReflowRequest>, Vec<ReflowExecution>) {
+) -> (
+  Vec<ReflowRequest>,
+  Vec<ReflowExecution>,
+  Vec<PageReplay>,
+  Vec<BackwardMove>,
+) {
   let mut remaining = Vec::new();
+  let mut page_replays = Vec::new();
+  let mut backward_moves = Vec::new();
   let mut stabilized_count = 0usize;
   let mut first_stabilized_page = usize::MAX;
+  let mut influence_count = 0usize;
+  let mut first_influence_page = usize::MAX;
+  let mut influence_scope = ReflowScope::Frame;
+  let mut influence_replayed_frames = 0usize;
+  let mut influence_replayed_items = 0usize;
+  let mut suppressed_moves = 0usize;
+  let mut move_backward_keys = HashMap::<MoveBackwardKey, usize>::new();
 
   for request in requests {
     match request.reason {
@@ -1036,21 +1638,322 @@ fn execute_reflow_requests(
         }
         remaining.push(request);
       }
+      ReflowReason::InsertionInfluenceChanged => {
+        if let Some(frame) = frames.get(request.frame_index)
+          && !frame.influences.is_empty()
+          && !frame.fragments.is_empty()
+        {
+          influence_count += 1;
+          first_influence_page = first_influence_page.min(request.page_index);
+          influence_scope = influence_scope.max(request.scope);
+          if let Some(backward) = execute_backward_move(frames, &request, &mut move_backward_keys) {
+            suppressed_moves += usize::from(backward.move_back.suppressed);
+            influence_replayed_frames += backward.move_back.replayed_frames;
+            influence_replayed_items += backward.move_back.replayed_items;
+            page_replays.extend(backward.pages);
+            backward_moves.push(backward.move_back);
+          }
+          let replay = replay_scoped_frames(frames, &request);
+          influence_replayed_frames += replay.frames;
+          influence_replayed_items += replay.items;
+          page_replays.extend(replay.pages);
+          continue;
+        }
+        remaining.push(request);
+      }
       ReflowReason::InvalidBounds => remaining.push(request),
     }
   }
 
-  let executions = if stabilized_count > 0 {
-    vec![ReflowExecution {
+  for request in &remaining {
+    let key = MoveBackwardKey {
+      frame_index: request.frame_index,
+      page_index: request.page_index,
+      section_page_index: request.section_page_index,
+      column_index: request.column_index,
+      scope: request.scope,
+    };
+    let count = move_backward_keys.entry(key).or_default();
+    *count += 1;
+    if *count > MOVE_BACKWARD_SUPPRESS_THRESHOLD {
+      suppressed_moves += 1;
+    }
+  }
+
+  let mut executions = Vec::new();
+  if stabilized_count > 0 {
+    executions.push(ReflowExecution {
       first_page_index: first_stabilized_page,
       request_count: stabilized_count,
       action: ReflowAction::StabilizedRetainedDecorationItems,
-    }]
-  } else {
-    Vec::new()
-  };
+      scope: ReflowScope::Frame,
+      suppressed_moves: 0,
+      backward_moves: 0,
+      page_replacements: 0,
+      replayed_frames: 0,
+      replayed_items: 0,
+    });
+  }
+  if influence_count > 0 {
+    executions.push(ReflowExecution {
+      first_page_index: first_influence_page,
+      request_count: influence_count,
+      action: ReflowAction::StabilizedInsertionInfluences,
+      scope: influence_scope,
+      suppressed_moves,
+      backward_moves: backward_moves.len(),
+      page_replacements: page_replays.len(),
+      replayed_frames: influence_replayed_frames,
+      replayed_items: influence_replayed_items,
+    });
+  }
 
-  (remaining, executions)
+  (remaining, executions, page_replays, backward_moves)
+}
+
+fn apply_page_replays(pages: &mut [Page], replays: &[PageReplay]) -> Vec<PageReplayApplication> {
+  let mut applications = Vec::with_capacity(replays.len());
+  for replay in replays {
+    let applied = pages
+      .get_mut(replay.page_index)
+      .is_some_and(|page| apply_page_replay(page, replay));
+    applications.push(PageReplayApplication {
+      page_index: replay.page_index,
+      section_page_index: replay.section_page_index,
+      column_index: replay.column_index,
+      scope: replay.scope,
+      item_start: replay.item_start,
+      item_end: replay.item_end,
+      replacement_count: replay.replacement_items.len(),
+      applied,
+    });
+  }
+  applications
+}
+
+fn apply_page_replay(page: &mut Page, replay: &PageReplay) -> bool {
+  if page.section_page_index != replay.section_page_index
+    || replay.item_start > replay.item_end
+    || replay.item_end > page.items.len()
+  {
+    return false;
+  }
+
+  page.items.splice(
+    replay.item_start..replay.item_end,
+    replay.replacement_items.clone(),
+  );
+  true
+}
+
+fn execute_backward_move(
+  frames: &mut [LayoutFrame],
+  request: &ReflowRequest,
+  move_backward_keys: &mut HashMap<MoveBackwardKey, usize>,
+) -> Option<BackwardMoveExecution> {
+  if request.page_index == 0 || matches!(request.scope, ReflowScope::Frame) {
+    return None;
+  }
+  let replay_start_frame_index = previous_page_replay_start_frame(frames, request)?;
+  let start_frame = frames.get(replay_start_frame_index)?;
+  let key = MoveBackwardKey {
+    frame_index: request.frame_index,
+    page_index: start_frame.page_index,
+    section_page_index: start_frame.section_page_index,
+    column_index: start_frame.column_index,
+    scope: request.scope,
+  };
+  let count = move_backward_keys.entry(key).or_default();
+  *count += 1;
+  let suppressed = *count > MOVE_BACKWARD_SUPPRESS_THRESHOLD;
+  let mut move_back = BackwardMove {
+    frame_index: request.frame_index,
+    replay_start_frame_index,
+    from_page_index: request.page_index,
+    to_page_index: start_frame.page_index,
+    from_section_page_index: request.section_page_index,
+    to_section_page_index: start_frame.section_page_index,
+    scope: request.scope,
+    reason: request.reason,
+    suppressed,
+    replayed_frames: 0,
+    replayed_items: 0,
+  };
+  if suppressed {
+    return Some(BackwardMoveExecution {
+      move_back,
+      pages: Vec::new(),
+    });
+  }
+
+  let replay_request = ReflowRequest {
+    frame_index: replay_start_frame_index,
+    kind: start_frame.kind,
+    reason: request.reason,
+    scope: request.scope,
+    restart: start_frame.split_start,
+    page_index: start_frame.page_index,
+    section_page_index: start_frame.section_page_index,
+    column_index: start_frame.column_index,
+    influence_count: start_frame.influences.len(),
+  };
+  let replay = replay_scoped_frames(frames, &replay_request);
+  move_back.replayed_frames = replay.frames;
+  move_back.replayed_items = replay.items;
+  Some(BackwardMoveExecution {
+    move_back,
+    pages: replay.pages,
+  })
+}
+
+struct BackwardMoveExecution {
+  move_back: BackwardMove,
+  pages: Vec<PageReplay>,
+}
+
+fn previous_page_replay_start_frame(
+  frames: &[LayoutFrame],
+  request: &ReflowRequest,
+) -> Option<usize> {
+  let target_page_index = request.page_index.checked_sub(1)?;
+  frames
+    .iter()
+    .enumerate()
+    .filter(|(_, frame)| {
+      frame.page_index == target_page_index
+        && (matches!(request.scope, ReflowScope::Page)
+          || frame.section_page_index + 1 >= request.section_page_index)
+    })
+    .map(|(index, _)| index)
+    .next()
+}
+
+#[derive(Clone, Debug, Default)]
+struct ReflowReplayStats {
+  frames: usize,
+  items: usize,
+  pages: Vec<PageReplay>,
+}
+
+fn replay_scoped_frames(frames: &mut [LayoutFrame], request: &ReflowRequest) -> ReflowReplayStats {
+  let mut stats = ReflowReplayStats::default();
+  let Some(start) = frames.get(request.frame_index) else {
+    return stats;
+  };
+  let start_page_index = start.page_index;
+  let start_section_page_index = start.section_page_index;
+  let start_column_index = start.column_index;
+
+  for frame in frames.iter_mut().skip(request.frame_index) {
+    if !frame_in_reflow_scope(
+      frame,
+      request.scope,
+      start_page_index,
+      start_section_page_index,
+      start_column_index,
+    ) {
+      break;
+    }
+    let replay = page_replay_for_frame(frame, request.scope);
+    replay_layout_frame(frame);
+    stats.frames += 1;
+    stats.items += frame.items.len();
+    stats.pages.push(replay);
+  }
+  stats
+}
+
+fn page_replay_for_frame(frame: &LayoutFrame, scope: ReflowScope) -> PageReplay {
+  PageReplay {
+    page_index: frame.page_index,
+    section_page_index: frame.section_page_index,
+    column_index: frame.column_index,
+    scope,
+    item_start: frame.item_start,
+    item_end: frame.item_end,
+    replacement_items: frame.items.clone(),
+  }
+}
+
+fn frame_in_reflow_scope(
+  frame: &LayoutFrame,
+  scope: ReflowScope,
+  page_index: usize,
+  section_page_index: usize,
+  column_index: usize,
+) -> bool {
+  match scope {
+    ReflowScope::Frame => frame.page_index == page_index && frame.column_index == column_index,
+    ReflowScope::Column => {
+      frame.page_index == page_index
+        && frame.section_page_index == section_page_index
+        && frame.column_index == column_index
+    }
+    ReflowScope::Page => frame.page_index == page_index,
+  }
+}
+
+fn replay_layout_frame(frame: &mut LayoutFrame) {
+  frame.item_start = 0;
+  frame.item_end = frame.items.len();
+  frame.bounds = frame_bounds_for_items(&frame.items);
+  frame.lines = line_boxes_for_items(&frame.items, 0, frame.items.len());
+  let fallback_fragments = frame_fragments_for(frame.kind, &frame.lines);
+  if frame.fragments.is_empty() {
+    frame.fragments = fallback_fragments;
+  } else {
+    normalize_replayed_fragments(
+      &mut frame.fragments,
+      &fallback_fragments,
+      frame.kind,
+      frame.items.len(),
+    );
+  }
+  frame.split_start = frame_cursor(frame.block_index, frame.kind, 0, &frame.lines, true);
+  frame.split_end = frame_cursor(
+    frame.block_index,
+    frame.kind,
+    frame.items.len(),
+    &frame.lines,
+    false,
+  );
+  frame.invalidation = FrameInvalidation::Clean;
+}
+
+fn normalize_replayed_fragments(
+  fragments: &mut Vec<FrameFragment>,
+  fallback: &[FrameFragment],
+  kind: FollowFrameKind,
+  item_len: usize,
+) {
+  if matches!(kind, FollowFrameKind::Table) {
+    if item_len == 0 {
+      fragments.clear();
+      return;
+    }
+    for fragment in fragments {
+      fragment.item_start = fragment.item_start.min(item_len.saturating_sub(1));
+      fragment.item_end = fragment.item_end.min(item_len).max(fragment.item_start + 1);
+      if fragment.bounds.is_none() {
+        fragment.bounds = fallback.first().and_then(|fragment| fragment.bounds);
+      }
+    }
+    return;
+  }
+  if fragments.len() != fallback.len() {
+    *fragments = fallback.to_vec();
+    return;
+  }
+  for (fragment, fallback) in fragments.iter_mut().zip(fallback) {
+    fragment.kind = match kind {
+      FollowFrameKind::Paragraph => FrameFragmentKind::ParagraphLine,
+      FollowFrameKind::Table => fragment.kind,
+      FollowFrameKind::Notes => FrameFragmentKind::NoteLine,
+    };
+    fragment.item_start = fallback.item_start;
+    fragment.item_end = fallback.item_end;
+    fragment.bounds = fallback.bounds;
+  }
 }
 
 fn page_invalidations_for_reflow_requests(requests: &[ReflowRequest]) -> Vec<PageInvalidation> {
@@ -1062,8 +1965,9 @@ fn page_invalidations_for_reflow_requests(requests: &[ReflowRequest]) -> Vec<Pag
     {
       Some(invalidation) => {
         invalidation.first_frame_index = invalidation.first_frame_index.min(request.frame_index);
-        if matches!(request.reason, ReflowReason::InvalidBounds) {
-          invalidation.reason = ReflowReason::InvalidBounds;
+        invalidation.scope = invalidation.scope.max(request.scope);
+        if reflow_reason_priority(request.reason) > reflow_reason_priority(invalidation.reason) {
+          invalidation.reason = request.reason;
         }
       }
       None => invalidations.push(PageInvalidation {
@@ -1071,12 +1975,21 @@ fn page_invalidations_for_reflow_requests(requests: &[ReflowRequest]) -> Vec<Pag
         section_page_index: request.section_page_index,
         first_frame_index: request.frame_index,
         reason: request.reason,
+        scope: request.scope,
       }),
     }
   }
   invalidations
     .sort_by_key(|invalidation| (invalidation.page_index, invalidation.first_frame_index));
   invalidations
+}
+
+fn reflow_reason_priority(reason: ReflowReason) -> u8 {
+  match reason {
+    ReflowReason::DecorationChangedItems => 0,
+    ReflowReason::InsertionInfluenceChanged => 1,
+    ReflowReason::InvalidBounds => 2,
+  }
 }
 
 fn restart_plan_for_page_invalidations(
@@ -1091,6 +2004,7 @@ fn restart_plan_for_page_invalidations(
     block_index: frame.block_index,
     cursor: frame.split_start,
     reason: invalidation.reason,
+    scope: invalidation.scope,
   })
 }
 
@@ -1179,6 +2093,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_page_index,
     items: Vec::new(),
     frame_fragments: Vec::new(),
+    frame_influences: Vec::new(),
     wrap_exclusions: Vec::new(),
   }
 }
@@ -2250,6 +3165,10 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
     pages: output_pages,
     follows: Vec::new(),
     frames: Vec::new(),
+    page_replays: Vec::new(),
+    page_replay_applications: Vec::new(),
+    backward_moves: Vec::new(),
+    layout_reruns: Vec::new(),
     page_invalidations: Vec::new(),
     reflow_executions: Vec::new(),
     reflow_requests: Vec::new(),
@@ -2470,6 +3389,7 @@ impl RowFrame<'_, '_> {
     content_offset: f32,
   ) {
     let row_item_start = current.items.len();
+    let split = self.fragment_split(row_bottom, content_offset);
     let cell_spacing_pt = self.cell_spacing_pt();
     let mut cell_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     let mut grid_index = self.row.grid_before;
@@ -2494,12 +3414,15 @@ impl RowFrame<'_, '_> {
       }
       push_page_fragment(
         current,
-        FrameFragmentKind::TableCell,
-        self.row_index,
-        self.row_index,
-        Some(cell_index),
-        cell_item_start,
-        current.items.len(),
+        PageFragmentRecord {
+          kind: FrameFragmentKind::TableCell,
+          split,
+          index: self.row_index,
+          row_index: self.row_index,
+          cell_index: Some(cell_index),
+          item_start: cell_item_start,
+          item_end: current.items.len(),
+        },
       );
       cell_left += cell_frame.width_pt + cell_spacing_pt;
     }
@@ -2508,13 +3431,29 @@ impl RowFrame<'_, '_> {
     self.paint_trailing_border(current, row_top, row_bottom);
     push_page_fragment(
       current,
-      FrameFragmentKind::TableRow,
-      self.row_index,
-      self.row_index,
-      None,
-      row_item_start,
-      current.items.len(),
+      PageFragmentRecord {
+        kind: FrameFragmentKind::TableRow,
+        split,
+        index: self.row_index,
+        row_index: self.row_index,
+        cell_index: None,
+        item_start: row_item_start,
+        item_end: current.items.len(),
+      },
     );
+  }
+
+  fn fragment_split(&self, row_bottom: f32, content_offset: f32) -> FragmentSplitKind {
+    if self.row.repeat_header {
+      return FragmentSplitKind::RepeatedHeader;
+    }
+    if content_offset > 0.1 {
+      return FragmentSplitKind::Follow;
+    }
+    if row_bottom + 0.1 < self.bottom() {
+      return FragmentSplitKind::Master;
+    }
+    FragmentSplitKind::Complete
   }
 
   fn cell_frame<'s>(
@@ -3621,12 +4560,15 @@ impl<'a> TextFrameLayout<'a> {
     }
     push_page_fragment(
       advance.current,
-      FrameFragmentKind::ParagraphLine,
-      advance.state.line_fragments.len(),
-      advance.state.line_fragments.len(),
-      None,
-      *advance.line_item_start_index,
-      advance.current.items.len(),
+      PageFragmentRecord {
+        kind: FrameFragmentKind::ParagraphLine,
+        split: FragmentSplitKind::Complete,
+        index: advance.state.line_fragments.len(),
+        row_index: advance.state.line_fragments.len(),
+        cell_index: None,
+        item_start: *advance.line_item_start_index,
+        item_end: advance.current.items.len(),
+      },
     );
     advance.state.finish_line(y, *line_height);
     let mut next_y = y + *line_height;
@@ -4049,6 +4991,7 @@ impl<'a> TextFrameLayout<'a> {
           );
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
             let (image_x, image_y) = floating_image_position(placement, flow, x, y, width, height);
+            let image_item_start = current.items.len();
             current.items.push(PageItem::Image(ImageItem {
               x_pt: image_x,
               y_pt: image_y,
@@ -4064,8 +5007,23 @@ impl<'a> TextFrameLayout<'a> {
               floating: true,
               behind_text: placement.behind_text,
             }));
+            let influence_bounds = Some(FrameBounds {
+              x_pt: image_x - placement.margin_left_pt,
+              y_pt: image_y - placement.margin_top_pt,
+              width_pt: width + placement.margin_left_pt + placement.margin_right_pt,
+              height_pt: height + placement.margin_top_pt + placement.margin_bottom_pt,
+            });
             match placement.wrap {
               ImageWrapMode::TopBottom | ImageWrapMode::None => {
+                if !placement.behind_text {
+                  push_page_influence(
+                    current,
+                    FrameInfluenceKind::FlyWrap,
+                    image_item_start,
+                    current.items.len(),
+                    influence_bounds,
+                  );
+                }
                 y = y.max(image_y + height + placement.margin_bottom_pt);
                 if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
                   (flow, y) = advance_section_flow(flow, current, pages);
@@ -4093,6 +5051,13 @@ impl<'a> TextFrameLayout<'a> {
                 };
                 wrap_exclusions.push(exclusion);
                 current.wrap_exclusions.push(exclusion);
+                push_page_influence(
+                  current,
+                  FrameInfluenceKind::FlyWrap,
+                  image_item_start,
+                  current.items.len(),
+                  influence_bounds,
+                );
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                 x = x.max(line_left).min(line_right);
@@ -4190,12 +5155,15 @@ impl<'a> TextFrameLayout<'a> {
     if emitted {
       push_page_fragment(
         current,
-        FrameFragmentKind::ParagraphLine,
-        text_state.line_fragments.len(),
-        text_state.line_fragments.len(),
-        None,
-        line_item_start_index,
-        current.items.len(),
+        PageFragmentRecord {
+          kind: FrameFragmentKind::ParagraphLine,
+          split: FragmentSplitKind::Complete,
+          index: text_state.line_fragments.len(),
+          row_index: text_state.line_fragments.len(),
+          cell_index: None,
+          item_start: line_item_start_index,
+          item_end: current.items.len(),
+        },
       );
       text_state.finish_paragraph(y, line_height, emitted);
       paragraph_bottom = y + line_height;

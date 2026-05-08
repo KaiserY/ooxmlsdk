@@ -320,7 +320,7 @@ more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
-Current Writer-parity estimate: about 50% of full LibreOffice Writer DOCX to
+Current Writer-parity estimate: about 64% of full LibreOffice Writer DOCX to
 PDF behavior. The main path now covers typed package import, section/page-style
 flow, first/default/even header/footer inheritance and selection, negative
 top/bottom margin header/footer fallback, basic column flow, paragraph/run/style
@@ -336,14 +336,29 @@ catch before pixel/PDF-byte comparison exists. `LayoutDocument` now carries
 concrete frame records and block-level follow metadata for paragraph, table,
 and note frame transitions: each frame has a page/column owner, display-list
 range, retained display-list items, bounds, synthesized line boxes, split
-cursors, paragraph/table/note fragments, invalidation state, page-level
-invalidations, a first reflow-request queue, and a conservative execution pass
-that stabilizes post-decoration requests against retained frame items. Remaining
-requests are reduced to a first invalid page/frame restart plan, matching the
-shape of Writer's first-invalid-page loop and Typst's relayout checkpoint. This
-moves the renderer past a flat display-list-only model and gives the next
-Writer-style rollback and backward invalidation work something concrete to
-operate on.
+cursors, paragraph/table/note fragments, table fragment split ownership,
+frame-owned insertion influences for footnote reservation, fly wrapping, and
+table splitting, invalidation state, page-level invalidations, scoped
+reflow-request records, move-backward suppression keys, retained frame replay,
+per-page replacement records for replayed body ranges, and page replay
+application records that splice replayed frame items back into the live page
+display list before page decorations are applied. Influence replay now also
+has an executable backward-move record and a block-entry checkpoint rerun path:
+when a non-suppressed backward move is selected, layout restores the saved
+pages/current frame/follows/frames/footnote state at the owning block and
+derives rerun constraints from the triggering insertion influence, shrinking
+the restored flow's bottom edge for footnote/table reservations or narrowing
+the column for fly wrapping before it reformats the remaining body plus
+trailing note frames. Decoration-driven invalidations are then handled as a
+separate retained-frame stabilization pass. PDF export now builds an explicit
+paint document from layout pages and frame/line ownership before touching the
+Krilla backend, so rendering consumes paint items instead of interpreting the
+DOCX layout display list directly.
+Remaining requests are reduced to a first invalid page/frame restart plan with
+frame/column/page scope, matching the shape of Writer's first-invalid-page loop
+and Typst's relayout checkpoint. This moves the renderer past a flat
+display-list-only model and gives the next Writer-style rollback and backward
+invalidation work something concrete to operate on.
 The remaining gap is still large because LibreOffice parity depends on durable
 Writer master/follow frame state, exact line breaking and full bidi/CJK
 justification, full footnote/table/fly interaction, compatibility-mode quirks,
@@ -358,11 +373,11 @@ Estimate by area, using LibreOffice Writer as the target:
 | DOCX package/import backbone | ~60% | Settings, compatibility flags, more part types, theme/style defaults, revision and field metadata. |
 | Sections/page styles/repeating areas | ~58% | Full negative-margin text-frame conversion, page-master reassignment after backward moves, page numbering, mirrored/gutter pages, exact header/footer dynamic sizing. |
 | Paragraph/run properties | ~40% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
-| Text layout | ~44% | Backward reflow, exact line breaking, full bidi/CJK justification, line-box-driven paint. |
-| Tables | ~48% | Full rowspan split recalculation, backward move/repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
-| Footnotes/endnotes | ~35% | True continuation frames, continuation separators, note/table/column interactions, separator style/settings. |
-| Drawing/floating objects | ~34% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
-| PDF paint/export quality | ~36% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, bookmarks/internal links, metadata/export options. |
+| Text layout | ~60% | Exact line breaking, full bidi/CJK justification, glyph-level line artifacts. |
+| Tables | ~56% | Full rowspan split recalculation, repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
+| Footnotes/endnotes | ~43% | True continuation frames, continuation separators, note/table/column interactions, separator style/settings. |
+| Drawing/floating objects | ~42% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
+| PDF paint/export quality | ~46% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, bookmarks/internal links, metadata/export options. |
 
 ### Phase 0: Freeze Non-DOCX Scope
 
@@ -1043,12 +1058,12 @@ The section/page-style backbone, DOCX/PDF cluster snapshots, and concrete
 layout frame records are now in place. Continue with Writer-frame alignment in
 larger behavior batches:
 
-1. Extend `LayoutFrame` reflow execution from retained-decoration stabilization
-   to the first backward move when footnotes or fly frames shrink the usable
-   region after initial placement.
-2. Promote line boxes from synthesized metadata to the primary text layout
-   artifact, so PDF paint consumes frame/line/glyph records instead of scanning
-   `PageItem::Text`.
+1. Make checkpoint reruns influence-aware by feeding fly/footnote/table
+   reservations back into the rerun's available region before formatting the
+   restarted block.
+2. Promote shaped glyph runs into the paint document so text paint is sourced
+   from frame/line/glyph records rather than measuring strings at PDF paint
+   time.
 3. Use table row/cell fragment ranges for row-span split recalculation,
    split-border ownership, and repeated header repaint after row fragments.
 4. Extend floating frame influence from paragraph-local exclusions to

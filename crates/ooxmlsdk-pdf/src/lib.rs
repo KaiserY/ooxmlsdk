@@ -3522,12 +3522,20 @@ mod tests {
       &[
         "pages=",
         "frames=",
+        "page_replays=",
+        "page_replay_applications=",
+        "backward_moves=",
+        "layout_reruns=",
         "page_invalidations=",
         "reflow_executions=",
         "reflow_requests=",
         "restart_plan=",
+        "replayed_frames=",
+        "backward_moves=",
+        "replacements=",
         "frame kind=Paragraph block=Some(0)",
         "fragments=",
+        "influences=",
         "invalidation=",
         "Cluster section header",
         "Cluster sections first body",
@@ -3580,6 +3588,8 @@ mod tests {
         "frame kind=Table block=Some(1)",
         "fragment kind=TableCell",
         "fragment kind=TableRow",
+        "split=",
+        "influence kind=TableSplit",
         "Cluster table before",
         "\"head 1\"",
         "\"rowspan \"",
@@ -3619,6 +3629,10 @@ mod tests {
         "frame kind=Paragraph block=Some(0)",
         "frame kind=Paragraph block=Some(1)",
         "fragment kind=ParagraphLine",
+        "influence kind=FlyWrap",
+        "scope=Column",
+        "page_replay page=",
+        "page_replay_application page=",
         "Cluster drawing before floating",
         "I x=36.0 y=",
         "floating=true",
@@ -3647,6 +3661,10 @@ mod tests {
         "frame kind=Notes block=Some(0)",
         "fragment kind=ParagraphLine",
         "fragment kind=NoteLine",
+        "influence kind=FootnoteReservation",
+        "scope=Page",
+        "page_replay page=",
+        "page_replay_application page=",
         "Cluster notes body with footnote",
         "Cluster notes following body text",
         "Cluster footnote",
@@ -3674,6 +3692,13 @@ mod tests {
     snapshot.push_str(&format!("pages={}\n", layout.pages.len()));
     snapshot.push_str(&format!("follows={}\n", layout.follows.len()));
     snapshot.push_str(&format!("frames={}\n", layout.frames.len()));
+    snapshot.push_str(&format!("page_replays={}\n", layout.page_replays.len()));
+    snapshot.push_str(&format!(
+      "page_replay_applications={}\n",
+      layout.page_replay_applications.len()
+    ));
+    snapshot.push_str(&format!("backward_moves={}\n", layout.backward_moves.len()));
+    snapshot.push_str(&format!("layout_reruns={}\n", layout.layout_reruns.len()));
     snapshot.push_str(&format!(
       "page_invalidations={}\n",
       layout.page_invalidations.len()
@@ -3688,8 +3713,13 @@ mod tests {
     ));
     match &layout.restart_plan {
       Some(plan) => snapshot.push_str(&format!(
-        "restart_plan page={} frame={} block={:?} cursor={:?} reason={:?}\n",
-        plan.page_index, plan.frame_index, plan.block_index, plan.cursor.kind, plan.reason
+        "restart_plan page={} frame={} block={:?} cursor={:?} reason={:?} scope={:?}\n",
+        plan.page_index,
+        plan.frame_index,
+        plan.block_index,
+        plan.cursor.kind,
+        plan.reason,
+        plan.scope
       )),
       None => snapshot.push_str("restart_plan=none\n"),
     }
@@ -3711,25 +3741,113 @@ mod tests {
     }
     for invalidation in &layout.page_invalidations {
       snapshot.push_str(&format!(
-        "invalid_page page={} section_page={} first_frame={} reason={:?}\n",
+        "invalid_page page={} section_page={} first_frame={} reason={:?} scope={:?}\n",
         invalidation.page_index,
         invalidation.section_page_index,
         invalidation.first_frame_index,
-        invalidation.reason
+        invalidation.reason,
+        invalidation.scope
       ));
     }
     for execution in &layout.reflow_executions {
       snapshot.push_str(&format!(
-        "reflow_execution first_page={} requests={} action={:?}\n",
-        execution.first_page_index, execution.request_count, execution.action
+        "reflow_execution first_page={} requests={} action={:?} scope={:?} suppressed={} backward_moves={} replacements={} replayed_frames={} replayed_items={}\n",
+        execution.first_page_index,
+        execution.request_count,
+        execution.action,
+        execution.scope,
+        execution.suppressed_moves,
+        execution.backward_moves,
+        execution.page_replacements,
+        execution.replayed_frames,
+        execution.replayed_items
       ));
+    }
+    for replay in &layout.page_replays {
+      snapshot.push_str(&format!(
+        "page_replay page={} section_page={} column={} scope={:?} items={}..{} replacements={}\n",
+        replay.page_index,
+        replay.section_page_index,
+        replay.column_index,
+        replay.scope,
+        replay.item_start,
+        replay.item_end,
+        replay.replacement_items.len()
+      ));
+    }
+    for application in &layout.page_replay_applications {
+      snapshot.push_str(&format!(
+        "page_replay_application page={} section_page={} column={} scope={:?} items={}..{} replacements={} applied={}\n",
+        application.page_index,
+        application.section_page_index,
+        application.column_index,
+        application.scope,
+        application.item_start,
+        application.item_end,
+        application.replacement_count,
+        application.applied
+      ));
+    }
+    for move_back in &layout.backward_moves {
+      snapshot.push_str(&format!(
+        "backward_move frame={} replay_start={} from={}:{} to={}:{} scope={:?} reason={:?} suppressed={} replayed_frames={} replayed_items={}\n",
+        move_back.frame_index,
+        move_back.replay_start_frame_index,
+        move_back.from_page_index,
+        move_back.from_section_page_index,
+        move_back.to_page_index,
+        move_back.to_section_page_index,
+        move_back.scope,
+        move_back.reason,
+        move_back.suppressed,
+        move_back.replayed_frames,
+        move_back.replayed_items
+      ));
+    }
+    for rerun in &layout.layout_reruns {
+      snapshot.push_str(&format!(
+        "layout_rerun checkpoint={} section={} block={} page={} frame={} reason={:?} scope={:?} replaced_pages={} produced_pages={} produced_frames={} constraints={}\n",
+        rerun.checkpoint_index,
+        rerun.section_index,
+        rerun.block_index,
+        rerun.page_index,
+        rerun.frame_index,
+        rerun.reason,
+        rerun.scope,
+        rerun.replaced_pages,
+        rerun.produced_pages,
+        rerun.produced_frames,
+        rerun.constraints.len()
+      ));
+      for constraint in rerun.constraints.iter().take(6) {
+        let bounds = constraint
+          .bounds
+          .map(|bounds| {
+            format!(
+              "{:.1},{:.1} {:.1}x{:.1}",
+              bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt
+            )
+          })
+          .unwrap_or_else(|| "none".to_string());
+        snapshot.push_str(&format!(
+          "  rerun_constraint kind={:?} scope={:?} bounds={} left={:.1} width={:.1} bottom={:.1}\n",
+          constraint.kind,
+          constraint.scope,
+          bounds,
+          constraint.content_left_pt,
+          constraint.content_width,
+          constraint.content_bottom
+        ));
+      }
     }
     for request in &layout.reflow_requests {
       snapshot.push_str(&format!(
-        "reflow frame={} kind={:?} reason={:?} page={} section_page={} column={} restart={:?}\n",
+        "reflow frame={} kind={:?} reason={:?} scope={:?} influences={} page={} section_page={} column={} restart={:?}\n",
         request.frame_index,
         request.kind,
         request.reason,
+        request.scope,
+        request.influence_count,
         request.page_index,
         request.section_page_index,
         request.column_index,
@@ -3747,7 +3865,7 @@ mod tests {
         })
         .unwrap_or_else(|| "none".to_string());
       snapshot.push_str(&format!(
-        "frame kind={:?} block={:?} page={} section={} section_page={} column={} items={}..{} retained={} bounds={} lines={} fragments={} invalidation={:?} split={:?}->{:?}\n",
+        "frame kind={:?} block={:?} page={} section={} section_page={} column={} items={}..{} retained={} bounds={} lines={} fragments={} influences={} invalidation={:?} split={:?}->{:?}\n",
         frame.kind,
         frame.block_index,
         frame.page_index,
@@ -3760,6 +3878,7 @@ mod tests {
         bounds,
         frame.lines.len(),
         frame.fragments.len(),
+        frame.influences.len(),
         frame.invalidation,
         frame.split_start.kind,
         frame.split_end.kind
@@ -3781,13 +3900,34 @@ mod tests {
           })
           .unwrap_or_else(|| "none".to_string());
         snapshot.push_str(&format!(
-          "  fragment kind={:?} index={} row={} cell={:?} items={}..{} bounds={}\n",
+          "  fragment kind={:?} split={:?} index={} row={} cell={:?} items={}..{} bounds={}\n",
           fragment.kind,
+          fragment.split,
           fragment.index,
           fragment.row_index,
           fragment.cell_index,
           fragment.item_start,
           fragment.item_end,
+          bounds
+        ));
+      }
+      for influence in frame.influences.iter().take(6) {
+        let bounds = influence
+          .bounds
+          .map(|bounds| {
+            format!(
+              "{:.1},{:.1} {:.1}x{:.1}",
+              bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt
+            )
+          })
+          .unwrap_or_else(|| "none".to_string());
+        snapshot.push_str(&format!(
+          "  influence kind={:?} count={} block={:?} items={}..{} bounds={}\n",
+          influence.kind,
+          influence.count,
+          influence.block_index,
+          influence.item_start,
+          influence.item_end,
           bounds
         ));
       }

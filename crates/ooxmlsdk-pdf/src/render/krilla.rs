@@ -19,7 +19,7 @@ use krilla::{Document, SerializeSettings};
 use crate::docx::TextStyle;
 use crate::error::{PdfError, Result};
 use crate::fonts::load_sans_face;
-use crate::layout::{ImageItem, LayoutDocument, PageItem};
+use crate::layout::{FillItem, ImageItem, LayoutDocument, LineItem, PageItem, TextItem};
 use crate::options::PdfOptions;
 use crate::text_metrics::{measure_text, shape_text};
 
@@ -63,6 +63,14 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             .bounds
             .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
       })
+      && frame.influences.iter().all(|influence| {
+        let _influence_kind = influence.kind;
+        influence.count > 0
+          && influence.block_index == frame.block_index
+          && influence
+            .bounds
+            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+      })
   }));
   debug_assert!(document.reflow_requests.iter().all(|request| {
     document
@@ -70,11 +78,13 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       .get(request.frame_index)
       .is_some_and(|frame| {
         let _reason = request.reason;
+        let _scope = request.scope;
         frame.kind == request.kind
           && frame.page_index == request.page_index
           && frame.section_page_index == request.section_page_index
           && frame.column_index == request.column_index
           && frame.split_start == request.restart
+          && request.influence_count == frame.influences.len()
       })
   }));
   debug_assert!(document.page_invalidations.iter().all(|invalidation| {
@@ -83,181 +93,98 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
       .get(invalidation.first_frame_index)
       .is_some_and(|frame| {
         let _reason = invalidation.reason;
+        let _scope = invalidation.scope;
         frame.page_index == invalidation.page_index
           && frame.section_page_index == invalidation.section_page_index
       })
   }));
+  debug_assert!(document.page_replays.iter().all(|replay| {
+    let _scope = replay.scope;
+    replay.page_index < document.pages.len()
+      && replay.item_start <= replay.item_end
+      && replay.column_index < 64
+      && replay.section_page_index == document.pages[replay.page_index].section_page_index
+      && !replay.replacement_items.is_empty()
+  }));
+  debug_assert!(document.page_replay_applications.iter().all(|application| {
+    let _scope = application.scope;
+    application.page_index < document.pages.len()
+      && application.item_start <= application.item_end
+      && application.column_index < 64
+      && application.section_page_index == document.pages[application.page_index].section_page_index
+      && application.replacement_count > 0
+      && application.applied
+  }));
+  debug_assert!(document.backward_moves.iter().all(|move_back| {
+    let _scope = move_back.scope;
+    let _reason = move_back.reason;
+    move_back.frame_index < document.frames.len()
+      && move_back.replay_start_frame_index < document.frames.len()
+      && move_back.from_page_index < document.pages.len()
+      && move_back.to_page_index < document.pages.len()
+      && move_back.to_page_index <= move_back.from_page_index
+      && (move_back.suppressed || move_back.replayed_frames > 0)
+  }));
+  debug_assert!(document.layout_reruns.iter().all(|rerun| {
+    let _scope = rerun.scope;
+    let _reason = rerun.reason;
+    rerun.page_index < document.pages.len()
+      && rerun.frame_index < document.frames.len()
+      && rerun.produced_pages > 0
+      && rerun.produced_frames > 0
+      && rerun.constraints.iter().all(|constraint| {
+        let _kind = constraint.kind;
+        let _scope = constraint.scope;
+        constraint.content_width >= 0.0
+          && constraint.content_bottom.is_finite()
+          && constraint
+            .bounds
+            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+      })
+  }));
   debug_assert!(document.reflow_executions.iter().all(|execution| {
     let _action = execution.action;
-    execution.request_count > 0 && execution.first_page_index < document.pages.len()
+    let _scope = execution.scope;
+    execution.request_count > 0
+      && execution.first_page_index < document.pages.len()
+      && execution.backward_moves <= document.backward_moves.len()
   }));
   debug_assert!(document.restart_plan.as_ref().is_none_or(|plan| {
     document.frames.get(plan.frame_index).is_some_and(|frame| {
       let _reason = plan.reason;
+      let _scope = plan.scope;
       frame.page_index == plan.page_index
         && frame.block_index == plan.block_index
         && frame.split_start == plan.cursor
     })
   }));
+  let paint = PaintDocument::from_layout(document);
+  debug_assert_eq!(paint.pages.len(), document.pages.len());
+  debug_assert!(paint.pages.iter().all(|page| {
+    page.width_pt >= 3.0
+      && page.height_pt >= 3.0
+      && page.items.iter().all(|item| match item {
+        PaintItem::Text(text) => {
+          text
+            .source_frame_index
+            .is_none_or(|index| index < document.frames.len())
+            && text.source_line_index.is_none_or(|index| index < 4096)
+        }
+        PaintItem::Image(_) | PaintItem::Fill(_) | PaintItem::Line(_) => true,
+      })
+  }));
   let mut pdf = Document::new_with(serialize_settings(options));
   let fonts = FontSet::load()?;
 
-  for page in &document.pages {
-    let settings =
-      PageSettings::from_wh(page.setup.width_pt.max(3.0), page.setup.height_pt.max(3.0))
-        .ok_or_else(|| PdfError::Krilla("invalid page size".to_string()))?;
+  for page in &paint.pages {
+    let settings = PageSettings::from_wh(page.width_pt.max(3.0), page.height_pt.max(3.0))
+      .ok_or_else(|| PdfError::Krilla("invalid page size".to_string()))?;
 
     let mut pdf_page = pdf.start_page_with(settings);
     let mut surface = pdf_page.surface();
     let mut link_annotations = Vec::new();
     for item in &page.items {
-      match item {
-        PageItem::Text(text) if !text.text.is_empty() => {
-          let baseline_y = text.y_pt - text.style.baseline_shift_pt;
-          let text_width = measure_text(&text.text, text.style);
-          if let Some(color) = text.style.highlight {
-            surface.set_stroke(None);
-            surface.set_fill(Some(Fill {
-              paint: rgb::Color::new(color.r, color.g, color.b).into(),
-              opacity: NormalizedF32::ONE,
-              rule: Default::default(),
-            }));
-            let top = baseline_y - text.style.font_size_pt;
-            let mut path = PathBuilder::new();
-            path.move_to(text.x_pt, top);
-            path.line_to(text.x_pt + text_width, top);
-            path.line_to(
-              text.x_pt + text_width,
-              baseline_y + text.style.font_size_pt * 0.25,
-            );
-            path.line_to(text.x_pt, baseline_y + text.style.font_size_pt * 0.25);
-            path.close();
-            if let Some(path) = path.finish() {
-              surface.draw_path(&path);
-            }
-          }
-          surface.set_stroke(None);
-          surface.set_fill(Some(fill(text.style)));
-          if let Some(glyphs) = shaped_pdf_glyphs(&text.text, text.style) {
-            surface.draw_glyphs(
-              Point::from_xy(text.x_pt, baseline_y),
-              &glyphs,
-              fonts.select(text.style).clone(),
-              &text.text,
-              text.style.font_size_pt,
-              false,
-            );
-          } else {
-            surface.draw_text(
-              Point::from_xy(text.x_pt, baseline_y),
-              fonts.select(text.style).clone(),
-              text.style.font_size_pt,
-              &text.text,
-              false,
-              TextDirection::Auto,
-            );
-          }
-          if text.style.underline {
-            surface.set_fill(None);
-            surface.set_stroke(Some(Stroke {
-              width: (text.style.font_size_pt / 18.0).max(0.5),
-              paint: rgb::Color::new(text.style.color.r, text.style.color.g, text.style.color.b)
-                .into(),
-              ..Default::default()
-            }));
-            let underline_y = baseline_y + (text.style.font_size_pt * 0.12).max(1.0);
-            let mut path = PathBuilder::new();
-            path.move_to(text.x_pt, underline_y);
-            path.line_to(text.x_pt + text_width, underline_y);
-            if let Some(path) = path.finish() {
-              surface.draw_path(&path);
-            }
-          }
-          if text.style.strikethrough {
-            surface.set_fill(None);
-            surface.set_stroke(Some(Stroke {
-              width: (text.style.font_size_pt / 18.0).max(0.5),
-              paint: rgb::Color::new(text.style.color.r, text.style.color.g, text.style.color.b)
-                .into(),
-              ..Default::default()
-            }));
-            let strike_y = baseline_y - (text.style.font_size_pt * 0.32);
-            let mut path = PathBuilder::new();
-            path.move_to(text.x_pt, strike_y);
-            path.line_to(text.x_pt + text_width, strike_y);
-            if let Some(path) = path.finish() {
-              surface.draw_path(&path);
-            }
-          }
-          if let Some(url) = &text.hyperlink_url {
-            let top = baseline_y - text.style.font_size_pt;
-            let bottom = baseline_y + text.style.font_size_pt * 0.25;
-            if let Some(rect) = Rect::from_ltrb(text.x_pt, top, text.x_pt + text_width, bottom) {
-              let target = Target::Action(Action::Link(LinkAction::new(url.clone())));
-              let link = LinkAnnotation::new(rect, target);
-              link_annotations.push(Annotation::new_link(link, None));
-            }
-          }
-        }
-        PageItem::Text(_) => {}
-        PageItem::Fill(fill_item) => {
-          surface.set_stroke(None);
-          surface.set_fill(Some(Fill {
-            paint: rgb::Color::new(fill_item.color.r, fill_item.color.g, fill_item.color.b).into(),
-            opacity: NormalizedF32::ONE,
-            rule: Default::default(),
-          }));
-          let mut path = PathBuilder::new();
-          path.move_to(fill_item.x_pt, fill_item.y_pt);
-          path.line_to(fill_item.x_pt + fill_item.width_pt, fill_item.y_pt);
-          path.line_to(
-            fill_item.x_pt + fill_item.width_pt,
-            fill_item.y_pt + fill_item.height_pt,
-          );
-          path.line_to(fill_item.x_pt, fill_item.y_pt + fill_item.height_pt);
-          path.close();
-          if let Some(path) = path.finish() {
-            surface.draw_path(&path);
-          }
-        }
-        PageItem::Image(image) => {
-          let _alt_text = image.alt_text.as_deref();
-          match decode_image(&image.data, image.content_type.as_deref()) {
-            Ok(pdf_image) => draw_image_item(&mut surface, image, pdf_image),
-            Err(_) => {
-              surface.set_fill(None);
-              surface.set_stroke(Some(Stroke {
-                width: 0.5,
-                paint: rgb::Color::new(128, 128, 128).into(),
-                ..Default::default()
-              }));
-              let mut path = PathBuilder::new();
-              path.move_to(image.x_pt, image.y_pt);
-              path.line_to(image.x_pt + image.width_pt, image.y_pt);
-              path.line_to(image.x_pt + image.width_pt, image.y_pt + image.height_pt);
-              path.line_to(image.x_pt, image.y_pt + image.height_pt);
-              path.close();
-              if let Some(path) = path.finish() {
-                surface.draw_path(&path);
-              }
-            }
-          }
-        }
-        PageItem::Line(line) => {
-          surface.set_fill(None);
-          surface.set_stroke(Some(Stroke {
-            width: line.width_pt,
-            paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
-            ..Default::default()
-          }));
-          let mut path = PathBuilder::new();
-          path.move_to(line.x1_pt, line.y1_pt);
-          path.line_to(line.x2_pt, line.y2_pt);
-          if let Some(path) = path.finish() {
-            surface.draw_path(&path);
-          }
-        }
-      }
+      draw_paint_item(&mut surface, item, &fonts, &mut link_annotations);
     }
     surface.finish();
     for annotation in link_annotations {
@@ -268,6 +195,273 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   pdf
     .finish()
     .map_err(|err| PdfError::Krilla(format!("{err:?}")))
+}
+
+#[derive(Clone, Debug)]
+struct PaintDocument {
+  pages: Vec<PaintPage>,
+}
+
+#[derive(Clone, Debug)]
+struct PaintPage {
+  width_pt: f32,
+  height_pt: f32,
+  items: Vec<PaintItem>,
+}
+
+#[derive(Clone, Debug)]
+enum PaintItem {
+  Text(PaintText),
+  Image(ImageItem),
+  Fill(FillItem),
+  Line(LineItem),
+}
+
+#[derive(Clone, Debug)]
+struct PaintText {
+  item: TextItem,
+  source_frame_index: Option<usize>,
+  source_line_index: Option<usize>,
+}
+
+impl PaintDocument {
+  fn from_layout(document: &LayoutDocument) -> Self {
+    let pages = document
+      .pages
+      .iter()
+      .enumerate()
+      .map(|(page_index, page)| {
+        let line_owners = paint_line_owners(document, page_index, page.items.len());
+        let items = page
+          .items
+          .iter()
+          .enumerate()
+          .map(|(item_index, item)| match item {
+            PageItem::Text(text) => {
+              let owner = line_owners.get(item_index).copied().flatten();
+              PaintItem::Text(PaintText {
+                item: text.clone(),
+                source_frame_index: owner.map(|owner| owner.frame_index),
+                source_line_index: owner.map(|owner| owner.line_index),
+              })
+            }
+            PageItem::Image(image) => PaintItem::Image(image.clone()),
+            PageItem::Fill(fill) => PaintItem::Fill(*fill),
+            PageItem::Line(line) => PaintItem::Line(*line),
+          })
+          .collect();
+        PaintPage {
+          width_pt: page.setup.width_pt,
+          height_pt: page.setup.height_pt,
+          items,
+        }
+      })
+      .collect();
+    Self { pages }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PaintLineOwner {
+  frame_index: usize,
+  line_index: usize,
+}
+
+fn paint_line_owners(
+  document: &LayoutDocument,
+  page_index: usize,
+  item_count: usize,
+) -> Vec<Option<PaintLineOwner>> {
+  let mut owners = vec![None; item_count];
+  for (frame_index, frame) in document
+    .frames
+    .iter()
+    .enumerate()
+    .filter(|(_, frame)| frame.page_index == page_index)
+  {
+    for (line_index, line) in frame.lines.iter().enumerate() {
+      let start = line.item_start.min(item_count);
+      let end = line.item_end.min(item_count);
+      for owner in owners.iter_mut().take(end).skip(start) {
+        if owner.is_none() {
+          *owner = Some(PaintLineOwner {
+            frame_index,
+            line_index,
+          });
+        }
+      }
+    }
+  }
+  owners
+}
+
+fn draw_paint_item(
+  surface: &mut Surface<'_>,
+  item: &PaintItem,
+  fonts: &FontSet,
+  link_annotations: &mut Vec<Annotation>,
+) {
+  match item {
+    PaintItem::Text(text) if !text.item.text.is_empty() => {
+      draw_text_item(surface, text, fonts, link_annotations);
+    }
+    PaintItem::Text(_) => {}
+    PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
+    PaintItem::Image(image) => {
+      let _alt_text = image.alt_text.as_deref();
+      match decode_image(&image.data, image.content_type.as_deref()) {
+        Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
+        Err(_) => draw_missing_image(surface, image),
+      }
+    }
+    PaintItem::Line(line) => draw_line_item(surface, line),
+  }
+}
+
+fn draw_text_item(
+  surface: &mut Surface<'_>,
+  text: &PaintText,
+  fonts: &FontSet,
+  link_annotations: &mut Vec<Annotation>,
+) {
+  let item = &text.item;
+  let baseline_y = item.y_pt - item.style.baseline_shift_pt;
+  let text_width = measure_text(&item.text, item.style);
+  if let Some(color) = item.style.highlight {
+    surface.set_stroke(None);
+    surface.set_fill(Some(Fill {
+      paint: rgb::Color::new(color.r, color.g, color.b).into(),
+      opacity: NormalizedF32::ONE,
+      rule: Default::default(),
+    }));
+    let top = baseline_y - item.style.font_size_pt;
+    let mut path = PathBuilder::new();
+    path.move_to(item.x_pt, top);
+    path.line_to(item.x_pt + text_width, top);
+    path.line_to(
+      item.x_pt + text_width,
+      baseline_y + item.style.font_size_pt * 0.25,
+    );
+    path.line_to(item.x_pt, baseline_y + item.style.font_size_pt * 0.25);
+    path.close();
+    if let Some(path) = path.finish() {
+      surface.draw_path(&path);
+    }
+  }
+  surface.set_stroke(None);
+  surface.set_fill(Some(fill(item.style)));
+  if let Some(glyphs) = shaped_pdf_glyphs(&item.text, item.style) {
+    surface.draw_glyphs(
+      Point::from_xy(item.x_pt, baseline_y),
+      &glyphs,
+      fonts.select(item.style).clone(),
+      &item.text,
+      item.style.font_size_pt,
+      false,
+    );
+  } else {
+    surface.draw_text(
+      Point::from_xy(item.x_pt, baseline_y),
+      fonts.select(item.style).clone(),
+      item.style.font_size_pt,
+      &item.text,
+      false,
+      TextDirection::Auto,
+    );
+  }
+  if item.style.underline {
+    surface.set_fill(None);
+    surface.set_stroke(Some(Stroke {
+      width: (item.style.font_size_pt / 18.0).max(0.5),
+      paint: rgb::Color::new(item.style.color.r, item.style.color.g, item.style.color.b).into(),
+      ..Default::default()
+    }));
+    let underline_y = baseline_y + (item.style.font_size_pt * 0.12).max(1.0);
+    let mut path = PathBuilder::new();
+    path.move_to(item.x_pt, underline_y);
+    path.line_to(item.x_pt + text_width, underline_y);
+    if let Some(path) = path.finish() {
+      surface.draw_path(&path);
+    }
+  }
+  if item.style.strikethrough {
+    surface.set_fill(None);
+    surface.set_stroke(Some(Stroke {
+      width: (item.style.font_size_pt / 18.0).max(0.5),
+      paint: rgb::Color::new(item.style.color.r, item.style.color.g, item.style.color.b).into(),
+      ..Default::default()
+    }));
+    let strike_y = baseline_y - (item.style.font_size_pt * 0.32);
+    let mut path = PathBuilder::new();
+    path.move_to(item.x_pt, strike_y);
+    path.line_to(item.x_pt + text_width, strike_y);
+    if let Some(path) = path.finish() {
+      surface.draw_path(&path);
+    }
+  }
+  if let Some(url) = &item.hyperlink_url {
+    let top = baseline_y - item.style.font_size_pt;
+    let bottom = baseline_y + item.style.font_size_pt * 0.25;
+    if let Some(rect) = Rect::from_ltrb(item.x_pt, top, item.x_pt + text_width, bottom) {
+      let target = Target::Action(Action::Link(LinkAction::new(url.clone())));
+      let link = LinkAnnotation::new(rect, target);
+      link_annotations.push(Annotation::new_link(link, None));
+    }
+  }
+}
+
+fn draw_fill_item(surface: &mut Surface<'_>, fill_item: &FillItem) {
+  surface.set_stroke(None);
+  surface.set_fill(Some(Fill {
+    paint: rgb::Color::new(fill_item.color.r, fill_item.color.g, fill_item.color.b).into(),
+    opacity: NormalizedF32::ONE,
+    rule: Default::default(),
+  }));
+  let mut path = PathBuilder::new();
+  path.move_to(fill_item.x_pt, fill_item.y_pt);
+  path.line_to(fill_item.x_pt + fill_item.width_pt, fill_item.y_pt);
+  path.line_to(
+    fill_item.x_pt + fill_item.width_pt,
+    fill_item.y_pt + fill_item.height_pt,
+  );
+  path.line_to(fill_item.x_pt, fill_item.y_pt + fill_item.height_pt);
+  path.close();
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
+}
+
+fn draw_missing_image(surface: &mut Surface<'_>, image: &ImageItem) {
+  surface.set_fill(None);
+  surface.set_stroke(Some(Stroke {
+    width: 0.5,
+    paint: rgb::Color::new(128, 128, 128).into(),
+    ..Default::default()
+  }));
+  let mut path = PathBuilder::new();
+  path.move_to(image.x_pt, image.y_pt);
+  path.line_to(image.x_pt + image.width_pt, image.y_pt);
+  path.line_to(image.x_pt + image.width_pt, image.y_pt + image.height_pt);
+  path.line_to(image.x_pt, image.y_pt + image.height_pt);
+  path.close();
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
+}
+
+fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
+  surface.set_fill(None);
+  surface.set_stroke(Some(Stroke {
+    width: line.width_pt,
+    paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+    ..Default::default()
+  }));
+  let mut path = PathBuilder::new();
+  path.move_to(line.x1_pt, line.y1_pt);
+  path.line_to(line.x2_pt, line.y2_pt);
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
 }
 
 fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Image) {

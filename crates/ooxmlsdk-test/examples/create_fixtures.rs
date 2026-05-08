@@ -3556,6 +3556,36 @@ fn create_wml_sections_fixtures(root: &Path) {
     ]);
     save(root, "test-data/wml/section_columns_explicit.docx", &data);
   }
+
+  // ── WML-S-06: page_background_borders ────────────────────────────────────
+  // Document-level page background plus section page borders. Writer paints
+  // page background first, then the page frame border.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:background w:color="EAF4FF"/>
+  <w:body>
+    <w:p><w:r><w:t>Page background and borders.</w:t></w:r></w:p>
+    <w:sectPr>
+      <w:pgSz w:w="6120" w:h="7920"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="720"
+               w:left="720" w:header="360" w:footer="360" w:gutter="0"/>
+      <w:pgBorders w:offsetFrom="page">
+        <w:top w:val="single" w:sz="16" w:space="18" w:color="1F4E79"/>
+        <w:left w:val="single" w:sz="16" w:space="18" w:color="1F4E79"/>
+        <w:bottom w:val="single" w:sz="16" w:space="18" w:color="1F4E79"/>
+        <w:right w:val="single" w:sz="16" w:space="18" w:color="1F4E79"/>
+      </w:pgBorders>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+    let data = make_package(&[
+      ("[Content_Types].xml", &docx_content_types("", "")),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+    ]);
+    save(root, "test-data/wml/page_background_borders.docx", &data);
+  }
 }
 
 fn create_wml_tables_fixtures(root: &Path) {

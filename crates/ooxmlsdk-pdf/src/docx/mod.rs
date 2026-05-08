@@ -195,6 +195,7 @@ pub(crate) struct CellBordersModel {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct BorderStyle {
   pub width_pt: f32,
+  pub spacing_pt: f32,
   pub color: RgbColor,
 }
 
@@ -202,6 +203,7 @@ impl Default for BorderStyle {
   fn default() -> Self {
     Self {
       width_pt: 0.5,
+      spacing_pt: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },
     }
   }
@@ -375,6 +377,9 @@ pub(crate) struct PageSetup {
   pub margin_left_pt: f32,
   pub header_distance_pt: f32,
   pub footer_distance_pt: f32,
+  pub background: Option<RgbColor>,
+  pub borders: CellBordersModel,
+  pub borders_offset_from_text: bool,
 }
 
 impl Default for PageSetup {
@@ -389,6 +394,9 @@ impl Default for PageSetup {
       margin_left_pt: 72.0,
       header_distance_pt: 36.0,
       footer_distance_pt: 36.0,
+      background: None,
+      borders: CellBordersModel::default(),
+      borders_offset_from_text: false,
     }
   }
 }
@@ -405,11 +413,18 @@ pub(crate) fn extract(
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let document = main.root_element(package)?;
+  let page_background = document
+    .document_background
+    .as_deref()
+    .and_then(document_background_color);
   let mut sections = document
     .body
     .as_deref()
     .map(|body| body_sections(body, &styles, &mut numbering, &images, &hyperlinks))
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
+  for section in &mut sections {
+    section.page.background = page_background;
+  }
   resolve_section_repeating_blocks(package, &main, &styles, &mut sections);
   let page = sections
     .first()
@@ -1560,10 +1575,24 @@ fn paragraph_borders_model(borders: &w::ParagraphBorders) -> CellBordersModel {
   }
 }
 
+fn page_borders_model(borders: &w::PageBorders) -> CellBordersModel {
+  CellBordersModel {
+    top: borders.top_border.as_ref().and_then(top_border_style),
+    right: borders.right_border.as_ref().and_then(right_border_style),
+    bottom: borders.bottom_border.as_ref().and_then(bottom_border_style),
+    left: borders.left_border.as_ref().and_then(left_border_style),
+  }
+}
+
 macro_rules! border_style_fn {
   ($name:ident, $ty:ty) => {
     fn $name(border: &$ty) -> Option<BorderStyle> {
-      border_style(border.val, border.size, border.color.as_deref())
+      border_style(
+        border.val,
+        border.size,
+        border.space,
+        border.color.as_deref(),
+      )
     }
   };
 }
@@ -1580,6 +1609,7 @@ border_style_fn!(inside_vertical_border_style, w::InsideVerticalBorder);
 fn border_style(
   value: w::BorderValues,
   size: Option<u32>,
+  space: Option<u32>,
   color: Option<&str>,
 ) -> Option<BorderStyle> {
   if matches!(value, w::BorderValues::Nil | w::BorderValues::None) {
@@ -1591,8 +1621,13 @@ fn border_style(
       .map(|value| value as f32 / 8.0)
       .unwrap_or(0.5)
       .max(0.25),
+    spacing_pt: space.unwrap_or(0) as f32,
     color: color.and_then(parse_hex_color).unwrap_or_default(),
   })
+}
+
+fn document_background_color(background: &w::DocumentBackground) -> Option<RgbColor> {
+  background.color.as_deref().and_then(parse_hex_color)
 }
 
 fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<ParagraphProps<'_>>) {
@@ -3944,6 +3979,12 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     if let Some(footer) = margin.footer {
       setup.footer_distance_pt = units::twips_to_points(footer as f32);
     }
+  }
+
+  if let Some(borders) = &section.w_pg_borders {
+    setup.borders = page_borders_model(borders);
+    setup.borders_offset_from_text =
+      matches!(borders.offset_from, Some(w::PageBorderOffsetValues::Text));
   }
 
   setup

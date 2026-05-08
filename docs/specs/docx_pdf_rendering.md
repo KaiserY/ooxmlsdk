@@ -102,6 +102,7 @@ This supports smoke-level PDF generation and a set of focused features:
   external hyperlink PDF annotations
 - PAGE/NUMPAGES fields resolved against layout page numbers for complex
   fields, simple fields, and legacy `w:pgNum`
+- document page background color and section page borders
 - headers/footers for a single effective section
 - footnotes/endnotes/comments as appended note blocks
 - basic inline images and anchor images treated as inline images
@@ -116,9 +117,12 @@ Known architectural drift:
 - Header/footer dimensions are not computed like Writer page styles.
 - Footnotes do not reserve space on the current page.
 - Anchored/floating drawings are collapsed into inline images.
-- Tables are laid out using simplified row heights and no real splitting model.
-- Paragraph layout is a direct greedy write to page items, leaving no line/frame
-  model for Writer-like pagination.
+- Tables now have table/row/cell frame ownership, but row splitting and
+  follow-flow-line continuation are still simplified.
+- Paragraph layout now enters through `TextFrameLayout`, `TextFrame`, and
+  `LineFrame`; column continuation, page follow recording, and the minimum
+  widow/orphan/keepLines split policy now live in the text frame state. Full
+  follow-frame repaint/reflow remains incremental work.
 
 ## 4. Target Internal Model
 
@@ -332,11 +336,14 @@ Current progress:
 - The existing flat `DocxDocument.blocks` field is still populated for
   compatibility, but `layout::layout` now consumes `DocxDocument.sections`
   when present and uses each section's page setup for body flow.
+- `layout::layout` now enters through a Writer-like root frame driver. The
+  driver owns page frame creation, section body frames, column flow, page
+  decoration order, and footnote boss reservation before converting the current
+  frame content into `PageItem`s.
 - Section page breaks currently start new pages for `nextPage`, `nextColumn`,
   `evenPage`, and `oddPage`; `continuous` keeps flowing on the current page.
-  This is still an adapter layer, not the final Writer frame tree.
-- `evenPage` and `oddPage` section breaks insert an adapter-level blank page
-  when needed so the following section starts on the requested page parity.
+- `evenPage` and `oddPage` section breaks insert a page frame when needed so
+  the following section starts on the requested page parity.
 - Header/footer import now resolves default/first/even slots per section.
 - Missing section header/footer references inherit the previous section's slot,
   matching LibreOffice's `CopyLastHeaderFooter` direction at the content level.
@@ -351,27 +358,26 @@ Current progress:
 - Section `w:cols` is now imported through generated `w::Columns` into
   `SectionColumns`, including count, gap, separator flag, and explicit
   non-equal `w:col` width/space definitions when `equalWidth` is off.
-- Layout has an adapter-level equal-column flow at block boundaries, plus
+- Layout has section body-frame equal-column flow at block boundaries, plus
   separator painting when `w:cols/@sep` is enabled. Paragraph-internal and
   table-internal column splitting remain frame-model work.
 - Run-level `w:br w:type="column"` is imported as a distinct typed
-  `InlineItem::ColumnBreak`. In multi-column sections it advances following
-  block content to the next column; in single-column or final-column contexts
-  it follows the LibreOffice/Typst fallback shape and behaves like a page
-  break. Inline continuation after the break is still deferred until the
-  Writer-like line/frame model lands.
+  `InlineItem::ColumnBreak`. In multi-column sections it advances the active
+  text frame to the next column and continues following inline content there;
+  in single-column or final-column contexts it follows the LibreOffice/Typst
+  fallback shape and behaves like a page break.
 - Footnotes/endnotes are now imported as typed id-to-block maps, and paragraphs
   retain generated-type-derived footnote/endnote reference ids.
-- Footnote content now uses an adapter-level page footnote area. Referenced
-  footnotes are estimated before laying out the referencing paragraph, the body
-  flow bottom is reduced for that page, and the note separator/content is
-  emitted near the bottom margin. This follows Writer's `ftnfrm` direction but
-  still needs true continuation separators and full table/column interaction.
+- Footnote content now uses a page footnote boss area. Referenced footnotes are
+  estimated before laying out the referencing paragraph, the body frame bottom
+  is reduced for that page, and the note separator/content is emitted near the
+  bottom margin. This follows Writer's `ftnfrm` direction but still needs true
+  continuation separators and full table/column interaction.
 - Paragraph keep properties are now imported through generated paragraph
   property types: `w:keepNext` maps to `keep_with_next`, `w:keepLines` maps to
   `keep_lines`, and `w:pageBreakBefore` remains the page-break-before signal.
-  Layout has an adapter-level preflight that advances to the next column/page
-  when a keep group does not fit in the current flow region.
+  Layout has a body-frame preflight that advances to the next column/page when
+  a keep group does not fit in the current flow region.
 - Table row properties are imported through generated `w::TableRowProperties`:
   `w:tblHeader` marks consecutive leading repeated header rows and
   `w:cantSplit` is retained on the row model. Layout repeats valid table header
@@ -384,21 +390,39 @@ Current progress:
 - Table preferred width now preserves absolute `dxa` widths and `pct` widths,
   while `w:jc` and `w:tblInd` are imported through generated table property
   types. Layout resolves scaled grid columns plus left/center/right table
-  placement against the current content region, matching the Writer table
-  positioning direction before full table frames land.
-- Table cell content now uses an adapter-level nested flow instead of the old
-  one-line clipping path. Paragraphs and nested tables inside cells reuse the
-  same paragraph/table layout functions used by body flow, so wrapping, run
-  styles, tabs, inline images, borders, and paragraph spacing are no longer
-  separately hand-implemented for cells.
+  placement through `TableFrameLayout`, matching the Writer table positioning
+  direction before full row split/follow behavior lands.
+- Table layout ownership now follows `SwTabFrame`/`SwRowFrame`/`SwCellFrame`:
+  `TableFrameLayout` owns follow-page moves and repeated headline rows,
+  `RowFrame` owns row bounds and horizontal borders, and `CellFrame` owns cell
+  background, leading border, and nested content formatting.
+- Table cell content now uses nested cell flow instead of the old one-line
+  clipping path. Paragraphs and nested tables inside cells reuse the same
+  paragraph/table layout functions used by body flow, so wrapping, run styles,
+  tabs, inline images, borders, and paragraph spacing are no longer separately
+  hand-implemented for cells.
+- Paragraph layout ownership now enters through `TextFrameLayout`, with a
+  `TextFrame` carrying paragraph geometry and `LineFrame` carrying current line
+  bounds, height, baseline y, and cursor x. `TextFrameLayout` now owns line
+  advance, page break reset, column break reset, and wrap-bound recalculation.
+  It also records `LineFragment` split candidates with inline cursors, matching
+  Writer's offset-based text follow direction. Column breaks now update the
+  active `FlowContext`, so later inline content and following body blocks keep
+  flowing in the destination column/page. Page-line overflow records
+  `TextFrameFollow` entries at the split cursor so page follows can be governed
+  by the text frame state instead of anonymous y advancement. The text frame
+  split policy now rejects `keepLines` splits and applies the LibreOffice
+  orphan/widow minimum-line shape to recorded split candidates.
+  The current formatter still emits `PageItem`s directly, preserving behavior
+  while preparing the Writer `SwTextFrame` follow path for column/page splits.
 - DrawingML anchors are imported through generated `wp::Anchor` types into a
-  typed floating image placement model. The adapter consumes `positionH`,
+  typed floating image placement model. The layout path consumes `positionH`,
   `positionV`, wrap mode, `behindDoc`, and anchor text distances for initial
   page/margin/column/paragraph-relative placement. Square/tight wrapping now
   creates paragraph-local exclusion bounds that shorten affected text lines,
   matching the Writer `SwTextFly`/fly portion direction. Page association,
-  contour wrapping, multi-paragraph influence, and z-ordering remain
-  frame-model work.
+  contour wrapping, multi-paragraph influence, and z-ordering remain fly-frame
+  work.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
   - missing `w:type` is treated as `nextPage`
@@ -433,6 +457,11 @@ Current progress:
   import keeps a dynamic field marker and resolves visible text after body flow
   and repeating header/footer layout, following Writer's field-expansion
   direction while avoiding stale cached results.
+- Real DOCX fixture coverage includes document-level `w:background` color and
+  section `w:pgBorders` via `test-data/wml/page_background_borders.docx`.
+  Layout paints the page background before content and page frame borders after
+  repeating header/footer content, matching Writer's page frame paint order at
+  the page-frame level.
 - Verification for DOCX/PDF iteration currently includes
   `cargo test -p ooxmlsdk-pdf` and
   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings`. Broader
@@ -442,9 +471,10 @@ Remaining Phase 1 work:
 
 - Handle negative header/footer margins using LibreOffice's text-frame fallback
   direction from `HandleMarginsHeaderFooter`.
-- Replace the adapter with a Writer-like page/frame layout that can enforce
-  paragraph-internal column splitting and inline continuation after column
-  breaks, bottom footnote areas, and floating frames.
+- Continue replacing the remaining direct block formatters with Writer-like
+  text/fly frames so paragraph-internal column splitting, inline continuation
+  after column breaks, bottom footnote areas, and floating frames are enforced
+  by frame ownership.
 
 ### Phase 2: Paragraph and Run Property Mapping
 
@@ -460,9 +490,18 @@ Implement:
 - Move extraction toward a typed property resolver rather than ad hoc merging.
 - Preserve direct, paragraph style, character style, doc default, and numbering
   precedence.
-- Finish paragraph keep behavior beyond the current adapter preflight:
-  - line-accurate `keepLines`
-  - widow/orphan control
+- Continue paragraph keep behavior beyond the current body/text-frame checks:
+  line-accurate `keepLines` and widow/orphan split decisions are present as a
+  text-frame policy; next refinements should reflow/repaint rejected candidates
+  instead of only exposing the decision point.
+- Continue the current `TextFrameLayout`/`TextFrame`/`LineFrame` path toward
+  Writer-like page text follows instead of direct page-item emission. Line
+  advance, page-break reset, column-break reset, and wrap-bound recalculation
+  are now owned by `TextFrameLayout`, line fragments carry inline cursor split
+  candidates, column-break inline continuation is active, and page overflow
+  records follow starts. Widow/orphan and `keepLines` decisions are applied to
+  those split candidates; remaining work is using rejected decisions to drive
+  real backward/forward reflow.
 - Model tabs, indents, spacing, borders, shading, bidi, and justification as
   layout properties.
 - Resolve run font properties sufficiently to choose fonts and measure text.
@@ -470,6 +509,11 @@ Implement:
   layout. PAGE and NUMPAGES are resolved after pagination for complex fields,
   simple fields, and `w:pgNum`; unsupported fields continue to use cached
   results until their Writer field type is mapped.
+- Import document background and section page borders from generated
+  `w::DocumentBackground` and `w::PageBorders` types. Solid background colors
+  and basic single-line page borders are present; theme colors, art borders,
+  background shapes/images, shadow/frame effects, and full border display rules
+  remain later Writer page-frame work.
 
 Minimal tests:
 
@@ -546,13 +590,14 @@ LibreOffice reference:
 
 Implement:
 
-- Introduce table/row/cell frames.
+- Extend the current table/row/cell frames toward full Writer follow-table
+  behavior.
 - Resolve table grid, preferred width, cell width, grid span, vertical merge.
   Absolute/percent preferred table width, table alignment, indentation,
-  `gridSpan`, and vertical merge import are present; remaining work is true
-  frame-based cell width negotiation and split behavior. Cell content now
-  flows through the shared paragraph/table layout adapter instead of clipped
-  single-line paint.
+  `gridSpan`, vertical merge import, and table/row/cell frame ownership are
+  present; remaining work is true cell width negotiation and split behavior.
+  Cell content now flows through the shared paragraph/table layout path instead
+  of clipped single-line paint.
 - Compute row height from cell content frames.
 - Support row splitting and `cantSplit`.
 - Support table headers repeating across pages.
@@ -666,7 +711,8 @@ Implement Phase 1 in small commits:
 
 1. Add a typed section collector for `w:sectPr`.
 2. Add internal section/page-style data structures.
-3. Keep existing layout output working through an adapter.
+3. Keep existing layout output working while moving ownership into page,
+   body, column, footnote, table, text, and fly frames.
 4. Add section-focused tests before touching paragraph, table, or floating
    layout.
 

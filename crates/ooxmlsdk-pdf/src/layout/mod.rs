@@ -6,8 +6,8 @@ use icu_segmenter::LineSegmenter;
 use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingImagePlacement,
   HorizontalImageReference, ImageWrapMode, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
-  SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, TableAlignment,
-  TableCellVerticalAlignment, TextStyle, VerticalImageReference,
+  SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
+  TableCellVerticalAlignment, TableRow, TextStyle, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -21,6 +21,8 @@ const TABLE_ROW_MIN_HEIGHT_PT: f32 = 24.0;
 const TABLE_SPACING_AFTER_PT: f32 = 6.0;
 const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
 const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
+const DEFAULT_ORPHAN_LINES: usize = 2;
+const DEFAULT_WIDOW_LINES: usize = 2;
 
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
@@ -117,178 +119,229 @@ struct BlockArea {
   content_width: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct TableRenderArea<'a> {
-  block: BlockArea,
-  column_widths: &'a [f32],
-  left_pt: f32,
-  right_pt: f32,
+pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
+  Ok(RootFrameLayout::new(document).format())
 }
 
-pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
-  let mut pages = Vec::new();
-  let mut current = empty_page(document.page, 0);
-  let mut y = document.page.margin_top_pt;
-  let mut emitted_footnotes = HashSet::new();
+struct RootFrameLayout<'a> {
+  document: &'a DocxDocument,
+  pages: Vec<Page>,
+  current: Page,
+  y: f32,
+  emitted_footnotes: HashSet<i64>,
+}
 
-  if document.sections.is_empty() {
-    let mut flow = flow_context(
-      document.page,
-      0,
-      SectionColumns::default(),
-      0,
-      document.default_tab_stop_pt,
-    );
-    for (index, block) in document.blocks.iter().enumerate() {
-      let next = document.blocks.get(index + 1);
-      let (block_flow, footnote_top) =
-        reserve_referenced_footnote_area(block, document, &emitted_footnotes, flow);
-      (flow, y) = prepare_block_flow(block, next, block_flow, &mut current, &mut pages, y);
-      y = layout_document_block(block, flow, &mut current, &mut pages, y);
-      render_referenced_footnotes(
-        block,
-        document,
-        &mut emitted_footnotes,
-        flow,
-        &mut current,
-        &mut pages,
-        footnote_top,
-      );
-      flow = restore_body_content_bottom(flow);
+impl<'a> RootFrameLayout<'a> {
+  fn new(document: &'a DocxDocument) -> Self {
+    Self {
+      document,
+      pages: Vec::new(),
+      current: empty_page(document.page, 0),
+      y: document.page.margin_top_pt,
+      emitted_footnotes: HashSet::new(),
     }
-  } else {
-    for (section_index, section) in document.sections.iter().enumerate() {
-      if section_index > 0 && starts_new_page(section.break_kind) && !current.items.is_empty() {
-        pages.push(std::mem::replace(
-          &mut current,
-          empty_page(section.page, section_index),
-        ));
-        if needs_section_parity_blank(section.break_kind, pages.len() + 1) {
-          pages.push(empty_page(section.page, section_index));
-        }
-        y = section.page.margin_top_pt;
-      } else if current.items.is_empty() {
-        current.setup = section.page;
-        current.section_index = section_index;
-        y = section.page.margin_top_pt;
-      }
+  }
 
-      let mut flow = flow_context(
+  fn format(mut self) -> LayoutDocument {
+    self.format_body_frames();
+    self.format_trailing_note_frames();
+    self.finish_current_page();
+
+    apply_page_backgrounds(&mut self.pages);
+    apply_column_separators(self.document, &mut self.pages);
+    apply_headers_and_footers(self.document, &mut self.pages);
+    apply_page_borders(&mut self.pages);
+    resolve_dynamic_fields(&mut self.pages);
+
+    LayoutDocument { pages: self.pages }
+  }
+
+  fn format_body_frames(&mut self) {
+    if self.document.sections.is_empty() {
+      let blocks = self.document.blocks.clone();
+      let flow = self.body_flow(document_page_frame(
+        self.document.page,
+        0,
+        SectionColumns::default(),
+      ));
+      self.format_block_sequence(&blocks, flow);
+      return;
+    }
+
+    for section_index in 0..self.document.sections.len() {
+      let section = self.document.sections[section_index].clone();
+      self.start_section_frame(section_index, &section);
+      let flow = self.body_flow(document_page_frame(
         section.page,
         section_index,
         section.columns,
-        0,
-        document.default_tab_stop_pt,
+      ));
+      self.format_block_sequence(&section.blocks, flow);
+    }
+  }
+
+  fn body_flow(&self, frame: BodyFrame) -> FlowContext {
+    flow_context(
+      frame.setup,
+      frame.section_index,
+      frame.columns,
+      0,
+      self.document.default_tab_stop_pt,
+    )
+  }
+
+  fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
+    if section_index > 0 && starts_new_page(section.break_kind) && !self.current.items.is_empty() {
+      self.push_current_page(empty_page(section.page, section_index));
+      if needs_section_parity_blank(section.break_kind, self.pages.len() + 1) {
+        self.pages.push(empty_page(section.page, section_index));
+      }
+      self.y = section.page.margin_top_pt;
+    } else if self.current.items.is_empty() {
+      self.current.setup = section.page;
+      self.current.section_index = section_index;
+      self.y = section.page.margin_top_pt;
+    }
+  }
+
+  fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
+    for (index, block) in blocks.iter().enumerate() {
+      let next = blocks.get(index + 1);
+      self.format_block(block, next, &mut flow);
+    }
+  }
+
+  fn format_block(&mut self, block: &Block, next: Option<&Block>, flow: &mut FlowContext) {
+    let (block_flow, footnote_top) =
+      footnote_boss_reserve(block, self.document, &self.emitted_footnotes, *flow);
+    (*flow, self.y) = prepare_block_flow(
+      block,
+      next,
+      block_flow,
+      &mut self.current,
+      &mut self.pages,
+      self.y,
+    );
+    *flow = self.advance_if_past_body(*flow);
+    (*flow, self.y) =
+      layout_document_block(block, *flow, &mut self.current, &mut self.pages, self.y);
+    footnote_boss_format(
+      block,
+      self.document,
+      &mut self.emitted_footnotes,
+      *flow,
+      &mut self.current,
+      &mut self.pages,
+      footnote_top,
+    );
+    *flow = restore_body_content_bottom(*flow);
+    *flow = self.advance_if_past_body(*flow);
+  }
+
+  fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
+    if self.y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !self.current.items.is_empty() {
+      let (next_flow, next_y) = advance_section_flow(flow, &mut self.current, &mut self.pages);
+      self.y = next_y;
+      next_flow
+    } else {
+      flow
+    }
+  }
+
+  fn format_trailing_note_frames(&mut self) {
+    let note_setup = self.current.setup;
+    let note_flow = flow_context(
+      note_setup,
+      self.current.section_index,
+      SectionColumns::default(),
+      0,
+      self.document.default_tab_stop_pt,
+    );
+
+    if self.document.footnotes.is_empty() && !self.document.footnote_blocks.is_empty() {
+      self.format_note_block_sequence(note_setup, note_flow, &self.document.footnote_blocks);
+    }
+
+    if !self.document.endnotes.is_empty() {
+      self.y = layout_note_separator(
+        note_setup,
+        &mut self.current,
+        &mut self.pages,
+        self.y,
+        note_flow.content_bottom,
       );
-      for (index, block) in section.blocks.iter().enumerate() {
-        let next = section.blocks.get(index + 1);
-        let (block_flow, footnote_top) =
-          reserve_referenced_footnote_area(block, document, &emitted_footnotes, flow);
-        (flow, y) = prepare_block_flow(block, next, block_flow, &mut current, &mut pages, y);
-        if y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !current.items.is_empty() {
-          (flow, y) = advance_section_flow(flow, &mut current, &mut pages);
+      let mut emitted_endnotes = HashSet::new();
+      for id in document_referenced_endnote_ids(self.document) {
+        if !emitted_endnotes.insert(id) {
+          continue;
         }
-        y = layout_document_block(block, flow, &mut current, &mut pages, y);
-        render_referenced_footnotes(
-          block,
-          document,
-          &mut emitted_footnotes,
-          flow,
-          &mut current,
-          &mut pages,
-          footnote_top,
-        );
-        flow = restore_body_content_bottom(flow);
-        if y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !current.items.is_empty() {
-          (flow, y) = advance_section_flow(flow, &mut current, &mut pages);
+        if let Some(blocks) = self.document.endnotes.get(&id) {
+          self.format_blocks_in_flow(blocks, note_flow);
         }
       }
-    }
-  }
-
-  let note_setup = current.setup;
-  let note_flow = flow_context(
-    note_setup,
-    current.section_index,
-    SectionColumns::default(),
-    0,
-    document.default_tab_stop_pt,
-  );
-  if document.footnotes.is_empty() && !document.footnote_blocks.is_empty() {
-    y = layout_note_separator(
-      note_setup,
-      &mut current,
-      &mut pages,
-      y,
-      note_flow.content_bottom,
-    );
-    for block in &document.footnote_blocks {
-      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
-    }
-  }
-
-  if !document.endnotes.is_empty() {
-    y = layout_note_separator(
-      note_setup,
-      &mut current,
-      &mut pages,
-      y,
-      note_flow.content_bottom,
-    );
-    let mut emitted_endnotes = HashSet::new();
-    for id in document_referenced_endnote_ids(document) {
-      if !emitted_endnotes.insert(id) {
-        continue;
-      }
-      if let Some(blocks) = document.endnotes.get(&id) {
-        for block in blocks {
-          y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
+      for (id, blocks) in &self.document.endnotes {
+        if !emitted_endnotes.contains(id) {
+          self.format_blocks_in_flow(blocks, note_flow);
         }
       }
+    } else if !self.document.endnote_blocks.is_empty() {
+      self.format_note_block_sequence(note_setup, note_flow, &self.document.endnote_blocks);
     }
-    for (id, blocks) in &document.endnotes {
-      if emitted_endnotes.contains(id) {
-        continue;
-      }
-      for block in blocks {
-        y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
-      }
+
+    if !self.document.comment_blocks.is_empty() {
+      self.format_note_block_sequence(note_setup, note_flow, &self.document.comment_blocks);
     }
-  } else if !document.endnote_blocks.is_empty() {
-    y = layout_note_separator(
-      note_setup,
-      &mut current,
-      &mut pages,
-      y,
-      note_flow.content_bottom,
+  }
+
+  fn format_note_block_sequence(&mut self, setup: PageSetup, flow: FlowContext, blocks: &[Block]) {
+    self.y = layout_note_separator(
+      setup,
+      &mut self.current,
+      &mut self.pages,
+      self.y,
+      flow.content_bottom,
     );
-    for block in &document.endnote_blocks {
-      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
+    self.format_blocks_in_flow(blocks, flow);
+  }
+
+  fn format_blocks_in_flow(&mut self, blocks: &[Block], flow: FlowContext) {
+    for block in blocks {
+      let (_, y) = layout_document_block(block, flow, &mut self.current, &mut self.pages, self.y);
+      self.y = y;
     }
   }
 
-  if !document.comment_blocks.is_empty() {
-    y = layout_note_separator(
-      note_setup,
-      &mut current,
-      &mut pages,
-      y,
-      note_flow.content_bottom,
-    );
-    for block in &document.comment_blocks {
-      y = layout_document_block(block, note_flow, &mut current, &mut pages, y);
+  fn finish_current_page(&mut self) {
+    if !self.current.items.is_empty() || self.pages.is_empty() {
+      self.pages.push(std::mem::replace(
+        &mut self.current,
+        empty_page(self.document.page, 0),
+      ));
     }
   }
 
-  if !current.items.is_empty() || pages.is_empty() {
-    pages.push(current);
+  fn push_current_page(&mut self, next: Page) {
+    self.pages.push(std::mem::replace(&mut self.current, next));
   }
+}
 
-  apply_column_separators(document, &mut pages);
-  apply_headers_and_footers(document, &mut pages);
-  resolve_dynamic_fields(&mut pages);
+#[derive(Clone, Copy, Debug)]
+struct BodyFrame {
+  setup: PageSetup,
+  section_index: usize,
+  columns: SectionColumns,
+}
 
-  Ok(LayoutDocument { pages })
+fn document_page_frame(
+  setup: PageSetup,
+  section_index: usize,
+  columns: SectionColumns,
+) -> BodyFrame {
+  BodyFrame {
+    setup,
+    section_index,
+    columns,
+  }
 }
 
 fn empty_page(setup: PageSetup, section_index: usize) -> Page {
@@ -552,15 +605,23 @@ fn layout_document_block(
   current: &mut Page,
   pages: &mut Vec<Page>,
   mut y: f32,
-) -> f32 {
+) -> (FlowContext, f32) {
   match block {
     Block::Paragraph(paragraph) => {
+      let mut flow = flow;
       if paragraph.format.page_break_before && !current.items.is_empty() {
         pages.push(std::mem::replace(
           current,
           empty_page(flow.setup, flow.section_index),
         ));
         y = flow.setup.margin_top_pt;
+        flow = flow_context(
+          flow.setup,
+          flow.section_index,
+          flow.columns,
+          0,
+          flow.default_tab_stop_pt,
+        );
       }
 
       y += paragraph.format.spacing_before_pt;
@@ -571,9 +632,19 @@ fn layout_document_block(
           .max(DEFAULT_FONT_SIZE_PT),
         ..flow
       };
-      layout_paragraph(paragraph, paragraph_flow, current, pages, y)
+      let (paragraph_flow, y) = layout_paragraph(paragraph, paragraph_flow, current, pages, y);
+      (
+        FlowContext {
+          content_width: flow.content_width,
+          ..paragraph_flow
+        },
+        y,
+      )
     }
-    Block::Table(table) => layout_table(table, block_area(flow), current, pages, y),
+    Block::Table(table) => (
+      flow,
+      layout_table(table, block_area(flow), current, pages, y),
+    ),
   }
 }
 
@@ -621,7 +692,7 @@ fn layout_note_separator(
   y + 8.0
 }
 
-fn reserve_referenced_footnote_area(
+fn footnote_boss_reserve(
   block: &Block,
   document: &DocxDocument,
   emitted_footnotes: &HashSet<i64>,
@@ -674,7 +745,7 @@ fn referenced_footnote_area_height(
   height
 }
 
-fn render_referenced_footnotes(
+fn footnote_boss_format(
   block: &Block,
   document: &DocxDocument,
   emitted_footnotes: &mut HashSet<i64>,
@@ -717,7 +788,8 @@ fn render_referenced_footnotes(
       needs_separator = false;
     }
     for block in blocks {
-      y = layout_document_block(block, footnote_flow, current, pages, y);
+      let (_, next_y) = layout_document_block(block, footnote_flow, current, pages, y);
+      y = next_y;
     }
   }
 }
@@ -876,6 +948,64 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
   }
 }
 
+fn apply_page_backgrounds(pages: &mut [Page]) {
+  for page in pages {
+    let Some(color) = page.setup.background else {
+      continue;
+    };
+    page.items.insert(
+      0,
+      PageItem::Fill(FillItem {
+        x_pt: 0.0,
+        y_pt: 0.0,
+        width_pt: page.setup.width_pt,
+        height_pt: page.setup.height_pt,
+        color,
+      }),
+    );
+  }
+}
+
+fn apply_page_borders(pages: &mut [Page]) {
+  for page in pages {
+    let borders = page.setup.borders;
+    if borders == crate::docx::CellBordersModel::default() {
+      continue;
+    }
+
+    let (left, top, right, bottom) = page_border_reference_rect(page.setup);
+    if let Some(border) = borders.top {
+      let y = top + border.spacing_pt + border.width_pt / 2.0;
+      push_styled_line(page, left, y, right, y, border);
+    }
+    if let Some(border) = borders.right {
+      let x = right - border.spacing_pt - border.width_pt / 2.0;
+      push_styled_line(page, x, top, x, bottom, border);
+    }
+    if let Some(border) = borders.bottom {
+      let y = bottom - border.spacing_pt - border.width_pt / 2.0;
+      push_styled_line(page, left, y, right, y, border);
+    }
+    if let Some(border) = borders.left {
+      let x = left + border.spacing_pt + border.width_pt / 2.0;
+      push_styled_line(page, x, top, x, bottom, border);
+    }
+  }
+}
+
+fn page_border_reference_rect(setup: PageSetup) -> (f32, f32, f32, f32) {
+  if setup.borders_offset_from_text {
+    (
+      setup.margin_left_pt,
+      setup.margin_top_pt,
+      setup.width_pt - setup.margin_right_pt,
+      setup.height_pt - setup.margin_bottom_pt,
+    )
+  } else {
+    (0.0, 0.0, setup.width_pt, setup.height_pt)
+  }
+}
+
 fn resolve_dynamic_fields(pages: &mut [Page]) {
   let total_pages = pages.len().to_string();
   for (page_index, page) in pages.iter_mut().enumerate() {
@@ -955,13 +1085,16 @@ fn layout_repeating_block(
   flow: FlowContext,
 ) -> f32 {
   match block {
-    Block::Paragraph(paragraph) => layout_paragraph(
-      paragraph,
-      flow,
-      page,
-      discarded_pages,
-      y + paragraph.format.spacing_before_pt,
-    ),
+    Block::Paragraph(paragraph) => {
+      let (_, y) = layout_paragraph(
+        paragraph,
+        flow,
+        page,
+        discarded_pages,
+        y + paragraph.format.spacing_before_pt,
+      );
+      y
+    }
     Block::Table(table) => layout_table(table, block_area(flow), page, discarded_pages, y),
   }
 }
@@ -1003,70 +1136,306 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
 }
 
 fn layout_table(
-  table: &crate::docx::Table,
+  table: &Table,
   area: BlockArea,
   current: &mut Page,
   pages: &mut Vec<Page>,
-  mut y: f32,
+  y: f32,
 ) -> f32 {
-  let _table_cell_margins = table.cell_margins;
-  let column_count = table
+  TableFrameLayout::new(table, area).map_or(y, |layout| layout.format(current, pages, y))
+}
+
+#[derive(Clone, Debug)]
+struct TableFrameLayout<'a> {
+  table: &'a Table,
+  frame: TableFrame,
+}
+
+impl<'a> TableFrameLayout<'a> {
+  fn new(table: &'a Table, area: BlockArea) -> Option<Self> {
+    let _table_cell_margins = table.cell_margins;
+    let column_count = table_column_count(table);
+    if column_count == 0 {
+      return None;
+    }
+
+    let column_widths = table_column_widths(table, column_count, area.content_width);
+    let table_width = column_widths.iter().sum::<f32>();
+    let left_pt = table_left_position(table, area.content_left_pt, area.content_width, table_width);
+    let repeating_header_count = table_repeating_header_count(table);
+    let repeating_header_height = table.rows[..repeating_header_count]
+      .iter()
+      .map(|row| table_row_height_with_widths(row, &column_widths))
+      .sum::<f32>();
+
+    Some(Self {
+      table,
+      frame: TableFrame {
+        block: area,
+        column_widths,
+        left_pt,
+        right_pt: left_pt + table_width,
+        repeating_header_count,
+        repeating_header_height,
+      },
+    })
+  }
+
+  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> f32 {
+    for (row_index, row) in self.table.rows.iter().enumerate() {
+      let mut row_frame = self.row_frame(row, row_index, y);
+      if self.should_move_row_to_follow(&row_frame, current) {
+        self.start_follow_table(current, pages);
+        y = self.frame.block.setup.margin_top_pt;
+        y = self.format_repeated_header_rows(current, y, row_frame.height_pt);
+        row_frame = self.row_frame(row, row_index, y);
+      }
+
+      y = row_frame.format(current);
+    }
+
+    y + TABLE_SPACING_AFTER_PT
+  }
+
+  fn row_frame(&self, row: &'a TableRow, row_index: usize, y: f32) -> RowFrame<'a, '_> {
+    RowFrame {
+      table: self.table,
+      table_frame: &self.frame,
+      row,
+      row_index,
+      y,
+      height_pt: table_row_height_with_widths(row, &self.frame.column_widths),
+    }
+  }
+
+  fn should_move_row_to_follow(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
+    if row.bottom() <= self.frame.block.content_bottom || current.items.is_empty() {
+      return false;
+    }
+
+    !row.row.cant_split
+      || row.fits_empty_body_region()
+      || row.y > self.frame.block.setup.margin_top_pt + 0.1
+  }
+
+  fn start_follow_table(&self, current: &mut Page, pages: &mut Vec<Page>) {
+    pages.push(std::mem::replace(
+      current,
+      empty_page(self.frame.block.setup, self.frame.block.section_index),
+    ));
+  }
+
+  fn format_repeated_header_rows(&self, current: &mut Page, mut y: f32, row_height: f32) -> f32 {
+    if self.frame.repeating_header_count == 0
+      || y + self.frame.repeating_header_height + row_height > self.frame.block.content_bottom
+    {
+      return y;
+    }
+
+    for (header_index, header) in self
+      .table
+      .rows
+      .iter()
+      .take(self.frame.repeating_header_count)
+      .enumerate()
+    {
+      y = self.row_frame(header, header_index, y).format(current);
+    }
+    y
+  }
+}
+
+#[derive(Clone, Debug)]
+struct TableFrame {
+  block: BlockArea,
+  column_widths: Vec<f32>,
+  left_pt: f32,
+  right_pt: f32,
+  repeating_header_count: usize,
+  repeating_header_height: f32,
+}
+
+struct RowFrame<'a, 'f> {
+  table: &'a Table,
+  table_frame: &'f TableFrame,
+  row: &'a TableRow,
+  row_index: usize,
+  y: f32,
+  height_pt: f32,
+}
+
+impl RowFrame<'_, '_> {
+  fn bottom(&self) -> f32 {
+    self.y + self.height_pt
+  }
+
+  fn fits_empty_body_region(&self) -> bool {
+    self.height_pt
+      <= self.table_frame.block.content_bottom - self.table_frame.block.setup.margin_top_pt
+  }
+
+  fn format(&self, current: &mut Page) -> f32 {
+    let row_top = self.y;
+    let row_bottom = self.bottom();
+
+    let mut cell_left = self.table_frame.left_pt;
+    let mut grid_index = 0;
+    for (cell_index, cell) in self.row.cells.iter().enumerate() {
+      let cell_frame = match self.cell_frame(cell, cell_index, cell_left, &mut grid_index) {
+        Some(cell_frame) => cell_frame,
+        None => break,
+      };
+      if !cell.vertical_merge_continue {
+        cell_frame.format(current, row_top, row_bottom);
+      }
+      cell_left += cell_frame.width_pt;
+    }
+
+    self.paint_horizontal_borders(current, row_top, row_bottom);
+    self.paint_trailing_border(current, row_top, row_bottom);
+    row_bottom
+  }
+
+  fn cell_frame<'s>(
+    &'s self,
+    cell: &'s TableCell,
+    cell_index: usize,
+    left_pt: f32,
+    grid_index: &mut usize,
+  ) -> Option<CellFrame<'s, 's>> {
+    if *grid_index >= self.table_frame.column_widths.len() {
+      return None;
+    }
+    let span = cell.grid_span.max(1).min(
+      self
+        .table_frame
+        .column_widths
+        .len()
+        .saturating_sub(*grid_index),
+    );
+    let width_pt = self.table_frame.column_widths[*grid_index..*grid_index + span]
+      .iter()
+      .sum::<f32>();
+    *grid_index += span;
+
+    Some(CellFrame {
+      table: self.table,
+      table_frame: self.table_frame,
+      row: self.row,
+      cell,
+      cell_index,
+      left_pt,
+      width_pt,
+      height_pt: self.height_pt,
+    })
+  }
+
+  fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    if let Some(border) = horizontal_border(self.table, self.row_index, true) {
+      push_styled_line(
+        current,
+        self.table_frame.left_pt,
+        row_top,
+        self.table_frame.right_pt,
+        row_top,
+        border,
+      );
+    }
+    if let Some(border) = horizontal_border(self.table, self.row_index, false) {
+      push_styled_line(
+        current,
+        self.table_frame.left_pt,
+        row_bottom,
+        self.table_frame.right_pt,
+        row_bottom,
+        border,
+      );
+    }
+  }
+
+  fn paint_trailing_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    if let Some(border) = self
+      .row
+      .cells
+      .last()
+      .and_then(|cell| cell.borders.right)
+      .or_else(|| self.table.borders.and_then(|borders| borders.right))
+      .or(Some(BorderStyle::default()))
+    {
+      push_styled_line(
+        current,
+        self.table_frame.right_pt,
+        row_top,
+        self.table_frame.right_pt,
+        row_bottom,
+        border,
+      );
+    }
+  }
+}
+
+struct CellFrame<'a, 'f> {
+  table: &'a Table,
+  table_frame: &'f TableFrame,
+  row: &'a TableRow,
+  cell: &'a TableCell,
+  cell_index: usize,
+  left_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+}
+
+impl CellFrame<'_, '_> {
+  fn format(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    self.paint_background(current, row_top);
+    self.paint_leading_border(current, row_top, row_bottom);
+    layout_table_cell(
+      self.cell,
+      self.table_frame.block.setup,
+      current,
+      self.left_pt,
+      row_top,
+      self.width_pt,
+      self.height_pt,
+    );
+  }
+
+  fn paint_background(&self, current: &mut Page, row_top: f32) {
+    if let Some(color) = self.cell.shading {
+      current.items.push(PageItem::Fill(FillItem {
+        x_pt: self.left_pt,
+        y_pt: row_top,
+        width_pt: self.width_pt,
+        height_pt: self.height_pt,
+        color,
+      }));
+    }
+  }
+
+  fn paint_leading_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    if let Some(border) = vertical_border(self.table, self.row, self.cell_index, true) {
+      push_styled_line(
+        current,
+        self.left_pt,
+        row_top,
+        self.left_pt,
+        row_bottom,
+        border,
+      );
+    }
+  }
+}
+
+fn table_column_count(table: &Table) -> usize {
+  table
     .rows
     .iter()
     .map(|row| row.cells.iter().map(|cell| cell.grid_span).sum::<usize>())
     .max()
-    .unwrap_or(0);
-  if column_count == 0 {
-    return y;
-  }
-
-  let column_widths = table_column_widths(table, column_count, area.content_width);
-  let table_width = column_widths.iter().sum::<f32>();
-  let table_left =
-    table_left_position(table, area.content_left_pt, area.content_width, table_width);
-  let table_right = table_left + table_width;
-  let render_area = TableRenderArea {
-    block: area,
-    column_widths: &column_widths,
-    left_pt: table_left,
-    right_pt: table_right,
-  };
-  let repeating_header_count = table_repeating_header_count(table);
-  let repeating_header_height = table.rows[..repeating_header_count]
-    .iter()
-    .map(|row| table_row_height_with_widths(row, &column_widths))
-    .sum::<f32>();
-
-  for (row_index, row) in table.rows.iter().enumerate() {
-    let row_height = table_row_height_with_widths(row, &column_widths);
-    let row_overflows = y + row_height > area.content_bottom;
-    let row_fits_empty_region = row_height <= area.content_bottom - area.setup.margin_top_pt;
-    if row_overflows
-      && !current.items.is_empty()
-      && (!row.cant_split || row_fits_empty_region || y > area.setup.margin_top_pt + 0.1)
-    {
-      pages.push(std::mem::replace(
-        current,
-        empty_page(area.setup, area.section_index),
-      ));
-      y = area.setup.margin_top_pt;
-      if row_index >= repeating_header_count
-        && repeating_header_count > 0
-        && y + repeating_header_height + row_height <= area.content_bottom
-      {
-        for (header_index, header) in table.rows[..repeating_header_count].iter().enumerate() {
-          y = render_table_row(table, header, header_index, render_area, current, y);
-        }
-      }
-    }
-
-    y = render_table_row(table, row, row_index, render_area, current, y);
-  }
-
-  y + TABLE_SPACING_AFTER_PT
+    .unwrap_or(0)
 }
 
-fn table_repeating_header_count(table: &crate::docx::Table) -> usize {
+fn table_repeating_header_count(table: &Table) -> usize {
   let count = table
     .rows
     .iter()
@@ -1079,101 +1448,7 @@ fn table_repeating_header_count(table: &crate::docx::Table) -> usize {
   }
 }
 
-fn render_table_row(
-  table: &crate::docx::Table,
-  row: &crate::docx::TableRow,
-  row_index: usize,
-  area: TableRenderArea<'_>,
-  current: &mut Page,
-  y: f32,
-) -> f32 {
-  let row_height = table_row_height_with_widths(row, area.column_widths);
-  let row_top = y;
-  let row_bottom = y + row_height;
-
-  let mut cell_left = area.left_pt;
-  let mut grid_index = 0;
-  for (cell_index, cell) in row.cells.iter().enumerate() {
-    if grid_index >= area.column_widths.len() {
-      break;
-    }
-    let span = cell
-      .grid_span
-      .max(1)
-      .min(area.column_widths.len().saturating_sub(grid_index));
-    let width = area.column_widths[grid_index..grid_index + span]
-      .iter()
-      .sum::<f32>();
-    if !cell.vertical_merge_continue {
-      if let Some(color) = cell.shading {
-        current.items.push(PageItem::Fill(FillItem {
-          x_pt: cell_left,
-          y_pt: row_top,
-          width_pt: width,
-          height_pt: row_height,
-          color,
-        }));
-      }
-      if let Some(border) = vertical_border(table, row, cell_index, true) {
-        push_styled_line(current, cell_left, row_top, cell_left, row_bottom, border);
-      }
-      layout_table_cell(
-        cell,
-        area.block.setup,
-        current,
-        cell_left,
-        row_top,
-        width,
-        row_height,
-      );
-    }
-    cell_left += width;
-    grid_index += span;
-  }
-  if let Some(border) = horizontal_border(table, row_index, true) {
-    push_styled_line(
-      current,
-      area.left_pt,
-      row_top,
-      area.right_pt,
-      row_top,
-      border,
-    );
-  }
-  if let Some(border) = horizontal_border(table, row_index, false) {
-    push_styled_line(
-      current,
-      area.left_pt,
-      row_bottom,
-      area.right_pt,
-      row_bottom,
-      border,
-    );
-  }
-  if let Some(border) = row
-    .cells
-    .last()
-    .and_then(|cell| cell.borders.right)
-    .or_else(|| table.borders.and_then(|borders| borders.right))
-    .or(Some(BorderStyle::default()))
-  {
-    push_styled_line(
-      current,
-      area.right_pt,
-      row_top,
-      area.right_pt,
-      row_bottom,
-      border,
-    );
-  }
-  row_bottom
-}
-
-fn horizontal_border(
-  table: &crate::docx::Table,
-  row_index: usize,
-  top_edge: bool,
-) -> Option<BorderStyle> {
+fn horizontal_border(table: &Table, row_index: usize, top_edge: bool) -> Option<BorderStyle> {
   let borders = table.borders;
   let row = table.rows.get(row_index)?;
   if top_edge {
@@ -1210,8 +1485,8 @@ fn horizontal_border(
 }
 
 fn vertical_border(
-  table: &crate::docx::Table,
-  row: &crate::docx::TableRow,
+  table: &Table,
+  row: &TableRow,
   cell_index: usize,
   left_edge: bool,
 ) -> Option<BorderStyle> {
@@ -1258,11 +1533,7 @@ fn vertical_border(
   }
 }
 
-fn table_column_widths(
-  table: &crate::docx::Table,
-  column_count: usize,
-  content_width: f32,
-) -> Vec<f32> {
+fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -> Vec<f32> {
   let preferred_width = table_preferred_width(table, content_width);
   if table.column_widths_pt.len() >= column_count {
     let mut widths = table.column_widths_pt[..column_count].to_vec();
@@ -1291,7 +1562,7 @@ fn table_column_widths(
   vec![width / column_count as f32; column_count]
 }
 
-fn table_preferred_width(table: &crate::docx::Table, content_width: f32) -> Option<f32> {
+fn table_preferred_width(table: &Table, content_width: f32) -> Option<f32> {
   table
     .preferred_width_pt
     .or_else(|| table.preferred_width_pct.map(|pct| content_width * pct))
@@ -1299,7 +1570,7 @@ fn table_preferred_width(table: &crate::docx::Table, content_width: f32) -> Opti
 }
 
 fn table_left_position(
-  table: &crate::docx::Table,
+  table: &Table,
   content_left: f32,
   content_width: f32,
   table_width: f32,
@@ -1312,11 +1583,11 @@ fn table_left_position(
   }
 }
 
-fn table_row_height(row: &crate::docx::TableRow) -> f32 {
+fn table_row_height(row: &TableRow) -> f32 {
   table_row_height_with_widths(row, &[])
 }
 
-fn table_row_height_with_widths(row: &crate::docx::TableRow, column_widths: &[f32]) -> f32 {
+fn table_row_height_with_widths(row: &TableRow, column_widths: &[f32]) -> f32 {
   let mut grid_index = 0;
   let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
   for cell in &row.cells {
@@ -1332,11 +1603,7 @@ fn table_row_height_with_widths(row: &crate::docx::TableRow, column_widths: &[f3
   }
 }
 
-fn spanned_cell_width(
-  cell: &crate::docx::TableCell,
-  column_widths: &[f32],
-  grid_index: &mut usize,
-) -> f32 {
+fn spanned_cell_width(cell: &TableCell, column_widths: &[f32], grid_index: &mut usize) -> f32 {
   if column_widths.is_empty() || *grid_index >= column_widths.len() {
     return 0.0;
   }
@@ -1352,7 +1619,7 @@ fn spanned_cell_width(
 }
 
 fn layout_table_cell(
-  cell: &crate::docx::TableCell,
+  cell: &TableCell,
   setup: PageSetup,
   page: &mut Page,
   x: f32,
@@ -1392,7 +1659,9 @@ fn layout_table_cell(
     if text_y > text_bottom {
       break;
     }
-    text_y = layout_document_block(block, flow, &mut nested_page, &mut discarded_pages, text_y);
+    let (_, next_y) =
+      layout_document_block(block, flow, &mut nested_page, &mut discarded_pages, text_y);
+    text_y = next_y;
   }
 
   page.items.extend(
@@ -1404,7 +1673,7 @@ fn layout_table_cell(
   let _overflow_pages = discarded_pages;
 }
 
-fn table_cell_content_height(cell: &crate::docx::TableCell, cell_width: f32) -> f32 {
+fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
   let content_width =
     (cell_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
   let flow = FlowContext {
@@ -1462,431 +1731,760 @@ fn layout_paragraph(
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
-  mut y: f32,
-) -> f32 {
-  let start_item_index = current.items.len();
-  let paragraph_top = y;
-  let setup = flow.setup;
-  let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
-  let first_line_left =
-    (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
-  let default_line_right = default_line_left + flow.content_width;
-  let mut line_left = first_line_left;
-  let mut line_right = default_line_right;
-  let paragraph_left = default_line_left.min(first_line_left);
-  let base_line_height = paragraph
-    .format
-    .line_height_pt
-    .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
-  let mut line_height = base_line_height;
-  let mut wrap_exclusions = Vec::new();
-  let mut emitted = paragraph.list_label.is_some();
-  let mut pending_tab: Option<ResolvedTabStop> = None;
-  let mut x = if let Some(label) = &paragraph.list_label {
-    current.items.push(PageItem::Text(TextItem {
-      x_pt: first_line_left,
+  y: f32,
+) -> (FlowContext, f32) {
+  TextFrameLayout::new(paragraph, flow).format(current, pages, y)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextFrame {
+  setup: PageSetup,
+  default_line_left: f32,
+  first_line_left: f32,
+  default_line_right: f32,
+  paragraph_left: f32,
+  base_line_height: f32,
+}
+
+impl TextFrame {
+  fn new(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> Self {
+    let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
+    let first_line_left =
+      (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
+    Self {
+      setup: flow.setup,
+      default_line_left,
+      first_line_left,
+      default_line_right: default_line_left + flow.content_width,
+      paragraph_left: default_line_left.min(first_line_left),
+      base_line_height: paragraph
+        .format
+        .line_height_pt
+        .unwrap_or(DEFAULT_LINE_HEIGHT_PT),
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LineFrame {
+  left_pt: f32,
+  right_pt: f32,
+  y_pt: f32,
+  height_pt: f32,
+  x_pt: f32,
+}
+
+impl LineFrame {
+  fn first(text_frame: TextFrame, y: f32, has_list_label: bool) -> Self {
+    let left_pt = if has_list_label {
+      text_frame.default_line_left
+    } else {
+      text_frame.first_line_left
+    };
+    Self {
+      left_pt,
+      right_pt: text_frame.default_line_right,
       y_pt: y,
-      text: label.clone(),
-      style: TextStyle::default(),
-      hyperlink_url: None,
-      dynamic_field: None,
-    }));
-    default_line_left
-  } else {
-    first_line_left
-  };
-  if paragraph.list_label.is_some() {
-    line_left = default_line_left;
+      height_pt: text_frame.base_line_height,
+      x_pt: left_pt,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Ord)]
+struct InlineCursor {
+  inline_index: usize,
+  text_offset: usize,
+}
+
+impl InlineCursor {
+  fn after_inline(inline_index: usize) -> Self {
+    Self {
+      inline_index: inline_index + 1,
+      text_offset: 0,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LineFragment {
+  start: InlineCursor,
+  end: InlineCursor,
+  y_pt: f32,
+  height_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextFrameFollow {
+  start: InlineCursor,
+  page_index: usize,
+  y_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextSplitDecision {
+  NoSplit,
+  Forced,
+  Allowed,
+  Rejected,
+}
+
+#[derive(Clone, Debug)]
+struct TextFrameState {
+  current_line_start: InlineCursor,
+  current_position: InlineCursor,
+  line_fragments: Vec<LineFragment>,
+  page_follows: Vec<TextFrameFollow>,
+}
+
+impl TextFrameState {
+  fn new() -> Self {
+    Self {
+      current_line_start: InlineCursor::default(),
+      current_position: InlineCursor::default(),
+      line_fragments: Vec::new(),
+      page_follows: Vec::new(),
+    }
   }
 
-  for item in &paragraph.inlines {
-    match item {
-      InlineItem::Text(run) => {
-        let mut chunk = String::new();
-        let mut chunk_x = x;
+  fn set_position(&mut self, cursor: InlineCursor) {
+    self.current_position = cursor;
+  }
 
-        for segment in text_segments(&run.text) {
-          if segment == "\n" {
-            flush_text(
-              current,
-              chunk_x,
-              y,
-              &mut chunk,
-              run.style,
-              run.hyperlink_url.as_deref(),
-              run.dynamic_field,
-            );
-            y = next_line(
-              setup,
-              current,
-              pages,
-              y,
-              &mut line_height,
-              flow.content_bottom,
-            );
-            (line_left, line_right) = line_bounds_for_y(
-              default_line_left,
-              default_line_right,
-              y,
-              line_height,
-              &wrap_exclusions,
-            );
-            x = line_left;
-            chunk_x = x;
-            pending_tab = None;
-            emitted = true;
-            continue;
-          }
-          if segment == "\t" {
-            flush_text(
-              current,
-              chunk_x,
-              y,
-              &mut chunk,
-              run.style,
-              run.hyperlink_url.as_deref(),
-              run.dynamic_field,
-            );
-            let mut tab_stop = next_tab_stop(
-              x,
-              line_left,
-              &paragraph.format.tab_stops,
-              flow.default_tab_stop_pt,
-            );
-            x = tab_stop.x_pt;
-            if x > line_right {
-              y = next_line(
-                setup,
+  fn finish_line(&mut self, y_pt: f32, height_pt: f32) {
+    self.line_fragments.push(LineFragment {
+      start: self.current_line_start,
+      end: self.current_position,
+      y_pt,
+      height_pt,
+    });
+    self.current_line_start = self.current_position;
+  }
+
+  fn note_page_follow(&mut self, page_index: usize, y_pt: f32) {
+    self.page_follows.push(TextFrameFollow {
+      start: self.current_line_start,
+      page_index,
+      y_pt,
+    });
+  }
+
+  fn finish_paragraph(&mut self, y_pt: f32, height_pt: f32, emitted: bool) {
+    if emitted && self.current_position >= self.current_line_start {
+      self.finish_line(y_pt, height_pt);
+    }
+  }
+
+  fn page_split_decision(
+    &self,
+    keep_lines: bool,
+    orphan_lines: usize,
+    widow_lines: usize,
+  ) -> TextSplitDecision {
+    let Some(follow) = self.page_follows.last() else {
+      return TextSplitDecision::NoSplit;
+    };
+    if keep_lines {
+      return TextSplitDecision::Rejected;
+    }
+
+    let before = self
+      .line_fragments
+      .iter()
+      .filter(|line| line.end <= follow.start && line.end > line.start)
+      .count();
+    let after = self
+      .line_fragments
+      .iter()
+      .filter(|line| line.start >= follow.start && line.end > line.start)
+      .count();
+
+    if before == 0 || after == 0 {
+      TextSplitDecision::Forced
+    } else if before >= orphan_lines && after >= widow_lines {
+      TextSplitDecision::Allowed
+    } else {
+      TextSplitDecision::Rejected
+    }
+  }
+
+  fn split_candidates_are_ordered(&self) -> bool {
+    self
+      .line_fragments
+      .windows(2)
+      .all(|lines| lines[0].end <= lines[1].start)
+      && self
+        .line_fragments
+        .iter()
+        .all(|line| line.start <= line.end && line.y_pt.is_finite() && line.height_pt >= 0.0)
+      && self
+        .page_follows
+        .iter()
+        .all(|follow| follow.y_pt.is_finite())
+      && self.page_follows.windows(2).all(|follows| {
+        follows[0].start <= follows[1].start && follows[0].page_index <= follows[1].page_index
+      })
+  }
+}
+
+#[derive(Clone, Debug)]
+struct TextSegment {
+  text: String,
+  start: usize,
+  end: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ActiveTextFrame {
+  flow: FlowContext,
+  frame: TextFrame,
+}
+
+struct TextLineAdvance<'a> {
+  current: &'a mut Page,
+  pages: &'a mut Vec<Page>,
+  wrap_exclusions: &'a [WrapExclusion],
+  state: &'a mut TextFrameState,
+  active: ActiveTextFrame,
+}
+
+struct TextFrameLayout<'a> {
+  paragraph: &'a crate::docx::Paragraph,
+  flow: FlowContext,
+  frame: TextFrame,
+}
+
+impl<'a> TextFrameLayout<'a> {
+  fn new(paragraph: &'a crate::docx::Paragraph, flow: FlowContext) -> Self {
+    Self {
+      paragraph,
+      flow,
+      frame: TextFrame::new(paragraph, flow),
+    }
+  }
+
+  fn line_bounds(
+    &self,
+    frame: TextFrame,
+    y: f32,
+    line_height: f32,
+    wrap_exclusions: &[WrapExclusion],
+  ) -> (f32, f32) {
+    line_bounds_for_y(
+      frame.default_line_left,
+      frame.default_line_right,
+      y,
+      line_height,
+      wrap_exclusions,
+    )
+  }
+
+  fn advance_line(
+    &self,
+    advance: TextLineAdvance<'_>,
+    y: f32,
+    line_height: &mut f32,
+  ) -> (f32, f32, f32) {
+    advance.state.finish_line(y, *line_height);
+    let page_count_before = advance.pages.len();
+    let y = next_line(
+      advance.active.frame.setup,
+      advance.current,
+      advance.pages,
+      y,
+      line_height,
+      advance.active.flow.content_bottom,
+    );
+    if advance.pages.len() > page_count_before {
+      advance.state.note_page_follow(advance.pages.len(), y);
+    }
+    let (line_left, line_right) = self.line_bounds(
+      advance.active.frame,
+      y,
+      *line_height,
+      advance.wrap_exclusions,
+    );
+    (y, line_left, line_right)
+  }
+
+  fn force_text_page_break(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    wrap_exclusions: &mut Vec<WrapExclusion>,
+  ) -> (f32, f32, f32, f32) {
+    let y = force_page_break(self.frame.setup, current, pages);
+    wrap_exclusions.clear();
+    (
+      y,
+      self.frame.first_line_left,
+      self.frame.default_line_right,
+      self.frame.base_line_height,
+    )
+  }
+
+  fn apply_column_break(
+    &self,
+    flow: FlowContext,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    wrap_exclusions: &mut Vec<WrapExclusion>,
+  ) -> (FlowContext, TextFrame, f32, f32, f32, f32, bool) {
+    let (next_flow, y) = advance_section_flow(flow, current, pages);
+    wrap_exclusions.clear();
+    let next_frame = TextFrame::new(self.paragraph, next_flow);
+    (
+      next_flow,
+      next_frame,
+      y,
+      next_frame.default_line_left,
+      next_frame.default_line_right,
+      next_frame.base_line_height,
+      flow.columns.count > 1 && flow.column_index + 1 < flow.columns.count,
+    )
+  }
+
+  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> (FlowContext, f32) {
+    let paragraph = self.paragraph;
+    let mut flow = self.flow;
+    let mut text_frame = self.frame;
+    let start_item_index = current.items.len();
+    let paragraph_top = y;
+    let default_line_left = text_frame.default_line_left;
+    let first_line_left = text_frame.first_line_left;
+    let mut default_line_right = text_frame.default_line_right;
+    let mut paragraph_left = text_frame.paragraph_left;
+    let mut wrap_exclusions = Vec::new();
+    let mut emitted = paragraph.list_label.is_some();
+    let mut pending_tab: Option<ResolvedTabStop> = None;
+    let mut text_state = TextFrameState::new();
+    let line = LineFrame::first(text_frame, y, paragraph.list_label.is_some());
+    y = line.y_pt;
+    let mut base_line_height = text_frame.base_line_height;
+    let mut line_height = line.height_pt;
+    let mut line_left = line.left_pt;
+    let mut line_right = line.right_pt;
+    let mut x = line.x_pt;
+    if let Some(label) = &paragraph.list_label {
+      current.items.push(PageItem::Text(TextItem {
+        x_pt: first_line_left,
+        y_pt: y,
+        text: label.clone(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      }));
+      x = default_line_left;
+    }
+
+    for (inline_index, item) in paragraph.inlines.iter().enumerate() {
+      match item {
+        InlineItem::Text(run) => {
+          let mut chunk = String::new();
+          let mut chunk_x = x;
+
+          for segment in text_segments_with_offsets(&run.text) {
+            if segment.text == "\n" {
+              text_state.set_position(InlineCursor {
+                inline_index,
+                text_offset: segment.end,
+              });
+              flush_text(
                 current,
-                pages,
+                chunk_x,
+                y,
+                &mut chunk,
+                run.style,
+                run.hyperlink_url.as_deref(),
+                run.dynamic_field,
+              );
+              (y, line_left, line_right) = self.advance_line(
+                TextLineAdvance {
+                  current,
+                  pages,
+                  wrap_exclusions: &wrap_exclusions,
+                  state: &mut text_state,
+                  active: ActiveTextFrame {
+                    flow,
+                    frame: text_frame,
+                  },
+                },
                 y,
                 &mut line_height,
-                flow.content_bottom,
               );
-              (line_left, line_right) = line_bounds_for_y(
-                default_line_left,
-                default_line_right,
+              x = line_left;
+              chunk_x = x;
+              pending_tab = None;
+              emitted = true;
+              continue;
+            }
+            if segment.text == "\t" {
+              text_state.set_position(InlineCursor {
+                inline_index,
+                text_offset: segment.end,
+              });
+              flush_text(
+                current,
+                chunk_x,
                 y,
-                line_height,
-                &wrap_exclusions,
+                &mut chunk,
+                run.style,
+                run.hyperlink_url.as_deref(),
+                run.dynamic_field,
               );
-              tab_stop = next_tab_stop(
-                line_left,
+              let mut tab_stop = next_tab_stop(
+                x,
                 line_left,
                 &paragraph.format.tab_stops,
                 flow.default_tab_stop_pt,
               );
               x = tab_stop.x_pt;
-            }
-            chunk_x = x;
-            pending_tab = Some(tab_stop);
-            line_height = line_height.max(run.style.font_size_pt * 1.25);
-            emitted = true;
-            continue;
-          }
-
-          let width = measure_text(&segment, run.style);
-          let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
-          let whitespace = segment.chars().all(char::is_whitespace);
-          if let Some(tab_stop) = pending_tab.take()
-            && !whitespace
-          {
-            x = aligned_tab_x(tab_stop, width, line_left, line_right);
-            chunk_x = x;
-          }
-
-          if x + width > line_right && x > line_left {
-            flush_text(
-              current,
-              chunk_x,
-              y,
-              &mut chunk,
-              run.style,
-              run.hyperlink_url.as_deref(),
-              run.dynamic_field,
-            );
-            y = next_line(
-              setup,
-              current,
-              pages,
-              y,
-              &mut line_height,
-              flow.content_bottom,
-            );
-            (line_left, line_right) = line_bounds_for_y(
-              default_line_left,
-              default_line_right,
-              y,
-              line_height,
-              &wrap_exclusions,
-            );
-            x = line_left;
-            chunk_x = x;
-            pending_tab = None;
-            if whitespace {
+              if x > line_right {
+                (y, line_left, line_right) = self.advance_line(
+                  TextLineAdvance {
+                    current,
+                    pages,
+                    wrap_exclusions: &wrap_exclusions,
+                    state: &mut text_state,
+                    active: ActiveTextFrame {
+                      flow,
+                      frame: text_frame,
+                    },
+                  },
+                  y,
+                  &mut line_height,
+                );
+                tab_stop = next_tab_stop(
+                  line_left,
+                  line_left,
+                  &paragraph.format.tab_stops,
+                  flow.default_tab_stop_pt,
+                );
+                x = tab_stop.x_pt;
+              }
+              chunk_x = x;
+              pending_tab = Some(tab_stop);
+              line_height = line_height.max(run.style.font_size_pt * 1.25);
               emitted = true;
               continue;
             }
-          }
 
-          if width > line_capacity && x <= line_left && !whitespace {
-            for text in emergency_break_segments(&segment) {
-              let width = measure_text(&text, run.style);
-              if width > line_capacity && text.chars().count() > 1 {
-                for ch in text.chars() {
-                  let mut encoded = [0; 4];
-                  let text = ch.encode_utf8(&mut encoded);
-                  let width = measure_text(text, run.style);
+            let width = measure_text(&segment.text, run.style);
+            let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
+            let whitespace = segment.text.chars().all(char::is_whitespace);
+            if let Some(tab_stop) = pending_tab.take()
+              && !whitespace
+            {
+              x = aligned_tab_x(tab_stop, width, line_left, line_right);
+              chunk_x = x;
+            }
 
-                  if x + width > line_right && x > line_left {
-                    flush_text(
-                      current,
-                      chunk_x,
-                      y,
-                      &mut chunk,
-                      run.style,
-                      run.hyperlink_url.as_deref(),
-                      run.dynamic_field,
-                    );
-                    y = next_line(
-                      setup,
-                      current,
-                      pages,
-                      y,
-                      &mut line_height,
-                      flow.content_bottom,
-                    );
-                    (line_left, line_right) = line_bounds_for_y(
-                      default_line_left,
-                      default_line_right,
-                      y,
-                      line_height,
-                      &wrap_exclusions,
-                    );
-                    x = line_left;
-                    chunk_x = x;
-                    pending_tab = None;
-                  }
-
-                  if chunk.is_empty() {
-                    chunk_x = x;
-                  }
-                  chunk.push_str(text);
-                  x += width;
-                  line_height = line_height.max(run.style.font_size_pt * 1.25);
-                  emitted = true;
-                }
-                continue;
-              }
-
-              if x + width > line_right && x > line_left {
-                flush_text(
-                  current,
-                  chunk_x,
-                  y,
-                  &mut chunk,
-                  run.style,
-                  run.hyperlink_url.as_deref(),
-                  run.dynamic_field,
-                );
-                y = next_line(
-                  setup,
+            if x + width > line_right && x > line_left {
+              flush_text(
+                current,
+                chunk_x,
+                y,
+                &mut chunk,
+                run.style,
+                run.hyperlink_url.as_deref(),
+                run.dynamic_field,
+              );
+              (y, line_left, line_right) = self.advance_line(
+                TextLineAdvance {
                   current,
                   pages,
-                  y,
-                  &mut line_height,
-                  flow.content_bottom,
-                );
-                (line_left, line_right) = line_bounds_for_y(
-                  default_line_left,
-                  default_line_right,
-                  y,
-                  line_height,
-                  &wrap_exclusions,
-                );
-                x = line_left;
-                chunk_x = x;
-                pending_tab = None;
+                  wrap_exclusions: &wrap_exclusions,
+                  state: &mut text_state,
+                  active: ActiveTextFrame {
+                    flow,
+                    frame: text_frame,
+                  },
+                },
+                y,
+                &mut line_height,
+              );
+              x = line_left;
+              chunk_x = x;
+              pending_tab = None;
+              if whitespace {
+                emitted = true;
+                continue;
               }
-
-              if chunk.is_empty() {
-                chunk_x = x;
-              }
-              chunk.push_str(&text);
-              x += width;
-              line_height = line_height.max(run.style.font_size_pt * 1.25);
-              emitted = true;
             }
+
+            if width > line_capacity && x <= line_left && !whitespace {
+              let mut text_offset = segment.start;
+              for text in emergency_break_segments(&segment.text) {
+                let width = measure_text(&text, run.style);
+                if width > line_capacity && text.chars().count() > 1 {
+                  for ch in text.chars() {
+                    let mut encoded = [0; 4];
+                    let text = ch.encode_utf8(&mut encoded);
+                    let width = measure_text(text, run.style);
+                    text_offset += text.len();
+
+                    if x + width > line_right && x > line_left {
+                      flush_text(
+                        current,
+                        chunk_x,
+                        y,
+                        &mut chunk,
+                        run.style,
+                        run.hyperlink_url.as_deref(),
+                        run.dynamic_field,
+                      );
+                      (y, line_left, line_right) = self.advance_line(
+                        TextLineAdvance {
+                          current,
+                          pages,
+                          wrap_exclusions: &wrap_exclusions,
+                          state: &mut text_state,
+                          active: ActiveTextFrame {
+                            flow,
+                            frame: text_frame,
+                          },
+                        },
+                        y,
+                        &mut line_height,
+                      );
+                      x = line_left;
+                      chunk_x = x;
+                      pending_tab = None;
+                    }
+
+                    if chunk.is_empty() {
+                      chunk_x = x;
+                    }
+                    chunk.push_str(text);
+                    x += width;
+                    text_state.set_position(InlineCursor {
+                      inline_index,
+                      text_offset,
+                    });
+                    line_height = line_height.max(run.style.font_size_pt * 1.25);
+                    emitted = true;
+                  }
+                  continue;
+                }
+                text_offset += text.len();
+
+                if x + width > line_right && x > line_left {
+                  flush_text(
+                    current,
+                    chunk_x,
+                    y,
+                    &mut chunk,
+                    run.style,
+                    run.hyperlink_url.as_deref(),
+                    run.dynamic_field,
+                  );
+                  (y, line_left, line_right) = self.advance_line(
+                    TextLineAdvance {
+                      current,
+                      pages,
+                      wrap_exclusions: &wrap_exclusions,
+                      state: &mut text_state,
+                      active: ActiveTextFrame {
+                        flow,
+                        frame: text_frame,
+                      },
+                    },
+                    y,
+                    &mut line_height,
+                  );
+                  x = line_left;
+                  chunk_x = x;
+                  pending_tab = None;
+                }
+
+                if chunk.is_empty() {
+                  chunk_x = x;
+                }
+                chunk.push_str(&text);
+                x += width;
+                text_state.set_position(InlineCursor {
+                  inline_index,
+                  text_offset,
+                });
+                line_height = line_height.max(run.style.font_size_pt * 1.25);
+                emitted = true;
+              }
+              continue;
+            }
+
+            if chunk.is_empty() {
+              chunk_x = x;
+            }
+            chunk.push_str(&segment.text);
+            x += width;
+            text_state.set_position(InlineCursor {
+              inline_index,
+              text_offset: segment.end,
+            });
+            line_height = line_height.max(run.style.font_size_pt * 1.25);
+            emitted = true;
+          }
+
+          flush_text(
+            current,
+            chunk_x,
+            y,
+            &mut chunk,
+            run.style,
+            run.hyperlink_url.as_deref(),
+            run.dynamic_field,
+          );
+        }
+        InlineItem::Image(image) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+          let (width, height) =
+            fit_image_to_line(image.width_pt, image.height_pt, flow.content_width);
+          if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
+            let (image_x, image_y) = floating_image_position(placement, flow, x, y);
+            current.items.push(PageItem::Image(ImageItem {
+              x_pt: image_x,
+              y_pt: image_y,
+              width_pt: width,
+              height_pt: height,
+              data: image.data.clone(),
+              content_type: image.content_type.clone(),
+              alt_text: image.alt_text.clone(),
+            }));
+            match placement.wrap {
+              ImageWrapMode::TopBottom | ImageWrapMode::None => {
+                y = y.max(image_y + height + placement.margin_bottom_pt);
+                (line_left, line_right) =
+                  self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                x = line_left;
+                line_height = base_line_height;
+              }
+              ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
+                wrap_exclusions.push(WrapExclusion {
+                  left_pt: image_x - placement.margin_left_pt,
+                  right_pt: image_x + width + placement.margin_right_pt,
+                  top_pt: image_y - placement.margin_top_pt,
+                  bottom_pt: image_y + height + placement.margin_bottom_pt,
+                });
+                (line_left, line_right) =
+                  self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                x = x.max(line_left).min(line_right);
+                line_height = line_height.max(height.min(base_line_height));
+              }
+              ImageWrapMode::Through
+              | ImageWrapMode::Inline
+              | ImageWrapMode::Square
+              | ImageWrapMode::Tight => {}
+            }
+            emitted = true;
             continue;
           }
-
-          if chunk.is_empty() {
-            chunk_x = x;
+          if x + width > line_right && x > line_left {
+            (y, line_left, line_right) = self.advance_line(
+              TextLineAdvance {
+                current,
+                pages,
+                wrap_exclusions: &wrap_exclusions,
+                state: &mut text_state,
+                active: ActiveTextFrame {
+                  flow,
+                  frame: text_frame,
+                },
+              },
+              y,
+              &mut line_height,
+            );
+            x = line_left;
           }
-          chunk.push_str(&segment);
-          x += width;
-          line_height = line_height.max(run.style.font_size_pt * 1.25);
-          emitted = true;
-        }
-
-        flush_text(
-          current,
-          chunk_x,
-          y,
-          &mut chunk,
-          run.style,
-          run.hyperlink_url.as_deref(),
-          run.dynamic_field,
-        );
-      }
-      InlineItem::Image(image) => {
-        pending_tab = None;
-        let (width, height) =
-          fit_image_to_line(image.width_pt, image.height_pt, flow.content_width);
-        if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
-          let (image_x, image_y) = floating_image_position(placement, flow, x, y);
           current.items.push(PageItem::Image(ImageItem {
-            x_pt: image_x,
-            y_pt: image_y,
+            x_pt: x,
+            y_pt: y,
             width_pt: width,
             height_pt: height,
             data: image.data.clone(),
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
           }));
-          match placement.wrap {
-            ImageWrapMode::TopBottom | ImageWrapMode::None => {
-              y = y.max(image_y + height + placement.margin_bottom_pt);
-              (line_left, line_right) = line_bounds_for_y(
-                default_line_left,
-                default_line_right,
-                y,
-                line_height,
-                &wrap_exclusions,
-              );
-              x = line_left;
-              line_height = base_line_height;
-            }
-            ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
-              wrap_exclusions.push(WrapExclusion {
-                left_pt: image_x - placement.margin_left_pt,
-                right_pt: image_x + width + placement.margin_right_pt,
-                top_pt: image_y - placement.margin_top_pt,
-                bottom_pt: image_y + height + placement.margin_bottom_pt,
-              });
-              (line_left, line_right) = line_bounds_for_y(
-                default_line_left,
-                default_line_right,
-                y,
-                line_height,
-                &wrap_exclusions,
-              );
-              x = x.max(line_left).min(line_right);
-              line_height = line_height.max(height.min(base_line_height));
-            }
-            ImageWrapMode::Through
-            | ImageWrapMode::Inline
-            | ImageWrapMode::Square
-            | ImageWrapMode::Tight => {}
-          }
+          x += width;
+          line_height = line_height.max(height);
           emitted = true;
-          continue;
         }
-        if x + width > line_right && x > line_left {
-          y = next_line(
-            setup,
-            current,
-            pages,
-            y,
-            &mut line_height,
-            flow.content_bottom,
-          );
-          (line_left, line_right) = line_bounds_for_y(
-            default_line_left,
-            default_line_right,
-            y,
-            line_height,
-            &wrap_exclusions,
-          );
+        InlineItem::PageBreak => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          text_state.finish_line(y, line_height);
+          (y, line_left, line_right, line_height) =
+            self.force_text_page_break(current, pages, &mut wrap_exclusions);
           x = line_left;
-        }
-        current.items.push(PageItem::Image(ImageItem {
-          x_pt: x,
-          y_pt: y,
-          width_pt: width,
-          height_pt: height,
-          data: image.data.clone(),
-          content_type: image.content_type.clone(),
-          alt_text: image.alt_text.clone(),
-        }));
-        x += width;
-        line_height = line_height.max(height);
-        emitted = true;
-      }
-      InlineItem::PageBreak => {
-        y = force_page_break(setup, current, pages);
-        wrap_exclusions.clear();
-        line_left = first_line_left;
-        line_right = default_line_right;
-        x = line_left;
-        line_height = base_line_height;
-        emitted = false;
-        pending_tab = None;
-      }
-      InlineItem::ColumnBreak => {
-        if flow.columns.count <= 1 || flow.column_index + 1 >= flow.columns.count {
-          y = force_page_break(setup, current, pages);
-          wrap_exclusions.clear();
-          line_left = first_line_left;
-          line_right = default_line_right;
-          x = line_left;
-          line_height = base_line_height;
           emitted = false;
-        } else {
-          y = flow.content_bottom;
-          line_left = default_line_left;
-          line_right = default_line_right;
-          x = line_left;
-          emitted = true;
+          pending_tab = None;
         }
-        pending_tab = None;
+        InlineItem::ColumnBreak => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          text_state.finish_line(y, line_height);
+          let column_emitted;
+          (
+            flow,
+            text_frame,
+            y,
+            line_left,
+            line_right,
+            line_height,
+            column_emitted,
+          ) = self.apply_column_break(flow, current, pages, &mut wrap_exclusions);
+          default_line_right = text_frame.default_line_right;
+          paragraph_left = text_frame.paragraph_left;
+          base_line_height = text_frame.base_line_height;
+          x = line_left;
+          emitted = column_emitted;
+          pending_tab = None;
+        }
       }
     }
-  }
 
-  let paragraph_bottom;
-  if emitted {
-    paragraph_bottom = y + line_height;
-    y = paragraph_bottom
-      + paragraph
-        .format
-        .spacing_after_pt
-        .max(PARAGRAPH_SPACING_AFTER_PT);
-  } else {
-    paragraph_bottom = y + base_line_height;
-    y = paragraph_bottom + paragraph.format.spacing_after_pt;
-  }
-
-  if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
-    align_paragraph_items(
-      &mut current.items[start_item_index..],
-      paragraph.format.alignment,
-      default_line_right,
+    let paragraph_bottom;
+    if emitted {
+      text_state.finish_paragraph(y, line_height, emitted);
+      paragraph_bottom = y + line_height;
+      y = paragraph_bottom
+        + paragraph
+          .format
+          .spacing_after_pt
+          .max(PARAGRAPH_SPACING_AFTER_PT);
+    } else {
+      paragraph_bottom = y + base_line_height;
+      y = paragraph_bottom + paragraph.format.spacing_after_pt;
+    }
+    debug_assert!(text_state.split_candidates_are_ordered());
+    let split_decision = text_state.page_split_decision(
+      paragraph.format.keep_lines,
+      DEFAULT_ORPHAN_LINES,
+      DEFAULT_WIDOW_LINES,
     );
-  }
-  if start_item_index <= current.items.len() {
-    decorate_paragraph(
-      current,
-      start_item_index,
-      paragraph,
-      paragraph_left,
-      paragraph_top,
-      default_line_right - paragraph_left,
-      paragraph_bottom - paragraph_top,
+    debug_assert!(
+      !matches!(split_decision, TextSplitDecision::Rejected) || !text_state.page_follows.is_empty()
     );
-  }
 
-  y
+    if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
+      align_paragraph_items(
+        &mut current.items[start_item_index..],
+        paragraph.format.alignment,
+        default_line_right,
+      );
+    }
+    if start_item_index <= current.items.len() {
+      decorate_paragraph(
+        current,
+        start_item_index,
+        paragraph,
+        paragraph_left,
+        paragraph_top,
+        default_line_right - paragraph_left,
+        paragraph_bottom - paragraph_top,
+      );
+    }
+
+    (flow, y)
+  }
 }
 
 fn text_segments(text: &str) -> Vec<String> {
@@ -1905,6 +2503,22 @@ fn text_segments(text: &str) -> Vec<String> {
 
   push_line_segments(&text[start..], &mut segments);
   segments
+}
+
+fn text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
+  let mut offset = 0;
+  text_segments(text)
+    .into_iter()
+    .map(|text| {
+      let start = offset;
+      offset += text.len();
+      TextSegment {
+        text,
+        start,
+        end: offset,
+      }
+    })
+    .collect()
 }
 
 fn emergency_break_segments(text: &str) -> Vec<String> {
@@ -2272,5 +2886,49 @@ mod tests {
     assert!(needs_section_parity_blank(SectionBreakKind::OddPage, 2));
     assert!(!needs_section_parity_blank(SectionBreakKind::OddPage, 3));
     assert!(!needs_section_parity_blank(SectionBreakKind::NextPage, 3));
+  }
+
+  #[test]
+  fn text_frame_split_policy_matches_orphan_and_widow_minimums() {
+    let mut state = TextFrameState::new();
+    for index in 0..4 {
+      state.set_position(InlineCursor {
+        inline_index: 0,
+        text_offset: index + 1,
+      });
+      state.finish_line(10.0 + index as f32 * 14.0, 14.0);
+      if index == 1 {
+        state.note_page_follow(1, 10.0);
+      }
+    }
+
+    assert_eq!(
+      state.page_split_decision(false, DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES),
+      TextSplitDecision::Allowed
+    );
+    assert_eq!(
+      state.page_split_decision(true, DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES),
+      TextSplitDecision::Rejected
+    );
+  }
+
+  #[test]
+  fn text_frame_split_policy_rejects_widow_line() {
+    let mut state = TextFrameState::new();
+    for index in 0..3 {
+      state.set_position(InlineCursor {
+        inline_index: 0,
+        text_offset: index + 1,
+      });
+      state.finish_line(10.0 + index as f32 * 14.0, 14.0);
+      if index == 1 {
+        state.note_page_follow(1, 10.0);
+      }
+    }
+
+    assert_eq!(
+      state.page_split_decision(false, DEFAULT_ORPHAN_LINES, DEFAULT_WIDOW_LINES),
+      TextSplitDecision::Rejected
+    );
   }
 }

@@ -145,6 +145,7 @@ mod tests {
         margin_bottom_pt: 10.0,
         header_distance_pt: 0.0,
         footer_distance_pt: 0.0,
+        ..Default::default()
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
@@ -195,6 +196,62 @@ mod tests {
   }
 
   #[test]
+  fn long_paragraph_continues_after_page_split() {
+    let text = (1..=8)
+      .map(|index| format!("Line {index:02}"))
+      .collect::<Vec<_>>()
+      .join("\n");
+    let run = crate::docx::TextRun {
+      text,
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 160.0,
+        height_pt: 60.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+
+    assert!(layout.pages.len() > 1);
+    assert!(page_has_text(&layout.pages[0], "Line 01"));
+    assert!(
+      layout.pages[1..]
+        .iter()
+        .any(|page| page_has_text(page, "Line 06"))
+    );
+  }
+
+  #[test]
   fn paragraph_tabs_advance_to_default_tab_stops() {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup {
@@ -206,6 +263,7 @@ mod tests {
         margin_bottom_pt: 10.0,
         header_distance_pt: 0.0,
         footer_distance_pt: 0.0,
+        ..Default::default()
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
@@ -277,6 +335,7 @@ mod tests {
         margin_bottom_pt: 10.0,
         header_distance_pt: 0.0,
         footer_distance_pt: 0.0,
+        ..Default::default()
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
@@ -837,6 +896,88 @@ mod tests {
   }
 
   #[test]
+  fn inline_column_break_continues_same_paragraph_in_next_column() {
+    let page = crate::docx::PageSetup {
+      width_pt: 300.0,
+      height_pt: 400.0,
+      margin_left_pt: 20.0,
+      margin_right_pt: 20.0,
+      margin_top_pt: 20.0,
+      margin_bottom_pt: 20.0,
+      ..Default::default()
+    };
+    let mut columns = crate::docx::SectionColumns {
+      count: 2,
+      gap_pt: 20.0,
+      ..Default::default()
+    };
+    columns.explicit_count = 0;
+    let before = crate::docx::TextRun {
+      text: "Inline before".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let after = crate::docx::TextRun {
+      text: "Inline after".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let paragraph = crate::docx::Paragraph {
+      inlines: vec![
+        crate::docx::InlineItem::Text(before.clone()),
+        crate::docx::InlineItem::ColumnBreak,
+        crate::docx::InlineItem::Text(after.clone()),
+      ],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      runs: vec![before, after],
+      format: crate::docx::ParagraphFormat::default(),
+      list_label: None,
+    };
+    let block = crate::docx::Block::Paragraph(paragraph);
+    let doc = crate::docx::DocxDocument {
+      page,
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: vec![crate::docx::ImportedSection {
+        break_kind: crate::docx::SectionBreakKind::Continuous,
+        section_properties: None,
+        page,
+        columns,
+        title_page: false,
+        header_blocks: Vec::new(),
+        footer_blocks: Vec::new(),
+        first_header_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(),
+        even_header_blocks: Vec::new(),
+        even_footer_blocks: Vec::new(),
+        blocks: vec![block.clone()],
+      }],
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![block],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let before = text_item(&layout, "Inline before");
+    let after = text_item(&layout, "Inline after");
+
+    assert_eq!(layout.pages.len(), 1);
+    assert!(after.x_pt > before.x_pt + 100.0);
+    assert!(after.y_pt <= page.margin_top_pt + 1.0);
+  }
+
+  #[test]
   fn explicit_section_column_widths_are_imported_and_used() {
     let path = fixture_path("test-data/wml/section_columns_explicit.docx");
     let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
@@ -863,6 +1004,47 @@ mod tests {
         .iter()
         .any(|item| matches!(item, crate::layout::PageItem::Line(_)))
     );
+
+    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn page_background_and_borders_are_extracted_and_rendered() {
+    let path = fixture_path("test-data/wml/page_background_borders.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+
+    assert_eq!(
+      doc.page.background,
+      Some(crate::docx::RgbColor {
+        r: 0xEA,
+        g: 0xF4,
+        b: 0xFF,
+      })
+    );
+    assert_eq!(doc.page.borders.top.unwrap().width_pt, 2.0);
+    assert_eq!(doc.page.borders.top.unwrap().spacing_pt, 18.0);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(layout.pages[0].items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Fill(fill)
+          if fill.x_pt == 0.0
+            && fill.y_pt == 0.0
+            && fill.color.r == 0xEA
+            && fill.color.g == 0xF4
+            && fill.color.b == 0xFF
+      )
+    }));
+    assert!(layout.pages[0].items.iter().any(|item| {
+      matches!(
+        item,
+        crate::layout::PageItem::Line(line)
+          if line.color.r == 0x1F && line.color.g == 0x4E && line.color.b == 0x79
+      )
+    }));
 
     let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));

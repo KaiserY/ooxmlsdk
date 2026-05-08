@@ -289,8 +289,24 @@ pub(crate) struct InlineImage {
   pub content_type: Option<String>,
   pub width_pt: f32,
   pub height_pt: f32,
+  pub effect_left_pt: f32,
+  pub effect_top_pt: f32,
+  pub effect_right_pt: f32,
+  pub effect_bottom_pt: f32,
+  pub crop: ImageCrop,
+  pub rotation_deg: f32,
+  pub flip_horizontal: bool,
+  pub flip_vertical: bool,
   pub alt_text: Option<String>,
   pub placement: ImagePlacement,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct ImageCrop {
+  pub left: f32,
+  pub top: f32,
+  pub right: f32,
+  pub bottom: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -309,11 +325,21 @@ pub(crate) struct FloatingImagePlacement {
   pub horizontal_offset_pt: f32,
   pub vertical_offset_pt: f32,
   pub wrap: ImageWrapMode,
+  pub wrap_side: ImageWrapSide,
   pub behind_text: bool,
   pub margin_top_pt: f32,
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum ImageWrapSide {
+  #[default]
+  BothSides,
+  Left,
+  Right,
+  Largest,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2569,13 +2595,22 @@ fn wingdings_symbol(code: u32) -> Option<char> {
 fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => {
-      let relationship_id = embedded_image_relationship_id(&inline.graphic.graphic_data)?;
+      let properties = drawing_image_properties(&inline.graphic.graphic_data)?;
+      let relationship_id = properties.relationship_id?;
       let resource = images.by_relationship_id.get(&relationship_id)?;
       Some(InlineImage {
         data: resource.data.clone(),
         content_type: resource.content_type.clone(),
         width_pt: units::emu_to_points(inline.extent.cx),
         height_pt: units::emu_to_points(inline.extent.cy),
+        effect_left_pt: effect_extent_left(inline.effect_extent.as_ref()),
+        effect_top_pt: effect_extent_top(inline.effect_extent.as_ref()),
+        effect_right_pt: effect_extent_right(inline.effect_extent.as_ref()),
+        effect_bottom_pt: effect_extent_bottom(inline.effect_extent.as_ref()),
+        crop: properties.crop,
+        rotation_deg: properties.rotation_deg,
+        flip_horizontal: properties.flip_horizontal,
+        flip_vertical: properties.flip_vertical,
         alt_text: inline.doc_properties.description.clone(),
         placement: ImagePlacement::Inline,
       })
@@ -2583,13 +2618,22 @@ fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineIma
     w::DrawingChoice::WpAnchor(anchor) => {
       let graphic = anchor.a_graphic.as_ref()?;
       let extent = anchor.extent.as_ref()?;
-      let relationship_id = embedded_image_relationship_id(&graphic.graphic_data)?;
+      let properties = drawing_image_properties(&graphic.graphic_data)?;
+      let relationship_id = properties.relationship_id?;
       let resource = images.by_relationship_id.get(&relationship_id)?;
       Some(InlineImage {
         data: resource.data.clone(),
         content_type: resource.content_type.clone(),
         width_pt: units::emu_to_points(extent.cx),
         height_pt: units::emu_to_points(extent.cy),
+        effect_left_pt: effect_extent_left(anchor.effect_extent.as_ref()),
+        effect_top_pt: effect_extent_top(anchor.effect_extent.as_ref()),
+        effect_right_pt: effect_extent_right(anchor.effect_extent.as_ref()),
+        effect_bottom_pt: effect_extent_bottom(anchor.effect_extent.as_ref()),
+        crop: properties.crop,
+        rotation_deg: properties.rotation_deg,
+        flip_horizontal: properties.flip_horizontal,
+        flip_vertical: properties.flip_vertical,
         alt_text: anchor
           .wp_doc_pr
           .as_ref()
@@ -2600,7 +2644,32 @@ fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineIma
   }
 }
 
+fn effect_extent_left(extent: Option<&wp::EffectExtent>) -> f32 {
+  extent
+    .map(|extent| units::emu_to_points(extent.left_edge))
+    .unwrap_or(0.0)
+}
+
+fn effect_extent_top(extent: Option<&wp::EffectExtent>) -> f32 {
+  extent
+    .map(|extent| units::emu_to_points(extent.top_edge))
+    .unwrap_or(0.0)
+}
+
+fn effect_extent_right(extent: Option<&wp::EffectExtent>) -> f32 {
+  extent
+    .map(|extent| units::emu_to_points(extent.right_edge))
+    .unwrap_or(0.0)
+}
+
+fn effect_extent_bottom(extent: Option<&wp::EffectExtent>) -> f32 {
+  extent
+    .map(|extent| units::emu_to_points(extent.bottom_edge))
+    .unwrap_or(0.0)
+}
+
 fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
+  let margins = floating_wrap_margins(anchor);
   FloatingImagePlacement {
     horizontal_relative_to: anchor
       .horizontal_position
@@ -2635,24 +2704,66 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .as_ref()
       .map(image_wrap_mode)
       .unwrap_or(ImageWrapMode::None),
+    wrap_side: anchor
+      .anchor_choice
+      .as_ref()
+      .map(image_wrap_side)
+      .unwrap_or_default(),
     behind_text: anchor.behind_doc,
-    margin_top_pt: anchor
-      .distance_from_top
-      .map(|value| units::emu_to_points(value as i64))
-      .unwrap_or(0.0),
-    margin_right_pt: anchor
-      .distance_from_right
-      .map(|value| units::emu_to_points(value as i64))
-      .unwrap_or(0.0),
-    margin_bottom_pt: anchor
-      .distance_from_bottom
-      .map(|value| units::emu_to_points(value as i64))
-      .unwrap_or(0.0),
-    margin_left_pt: anchor
-      .distance_from_left
-      .map(|value| units::emu_to_points(value as i64))
-      .unwrap_or(0.0),
+    margin_top_pt: margins.top_pt,
+    margin_right_pt: margins.right_pt,
+    margin_bottom_pt: margins.bottom_pt,
+    margin_left_pt: margins.left_pt,
   }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ImageWrapMargins {
+  top_pt: f32,
+  right_pt: f32,
+  bottom_pt: f32,
+  left_pt: f32,
+}
+
+fn floating_wrap_margins(anchor: &wp::Anchor) -> ImageWrapMargins {
+  let mut margins = ImageWrapMargins {
+    top_pt: optional_emu_to_points(anchor.distance_from_top),
+    right_pt: optional_emu_to_points(anchor.distance_from_right),
+    bottom_pt: optional_emu_to_points(anchor.distance_from_bottom),
+    left_pt: optional_emu_to_points(anchor.distance_from_left),
+  };
+
+  match anchor.anchor_choice.as_ref() {
+    Some(wp::AnchorChoice::WpWrapSquare(square)) => {
+      margins.top_pt = optional_emu_to_points(square.distance_from_top).max(margins.top_pt);
+      margins.right_pt = optional_emu_to_points(square.distance_from_right).max(margins.right_pt);
+      margins.bottom_pt =
+        optional_emu_to_points(square.distance_from_bottom).max(margins.bottom_pt);
+      margins.left_pt = optional_emu_to_points(square.distance_from_left).max(margins.left_pt);
+    }
+    Some(wp::AnchorChoice::WpWrapTight(tight)) => {
+      margins.right_pt = optional_emu_to_points(tight.distance_from_right).max(margins.right_pt);
+      margins.left_pt = optional_emu_to_points(tight.distance_from_left).max(margins.left_pt);
+    }
+    Some(wp::AnchorChoice::WpWrapThrough(through)) => {
+      margins.right_pt = optional_emu_to_points(through.distance_from_right).max(margins.right_pt);
+      margins.left_pt = optional_emu_to_points(through.distance_from_left).max(margins.left_pt);
+    }
+    Some(wp::AnchorChoice::WpWrapTopAndBottom(top_bottom)) => {
+      margins.top_pt = optional_emu_to_points(top_bottom.distance_from_top).max(margins.top_pt);
+      margins.bottom_pt =
+        optional_emu_to_points(top_bottom.distance_from_bottom).max(margins.bottom_pt);
+    }
+    Some(wp::AnchorChoice::WpWrapNone) | None => {}
+  }
+
+  margins
+}
+
+fn optional_emu_to_points(value: Option<u32>) -> f32 {
+  value
+    .map(|value| units::emu_to_points(value as i64))
+    .unwrap_or(0.0)
 }
 
 fn horizontal_image_reference(position: &wp::HorizontalPosition) -> HorizontalImageReference {
@@ -2739,6 +2850,26 @@ fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
     wp::AnchorChoice::WpWrapTight(_) => ImageWrapMode::Tight,
     wp::AnchorChoice::WpWrapThrough(_) => ImageWrapMode::Through,
     wp::AnchorChoice::WpWrapTopAndBottom(_) => ImageWrapMode::TopBottom,
+  }
+}
+
+fn image_wrap_side(choice: &wp::AnchorChoice) -> ImageWrapSide {
+  match choice {
+    wp::AnchorChoice::WpWrapSquare(square) => wrap_text_side(square.wrap_text),
+    wp::AnchorChoice::WpWrapTight(tight) => wrap_text_side(tight.wrap_text),
+    wp::AnchorChoice::WpWrapThrough(through) => wrap_text_side(through.wrap_text),
+    wp::AnchorChoice::WpWrapNone | wp::AnchorChoice::WpWrapTopAndBottom(_) => {
+      ImageWrapSide::BothSides
+    }
+  }
+}
+
+fn wrap_text_side(value: wp::WrapTextValues) -> ImageWrapSide {
+  match value {
+    wp::WrapTextValues::BothSides => ImageWrapSide::BothSides,
+    wp::WrapTextValues::Left => ImageWrapSide::Left,
+    wp::WrapTextValues::Right => ImageWrapSide::Right,
+    wp::WrapTextValues::Largest => ImageWrapSide::Largest,
   }
 }
 
@@ -3026,6 +3157,14 @@ fn vml_image_data(
     content_type: resource.content_type.clone(),
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    crop: ImageCrop::default(),
+    rotation_deg: 0.0,
+    flip_horizontal: false,
+    flip_vertical: false,
     alt_text: alt_text.or_else(|| data.title.clone()),
     placement: ImagePlacement::Inline,
   })
@@ -3076,34 +3215,107 @@ fn vml_measure_to_points(value: &str) -> Option<f32> {
     .map(|points| points * multiplier)
 }
 
-fn embedded_image_relationship_id(
+#[derive(Clone, Debug, Default)]
+struct DrawingImageProperties {
+  relationship_id: Option<String>,
+  crop: ImageCrop,
+  rotation_deg: f32,
+  flip_horizontal: bool,
+  flip_vertical: bool,
+}
+
+fn drawing_image_properties(
   graphic_data: &ooxmlsdk::schemas::a::GraphicData,
-) -> Option<String> {
+) -> Option<DrawingImageProperties> {
   graphic_data
     .xml_children
     .iter()
-    .find_map(|child| blip_embed_relationship_id(child))
+    .find_map(|child| drawing_image_properties_from_xml(child))
 }
 
-fn blip_embed_relationship_id(xml: &str) -> Option<String> {
+fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(true);
+  let mut properties = DrawingImageProperties::default();
   loop {
     match reader.read_event().ok()? {
       Event::Empty(event) | Event::Start(event) if event.name().as_ref().ends_with(b":blip") => {
         for attr in event.attributes().with_checks(false).flatten() {
           if attr.key.as_ref().ends_with(b":embed") || attr.key.as_ref() == b"embed" {
-            return attr
+            properties.relationship_id = attr
               .decode_and_unescape_value(reader.decoder())
               .ok()
               .map(|value| value.into_owned());
           }
         }
       }
-      Event::Eof => return None,
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"srcRect") =>
+      {
+        properties.crop = image_crop_from_src_rect(&event, reader.decoder());
+      }
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"xfrm") =>
+      {
+        apply_image_transform_attrs(&mut properties, &event, reader.decoder());
+      }
+      Event::Eof => return properties.relationship_id.is_some().then_some(properties),
       _ => {}
     }
   }
+}
+
+fn image_crop_from_src_rect(
+  event: &quick_xml::events::BytesStart<'_>,
+  decoder: quick_xml::Decoder,
+) -> ImageCrop {
+  let mut crop = ImageCrop::default();
+  for attr in event.attributes().with_checks(false).flatten() {
+    let value = attr
+      .decode_and_unescape_value(decoder)
+      .ok()
+      .and_then(|value| value.parse::<i32>().ok())
+      .map(relative_rect_attr_to_fraction)
+      .unwrap_or(0.0);
+    match attr.key.as_ref() {
+      b"l" => crop.left = value,
+      b"t" => crop.top = value,
+      b"r" => crop.right = value,
+      b"b" => crop.bottom = value,
+      _ => {}
+    }
+  }
+  crop
+}
+
+fn apply_image_transform_attrs(
+  properties: &mut DrawingImageProperties,
+  event: &quick_xml::events::BytesStart<'_>,
+  decoder: quick_xml::Decoder,
+) {
+  for attr in event.attributes().with_checks(false).flatten() {
+    let value = attr.decode_and_unescape_value(decoder).ok();
+    match attr.key.as_ref() {
+      b"rot" => {
+        properties.rotation_deg = value
+          .as_deref()
+          .and_then(|value| value.parse::<i32>().ok())
+          .map(|value| value as f32 / 60000.0)
+          .unwrap_or(0.0);
+      }
+      b"flipH" => properties.flip_horizontal = value.as_deref().is_some_and(xml_bool),
+      b"flipV" => properties.flip_vertical = value.as_deref().is_some_and(xml_bool),
+      _ => {}
+    }
+  }
+}
+
+fn relative_rect_attr_to_fraction(value: i32) -> f32 {
+  (value as f32 / 100000.0).clamp(0.0, 0.999)
+}
+
+fn xml_bool(value: &str) -> bool {
+  matches!(value, "1" | "true" | "t" | "on")
 }
 
 fn drawing_textbox_text(xml: &str) -> Option<String> {
@@ -4168,6 +4380,22 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn drawing_image_properties_preserve_crop_and_transform() {
+    let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
+
+    let properties = drawing_image_properties_from_xml(xml).expect("image properties");
+
+    assert_eq!(properties.relationship_id.as_deref(), Some("rId7"));
+    assert!((properties.crop.left - 0.1).abs() < 0.001);
+    assert!((properties.crop.top - 0.2).abs() < 0.001);
+    assert!((properties.crop.right - 0.3).abs() < 0.001);
+    assert!((properties.crop.bottom - 0.4).abs() < 0.001);
+    assert!((properties.rotation_deg - 90.0).abs() < 0.001);
+    assert!(properties.flip_horizontal);
+    assert!(properties.flip_vertical);
+  }
 
   #[test]
   fn symbol_runs_emit_unicode_text() {

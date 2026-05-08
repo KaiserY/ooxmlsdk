@@ -43,6 +43,7 @@ thiserror = "2.0.18"
 criterion = "0.8.2"
 crc32fast = "1.5.0"
 pprof = { version = "0.15", features = ["criterion", "flamegraph"] }
+png = "0.18.1"
 walkdir = "2.5.0"
 toml = "1.1"
 fontdb = "0.23"

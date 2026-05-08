@@ -5,10 +5,10 @@ use icu_segmenter::LineSegmenter;
 
 use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingImagePlacement,
-  HorizontalImageAlignment, HorizontalImageReference, ImageWrapMode, InlineItem, LineHeightRule,
-  PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabStop,
-  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
-  TextStyle, VerticalImageAlignment, VerticalImageReference,
+  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
+  InlineItem, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
+  SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
+  TableCellVerticalAlignment, TableRow, TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -45,6 +45,7 @@ pub(crate) struct LayoutDocument {
 pub(crate) struct Page {
   pub setup: PageSetup,
   pub section_index: usize,
+  pub section_page_index: usize,
   pub items: Vec<PageItem>,
 }
 
@@ -72,6 +73,10 @@ pub(crate) struct ImageItem {
   pub y_pt: f32,
   pub width_pt: f32,
   pub height_pt: f32,
+  pub crop: ImageCrop,
+  pub rotation_deg: f32,
+  pub flip_horizontal: bool,
+  pub flip_vertical: bool,
   pub data: Vec<u8>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
@@ -138,6 +143,7 @@ struct WrapExclusion {
   right_pt: f32,
   top_pt: f32,
   bottom_pt: f32,
+  side: ImageWrapSide,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -240,19 +246,23 @@ impl<'a> RootFrameLayout<'a> {
   fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
     if section_index > 0 && starts_new_page(section.break_kind) && !self.current.items.is_empty() {
       self.push_current_page(empty_page(section.page, section_index));
+      let mut section_page_index = 0;
       if needs_section_parity_blank(section.break_kind, self.pages.len() + 1) {
         self.pages.push(empty_page(section.page, section_index));
+        section_page_index = 1;
+        self.current.section_page_index = section_page_index;
       }
       self.y = body_content_limits_for_page(
         section.page,
         repeating_slot_state(self.document, section_index),
         self.pages.len() + 1,
-        0,
+        section_page_index,
       )
       .0;
     } else if self.current.items.is_empty() {
       self.current.setup = section.page;
       self.current.section_index = section_index;
+      self.current.section_page_index = 0;
       self.y = body_content_limits_for_page(
         section.page,
         repeating_slot_state(self.document, section_index),
@@ -428,9 +438,14 @@ fn document_page_frame(
 }
 
 fn empty_page(setup: PageSetup, section_index: usize) -> Page {
+  empty_section_page(setup, section_index, 0)
+}
+
+fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index: usize) -> Page {
   Page {
     setup,
     section_index,
+    section_page_index,
     items: Vec::new(),
   }
 }
@@ -554,7 +569,7 @@ fn advance_section_flow(
   } else {
     pages.push(std::mem::replace(
       current,
-      empty_page(flow.setup, flow.section_index),
+      empty_section_page(flow.setup, flow.section_index, flow.section_page_index + 1),
     ));
     let next_flow = body_flow_for_page(
       flow_with_column(
@@ -649,7 +664,11 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         }
       }
       InlineItem::Image(image) => {
-        let (width, height) = fit_image_to_line(image.width_pt, image.height_pt, content_width);
+        let (width, height) = fit_image_to_line(
+          image_frame_width(image),
+          image_frame_height(image),
+          content_width,
+        );
         if x + width > content_width && x > 0.0 {
           line_count += 1;
         }
@@ -736,7 +755,7 @@ fn layout_document_block(
       if paragraph.format.page_break_before && !current.items.is_empty() {
         pages.push(std::mem::replace(
           current,
-          empty_page(flow.setup, flow.section_index),
+          empty_section_page(flow.setup, flow.section_index, flow.section_page_index + 1),
         ));
         flow = body_flow_for_page(
           flow_with_column(
@@ -1009,10 +1028,8 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
     return;
   }
 
-  let mut previous_section_index = None;
   for (index, page) in pages.iter_mut().enumerate() {
-    let first_page_in_section = previous_section_index != Some(page.section_index);
-    previous_section_index = Some(page.section_index);
+    let first_page_in_section = page.section_page_index == 0;
     let section = document.sections.get(page.section_index);
     let title_page = section
       .map(|section| section.title_page)
@@ -1060,7 +1077,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
     let content_width =
       (page.setup.width_pt - page.setup.margin_left_pt - page.setup.margin_right_pt)
         .max(DEFAULT_FONT_SIZE_PT);
-    let mut adornment = empty_page(page.setup, page.section_index);
+    let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
     let mut discarded_pages = Vec::new();
     let header_area = header_area(page.setup);
     let mut y = header_area.top_pt;
@@ -1073,7 +1090,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         FlowContext {
           setup: page.setup,
           section_index: page.section_index,
-          section_page_index: 0,
+          section_page_index: page.section_page_index,
           column_index: 0,
           columns: SectionColumns::default(),
           content_top_pt: header_area.top_pt,
@@ -1098,7 +1115,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         FlowContext {
           setup: page.setup,
           section_index: page.section_index,
-          section_page_index: 0,
+          section_page_index: page.section_page_index,
           column_index: 0,
           columns: SectionColumns::default(),
           content_top_pt: footer_area.top_pt,
@@ -1664,6 +1681,7 @@ impl RowFrame<'_, '_> {
     let mut cell_left = self.table_frame.left_pt;
     let mut grid_index = 0;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
+      let grid_start = grid_index;
       let cell_frame = match self.cell_frame(
         cell,
         cell_index,
@@ -1674,7 +1692,10 @@ impl RowFrame<'_, '_> {
         Some(cell_frame) => cell_frame,
         None => break,
       };
-      if !cell.vertical_merge_continue {
+      if cell.vertical_merge_continue {
+        let origin = self.vertical_merge_origin_cell(grid_start);
+        cell_frame.format_merged_continue(current, row_top, row_bottom, origin);
+      } else {
         cell_frame.format(current, row_top, row_bottom, content_offset);
       }
       cell_left += cell_frame.width_pt;
@@ -1719,26 +1740,56 @@ impl RowFrame<'_, '_> {
     })
   }
 
+  fn vertical_merge_origin_cell(&self, grid_start: usize) -> Option<&TableCell> {
+    self
+      .table
+      .rows
+      .iter()
+      .take(self.row_index)
+      .rev()
+      .find_map(|row| row_cell_at_grid(row, grid_start))
+      .filter(|cell| !cell.vertical_merge_continue)
+  }
+
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
-    if let Some(border) = horizontal_border(self.table, self.row_index, true) {
-      push_styled_line(
-        current,
-        self.table_frame.left_pt,
-        row_top,
-        self.table_frame.right_pt,
-        row_top,
-        border,
+    let mut left_pt = self.table_frame.left_pt;
+    let mut grid_index = 0;
+    for cell in &self.row.cells {
+      if grid_index >= self.table_frame.column_widths.len() {
+        break;
+      }
+      let span = cell.grid_span.max(1).min(
+        self
+          .table_frame
+          .column_widths
+          .len()
+          .saturating_sub(grid_index),
       );
-    }
-    if let Some(border) = horizontal_border(self.table, self.row_index, false) {
-      push_styled_line(
-        current,
-        self.table_frame.left_pt,
-        row_bottom,
-        self.table_frame.right_pt,
-        row_bottom,
-        border,
-      );
+      let width_pt = self.table_frame.column_widths[grid_index..grid_index + span]
+        .iter()
+        .sum::<f32>();
+      let right_pt = left_pt + width_pt;
+
+      if !cell.vertical_merge_continue
+        && let Some(border) = cell_horizontal_border(self.table, self.row_index, cell, true)
+      {
+        push_styled_line(current, left_pt, row_top, right_pt, row_top, border);
+      }
+
+      let continues_into_next = self
+        .table
+        .rows
+        .get(self.row_index + 1)
+        .and_then(|row| row_cell_at_grid(row, grid_index))
+        .is_some_and(|next_cell| next_cell.vertical_merge_continue);
+      if !continues_into_next
+        && let Some(border) = cell_horizontal_border(self.table, self.row_index, cell, false)
+      {
+        push_styled_line(current, left_pt, row_bottom, right_pt, row_bottom, border);
+      }
+
+      left_pt = right_pt;
+      grid_index += span;
     }
   }
 
@@ -1790,8 +1841,24 @@ impl CellFrame<'_, '_> {
     });
   }
 
+  fn format_merged_continue(
+    &self,
+    current: &mut Page,
+    row_top: f32,
+    row_bottom: f32,
+    origin: Option<&TableCell>,
+  ) {
+    let paint_cell = origin.unwrap_or(self.cell);
+    self.paint_cell_background(current, row_top, paint_cell);
+    self.paint_leading_border_for_cell(current, row_top, row_bottom, paint_cell);
+  }
+
   fn paint_background(&self, current: &mut Page, row_top: f32) {
-    if let Some(color) = self.cell.shading {
+    self.paint_cell_background(current, row_top, self.cell);
+  }
+
+  fn paint_cell_background(&self, current: &mut Page, row_top: f32, cell: &TableCell) {
+    if let Some(color) = cell.shading {
       current.items.push(PageItem::Fill(FillItem {
         x_pt: self.left_pt,
         y_pt: row_top,
@@ -1803,7 +1870,26 @@ impl CellFrame<'_, '_> {
   }
 
   fn paint_leading_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    self.paint_leading_border_for_cell(current, row_top, row_bottom, self.cell);
+  }
+
+  fn paint_leading_border_for_cell(
+    &self,
+    current: &mut Page,
+    row_top: f32,
+    row_bottom: f32,
+    cell: &TableCell,
+  ) {
     if let Some(border) = vertical_border(self.table, self.row, self.cell_index, true) {
+      push_styled_line(
+        current,
+        self.left_pt,
+        row_top,
+        self.left_pt,
+        row_bottom,
+        border,
+      );
+    } else if let Some(border) = cell.borders.left {
       push_styled_line(
         current,
         self.left_pt,
@@ -1814,6 +1900,18 @@ impl CellFrame<'_, '_> {
       );
     }
   }
+}
+
+fn row_cell_at_grid(row: &TableRow, grid_index: usize) -> Option<&TableCell> {
+  let mut current_grid = 0;
+  for cell in &row.cells {
+    let span = cell.grid_span.max(1);
+    if grid_index >= current_grid && grid_index < current_grid + span {
+      return Some(cell);
+    }
+    current_grid += span;
+  }
+  None
 }
 
 fn table_column_count(table: &Table) -> usize {
@@ -1838,14 +1936,17 @@ fn table_repeating_header_count(table: &Table) -> usize {
   }
 }
 
-fn horizontal_border(table: &Table, row_index: usize, top_edge: bool) -> Option<BorderStyle> {
+fn cell_horizontal_border(
+  table: &Table,
+  row_index: usize,
+  cell: &TableCell,
+  top_edge: bool,
+) -> Option<BorderStyle> {
   let borders = table.borders;
-  let row = table.rows.get(row_index)?;
   if top_edge {
-    row
-      .cells
-      .first()
-      .and_then(|cell| cell.borders.top)
+    cell
+      .borders
+      .top
       .or_else(|| {
         borders.and_then(|borders| {
           if row_index == 0 {
@@ -1857,10 +1958,9 @@ fn horizontal_border(table: &Table, row_index: usize, top_edge: bool) -> Option<
       })
       .or(Some(BorderStyle::default()))
   } else {
-    row
-      .cells
-      .first()
-      .and_then(|cell| cell.borders.bottom)
+    cell
+      .borders
+      .bottom
       .or_else(|| {
         borders.and_then(|borders| {
           if row_index + 1 == table.rows.len() {
@@ -1953,32 +2053,65 @@ fn table_cell_preferred_column_widths(
   column_count: usize,
   content_width: f32,
 ) -> Option<Vec<f32>> {
+  let mut widths = vec![0.0; column_count];
+  let mut saw_preferred_width = false;
+
   for row in &table.rows {
-    let mut widths = vec![0.0; column_count];
     let mut grid_index = 0;
-    let mut complete = true;
     for cell in &row.cells {
-      let span = cell.grid_span.max(1);
-      if span != 1 || grid_index >= column_count {
-        complete = false;
+      if grid_index >= column_count {
         break;
       }
+      let span = cell
+        .grid_span
+        .max(1)
+        .min(column_count.saturating_sub(grid_index));
       let width = cell
         .preferred_width_pt
         .or_else(|| cell.preferred_width_pct.map(|pct| content_width * pct))
         .unwrap_or(0.0);
-      if width <= 0.0 {
-        complete = false;
-        break;
+      if width > 0.0 {
+        saw_preferred_width = true;
+        grow_spanned_columns_to_width(&mut widths[grid_index..grid_index + span], width);
       }
-      widths[grid_index] = width;
       grid_index += span;
     }
-    if complete && grid_index == column_count {
-      return Some(widths);
+  }
+
+  if saw_preferred_width {
+    fill_empty_table_columns(&mut widths, content_width);
+    Some(widths)
+  } else {
+    None
+  }
+}
+
+fn grow_spanned_columns_to_width(widths: &mut [f32], preferred_width: f32) {
+  if widths.is_empty() || preferred_width <= 0.0 {
+    return;
+  }
+  let current = widths.iter().sum::<f32>();
+  if current >= preferred_width {
+    return;
+  }
+  let extra = (preferred_width - current) / widths.len() as f32;
+  for width in widths {
+    *width += extra;
+  }
+}
+
+fn fill_empty_table_columns(widths: &mut [f32], content_width: f32) {
+  let empty_count = widths.iter().filter(|width| **width <= 0.0).count();
+  if empty_count == 0 {
+    return;
+  }
+  let used = widths.iter().sum::<f32>();
+  let fallback = ((content_width - used).max(0.0) / empty_count as f32).max(DEFAULT_FONT_SIZE_PT);
+  for width in widths {
+    if *width <= 0.0 {
+      *width = fallback;
     }
   }
-  None
 }
 
 fn scale_widths_to_total(widths: &mut [f32], target_total: f32) {
@@ -2922,8 +3055,11 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::Image(image) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
-          let (width, height) =
-            fit_image_to_line(image.width_pt, image.height_pt, flow.content_width);
+          let (width, height) = fit_image_to_line(
+            image_frame_width(image),
+            image_frame_height(image),
+            flow.content_width,
+          );
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
             let (image_x, image_y) = floating_image_position(placement, flow, x, y, width, height);
             current.items.push(PageItem::Image(ImageItem {
@@ -2931,6 +3067,10 @@ impl<'a> TextFrameLayout<'a> {
               y_pt: image_y,
               width_pt: width,
               height_pt: height,
+              crop: image.crop,
+              rotation_deg: image.rotation_deg,
+              flip_horizontal: image.flip_horizontal,
+              flip_vertical: image.flip_vertical,
               data: image.data.clone(),
               content_type: image.content_type.clone(),
               alt_text: image.alt_text.clone(),
@@ -2962,6 +3102,7 @@ impl<'a> TextFrameLayout<'a> {
                   right_pt: image_x + width + placement.margin_right_pt,
                   top_pt: image_y - placement.margin_top_pt,
                   bottom_pt: image_y + height + placement.margin_bottom_pt,
+                  side: placement.wrap_side,
                 });
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
@@ -3005,6 +3146,10 @@ impl<'a> TextFrameLayout<'a> {
             y_pt: y,
             width_pt: width,
             height_pt: height,
+            crop: image.crop,
+            rotation_deg: image.rotation_deg,
+            flip_horizontal: image.flip_horizontal,
+            flip_vertical: image.flip_vertical,
             data: image.data.clone(),
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
@@ -3237,17 +3382,27 @@ fn line_bounds_for_y(
 
     let exclude_left = exclusion.left_pt.max(default_left);
     let exclude_right = exclusion.right_pt.min(default_right);
-    if exclude_left <= default_left {
-      left = left.max(exclude_right);
-    } else if exclude_right >= default_right {
-      right = right.min(exclude_left);
-    } else {
-      let left_space = exclude_left - default_left;
-      let right_space = default_right - exclude_right;
-      if right_space >= left_space {
-        left = left.max(exclude_right);
-      } else {
+    match exclusion.side {
+      ImageWrapSide::Left => {
         right = right.min(exclude_left);
+      }
+      ImageWrapSide::Right => {
+        left = left.max(exclude_right);
+      }
+      ImageWrapSide::BothSides | ImageWrapSide::Largest => {
+        if exclude_left <= default_left {
+          left = left.max(exclude_right);
+        } else if exclude_right >= default_right {
+          right = right.min(exclude_left);
+        } else {
+          let left_space = exclude_left - default_left;
+          let right_space = default_right - exclude_right;
+          if right_space >= left_space {
+            left = left.max(exclude_right);
+          } else {
+            right = right.min(exclude_left);
+          }
+        }
       }
     }
   }
@@ -3509,18 +3664,35 @@ fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
   }
 }
 
+fn image_frame_width(image: &crate::docx::InlineImage) -> f32 {
+  (image.width_pt + image.effect_left_pt + image.effect_right_pt).max(1.0)
+}
+
+fn image_frame_height(image: &crate::docx::InlineImage) -> f32 {
+  (image.height_pt + image.effect_top_pt + image.effect_bottom_pt).max(1.0)
+}
+
 fn force_page_break(
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
 ) -> (FlowContext, f32) {
+  let mut next_flow = flow;
   if !current.items.is_empty() {
+    next_flow = FlowContext {
+      section_page_index: flow.section_page_index + 1,
+      ..flow
+    };
     pages.push(std::mem::replace(
       current,
-      empty_page(flow.setup, current.section_index),
+      empty_section_page(
+        flow.setup,
+        current.section_index,
+        next_flow.section_page_index,
+      ),
     ));
   }
-  let next_flow = flow_with_column(flow, 0);
+  next_flow = body_flow_for_page(flow_with_column(next_flow, 0), pages.len() + 1);
   (next_flow, next_flow.content_top_pt)
 }
 

@@ -13,7 +13,6 @@ categories.workspace = true
 readme.workspace = true
 
 [dependencies]
-crc32fast = { workspace = true }
 fontdb = { workspace = true }
 hypher = { workspace = true }
 icu_segmenter = { workspace = true }
@@ -21,6 +20,7 @@ image = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
 ooxmlsdk = { workspace = true, features = ["parts"] }
+png = { workspace = true }
 quick-xml = { workspace = true }
 rustybuzz = { workspace = true }
 thiserror = { workspace = true }

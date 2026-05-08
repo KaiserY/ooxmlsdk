@@ -794,7 +794,6 @@ dependencies = [
 name = "ooxmlsdk-pdf"
 version = "0.6.2"
 dependencies = [
- "crc32fast",
  "fontdb",
  "hypher",
  "icu_segmenter",
@@ -802,6 +801,7 @@ dependencies = [
  "krilla",
  "krilla-svg",
  "ooxmlsdk",
+ "png 0.18.1",
  "quick-xml",
  "rustybuzz",
  "thiserror",

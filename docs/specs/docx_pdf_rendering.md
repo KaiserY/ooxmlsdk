@@ -350,8 +350,11 @@ Current progress:
   matching LibreOffice's `CopyLastHeaderFooter` direction at the content level.
 - `w:evenAndOddHeaders` is read from settings before selecting even-page
   header/footer slots.
-- Layout pages now track their source section index so repeating content can be
-  selected per section instead of only from document-level fallback slots.
+- Layout pages now track their source section index and page index within that
+  section so repeating content can be selected from the section page style
+  state instead of by scanning neighboring pages. Hard page breaks,
+  `pageBreakBefore`, and natural overflow all advance the same section page
+  counter before first/default/even header/footer slots are resolved.
 - Header/footer repeating areas now follow the Writer margin-distance shape from
   `PrepareHeaderFooterProperties`: header starts at `w:pgMar/@header` and ends
   at the top body margin, footer starts at the bottom body margin and ends at
@@ -401,15 +404,18 @@ Current progress:
   direction before full row split/follow behavior lands.
 - Table cells now retain generated `w::TableCellWidth` absolute and percent
   widths. When `tblGrid` is absent or incomplete, `TableFrameLayout` can seed
-  its column widths from a complete unmerged row of preferred cell widths before
-  applying the table preferred width, following the Writer width negotiation
-  direction instead of falling back directly to equal columns.
+  its column widths from preferred cell widths before applying the table
+  preferred width. This now handles `gridSpan` by distributing a spanned cell's
+  preferred width across the covered grid columns, following the Writer width
+  negotiation direction instead of falling back directly to equal columns.
 - Table layout ownership now follows `SwTabFrame`/`SwRowFrame`/`SwCellFrame`:
   `TableFrameLayout` owns follow moves through the same section leaf traversal
   as body text, repeated headline rows, and the destination `FlowContext` for
   following body blocks. `RowFrame` owns row bounds and horizontal borders, and
-  `CellFrame` owns cell background, leading border, and nested content
-  formatting.
+  `CellFrame` owns cell background, leading border, vertical-merge continuation
+  paint, and nested content formatting. Vertical merge continuation cells now
+  retain the origin cell shading in the display list and row horizontal borders
+  are segmented so the border does not cut through the merged column.
 - Table cell content now uses nested cell flow instead of the old one-line
   clipping path. Paragraphs and nested tables inside cells reuse the same
   paragraph/table layout functions used by body flow, so wrapping, run styles,
@@ -446,15 +452,38 @@ Current progress:
   the Writer fly-frame positioning path and Typst placed-frame alignment
   technique. Square/tight wrapping now creates paragraph-local exclusion bounds
   that shorten affected text lines, matching the Writer `SwTextFly`/fly portion
-  direction. Floating images are tagged as floating page items, while inline
-  images keep their line position. Floating images that import `behindDoc` are
-  ordered after page backgrounds but before body text; foreground floating
-  images are ordered after body text, matching the Writer page-object layer
-  direction while preserving Typst-style stable display-list output. Top/bottom floating images
+  direction. `wp:effectExtent` is now retained from typed inline/anchor values
+  and expands the image frame used for alignment, line height, and wrap bounds,
+  following LibreOffice's `GraphicImport::lcl_expandRectangleByEffectExtent()`
+  direction. Wrap-level `dist*` values from `wrapSquare`, `wrapTight`,
+  `wrapThrough`, and `wrapTopAndBottom` are merged with anchor distances, and
+  `wrapText` left/right/largest/both is preserved in the paragraph exclusion
+  model. Floating images are tagged as floating page items, while inline images
+  keep their line position. Floating images that import `behindDoc` are ordered
+  after page backgrounds but before body text; foreground floating images are
+  ordered after body text, matching the Writer page-object layer direction while
+  preserving Typst-style stable display-list output. Top/bottom floating images
   that exhaust the current column/page now advance following text through the
   same section leaf traversal as text-frame follows. Full page association,
   contour wrapping,
   multi-paragraph influence, and complete z-ordering remain fly-frame work.
+- Raster image painting now follows the same broad division as Writer and
+  Typst: the DOCX importer keeps image bytes/resources on image frames, layout
+  places inline/floating image items, and the PDF renderer performs only paint
+  conversion. JPEG is passed through when krilla can consume it directly; PNG
+  is decoded into an RGB/alpha sampled image using a tolerant decoder that can
+  ignore bad CRC/checksum metadata in OOXML fixtures, matching LibreOffice's
+  preference to paint recoverable graphic content instead of dropping the
+  frame. Other raster formats fall back to the `image` crate and are emitted
+  through a Typst-style `CustomImage` path. Inline and floating DOCX image
+  fixtures now assert that generated PDF bytes contain image XObjects.
+- DrawingML picture crop and basic transform state now stays on the image
+  frame: `a:srcRect` becomes a source crop rectangle and `a:xfrm` rotation plus
+  horizontal/vertical flips are carried through layout into PDF painting. The
+  renderer follows the Typst group/image pattern by applying a local transform,
+  clipping to the image frame, then painting an expanded source image for crop.
+  This matches LibreOffice's direction of preserving DrawingML graphic geometry
+  on the frame instead of dropping the picture or guessing a new layout size.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
   - missing `w:type` is treated as `nextPage`
@@ -665,11 +694,12 @@ Implement:
   behavior.
 - Resolve table grid, preferred width, cell width, grid span, vertical merge.
   Absolute/percent preferred table width, table alignment, indentation,
-  `tcW` cell preferred widths for simple unmerged rows, `gridSpan`, vertical
-  merge import, and table/row/cell frame ownership are present; remaining work
-  is full multi-row cell width negotiation and split behavior. Cell content now
-  flows through the shared paragraph/table layout path instead of clipped
-  single-line paint.
+  `tcW` cell preferred widths including spanned cells, `gridSpan`, vertical
+  merge import/continuation shading, and table/row/cell frame ownership are
+  present; remaining work is full grid conflict resolution, rowspan-aware split
+  recalculation, and exact border conflict handling. Cell content now flows
+  through the shared paragraph/table layout path instead of clipped single-line
+  paint.
 - Table row overflow now advances through section leaves and returns the
   destination flow to subsequent body blocks. Rows with `cantSplit=false` can
   emit basic follow-flow-line fragments across leaves: the current fragment is
@@ -747,6 +777,11 @@ Implement:
 - Convert layout frames to paint items.
 - Render text using shaped glyph output where possible.
 - Add images, fills, strokes, clipping, and transforms.
+- Raster image output is active for inline/floating DOCX images. Current scope
+  covers JPEG direct output and decoded sampled-image output for PNG/GIF/WebP
+  style raster inputs, plus DrawingML `srcRect` crop and basic `xfrm`
+  rotation/flip paint transforms; SVG/PDF image embedding, artistic effects,
+  and full graphic attributes remain later paint quality work.
 - Carry external hyperlink relationships into text layout and emit PDF link
   annotations. Internal bookmark destinations remain future work and should
   follow LibreOffice's document target mapping rather than ad-hoc anchors.

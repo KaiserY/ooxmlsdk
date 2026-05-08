@@ -142,6 +142,8 @@ pub(crate) struct TableCell {
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub margins: CellMargins,
+  pub preferred_width_pt: Option<f32>,
+  pub preferred_width_pct: Option<f32>,
   pub grid_span: usize,
   pub vertical_merge_continue: bool,
   pub vertical_alignment: TableCellVerticalAlignment,
@@ -214,6 +216,7 @@ pub(crate) struct ParagraphFormat {
   pub spacing_before_pt: f32,
   pub spacing_after_pt: f32,
   pub line_height_pt: Option<f32>,
+  pub line_height_rule: LineHeightRule,
   pub indent_left_pt: f32,
   pub indent_right_pt: f32,
   pub first_line_indent_pt: f32,
@@ -224,6 +227,15 @@ pub(crate) struct ParagraphFormat {
   pub page_break_before: bool,
   pub keep_with_next: bool,
   pub keep_lines: bool,
+  pub contextual_spacing: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum LineHeightRule {
+  #[default]
+  Auto,
+  AtLeast,
+  Exact,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -292,6 +304,8 @@ pub(crate) enum ImagePlacement {
 pub(crate) struct FloatingImagePlacement {
   pub horizontal_relative_to: HorizontalImageReference,
   pub vertical_relative_to: VerticalImageReference,
+  pub horizontal_alignment: Option<HorizontalImageAlignment>,
+  pub vertical_alignment: Option<VerticalImageAlignment>,
   pub horizontal_offset_pt: f32,
   pub vertical_offset_pt: f32,
   pub wrap: ImageWrapMode,
@@ -300,6 +314,20 @@ pub(crate) struct FloatingImagePlacement {
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum HorizontalImageAlignment {
+  Left,
+  Center,
+  Right,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum VerticalImageAlignment {
+  Top,
+  Center,
+  Bottom,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1342,6 +1370,12 @@ fn table_cell_model(
       .and_then(|properties| properties.table_cell_margin.as_deref())
       .map(|margins| table_cell_margin(margins, default_margins))
       .unwrap_or(default_margins),
+    preferred_width_pt: properties
+      .and_then(|properties| properties.table_cell_width.as_ref())
+      .and_then(table_cell_width_to_points),
+    preferred_width_pct: properties
+      .and_then(|properties| properties.table_cell_width.as_ref())
+      .and_then(table_cell_width_to_percent),
     grid_span: properties
       .and_then(|properties| properties.grid_span.as_ref())
       .map(|span| span.val.max(1) as usize)
@@ -1500,6 +1534,26 @@ fn table_width_to_percent(width: &w::TableWidth) -> Option<f32> {
   value.parse::<f32>().ok().map(|value| value / 5000.0)
 }
 
+fn table_cell_width_to_points(width: &w::TableCellWidth) -> Option<f32> {
+  match width.r#type {
+    Some(w::TableWidthUnitValues::Dxa) | None => {
+      width.width.as_deref().and_then(twips_attr_to_points)
+    }
+    _ => None,
+  }
+}
+
+fn table_cell_width_to_percent(width: &w::TableCellWidth) -> Option<f32> {
+  if !matches!(width.r#type, Some(w::TableWidthUnitValues::Pct)) {
+    return None;
+  }
+  let value = width.width.as_deref()?;
+  if let Some(percent) = value.strip_suffix('%') {
+    return percent.parse::<f32>().ok().map(|value| value / 100.0);
+  }
+  value.parse::<f32>().ok().map(|value| value / 5000.0)
+}
+
 fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32> {
   if !matches!(
     indentation.r#type,
@@ -1644,6 +1698,9 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(keep_lines) = properties.keep_lines() {
     format.keep_lines = keep_lines.val.unwrap_or(true);
   }
+  if let Some(contextual_spacing) = properties.contextual_spacing() {
+    format.contextual_spacing = contextual_spacing.val.unwrap_or(true);
+  }
 
   if let Some(spacing) = properties.spacing_between_lines() {
     format.spacing_before_pt = spacing
@@ -1656,15 +1713,23 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
       .as_deref()
       .and_then(twips_attr_to_points)
       .unwrap_or(0.0);
-    format.line_height_pt = spacing.line.as_deref().and_then(twips_attr_to_points);
-    if let Some(line) = spacing.line.as_deref()
-      && matches!(
-        spacing.line_rule,
-        None | Some(w::LineSpacingRuleValues::Auto)
-      )
-      && let Ok(value) = line.parse::<f32>()
-    {
-      format.line_height_pt = Some(14.0 * (value / 240.0).max(0.1));
+    if let Some(line) = spacing.line.as_deref() {
+      match spacing.line_rule {
+        None | Some(w::LineSpacingRuleValues::Auto) => {
+          format.line_height_rule = LineHeightRule::Auto;
+          if let Ok(value) = line.parse::<f32>() {
+            format.line_height_pt = Some(14.0 * (value / 240.0).max(0.1));
+          }
+        }
+        Some(w::LineSpacingRuleValues::AtLeast) => {
+          format.line_height_rule = LineHeightRule::AtLeast;
+          format.line_height_pt = twips_attr_to_points(line);
+        }
+        Some(w::LineSpacingRuleValues::Exact) => {
+          format.line_height_rule = LineHeightRule::Exact;
+          format.line_height_pt = twips_attr_to_points(line);
+        }
+      }
     }
   }
 
@@ -2547,6 +2612,14 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .as_deref()
       .map(vertical_image_reference)
       .unwrap_or_default(),
+    horizontal_alignment: anchor
+      .horizontal_position
+      .as_deref()
+      .and_then(horizontal_position_alignment),
+    vertical_alignment: anchor
+      .vertical_position
+      .as_deref()
+      .and_then(vertical_position_alignment),
     horizontal_offset_pt: anchor
       .horizontal_position
       .as_deref()
@@ -2616,12 +2689,46 @@ fn horizontal_position_offset(position: &wp::HorizontalPosition) -> Option<f32> 
   }
 }
 
+fn horizontal_position_alignment(
+  position: &wp::HorizontalPosition,
+) -> Option<HorizontalImageAlignment> {
+  match position.horizontal_position_choice.as_ref()? {
+    wp::HorizontalPositionChoice::WpAlign(alignment) => match alignment {
+      wp::HorizontalAlignmentValues::Left | wp::HorizontalAlignmentValues::Inside => {
+        Some(HorizontalImageAlignment::Left)
+      }
+      wp::HorizontalAlignmentValues::Center => Some(HorizontalImageAlignment::Center),
+      wp::HorizontalAlignmentValues::Right | wp::HorizontalAlignmentValues::Outside => {
+        Some(HorizontalImageAlignment::Right)
+      }
+    },
+    wp::HorizontalPositionChoice::WpPosOffset(_)
+    | wp::HorizontalPositionChoice::Wp14PctPosHOffset(_) => None,
+  }
+}
+
 fn vertical_position_offset(position: &wp::VerticalPosition) -> Option<f32> {
   match position.vertical_position_choice.as_ref()? {
     wp::VerticalPositionChoice::WpPosOffset(offset) => Some(units::emu_to_points(*offset as i64)),
     wp::VerticalPositionChoice::WpAlign(_) | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => {
       None
     }
+  }
+}
+
+fn vertical_position_alignment(position: &wp::VerticalPosition) -> Option<VerticalImageAlignment> {
+  match position.vertical_position_choice.as_ref()? {
+    wp::VerticalPositionChoice::WpAlign(alignment) => match alignment {
+      wp::VerticalAlignmentValues::Top | wp::VerticalAlignmentValues::Inside => {
+        Some(VerticalImageAlignment::Top)
+      }
+      wp::VerticalAlignmentValues::Center => Some(VerticalImageAlignment::Center),
+      wp::VerticalAlignmentValues::Bottom | wp::VerticalAlignmentValues::Outside => {
+        Some(VerticalImageAlignment::Bottom)
+      }
+    },
+    wp::VerticalPositionChoice::WpPosOffset(_)
+    | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => None,
   }
 }
 
@@ -3457,6 +3564,7 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
+    target.line_height_rule = values.line_height_rule;
   }
   if values.indent_left_pt != 0.0 {
     target.indent_left_pt = values.indent_left_pt;
@@ -3487,6 +3595,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
   if values.keep_lines {
     target.keep_lines = true;
+  }
+  if values.contextual_spacing {
+    target.contextual_spacing = true;
   }
 }
 
@@ -3822,6 +3933,15 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.keep_lines.as_ref(),
       Self::BaseStyle(properties) => properties.keep_lines.as_ref(),
       Self::Previous(properties) => properties.keep_lines.as_ref(),
+    }
+  }
+
+  fn contextual_spacing(&self) -> Option<&'a w::ContextualSpacing> {
+    match self {
+      Self::Direct(properties) => properties.contextual_spacing.as_ref(),
+      Self::Style(properties) => properties.contextual_spacing.as_ref(),
+      Self::BaseStyle(properties) => properties.contextual_spacing.as_ref(),
+      Self::Previous(properties) => properties.contextual_spacing.as_ref(),
     }
   }
 

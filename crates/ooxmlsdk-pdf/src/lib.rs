@@ -196,6 +196,58 @@ mod tests {
   }
 
   #[test]
+  fn justified_wrapped_line_expands_word_spacing() {
+    let run = crate::docx::TextRun {
+      text: "One Two Three Four".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 76.0,
+        height_pt: 200.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat {
+          alignment: crate::docx::ParagraphAlignment::Justify,
+          ..Default::default()
+        },
+        list_label: None,
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let one = text_item(&layout, "One");
+    let two = text_item(&layout, "Two");
+
+    assert_eq!(one.y_pt, two.y_pt);
+    assert!(two.x_pt - one.x_pt > 30.0);
+  }
+
+  #[test]
   fn paragraph_explicit_line_height_applies_to_each_line() {
     let run = crate::docx::TextRun {
       text: "Line A\nLine B\nLine C".into(),
@@ -246,6 +298,206 @@ mod tests {
 
     assert!((line_b.y_pt - line_a.y_pt - 24.0).abs() < 0.1);
     assert!((line_c.y_pt - line_b.y_pt - 24.0).abs() < 0.1);
+  }
+
+  #[test]
+  fn baseline_shift_contributes_to_line_advance() {
+    let base = crate::docx::TextRun {
+      text: "Base".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let shifted = crate::docx::TextRun {
+      text: "2\n".into(),
+      style: crate::docx::TextStyle {
+        font_size_pt: 8.0,
+        baseline_shift_pt: 12.0,
+        ..Default::default()
+      },
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let next = crate::docx::TextRun {
+      text: "Next".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 160.0,
+        height_pt: 200.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![
+          crate::docx::InlineItem::Text(base.clone()),
+          crate::docx::InlineItem::Text(shifted.clone()),
+          crate::docx::InlineItem::Text(next.clone()),
+        ],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![base, shifted, next],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let base = text_item(&layout, "Base");
+    let next = text_item(&layout, "Next");
+
+    assert!(next.y_pt - base.y_pt >= 22.0);
+  }
+
+  #[test]
+  fn exact_line_height_keeps_fixed_advance_but_at_least_expands() {
+    fn line_gap(rule: crate::docx::LineHeightRule) -> f32 {
+      let tall = crate::docx::TextRun {
+        text: "Tall\n".into(),
+        style: crate::docx::TextStyle {
+          font_size_pt: 30.0,
+          ..Default::default()
+        },
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      let next = crate::docx::TextRun {
+        text: "Next".into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      let doc = crate::docx::DocxDocument {
+        page: crate::docx::PageSetup {
+          width_pt: 160.0,
+          height_pt: 200.0,
+          margin_left_pt: 10.0,
+          margin_right_pt: 10.0,
+          margin_top_pt: 10.0,
+          margin_bottom_pt: 10.0,
+          ..Default::default()
+        },
+        default_tab_stop_pt: 36.0,
+        even_and_odd_headers: false,
+        sections: Vec::new(),
+        title_page: false,
+        header_blocks: Vec::new(),
+        first_header_blocks: Vec::new(),
+        footer_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(),
+        footnote_blocks: Vec::new(),
+        footnotes: Default::default(),
+        endnote_blocks: Vec::new(),
+        endnotes: Default::default(),
+        comment_blocks: Vec::new(),
+        blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+          inlines: vec![
+            crate::docx::InlineItem::Text(tall.clone()),
+            crate::docx::InlineItem::Text(next.clone()),
+          ],
+          footnote_reference_ids: Vec::new(),
+          endnote_reference_ids: Vec::new(),
+          runs: vec![tall, next],
+          format: crate::docx::ParagraphFormat {
+            line_height_pt: Some(10.0),
+            line_height_rule: rule,
+            ..Default::default()
+          },
+          list_label: None,
+        })],
+      };
+
+      let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+      let tall = text_item(&layout, "Tall");
+      let next = text_item(&layout, "Next");
+      next.y_pt - tall.y_pt
+    }
+
+    assert!((line_gap(crate::docx::LineHeightRule::Exact) - 10.0).abs() < 0.1);
+    assert!(line_gap(crate::docx::LineHeightRule::AtLeast) > 35.0);
+  }
+
+  #[test]
+  fn contextual_spacing_suppresses_adjacent_matching_paragraph_spacing() {
+    fn paragraph(text: &str, contextual_spacing: bool) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat {
+          spacing_before_pt: 12.0,
+          spacing_after_pt: 24.0,
+          contextual_spacing,
+          ..Default::default()
+        },
+        list_label: None,
+      }
+    }
+
+    fn paragraph_gap(contextual_spacing: bool) -> f32 {
+      let doc = crate::docx::DocxDocument {
+        page: crate::docx::PageSetup {
+          width_pt: 160.0,
+          height_pt: 200.0,
+          margin_left_pt: 10.0,
+          margin_right_pt: 10.0,
+          margin_top_pt: 10.0,
+          margin_bottom_pt: 10.0,
+          ..Default::default()
+        },
+        default_tab_stop_pt: 36.0,
+        even_and_odd_headers: false,
+        sections: Vec::new(),
+        title_page: false,
+        header_blocks: Vec::new(),
+        first_header_blocks: Vec::new(),
+        footer_blocks: Vec::new(),
+        first_footer_blocks: Vec::new(),
+        footnote_blocks: Vec::new(),
+        footnotes: Default::default(),
+        endnote_blocks: Vec::new(),
+        endnotes: Default::default(),
+        comment_blocks: Vec::new(),
+        blocks: vec![
+          crate::docx::Block::Paragraph(paragraph("First", contextual_spacing)),
+          crate::docx::Block::Paragraph(paragraph("Second", contextual_spacing)),
+        ],
+      };
+
+      let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+      let first = text_item(&layout, "First");
+      let second = text_item(&layout, "Second");
+      second.y_pt - first.y_pt
+    }
+
+    assert!(paragraph_gap(false) > 45.0);
+    assert!((paragraph_gap(true) - 14.0).abs() < 0.1);
   }
 
   #[test]
@@ -485,6 +737,8 @@ mod tests {
           shading: None,
           borders: crate::docx::CellBordersModel::default(),
           margins: crate::docx::CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
           grid_span: 1,
           vertical_merge_continue: false,
           vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
@@ -564,6 +818,85 @@ mod tests {
   }
 
   #[test]
+  fn table_without_grid_uses_cell_preferred_widths() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    fn cell(text: &str, width: f32) -> crate::docx::TableCell {
+      crate::docx::TableCell {
+        blocks: vec![crate::docx::Block::Paragraph(paragraph(text))],
+        shading: None,
+        borders: crate::docx::CellBordersModel::default(),
+        margins: crate::docx::CellMargins {
+          top_pt: 0.0,
+          right_pt: 0.0,
+          bottom_pt: 0.0,
+          left_pt: 0.0,
+        },
+        preferred_width_pt: Some(width),
+        preferred_width_pct: None,
+        grid_span: 1,
+        vertical_merge_continue: false,
+        vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
+      }
+    }
+
+    let table = crate::docx::Table {
+      column_widths_pt: Vec::new(),
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: crate::docx::TableAlignment::Left,
+      borders: None,
+      cell_margins: crate::docx::CellMargins::default(),
+      rows: vec![crate::docx::TableRow {
+        cells: vec![cell("Narrow", 50.0), cell("Wide", 100.0)],
+        height_pt: Some(24.0),
+        exact_height: true,
+        repeat_header: false,
+        cant_split: false,
+      }],
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Table(table)],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let narrow = text_item(&layout, "Narrow");
+    let wide = text_item(&layout, "Wide");
+
+    assert!((wide.x_pt - narrow.x_pt - 50.0).abs() < 0.1);
+  }
+
+  #[test]
   fn cant_split_table_row_moves_once_to_follow_column() {
     fn paragraph(text: &str) -> crate::docx::Paragraph {
       let run = crate::docx::TextRun {
@@ -589,6 +922,8 @@ mod tests {
           shading: None,
           borders: crate::docx::CellBordersModel::default(),
           margins: crate::docx::CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
           grid_span: 1,
           vertical_merge_continue: false,
           vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
@@ -663,6 +998,91 @@ mod tests {
     assert!(before.x_pt < page.margin_left_pt + 100.0);
     assert!(kept.x_pt > page.margin_left_pt + 100.0);
     assert!(kept.y_pt <= page.margin_top_pt + crate::docx::CellMargins::default().top_pt + 12.0);
+  }
+
+  #[test]
+  fn splittable_table_row_continues_cell_content_on_follow_page() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    let line_blocks = (1..=6)
+      .map(|index| crate::docx::Block::Paragraph(paragraph(&format!("Line {index:02}"))))
+      .collect::<Vec<_>>();
+    let table = crate::docx::Table {
+      column_widths_pt: vec![120.0],
+      preferred_width_pt: None,
+      preferred_width_pct: None,
+      indent_left_pt: 0.0,
+      alignment: crate::docx::TableAlignment::Left,
+      borders: None,
+      cell_margins: crate::docx::CellMargins::default(),
+      rows: vec![crate::docx::TableRow {
+        cells: vec![crate::docx::TableCell {
+          blocks: line_blocks,
+          shading: None,
+          borders: crate::docx::CellBordersModel::default(),
+          margins: crate::docx::CellMargins::default(),
+          preferred_width_pt: None,
+          preferred_width_pct: None,
+          grid_span: 1,
+          vertical_merge_continue: false,
+          vertical_alignment: crate::docx::TableCellVerticalAlignment::Top,
+        }],
+        height_pt: Some(140.0),
+        exact_height: true,
+        repeat_header: false,
+        cant_split: false,
+      }],
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 180.0,
+        height_pt: 90.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![
+        crate::docx::Block::Paragraph(paragraph("Before table")),
+        crate::docx::Block::Table(table),
+      ],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let line_01_page = text_page_index(&layout, "Line 01").expect("first row fragment");
+    let line_04_page = text_page_index(&layout, "Line 04").expect("follow row fragment");
+
+    assert_eq!(line_01_page, 0);
+    assert!(line_04_page > line_01_page);
   }
 
   #[test]
@@ -1155,6 +1575,118 @@ mod tests {
 
     let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
+  }
+
+  #[test]
+  fn header_area_reduces_body_text_region_when_margins_overlap() {
+    fn paragraph(text: &str) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      }
+    }
+
+    let page = crate::docx::PageSetup {
+      margin_top_pt: 20.0,
+      header_distance_pt: 30.0,
+      ..Default::default()
+    };
+    let doc = crate::docx::DocxDocument {
+      page,
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: vec![crate::docx::Block::Paragraph(paragraph("Tall header"))],
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(paragraph(
+        "Body below header",
+      ))],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let body = text_item(&layout, "Body below header");
+
+    assert!(body.y_pt >= page.header_distance_pt + 72.0 / 25.4);
+  }
+
+  #[test]
+  fn body_region_uses_page_specific_repeating_header_slots() {
+    fn paragraph(text: &str, page_break_before: bool) -> crate::docx::Paragraph {
+      let run = crate::docx::TextRun {
+        text: text.into(),
+        style: crate::docx::TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      };
+      crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Text(run.clone())],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat {
+          page_break_before,
+          ..Default::default()
+        },
+        list_label: None,
+      }
+    }
+
+    let page = crate::docx::PageSetup {
+      width_pt: 200.0,
+      height_pt: 120.0,
+      margin_top_pt: 20.0,
+      margin_bottom_pt: 20.0,
+      header_distance_pt: 30.0,
+      ..Default::default()
+    };
+    let doc = crate::docx::DocxDocument {
+      page,
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: true,
+      header_blocks: Vec::new(),
+      first_header_blocks: vec![crate::docx::Block::Paragraph(paragraph(
+        "First only header",
+        false,
+      ))],
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![
+        crate::docx::Block::Paragraph(paragraph("F1", false)),
+        crate::docx::Block::Paragraph(paragraph("S2", true)),
+      ],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let first = text_item(&layout, "F1");
+    let second = text_item(&layout, "S2");
+
+    assert!(first.y_pt >= page.header_distance_pt + 72.0 / 25.4);
+    assert!((second.y_pt - page.margin_top_pt).abs() < 0.1);
   }
 
   #[test]
@@ -1762,6 +2294,8 @@ mod tests {
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
+        horizontal_alignment: None,
+        vertical_alignment: None,
         horizontal_offset_pt: 0.0,
         vertical_offset_pt: 0.0,
         wrap: crate::docx::ImageWrapMode::Through,
@@ -1822,6 +2356,170 @@ mod tests {
   }
 
   #[test]
+  fn foreground_floating_images_are_ordered_after_body_text() {
+    let before = crate::docx::TextRun {
+      text: "Before foreground ".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let after = crate::docx::TextRun {
+      text: "After foreground".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let image = crate::docx::InlineImage {
+      data: vec![0; 8],
+      content_type: Some("image/png".into()),
+      width_pt: 36.0,
+      height_pt: 36.0,
+      alt_text: Some("foreground".into()),
+      placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
+        horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
+        vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
+        horizontal_alignment: None,
+        vertical_alignment: None,
+        horizontal_offset_pt: 0.0,
+        vertical_offset_pt: 0.0,
+        wrap: crate::docx::ImageWrapMode::Through,
+        behind_text: false,
+        margin_top_pt: 0.0,
+        margin_right_pt: 0.0,
+        margin_bottom_pt: 0.0,
+        margin_left_pt: 0.0,
+      }),
+    };
+    let paragraph = crate::docx::Paragraph {
+      inlines: vec![
+        crate::docx::InlineItem::Text(before.clone()),
+        crate::docx::InlineItem::Image(image),
+        crate::docx::InlineItem::Text(after.clone()),
+      ],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      runs: vec![before, after],
+      format: crate::docx::ParagraphFormat::default(),
+      list_label: None,
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(paragraph)],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let page = &layout.pages[0];
+    let image_index = page
+      .items
+      .iter()
+      .position(|item| matches!(item, crate::layout::PageItem::Image(image) if image.floating))
+      .expect("foreground image");
+    let text_index = page
+      .items
+      .iter()
+      .position(
+        |item| matches!(item, crate::layout::PageItem::Text(text) if text.text == "After foreground"),
+      )
+      .expect("body text");
+
+    assert!(image_index > text_index);
+  }
+
+  #[test]
+  fn floating_image_aligns_inside_relative_margin_area() {
+    let run = crate::docx::TextRun {
+      text: "Aligned float".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let image = crate::docx::InlineImage {
+      data: vec![0; 8],
+      content_type: Some("image/png".into()),
+      width_pt: 40.0,
+      height_pt: 50.0,
+      alt_text: Some("aligned".into()),
+      placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
+        horizontal_relative_to: crate::docx::HorizontalImageReference::Margin,
+        vertical_relative_to: crate::docx::VerticalImageReference::Margin,
+        horizontal_alignment: Some(crate::docx::HorizontalImageAlignment::Center),
+        vertical_alignment: Some(crate::docx::VerticalImageAlignment::Bottom),
+        horizontal_offset_pt: 0.0,
+        vertical_offset_pt: 0.0,
+        wrap: crate::docx::ImageWrapMode::Through,
+        behind_text: false,
+        margin_top_pt: 0.0,
+        margin_right_pt: 0.0,
+        margin_bottom_pt: 0.0,
+        margin_left_pt: 0.0,
+      }),
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup {
+        width_pt: 200.0,
+        height_pt: 200.0,
+        margin_left_pt: 20.0,
+        margin_right_pt: 20.0,
+        margin_top_pt: 20.0,
+        margin_bottom_pt: 20.0,
+        ..Default::default()
+      },
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![
+          crate::docx::InlineItem::Image(image),
+          crate::docx::InlineItem::Text(run.clone()),
+        ],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: vec![run],
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let image = layout.pages[0]
+      .items
+      .iter()
+      .find_map(|item| match item {
+        crate::layout::PageItem::Image(image) => Some(image),
+        crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .expect("aligned image");
+
+    assert!((image.x_pt - 80.0).abs() < 0.1);
+    assert!((image.y_pt - 130.0).abs() < 0.1);
+  }
+
+  #[test]
   fn top_bottom_floating_image_advances_following_text_to_next_column() {
     let before = crate::docx::TextRun {
       text: "Before float ".into(),
@@ -1844,6 +2542,8 @@ mod tests {
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
+        horizontal_alignment: None,
+        vertical_alignment: None,
         horizontal_offset_pt: 0.0,
         vertical_offset_pt: 0.0,
         wrap: crate::docx::ImageWrapMode::TopBottom,
@@ -2102,6 +2802,13 @@ mod tests {
         crate::layout::PageItem::Text(item) if item.text == text
       )
     })
+  }
+
+  fn text_page_index(layout: &crate::layout::LayoutDocument, text: &str) -> Option<usize> {
+    layout
+      .pages
+      .iter()
+      .position(|page| page_has_text(page, text))
   }
 
   fn text_occurrence_count(layout: &crate::layout::LayoutDocument, text: &str) -> usize {

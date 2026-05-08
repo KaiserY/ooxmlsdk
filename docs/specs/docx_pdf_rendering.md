@@ -356,6 +356,12 @@ Current progress:
   `PrepareHeaderFooterProperties`: header starts at `w:pgMar/@header` and ends
   at the top body margin, footer starts at the bottom body margin and ends at
   `w:pgMar/@footer`, with a 1mm minimum area height.
+- Body text flow now reserves those repeating areas when header/footer
+  distances overlap body margins, so the page body starts below an intrusive
+  header and ends above an intrusive footer instead of relying on paint order.
+  The reservation is page-style aware: first/default/even header and footer
+  slots are resolved per body leaf, and the same slot-selection state is reused
+  when section/column flow advances to a new page.
 - Section `w:cols` is now imported through generated `w::Columns` into
   `SectionColumns`, including count, gap, separator flag, and explicit
   non-equal `w:col` width/space definitions when `equalWidth` is off.
@@ -393,6 +399,11 @@ Current progress:
   types. Layout resolves scaled grid columns plus left/center/right table
   placement through `TableFrameLayout`, matching the Writer table positioning
   direction before full row split/follow behavior lands.
+- Table cells now retain generated `w::TableCellWidth` absolute and percent
+  widths. When `tblGrid` is absent or incomplete, `TableFrameLayout` can seed
+  its column widths from a complete unmerged row of preferred cell widths before
+  applying the table preferred width, following the Writer width negotiation
+  direction instead of falling back directly to equal columns.
 - Table layout ownership now follows `SwTabFrame`/`SwRowFrame`/`SwCellFrame`:
   `TableFrameLayout` owns follow moves through the same section leaf traversal
   as body text, repeated headline rows, and the destination `FlowContext` for
@@ -429,16 +440,20 @@ Current progress:
   Writer master/follow invariant rather than restarting from the old body leaf.
 - DrawingML anchors are imported through generated `wp::Anchor` types into a
   typed floating image placement model. The layout path consumes `positionH`,
-  `positionV`, wrap mode, `behindDoc`, and anchor text distances for initial
-  page/margin/column/paragraph-relative placement. Square/tight wrapping now
-  creates paragraph-local exclusion bounds that shorten affected text lines,
-  matching the Writer `SwTextFly`/fly portion direction. Floating images that
-  import `behindDoc` are kept as page image items with a behind-text layer flag
-  and are ordered after page backgrounds but before body text, matching the
-  Writer page-object layer direction while preserving Typst-style stable
-  display-list output. Top/bottom floating images that exhaust the current
-  column/page now advance following text through the same section leaf traversal
-  as text-frame follows. Full page association, contour wrapping,
+  `positionV`, `wp:align`, wrap mode, `behindDoc`, and anchor text distances
+  for initial page/margin/column/paragraph-relative placement. Aligned anchors
+  resolve against the selected reference area using the image extents, matching
+  the Writer fly-frame positioning path and Typst placed-frame alignment
+  technique. Square/tight wrapping now creates paragraph-local exclusion bounds
+  that shorten affected text lines, matching the Writer `SwTextFly`/fly portion
+  direction. Floating images are tagged as floating page items, while inline
+  images keep their line position. Floating images that import `behindDoc` are
+  ordered after page backgrounds but before body text; foreground floating
+  images are ordered after body text, matching the Writer page-object layer
+  direction while preserving Typst-style stable display-list output. Top/bottom floating images
+  that exhaust the current column/page now advance following text through the
+  same section leaf traversal as text-frame follows. Full page association,
+  contour wrapping,
   multi-paragraph influence, and complete z-ordering remain fly-frame work.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
@@ -496,6 +511,9 @@ Remaining Phase 1 work:
 
 - Handle negative header/footer margins using LibreOffice's text-frame fallback
   direction from `HandleMarginsHeaderFooter`.
+- Continue tightening page-style body geometry for inherited/linked header and
+  footer edge cases, including negative margins and page-master reassignment
+  after backward movement.
 - Continue replacing the remaining direct block formatters with Writer-like
   text/fly frames so paragraph-internal column splitting, inline continuation
   after column breaks, bottom footnote areas, and floating frames are enforced
@@ -534,10 +552,17 @@ Implement:
   records follow starts. Widow/orphan and `keepLines` decisions are applied to
   those split candidates; rejected decisions now drive one forward reflow pass.
   Natural line overflow also propagates the destination flow to subsequent
-  body blocks. Remaining work is durable master/follow state, backward reflow,
-  and repaint invalidation when following frames shrink or grow.
+  body blocks. Wrapped justified lines now expand word spacing at the line
+  boundary, matching the Writer `SpaceAdd` direction and Typst's line-level
+  justifiable adjustment rather than paragraph-level shifting. Remaining work
+  is durable master/follow state, backward reflow, and repaint invalidation when
+  following frames shrink or grow.
 - Model tabs, indents, spacing, borders, shading, bidi, and justification as
   layout properties.
+- Import `w:contextualSpacing` through the OOXMLSDK paragraph property model and
+  suppress adjacent matching paragraph before/after spacing in the block
+  sequence, following Writer's contextual frame spacing direction instead of
+  blindly adding both paragraph margins.
 - Resolve run font properties sufficiently to choose fonts and measure text.
 - Preserve field runs as typed dynamic markers where the value depends on
   layout. PAGE and NUMPAGES are resolved after pagination for complex fields,
@@ -580,8 +605,17 @@ Implement:
 - Preserve imported paragraph line height across every formatted line in a
   `TextFrame`, matching Writer's line-space calculation path instead of
   resetting follows to the renderer default.
+- Preserve `w:spacing/@lineRule` as layout state: `auto` keeps proportional
+  240ths-of-a-line behavior, `atLeast` supplies a minimum line box, and `exact`
+  keeps the imported fixed advance even when run glyph extents are taller.
+- Apply justification as line-level word-space expansion for wrapped lines;
+  mandatory breaks and final paragraph lines are left unexpanded.
+- Include run baseline shifts in line advance so superscript/subscript text
+  expands the inline line extent before PDF painting, matching Writer's line
+  portion sizing and Typst's inline box behavior.
 - Preserve text shaping and bidi measurement through `rustybuzz` or equivalent.
-- Add justification as line-level adjustment, not paragraph-level item shifting.
+- Extend justification beyond simple word spaces to CJK/kana compression and
+  shaped glyph adjustability.
 - Keep fallback behavior deterministic when system fonts are missing.
 
 Minimal tests:
@@ -631,18 +665,22 @@ Implement:
   behavior.
 - Resolve table grid, preferred width, cell width, grid span, vertical merge.
   Absolute/percent preferred table width, table alignment, indentation,
-  `gridSpan`, vertical merge import, and table/row/cell frame ownership are
-  present; remaining work is true cell width negotiation and split behavior.
-  Cell content now flows through the shared paragraph/table layout path instead
-  of clipped single-line paint.
+  `tcW` cell preferred widths for simple unmerged rows, `gridSpan`, vertical
+  merge import, and table/row/cell frame ownership are present; remaining work
+  is full multi-row cell width negotiation and split behavior. Cell content now
+  flows through the shared paragraph/table layout path instead of clipped
+  single-line paint.
 - Table row overflow now advances through section leaves and returns the
-  destination flow to subsequent body blocks. Remaining follow-table work is
-  row splitting, follow-flow-line rows, cell content continuation, and backward
-  move/repaint invalidation.
+  destination flow to subsequent body blocks. Rows with `cantSplit=false` can
+  emit basic follow-flow-line fragments across leaves: the current fragment is
+  clipped to the remaining body area, follow fragments continue cell content
+  through the nested cell flow, and repeated header rows are inserted before
+  follow fragments when they fit. Remaining follow-table work is rowspan-aware
+  split recalculation, exact border conflict handling across split fragments,
+  and backward move/repaint invalidation.
 - `cantSplit` rows now use the same one-move guard as other row follows:
   a row that still does not fit after moving to its destination leaf is laid out
-  there, matching Writer's loop-control direction before real
-  follow-flow-line splitting is added.
+  there, matching Writer's loop-control direction.
 - Compute row height from cell content frames.
 - Support row splitting and `cantSplit`.
 - Support table headers repeating across pages.
@@ -672,15 +710,16 @@ Implement:
   - as-character anchored object
   - paragraph/character/page anchored floating object
 - Preserve `wp:anchor` position and wrap properties.
-- Resolve relative horizontal/vertical positions.
+- Resolve relative horizontal/vertical positions, including basic
+  left/center/right and top/center/bottom `wp:align` values.
 - Top/bottom wrap now moves following inline text to the next column/page when
   the object leaves no remaining body space in the current leaf.
 - Reserve text wrap exclusion areas during line layout. Paragraph-local
   square/tight exclusion is present; multi-paragraph/page-level fly influence is
   still pending.
-- Support basic z-order and page association. `behindDoc` ordering is present
-  for floating image page items; foreground object ordering, page reassignment
-  after master/follow movement, and cross-paragraph wrap influence remain.
+- Support basic z-order and page association. `behindDoc` and foreground
+  floating image ordering are present for page image items; page reassignment
+  after master/follow movement and cross-paragraph wrap influence remain.
 
 Minimal tests:
 

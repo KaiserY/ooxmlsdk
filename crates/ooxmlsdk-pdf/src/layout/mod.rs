@@ -5,9 +5,10 @@ use icu_segmenter::LineSegmenter;
 
 use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingImagePlacement,
-  HorizontalImageReference, ImageWrapMode, InlineItem, PageSetup, ParagraphAlignment, RgbColor,
-  SectionBreakKind, SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextStyle, VerticalImageReference,
+  HorizontalImageAlignment, HorizontalImageReference, ImageWrapMode, InlineItem, LineHeightRule,
+  PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind, SectionColumns, TabStop,
+  TabStopAlignment, Table, TableAlignment, TableCell, TableCellVerticalAlignment, TableRow,
+  TextStyle, VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -23,6 +24,17 @@ const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
 const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
+
+fn inline_text_height(style: TextStyle) -> f32 {
+  style.font_size_pt * 1.25 + style.baseline_shift_pt.abs()
+}
+
+fn include_text_height(line_height: f32, text_frame: TextFrame, style: TextStyle) -> f32 {
+  match text_frame.line_height_rule {
+    LineHeightRule::Exact => line_height,
+    LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(inline_text_height(style)),
+  }
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
@@ -63,6 +75,7 @@ pub(crate) struct ImageItem {
   pub data: Vec<u8>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
+  pub floating: bool,
   pub behind_text: bool,
 }
 
@@ -89,12 +102,28 @@ pub(crate) struct LineItem {
 struct FlowContext {
   setup: PageSetup,
   section_index: usize,
+  section_page_index: usize,
   column_index: usize,
   columns: SectionColumns,
+  content_top_pt: f32,
   content_left_pt: f32,
   content_bottom: f32,
+  body_content_bottom_pt: f32,
   content_width: f32,
   default_tab_stop_pt: f32,
+  repeating_slots: RepeatingSlotState,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct RepeatingSlotState {
+  title_page: bool,
+  even_and_odd_headers: bool,
+  default_header: bool,
+  default_footer: bool,
+  first_header: bool,
+  first_footer: bool,
+  even_header: bool,
+  even_footer: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -115,12 +144,16 @@ struct WrapExclusion {
 struct BlockArea {
   setup: PageSetup,
   section_index: usize,
+  section_page_index: usize,
   column_index: usize,
   columns: SectionColumns,
+  content_top_pt: f32,
   content_left_pt: f32,
   content_bottom: f32,
+  body_content_bottom_pt: f32,
   content_width: f32,
   default_tab_stop_pt: f32,
+  repeating_slots: RepeatingSlotState,
 }
 
 pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
@@ -152,7 +185,7 @@ impl<'a> RootFrameLayout<'a> {
     self.finish_current_page();
 
     apply_page_backgrounds(&mut self.pages);
-    place_behind_text_images(&mut self.pages);
+    place_floating_images(&mut self.pages);
     apply_column_separators(self.document, &mut self.pages);
     apply_headers_and_footers(self.document, &mut self.pages);
     apply_page_borders(&mut self.pages);
@@ -169,6 +202,7 @@ impl<'a> RootFrameLayout<'a> {
         0,
         SectionColumns::default(),
       ));
+      self.y = flow.content_top_pt;
       self.format_block_sequence(&blocks, flow);
       return;
     }
@@ -181,17 +215,25 @@ impl<'a> RootFrameLayout<'a> {
         section_index,
         section.columns,
       ));
+      self.y = self.y.max(flow.content_top_pt);
       self.format_block_sequence(&section.blocks, flow);
     }
   }
 
   fn body_flow(&self, frame: BodyFrame) -> FlowContext {
-    flow_context(
+    let flow = flow_context(
       frame.setup,
       frame.section_index,
       frame.columns,
       0,
       self.document.default_tab_stop_pt,
+    );
+    body_flow_for_page(
+      FlowContext {
+        repeating_slots: repeating_slot_state(self.document, frame.section_index),
+        ..flow
+      },
+      self.pages.len() + 1,
     )
   }
 
@@ -201,22 +243,41 @@ impl<'a> RootFrameLayout<'a> {
       if needs_section_parity_blank(section.break_kind, self.pages.len() + 1) {
         self.pages.push(empty_page(section.page, section_index));
       }
-      self.y = section.page.margin_top_pt;
+      self.y = body_content_limits_for_page(
+        section.page,
+        repeating_slot_state(self.document, section_index),
+        self.pages.len() + 1,
+        0,
+      )
+      .0;
     } else if self.current.items.is_empty() {
       self.current.setup = section.page;
       self.current.section_index = section_index;
-      self.y = section.page.margin_top_pt;
+      self.y = body_content_limits_for_page(
+        section.page,
+        repeating_slot_state(self.document, section_index),
+        self.pages.len() + 1,
+        0,
+      )
+      .0;
     }
   }
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
     for (index, block) in blocks.iter().enumerate() {
+      let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
-      self.format_block(block, next, &mut flow);
+      self.format_block(previous, block, next, &mut flow);
     }
   }
 
-  fn format_block(&mut self, block: &Block, next: Option<&Block>, flow: &mut FlowContext) {
+  fn format_block(
+    &mut self,
+    previous: Option<&Block>,
+    block: &Block,
+    next: Option<&Block>,
+    flow: &mut FlowContext,
+  ) {
     let (block_flow, footnote_top) =
       footnote_boss_reserve(block, self.document, &self.emitted_footnotes, *flow);
     (*flow, self.y) = prepare_block_flow(
@@ -228,8 +289,15 @@ impl<'a> RootFrameLayout<'a> {
       self.y,
     );
     *flow = self.advance_if_past_body(*flow);
-    (*flow, self.y) =
-      layout_document_block(block, *flow, &mut self.current, &mut self.pages, self.y);
+    (*flow, self.y) = layout_document_block(
+      previous,
+      block,
+      next,
+      *flow,
+      &mut self.current,
+      &mut self.pages,
+      self.y,
+    );
     footnote_boss_format(
       block,
       self.document,
@@ -310,8 +378,18 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn format_blocks_in_flow(&mut self, blocks: &[Block], flow: FlowContext) {
-    for block in blocks {
-      let (_, y) = layout_document_block(block, flow, &mut self.current, &mut self.pages, self.y);
+    for (index, block) in blocks.iter().enumerate() {
+      let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
+      let next = blocks.get(index + 1);
+      let (_, y) = layout_document_block(
+        previous,
+        block,
+        next,
+        flow,
+        &mut self.current,
+        &mut self.pages,
+        self.y,
+      );
       self.y = y;
     }
   }
@@ -372,12 +450,28 @@ fn flow_context(
   FlowContext {
     setup,
     section_index,
+    section_page_index: 0,
     column_index,
     columns,
+    content_top_pt: setup.margin_top_pt,
     content_left_pt,
     content_bottom: setup.height_pt - setup.margin_bottom_pt,
+    body_content_bottom_pt: setup.height_pt - setup.margin_bottom_pt,
     content_width: column_width.max(DEFAULT_FONT_SIZE_PT),
     default_tab_stop_pt,
+    repeating_slots: RepeatingSlotState::default(),
+  }
+}
+
+fn flow_with_column(flow: FlowContext, column_index: usize) -> FlowContext {
+  let geometry = column_geometry(flow.setup, flow.columns);
+  let count = geometry.widths.len().max(1);
+  let column_index = column_index.min(count - 1);
+  FlowContext {
+    column_index,
+    content_left_pt: geometry.lefts[column_index],
+    content_width: geometry.widths[column_index].max(DEFAULT_FONT_SIZE_PT),
+    ..flow
   }
 }
 
@@ -455,31 +549,24 @@ fn advance_section_flow(
 ) -> (FlowContext, f32) {
   let next_column = flow.column_index + 1;
   if next_column < flow.columns.count {
-    (
-      flow_context(
-        flow.setup,
-        flow.section_index,
-        flow.columns,
-        next_column,
-        flow.default_tab_stop_pt,
-      ),
-      flow.setup.margin_top_pt,
-    )
+    let next_flow = flow_with_column(flow, next_column);
+    (next_flow, next_flow.content_top_pt)
   } else {
     pages.push(std::mem::replace(
       current,
       empty_page(flow.setup, flow.section_index),
     ));
-    (
-      flow_context(
-        flow.setup,
-        flow.section_index,
-        flow.columns,
+    let next_flow = body_flow_for_page(
+      flow_with_column(
+        FlowContext {
+          section_page_index: flow.section_page_index + 1,
+          ..flow
+        },
         0,
-        flow.default_tab_stop_pt,
       ),
-      flow.setup.margin_top_pt,
-    )
+      pages.len() + 1,
+    );
+    (next_flow, next_flow.content_top_pt)
   }
 }
 
@@ -495,7 +582,7 @@ fn prepare_block_flow(
     return (flow, y);
   }
   let required_height = keep_group_height(block, next, flow);
-  if y + required_height <= flow.content_bottom || y <= flow.setup.margin_top_pt + 0.1 {
+  if y + required_height <= flow.content_bottom || y <= flow.content_top_pt + 0.1 {
     return (flow, y);
   }
   advance_section_flow(flow, current, pages)
@@ -604,8 +691,40 @@ fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -
   }
 }
 
+fn paragraph_spacing_before(previous: Option<&Block>, paragraph: &crate::docx::Paragraph) -> f32 {
+  if let Some(Block::Paragraph(previous)) = previous
+    && suppress_contextual_spacing(previous, paragraph)
+  {
+    return 0.0;
+  }
+  paragraph.format.spacing_before_pt
+}
+
+fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
+  if let Some(Block::Paragraph(next)) = next
+    && suppress_contextual_spacing(paragraph, next)
+  {
+    return 0.0;
+  }
+  paragraph
+    .format
+    .spacing_after_pt
+    .max(PARAGRAPH_SPACING_AFTER_PT)
+}
+
+fn suppress_contextual_spacing(
+  first: &crate::docx::Paragraph,
+  second: &crate::docx::Paragraph,
+) -> bool {
+  first.format.contextual_spacing
+    && second.format.contextual_spacing
+    && first.format == second.format
+}
+
 fn layout_document_block(
+  previous: Option<&Block>,
   block: &Block,
+  next: Option<&Block>,
   flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
@@ -619,17 +738,20 @@ fn layout_document_block(
           current,
           empty_page(flow.setup, flow.section_index),
         ));
-        y = flow.setup.margin_top_pt;
-        flow = flow_context(
-          flow.setup,
-          flow.section_index,
-          flow.columns,
-          0,
-          flow.default_tab_stop_pt,
+        flow = body_flow_for_page(
+          flow_with_column(
+            FlowContext {
+              section_page_index: flow.section_page_index + 1,
+              ..flow
+            },
+            0,
+          ),
+          pages.len() + 1,
         );
+        y = flow.content_top_pt;
       }
 
-      y += paragraph.format.spacing_before_pt;
+      y += paragraph_spacing_before(previous, paragraph);
       let paragraph_flow = FlowContext {
         content_width: (flow.content_width
           - paragraph.format.indent_left_pt
@@ -637,7 +759,14 @@ fn layout_document_block(
           .max(DEFAULT_FONT_SIZE_PT),
         ..flow
       };
-      let (paragraph_flow, y) = layout_paragraph(paragraph, paragraph_flow, current, pages, y);
+      let (paragraph_flow, y) = layout_paragraph(
+        paragraph,
+        paragraph_flow,
+        current,
+        pages,
+        y,
+        paragraph_spacing_after(paragraph, next),
+      );
       (
         FlowContext {
           content_width: flow.content_width,
@@ -654,12 +783,16 @@ fn block_area(flow: FlowContext) -> BlockArea {
   BlockArea {
     setup: flow.setup,
     section_index: flow.section_index,
+    section_page_index: flow.section_page_index,
     column_index: flow.column_index,
     columns: flow.columns,
+    content_top_pt: flow.content_top_pt,
     content_left_pt: flow.content_left_pt,
     content_bottom: flow.content_bottom,
+    body_content_bottom_pt: flow.body_content_bottom_pt,
     content_width: flow.content_width,
     default_tab_stop_pt: flow.default_tab_stop_pt,
+    repeating_slots: flow.repeating_slots,
   }
 }
 
@@ -667,18 +800,22 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
   FlowContext {
     setup: area.setup,
     section_index: area.section_index,
+    section_page_index: area.section_page_index,
     column_index: area.column_index,
     columns: area.columns,
+    content_top_pt: area.content_top_pt,
     content_left_pt: area.content_left_pt,
     content_bottom: area.content_bottom,
+    body_content_bottom_pt: area.body_content_bottom_pt,
     content_width: area.content_width,
     default_tab_stop_pt: area.default_tab_stop_pt,
+    repeating_slots: area.repeating_slots,
   }
 }
 
 fn restore_body_content_bottom(flow: FlowContext) -> FlowContext {
   FlowContext {
-    content_bottom: flow.setup.height_pt - flow.setup.margin_bottom_pt,
+    content_bottom: flow.body_content_bottom_pt,
     ..flow
   }
 }
@@ -721,7 +858,7 @@ fn footnote_boss_reserve(
     return (flow, None);
   }
 
-  let available_height = flow.content_bottom - flow.setup.margin_top_pt;
+  let available_height = flow.content_bottom - flow.content_top_pt;
   let reserved_height = height.min(available_height * FOOTNOTE_AREA_MAX_FRACTION);
   let footnote_top = flow.content_bottom - reserved_height;
   (
@@ -781,9 +918,11 @@ fn footnote_boss_format(
 
   let mut needs_separator = true;
   let footnote_flow = FlowContext {
+    content_top_pt: y,
     content_left_pt: flow.setup.margin_left_pt,
     content_width: flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
     content_bottom: flow.setup.height_pt - flow.setup.margin_bottom_pt,
+    body_content_bottom_pt: flow.setup.height_pt - flow.setup.margin_bottom_pt,
     columns: SectionColumns::default(),
     column_index: 0,
     ..flow
@@ -805,8 +944,11 @@ fn footnote_boss_format(
       );
       needs_separator = false;
     }
-    for block in blocks {
-      let (_, next_y) = layout_document_block(block, footnote_flow, current, pages, y);
+    for (index, block) in blocks.iter().enumerate() {
+      let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
+      let next = blocks.get(index + 1);
+      let (_, next_y) =
+        layout_document_block(previous, block, next, footnote_flow, current, pages, y);
       y = next_y;
     }
   }
@@ -931,12 +1073,16 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         FlowContext {
           setup: page.setup,
           section_index: page.section_index,
+          section_page_index: 0,
           column_index: 0,
           columns: SectionColumns::default(),
+          content_top_pt: header_area.top_pt,
           content_left_pt: page.setup.margin_left_pt,
           content_bottom: header_area.bottom_pt,
+          body_content_bottom_pt: header_area.bottom_pt,
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
+          repeating_slots: RepeatingSlotState::default(),
         },
       );
     }
@@ -952,12 +1098,16 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         FlowContext {
           setup: page.setup,
           section_index: page.section_index,
+          section_page_index: 0,
           column_index: 0,
           columns: SectionColumns::default(),
+          content_top_pt: footer_area.top_pt,
           content_left_pt: page.setup.margin_left_pt,
           content_bottom: footer_area.bottom_pt,
+          body_content_bottom_pt: footer_area.bottom_pt,
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
+          repeating_slots: RepeatingSlotState::default(),
         },
       );
     }
@@ -984,32 +1134,37 @@ fn apply_page_backgrounds(pages: &mut [Page]) {
   }
 }
 
-fn place_behind_text_images(pages: &mut [Page]) {
+fn place_floating_images(pages: &mut [Page]) {
   for page in pages {
     let mut behind_images = Vec::new();
-    let mut foreground_items = Vec::with_capacity(page.items.len());
+    let mut foreground_images = Vec::new();
+    let mut body_items = Vec::with_capacity(page.items.len());
     let mut background_count = 0;
 
     for item in page.items.drain(..) {
-      if matches!(&item, PageItem::Image(image) if image.behind_text) {
+      if matches!(&item, PageItem::Image(image) if image.floating && image.behind_text) {
         behind_images.push(item);
+      } else if matches!(&item, PageItem::Image(image) if image.floating) {
+        foreground_images.push(item);
       } else {
         if is_page_background_item(&item, page.setup) {
           background_count += 1;
         }
-        foreground_items.push(item);
+        body_items.push(item);
       }
     }
 
-    if behind_images.is_empty() {
-      page.items = foreground_items;
+    if behind_images.is_empty() && foreground_images.is_empty() {
+      page.items = body_items;
       continue;
     }
 
-    let mut ordered = Vec::with_capacity(foreground_items.len() + behind_images.len());
-    ordered.extend(foreground_items.drain(..background_count));
+    let mut ordered =
+      Vec::with_capacity(body_items.len() + behind_images.len() + foreground_images.len());
+    ordered.extend(body_items.drain(..background_count));
     ordered.extend(behind_images);
-    ordered.extend(foreground_items);
+    ordered.extend(body_items);
+    ordered.extend(foreground_images);
     page.items = ordered;
   }
 }
@@ -1136,6 +1291,108 @@ fn footer_area(setup: PageSetup) -> RepeatingArea {
   }
 }
 
+fn body_flow_for_page(flow: FlowContext, page_number: usize) -> FlowContext {
+  let (content_top_pt, content_bottom) = body_content_limits_for_page(
+    flow.setup,
+    flow.repeating_slots,
+    page_number,
+    flow.section_page_index,
+  );
+  FlowContext {
+    content_top_pt,
+    content_bottom,
+    body_content_bottom_pt: content_bottom,
+    ..flow
+  }
+}
+
+fn body_content_limits_for_page(
+  setup: PageSetup,
+  slots: RepeatingSlotState,
+  page_number: usize,
+  section_page_index: usize,
+) -> (f32, f32) {
+  let mut top = setup.margin_top_pt;
+  let mut bottom = setup.height_pt - setup.margin_bottom_pt;
+  let (has_header, has_footer) =
+    repeating_slots_present_for_page(slots, page_number, section_page_index);
+
+  if has_header {
+    top = top.max(header_area(setup).bottom_pt);
+  }
+  if has_footer {
+    bottom = bottom.min(footer_area(setup).top_pt);
+  }
+  if bottom < top + DEFAULT_LINE_HEIGHT_PT {
+    bottom = (top + DEFAULT_LINE_HEIGHT_PT).min(setup.height_pt);
+  }
+
+  (top, bottom)
+}
+
+fn repeating_slot_state(document: &DocxDocument, section_index: usize) -> RepeatingSlotState {
+  if let Some(section) = document.sections.get(section_index) {
+    return RepeatingSlotState {
+      title_page: section.title_page,
+      even_and_odd_headers: document.even_and_odd_headers,
+      default_header: !section.header_blocks.is_empty(),
+      default_footer: !section.footer_blocks.is_empty(),
+      first_header: !section.first_header_blocks.is_empty(),
+      first_footer: !section.first_footer_blocks.is_empty(),
+      even_header: !section.even_header_blocks.is_empty(),
+      even_footer: !section.even_footer_blocks.is_empty(),
+    };
+  }
+
+  RepeatingSlotState {
+    title_page: document.title_page,
+    even_and_odd_headers: document.even_and_odd_headers,
+    default_header: !document.header_blocks.is_empty(),
+    default_footer: !document.footer_blocks.is_empty(),
+    first_header: !document.first_header_blocks.is_empty(),
+    first_footer: !document.first_footer_blocks.is_empty(),
+    even_header: !document.header_blocks.is_empty(),
+    even_footer: !document.footer_blocks.is_empty(),
+  }
+}
+
+fn repeating_slots_present_for_page(
+  slots: RepeatingSlotState,
+  page_number: usize,
+  section_page_index: usize,
+) -> (bool, bool) {
+  let first_page_in_section = section_page_index == 0;
+  let use_even_slot = slots.even_and_odd_headers && page_number.is_multiple_of(2);
+  let header = selected_repeating_slot_present(
+    first_page_in_section,
+    use_even_slot,
+    slots.title_page,
+    slots.first_header,
+    slots.even_header,
+    slots.default_header,
+  );
+  let footer = selected_repeating_slot_present(
+    first_page_in_section,
+    use_even_slot,
+    slots.title_page,
+    slots.first_footer,
+    slots.even_footer,
+    slots.default_footer,
+  );
+  (header, footer)
+}
+
+fn selected_repeating_slot_present(
+  first_page_in_section: bool,
+  use_even_slot: bool,
+  title_page: bool,
+  first: bool,
+  even: bool,
+  default: bool,
+) -> bool {
+  (first_page_in_section && title_page && first) || (use_even_slot && even) || default
+}
+
 fn layout_repeating_block(
   block: &Block,
   page: &mut Page,
@@ -1151,6 +1408,10 @@ fn layout_repeating_block(
         page,
         discarded_pages,
         y + paragraph.format.spacing_before_pt,
+        paragraph
+          .format
+          .spacing_after_pt
+          .max(PARAGRAPH_SPACING_AFTER_PT),
       );
       y
     }
@@ -1251,6 +1512,37 @@ impl<'a> TableFrameLayout<'a> {
     for (row_index, row) in self.table.rows.iter().enumerate() {
       let mut row_frame = layout.row_frame(row, row_index, y);
       let row_height = row_frame.height_pt;
+      if layout.should_split_row(&row_frame, current) {
+        let mut remaining_height = row_height;
+        let mut content_offset = 0.0;
+        while remaining_height > 0.1 {
+          let available_height = (layout.frame.block.content_bottom - y).max(0.0);
+          if available_height <= 0.1 {
+            (flow, y) = advance_section_flow(flow, current, pages);
+            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+              layout = next_layout;
+            }
+            y = layout.format_repeated_header_rows(current, y, remaining_height);
+            continue;
+          }
+
+          let fragment_height = remaining_height.min(available_height);
+          row_frame = layout.row_frame(row, row_index, y);
+          row_frame.format_fragment(current, y, y + fragment_height, content_offset);
+          y += fragment_height;
+          remaining_height -= fragment_height;
+          content_offset += fragment_height;
+          if remaining_height > 0.1 {
+            (flow, y) = advance_section_flow(flow, current, pages);
+            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+              layout = next_layout;
+            }
+            y = layout.format_repeated_header_rows(current, y, remaining_height);
+          }
+        }
+        continue;
+      }
+
       let move_to_follow = layout.should_move_row_to_follow(
         &row_frame,
         current,
@@ -1296,7 +1588,15 @@ impl<'a> TableFrameLayout<'a> {
 
     !row.row.cant_split
       || row.fits_empty_body_region()
-      || row.y > self.frame.block.setup.margin_top_pt + 0.1
+      || row.y > self.frame.block.content_top_pt + 0.1
+  }
+
+  fn should_split_row(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
+    !row.row.cant_split
+      && row.bottom() > self.frame.block.content_bottom
+      && !row.fits_empty_body_region()
+      && row.y < self.frame.block.content_bottom
+      && !current.items.is_empty()
   }
 
   fn format_repeated_header_rows(&self, current: &mut Page, mut y: f32, row_height: f32) -> f32 {
@@ -1344,30 +1644,44 @@ impl RowFrame<'_, '_> {
   }
 
   fn fits_empty_body_region(&self) -> bool {
-    self.height_pt
-      <= self.table_frame.block.content_bottom - self.table_frame.block.setup.margin_top_pt
+    self.height_pt <= self.table_frame.block.content_bottom - self.table_frame.block.content_top_pt
   }
 
   fn format(&self, current: &mut Page) -> f32 {
     let row_top = self.y;
     let row_bottom = self.bottom();
+    self.format_fragment(current, row_top, row_bottom, 0.0);
+    row_bottom
+  }
 
+  fn format_fragment(
+    &self,
+    current: &mut Page,
+    row_top: f32,
+    row_bottom: f32,
+    content_offset: f32,
+  ) {
     let mut cell_left = self.table_frame.left_pt;
     let mut grid_index = 0;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
-      let cell_frame = match self.cell_frame(cell, cell_index, cell_left, &mut grid_index) {
+      let cell_frame = match self.cell_frame(
+        cell,
+        cell_index,
+        cell_left,
+        row_bottom - row_top,
+        &mut grid_index,
+      ) {
         Some(cell_frame) => cell_frame,
         None => break,
       };
       if !cell.vertical_merge_continue {
-        cell_frame.format(current, row_top, row_bottom);
+        cell_frame.format(current, row_top, row_bottom, content_offset);
       }
       cell_left += cell_frame.width_pt;
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
     self.paint_trailing_border(current, row_top, row_bottom);
-    row_bottom
   }
 
   fn cell_frame<'s>(
@@ -1375,6 +1689,7 @@ impl RowFrame<'_, '_> {
     cell: &'s TableCell,
     cell_index: usize,
     left_pt: f32,
+    height_pt: f32,
     grid_index: &mut usize,
   ) -> Option<CellFrame<'s, 's>> {
     if *grid_index >= self.table_frame.column_widths.len() {
@@ -1400,7 +1715,7 @@ impl RowFrame<'_, '_> {
       cell_index,
       left_pt,
       width_pt,
-      height_pt: self.height_pt,
+      height_pt,
     })
   }
 
@@ -1460,18 +1775,19 @@ struct CellFrame<'a, 'f> {
 }
 
 impl CellFrame<'_, '_> {
-  fn format(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+  fn format(&self, current: &mut Page, row_top: f32, row_bottom: f32, content_offset: f32) {
     self.paint_background(current, row_top);
     self.paint_leading_border(current, row_top, row_bottom);
-    layout_table_cell(
-      self.cell,
-      self.table_frame.block.setup,
+    layout_table_cell(TableCellLayout {
+      cell: self.cell,
+      setup: self.table_frame.block.setup,
       current,
-      self.left_pt,
-      row_top,
-      self.width_pt,
-      self.height_pt,
-    );
+      x: self.left_pt,
+      y: row_top,
+      width: self.width_pt,
+      height: self.height_pt,
+      content_offset,
+    });
   }
 
   fn paint_background(&self, current: &mut Page, row_top: f32) {
@@ -1614,26 +1930,80 @@ fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -
     if let Some(preferred) = preferred_width
       && preferred > 0.0
     {
-      let total = widths.iter().sum::<f32>();
-      if total > 0.0 {
-        let scale = preferred / total;
-        for width in &mut widths {
-          *width *= scale;
-        }
-      }
+      scale_widths_to_total(&mut widths, preferred);
     }
-    let total = widths.iter().sum::<f32>();
-    if total > content_width && total > 0.0 {
-      let scale = content_width / total;
-      for width in &mut widths {
-        *width *= scale;
-      }
+    clamp_widths_to_content(&mut widths, content_width);
+    return widths;
+  }
+
+  if let Some(mut widths) = table_cell_preferred_column_widths(table, column_count, content_width) {
+    if let Some(preferred) = preferred_width {
+      scale_widths_to_total(&mut widths, preferred);
     }
+    clamp_widths_to_content(&mut widths, content_width);
     return widths;
   }
 
   let width = preferred_width.unwrap_or(content_width).min(content_width);
   vec![width / column_count as f32; column_count]
+}
+
+fn table_cell_preferred_column_widths(
+  table: &Table,
+  column_count: usize,
+  content_width: f32,
+) -> Option<Vec<f32>> {
+  for row in &table.rows {
+    let mut widths = vec![0.0; column_count];
+    let mut grid_index = 0;
+    let mut complete = true;
+    for cell in &row.cells {
+      let span = cell.grid_span.max(1);
+      if span != 1 || grid_index >= column_count {
+        complete = false;
+        break;
+      }
+      let width = cell
+        .preferred_width_pt
+        .or_else(|| cell.preferred_width_pct.map(|pct| content_width * pct))
+        .unwrap_or(0.0);
+      if width <= 0.0 {
+        complete = false;
+        break;
+      }
+      widths[grid_index] = width;
+      grid_index += span;
+    }
+    if complete && grid_index == column_count {
+      return Some(widths);
+    }
+  }
+  None
+}
+
+fn scale_widths_to_total(widths: &mut [f32], target_total: f32) {
+  if target_total <= 0.0 {
+    return;
+  }
+  let total = widths.iter().sum::<f32>();
+  if total <= 0.0 {
+    return;
+  }
+  let scale = target_total / total;
+  for width in widths {
+    *width *= scale;
+  }
+}
+
+fn clamp_widths_to_content(widths: &mut [f32], content_width: f32) {
+  let total = widths.iter().sum::<f32>();
+  if total <= content_width || total <= 0.0 {
+    return;
+  }
+  let scale = content_width / total;
+  for width in widths {
+    *width *= scale;
+  }
 }
 
 fn table_preferred_width(table: &Table, content_width: f32) -> Option<f32> {
@@ -1692,19 +2062,32 @@ fn spanned_cell_width(cell: &TableCell, column_widths: &[f32], grid_index: &mut 
   width
 }
 
-fn layout_table_cell(
-  cell: &TableCell,
+struct TableCellLayout<'a> {
+  cell: &'a TableCell,
   setup: PageSetup,
-  page: &mut Page,
+  current: &'a mut Page,
   x: f32,
   y: f32,
   width: f32,
   height: f32,
-) {
+  content_offset: f32,
+}
+
+fn layout_table_cell(fragment: TableCellLayout<'_>) {
+  let TableCellLayout {
+    cell,
+    setup,
+    current,
+    x,
+    y,
+    width,
+    height,
+    content_offset,
+  } = fragment;
   let content_width =
     (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
   let content_height = table_cell_content_height(cell, width);
-  let mut text_y = match cell.vertical_alignment {
+  let aligned_text_y = match cell.vertical_alignment {
     TableCellVerticalAlignment::Top => y + cell.margins.top_pt + DEFAULT_FONT_SIZE_PT,
     TableCellVerticalAlignment::Center => {
       y + ((height - content_height) / 2.0).max(cell.margins.top_pt) + DEFAULT_FONT_SIZE_PT
@@ -1714,37 +2097,53 @@ fn layout_table_cell(
         + DEFAULT_FONT_SIZE_PT
     }
   };
+  let mut text_y = aligned_text_y - content_offset;
   let text_left = x + cell.margins.left_pt;
   let text_bottom = y + height - cell.margins.bottom_pt;
   let flow = FlowContext {
     setup,
-    section_index: page.section_index,
+    section_index: current.section_index,
+    section_page_index: 0,
     column_index: 0,
     columns: SectionColumns::default(),
+    content_top_pt: text_y,
     content_left_pt: text_left,
     content_bottom: text_bottom,
+    body_content_bottom_pt: text_bottom,
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    repeating_slots: RepeatingSlotState::default(),
   };
-  let mut nested_page = empty_page(setup, page.section_index);
+  let mut nested_page = empty_page(setup, current.section_index);
   let mut discarded_pages = Vec::new();
 
-  for block in &cell.blocks {
+  for (index, block) in cell.blocks.iter().enumerate() {
     if text_y > text_bottom {
       break;
     }
-    let (_, next_y) =
-      layout_document_block(block, flow, &mut nested_page, &mut discarded_pages, text_y);
+    let previous = index
+      .checked_sub(1)
+      .and_then(|index| cell.blocks.get(index));
+    let next = cell.blocks.get(index + 1);
+    let (_, next_y) = layout_document_block(
+      previous,
+      block,
+      next,
+      flow,
+      &mut nested_page,
+      &mut discarded_pages,
+      text_y,
+    );
     text_y = next_y;
   }
 
-  page.items.extend(
-    nested_page
+  let visible_page = discarded_pages.into_iter().next().unwrap_or(nested_page);
+  current.items.extend(
+    visible_page
       .items
       .into_iter()
-      .filter(|item| item_y(item).is_none_or(|item_y| item_y <= text_bottom)),
+      .filter(|item| item_y(item).is_none_or(|item_y| item_y >= y && item_y <= text_bottom)),
   );
-  let _overflow_pages = discarded_pages;
 }
 
 fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
@@ -1753,12 +2152,16 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
   let flow = FlowContext {
     setup: PageSetup::default(),
     section_index: 0,
+    section_page_index: 0,
     column_index: 0,
     columns: SectionColumns::default(),
+    content_top_pt: 0.0,
     content_left_pt: 0.0,
     content_bottom: f32::MAX / 4.0,
+    body_content_bottom_pt: f32::MAX / 4.0,
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    repeating_slots: RepeatingSlotState::default(),
   };
   let content = cell
     .blocks
@@ -1782,22 +2185,60 @@ fn floating_image_position(
   flow: FlowContext,
   current_x: f32,
   current_y: f32,
+  image_width: f32,
+  image_height: f32,
 ) -> (f32, f32) {
-  let base_x = match placement.horizontal_relative_to {
-    HorizontalImageReference::Page => 0.0,
-    HorizontalImageReference::Margin => flow.setup.margin_left_pt,
-    HorizontalImageReference::Column => flow.content_left_pt,
-    HorizontalImageReference::Character => current_x,
+  let (base_x, reference_width) = match placement.horizontal_relative_to {
+    HorizontalImageReference::Page => (0.0, flow.setup.width_pt),
+    HorizontalImageReference::Margin => (
+      flow.setup.margin_left_pt,
+      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
+    ),
+    HorizontalImageReference::Column => (flow.content_left_pt, flow.content_width),
+    HorizontalImageReference::Character => (current_x, 0.0),
   };
-  let base_y = match placement.vertical_relative_to {
-    VerticalImageReference::Page => 0.0,
-    VerticalImageReference::Margin => flow.setup.margin_top_pt,
-    VerticalImageReference::Paragraph | VerticalImageReference::Line => current_y,
+  let (base_y, reference_height) = match placement.vertical_relative_to {
+    VerticalImageReference::Page => (0.0, flow.setup.height_pt),
+    VerticalImageReference::Margin => (
+      flow.setup.margin_top_pt,
+      flow.setup.height_pt - flow.setup.margin_top_pt - flow.setup.margin_bottom_pt,
+    ),
+    VerticalImageReference::Paragraph | VerticalImageReference::Line => (current_y, 0.0),
   };
   (
-    base_x + placement.horizontal_offset_pt,
-    base_y + placement.vertical_offset_pt,
+    base_x
+      + aligned_horizontal_offset(placement.horizontal_alignment, reference_width, image_width)
+      + placement.horizontal_offset_pt,
+    base_y
+      + aligned_vertical_offset(placement.vertical_alignment, reference_height, image_height)
+      + placement.vertical_offset_pt,
   )
+}
+
+fn aligned_horizontal_offset(
+  alignment: Option<HorizontalImageAlignment>,
+  reference_width: f32,
+  image_width: f32,
+) -> f32 {
+  let available = (reference_width - image_width).max(0.0);
+  match alignment {
+    Some(HorizontalImageAlignment::Center) => available / 2.0,
+    Some(HorizontalImageAlignment::Right) => available,
+    Some(HorizontalImageAlignment::Left) | None => 0.0,
+  }
+}
+
+fn aligned_vertical_offset(
+  alignment: Option<VerticalImageAlignment>,
+  reference_height: f32,
+  image_height: f32,
+) -> f32 {
+  let available = (reference_height - image_height).max(0.0);
+  match alignment {
+    Some(VerticalImageAlignment::Center) => available / 2.0,
+    Some(VerticalImageAlignment::Bottom) => available,
+    Some(VerticalImageAlignment::Top) | None => 0.0,
+  }
 }
 
 fn layout_paragraph(
@@ -1806,18 +2247,19 @@ fn layout_paragraph(
   current: &mut Page,
   pages: &mut Vec<Page>,
   y: f32,
+  spacing_after_pt: f32,
 ) -> (FlowContext, f32) {
-  TextFrameLayout::new(paragraph, flow).format(current, pages, y)
+  TextFrameLayout::new(paragraph, flow, spacing_after_pt).format(current, pages, y)
 }
 
 #[derive(Clone, Copy, Debug)]
 struct TextFrame {
-  setup: PageSetup,
   default_line_left: f32,
   first_line_left: f32,
   default_line_right: f32,
   paragraph_left: f32,
   base_line_height: f32,
+  line_height_rule: LineHeightRule,
 }
 
 impl TextFrame {
@@ -1826,7 +2268,6 @@ impl TextFrame {
     let first_line_left =
       (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
     Self {
-      setup: flow.setup,
       default_line_left,
       first_line_left,
       default_line_right: default_line_left + flow.content_width,
@@ -1835,6 +2276,7 @@ impl TextFrame {
         .format
         .line_height_pt
         .unwrap_or(DEFAULT_LINE_HEIGHT_PT),
+      line_height_rule: paragraph.format.line_height_rule,
     }
   }
 }
@@ -2020,20 +2462,26 @@ struct TextLineAdvance<'a> {
   wrap_exclusions: &'a [WrapExclusion],
   state: &'a mut TextFrameState,
   active: ActiveTextFrame,
+  line_left: f32,
+  line_right: f32,
+  justify: bool,
+  line_item_start_index: &'a mut usize,
 }
 
 struct TextFrameLayout<'a> {
   paragraph: &'a crate::docx::Paragraph,
   flow: FlowContext,
   frame: TextFrame,
+  spacing_after_pt: f32,
 }
 
 impl<'a> TextFrameLayout<'a> {
-  fn new(paragraph: &'a crate::docx::Paragraph, flow: FlowContext) -> Self {
+  fn new(paragraph: &'a crate::docx::Paragraph, flow: FlowContext, spacing_after_pt: f32) -> Self {
     Self {
       paragraph,
       flow,
       frame: TextFrame::new(paragraph, flow),
+      spacing_after_pt,
     }
   }
 
@@ -2059,6 +2507,15 @@ impl<'a> TextFrameLayout<'a> {
     y: f32,
     line_height: &mut f32,
   ) -> (FlowContext, TextFrame, f32, f32, f32) {
+    if advance.justify {
+      justify_line_items(
+        &mut advance.current.items,
+        *advance.line_item_start_index,
+        y,
+        advance.line_left,
+        advance.line_right,
+      );
+    }
     advance.state.finish_line(y, *line_height);
     let mut next_y = y + *line_height;
     *line_height = advance.active.frame.base_line_height;
@@ -2075,22 +2532,27 @@ impl<'a> TextFrameLayout<'a> {
     }
     let (line_left, line_right) =
       self.line_bounds(next_frame, next_y, *line_height, advance.wrap_exclusions);
+    *advance.line_item_start_index = advance.current.items.len();
     (next_flow, next_frame, next_y, line_left, line_right)
   }
 
   fn force_text_page_break(
     &self,
+    flow: FlowContext,
     current: &mut Page,
     pages: &mut Vec<Page>,
     wrap_exclusions: &mut Vec<WrapExclusion>,
-  ) -> (f32, f32, f32, f32) {
-    let y = force_page_break(self.frame.setup, current, pages);
+  ) -> (FlowContext, TextFrame, f32, f32, f32, f32) {
+    let (next_flow, y) = force_page_break(flow, current, pages);
+    let next_frame = TextFrame::new(self.paragraph, next_flow);
     wrap_exclusions.clear();
     (
+      next_flow,
+      next_frame,
       y,
-      self.frame.first_line_left,
-      self.frame.default_line_right,
-      self.frame.base_line_height,
+      next_frame.first_line_left,
+      next_frame.default_line_right,
+      next_frame.base_line_height,
     )
   }
 
@@ -2160,6 +2622,9 @@ impl<'a> TextFrameLayout<'a> {
       }));
       x = default_line_left;
     }
+    let mut line_item_start_index = current.items.len();
+    let justify_wrapped_lines =
+      paragraph.format.alignment == ParagraphAlignment::Justify && paragraph.list_label.is_none();
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
@@ -2192,6 +2657,10 @@ impl<'a> TextFrameLayout<'a> {
                     flow,
                     frame: text_frame,
                   },
+                  line_left,
+                  line_right,
+                  justify: false,
+                  line_item_start_index: &mut line_item_start_index,
                 },
                 y,
                 &mut line_height,
@@ -2237,6 +2706,10 @@ impl<'a> TextFrameLayout<'a> {
                       flow,
                       frame: text_frame,
                     },
+                    line_left,
+                    line_right,
+                    justify: justify_wrapped_lines,
+                    line_item_start_index: &mut line_item_start_index,
                   },
                   y,
                   &mut line_height,
@@ -2254,7 +2727,7 @@ impl<'a> TextFrameLayout<'a> {
               }
               chunk_x = x;
               pending_tab = Some(tab_stop);
-              line_height = line_height.max(run.style.font_size_pt * 1.25);
+              line_height = include_text_height(line_height, text_frame, run.style);
               emitted = true;
               continue;
             }
@@ -2289,6 +2762,10 @@ impl<'a> TextFrameLayout<'a> {
                     flow,
                     frame: text_frame,
                   },
+                  line_left,
+                  line_right,
+                  justify: justify_wrapped_lines,
+                  line_item_start_index: &mut line_item_start_index,
                 },
                 y,
                 &mut line_height,
@@ -2336,6 +2813,10 @@ impl<'a> TextFrameLayout<'a> {
                             flow,
                             frame: text_frame,
                           },
+                          line_left,
+                          line_right,
+                          justify: justify_wrapped_lines,
+                          line_item_start_index: &mut line_item_start_index,
                         },
                         y,
                         &mut line_height,
@@ -2357,7 +2838,7 @@ impl<'a> TextFrameLayout<'a> {
                       inline_index,
                       text_offset,
                     });
-                    line_height = line_height.max(run.style.font_size_pt * 1.25);
+                    line_height = include_text_height(line_height, text_frame, run.style);
                     emitted = true;
                   }
                   continue;
@@ -2384,6 +2865,10 @@ impl<'a> TextFrameLayout<'a> {
                         flow,
                         frame: text_frame,
                       },
+                      line_left,
+                      line_right,
+                      justify: justify_wrapped_lines,
+                      line_item_start_index: &mut line_item_start_index,
                     },
                     y,
                     &mut line_height,
@@ -2405,7 +2890,7 @@ impl<'a> TextFrameLayout<'a> {
                   inline_index,
                   text_offset,
                 });
-                line_height = line_height.max(run.style.font_size_pt * 1.25);
+                line_height = include_text_height(line_height, text_frame, run.style);
                 emitted = true;
               }
               continue;
@@ -2420,7 +2905,7 @@ impl<'a> TextFrameLayout<'a> {
               inline_index,
               text_offset: segment.end,
             });
-            line_height = line_height.max(run.style.font_size_pt * 1.25);
+            line_height = include_text_height(line_height, text_frame, run.style);
             emitted = true;
           }
 
@@ -2440,7 +2925,7 @@ impl<'a> TextFrameLayout<'a> {
           let (width, height) =
             fit_image_to_line(image.width_pt, image.height_pt, flow.content_width);
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
-            let (image_x, image_y) = floating_image_position(placement, flow, x, y);
+            let (image_x, image_y) = floating_image_position(placement, flow, x, y, width, height);
             current.items.push(PageItem::Image(ImageItem {
               x_pt: image_x,
               y_pt: image_y,
@@ -2449,6 +2934,7 @@ impl<'a> TextFrameLayout<'a> {
               data: image.data.clone(),
               content_type: image.content_type.clone(),
               alt_text: image.alt_text.clone(),
+              floating: true,
               behind_text: placement.behind_text,
             }));
             match placement.wrap {
@@ -2463,6 +2949,7 @@ impl<'a> TextFrameLayout<'a> {
                   paragraph_left = text_frame.paragraph_left;
                   base_line_height = text_frame.base_line_height;
                   line_height = base_line_height;
+                  line_item_start_index = current.items.len();
                 }
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
@@ -2500,6 +2987,10 @@ impl<'a> TextFrameLayout<'a> {
                   flow,
                   frame: text_frame,
                 },
+                line_left,
+                line_right,
+                justify: justify_wrapped_lines,
+                line_item_start_index: &mut line_item_start_index,
               },
               y,
               &mut line_height,
@@ -2517,6 +3008,7 @@ impl<'a> TextFrameLayout<'a> {
             data: image.data.clone(),
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
+            floating: false,
             behind_text: false,
           }));
           x += width;
@@ -2526,9 +3018,13 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::PageBreak => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           text_state.finish_line(y, line_height);
-          (y, line_left, line_right, line_height) =
-            self.force_text_page_break(current, pages, &mut wrap_exclusions);
+          (flow, text_frame, y, line_left, line_right, line_height) =
+            self.force_text_page_break(flow, current, pages, &mut wrap_exclusions);
+          default_line_right = text_frame.default_line_right;
+          paragraph_left = text_frame.paragraph_left;
+          base_line_height = text_frame.base_line_height;
           x = line_left;
+          line_item_start_index = current.items.len();
           emitted = false;
           pending_tab = None;
         }
@@ -2549,6 +3045,7 @@ impl<'a> TextFrameLayout<'a> {
           paragraph_left = text_frame.paragraph_left;
           base_line_height = text_frame.base_line_height;
           x = line_left;
+          line_item_start_index = current.items.len();
           emitted = column_emitted;
           pending_tab = None;
         }
@@ -2559,14 +3056,10 @@ impl<'a> TextFrameLayout<'a> {
     if emitted {
       text_state.finish_paragraph(y, line_height, emitted);
       paragraph_bottom = y + line_height;
-      y = paragraph_bottom
-        + paragraph
-          .format
-          .spacing_after_pt
-          .max(PARAGRAPH_SPACING_AFTER_PT);
+      y = paragraph_bottom + self.spacing_after_pt;
     } else {
       paragraph_bottom = y + base_line_height;
-      y = paragraph_bottom + paragraph.format.spacing_after_pt;
+      y = paragraph_bottom + self.spacing_after_pt;
     }
     debug_assert!(text_state.split_candidates_are_ordered());
     let split_decision = text_state.page_split_decision(
@@ -2581,7 +3074,7 @@ impl<'a> TextFrameLayout<'a> {
       pages.truncate(start_pages_len);
       *current = start_current;
       let (follow_flow, follow_y) = advance_section_flow(start_flow, current, pages);
-      return TextFrameLayout::new(paragraph, follow_flow)
+      return TextFrameLayout::new(paragraph, follow_flow, self.spacing_after_pt)
         .format_with_reflow(current, pages, follow_y, false);
     }
 
@@ -2864,6 +3357,120 @@ fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, 
   }
 }
 
+fn justify_line_items(
+  items: &mut Vec<PageItem>,
+  start_index: usize,
+  y: f32,
+  line_left: f32,
+  line_right: f32,
+) {
+  if start_index >= items.len() {
+    return;
+  }
+
+  let line_end = items.len();
+  let line_text_indices = items[start_index..line_end]
+    .iter()
+    .enumerate()
+    .filter_map(|(offset, item)| match item {
+      PageItem::Text(text) if f32::abs(text.y_pt - y) < 0.01 => Some(start_index + offset),
+      _ => None,
+    })
+    .collect::<Vec<_>>();
+  let Some(last_text_index) = line_text_indices.last().copied() else {
+    return;
+  };
+
+  let mut line_width: f32 = 0.0;
+  let mut space_count = 0usize;
+  for index in &line_text_indices {
+    let PageItem::Text(text) = &items[*index] else {
+      continue;
+    };
+    let measured_text = if *index == last_text_index {
+      text.text.trim_end_matches(' ')
+    } else {
+      &text.text
+    };
+    line_width = line_width.max(text.x_pt + measure_text(measured_text, text.style) - line_left);
+    space_count += measured_text.chars().filter(|ch| *ch == ' ').count();
+  }
+
+  let extra = line_right - line_left - line_width;
+  if space_count == 0 || extra <= 0.0 {
+    return;
+  }
+
+  let extra_per_space = extra / space_count as f32;
+  let mut rebuilt = Vec::with_capacity(line_end - start_index + space_count);
+  let mut text_index = 0usize;
+  for item in items.drain(start_index..line_end) {
+    let PageItem::Text(text) = item else {
+      rebuilt.push(item);
+      continue;
+    };
+    if f32::abs(text.y_pt - y) >= 0.01 {
+      rebuilt.push(PageItem::Text(text));
+      continue;
+    }
+    text_index += 1;
+    let trim_trailing_spaces = text_index == line_text_indices.len();
+    if !text.text.contains(' ') {
+      rebuilt.push(PageItem::Text(text));
+      continue;
+    }
+    rebuilt.extend(justified_text_segments(
+      text,
+      extra_per_space,
+      trim_trailing_spaces,
+    ));
+  }
+  items.splice(start_index..start_index, rebuilt);
+}
+
+fn justified_text_segments(
+  mut text: TextItem,
+  extra_per_space: f32,
+  trim_trailing_spaces: bool,
+) -> Vec<PageItem> {
+  if trim_trailing_spaces {
+    text.text.truncate(text.text.trim_end_matches(' ').len());
+  }
+  let mut items = Vec::new();
+  let mut cursor_x = text.x_pt;
+  let mut current = String::new();
+  for ch in text.text.chars() {
+    if ch == ' ' {
+      if !current.is_empty() {
+        let width = measure_text(&current, text.style);
+        items.push(PageItem::Text(TextItem {
+          x_pt: cursor_x,
+          y_pt: text.y_pt,
+          text: std::mem::take(&mut current),
+          style: text.style,
+          hyperlink_url: text.hyperlink_url.clone(),
+          dynamic_field: text.dynamic_field,
+        }));
+        cursor_x += width;
+      }
+      cursor_x += measure_text(" ", text.style) + extra_per_space;
+    } else {
+      current.push(ch);
+    }
+  }
+  if !current.is_empty() {
+    items.push(PageItem::Text(TextItem {
+      x_pt: cursor_x,
+      y_pt: text.y_pt,
+      text: current,
+      style: text.style,
+      hyperlink_url: text.hyperlink_url,
+      dynamic_field: text.dynamic_field,
+    }));
+  }
+  items
+}
+
 fn item_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
@@ -2902,14 +3509,19 @@ fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
   }
 }
 
-fn force_page_break(setup: PageSetup, current: &mut Page, pages: &mut Vec<Page>) -> f32 {
+fn force_page_break(
+  flow: FlowContext,
+  current: &mut Page,
+  pages: &mut Vec<Page>,
+) -> (FlowContext, f32) {
   if !current.items.is_empty() {
     pages.push(std::mem::replace(
       current,
-      empty_page(setup, current.section_index),
+      empty_page(flow.setup, current.section_index),
     ));
   }
-  setup.margin_top_pt
+  let next_flow = flow_with_column(flow, 0);
+  (next_flow, next_flow.content_top_pt)
 }
 
 fn flush_text(

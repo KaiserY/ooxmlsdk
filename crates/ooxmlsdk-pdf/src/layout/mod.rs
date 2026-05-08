@@ -47,6 +47,7 @@ pub(crate) struct Page {
   pub section_index: usize,
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
+  wrap_exclusions: Vec<WrapExclusion>,
 }
 
 #[derive(Clone, Debug)]
@@ -447,6 +448,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_index,
     section_page_index,
     items: Vec::new(),
+    wrap_exclusions: Vec::new(),
   }
 }
 
@@ -912,11 +914,54 @@ fn referenced_footnote_area_height(
       height += DEFAULT_LINE_HEIGHT_PT;
       has_note = true;
     }
-    for block in blocks {
-      height += estimated_block_height(block, flow);
-    }
+    height += measured_note_blocks_height(blocks, flow);
   }
   height
+}
+
+fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
+  let mut scratch = empty_section_page(
+    PageSetup {
+      width_pt: flow.setup.width_pt,
+      height_pt: 100_000.0,
+      margin_left_pt: flow.setup.margin_left_pt,
+      margin_right_pt: flow.setup.margin_right_pt,
+      margin_top_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      ..flow.setup
+    },
+    flow.section_index,
+    flow.section_page_index,
+  );
+  let mut discarded_pages = Vec::new();
+  let note_flow = FlowContext {
+    setup: scratch.setup,
+    content_top_pt: 0.0,
+    content_left_pt: flow.setup.margin_left_pt,
+    content_width: flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
+    content_bottom: scratch.setup.height_pt,
+    body_content_bottom_pt: scratch.setup.height_pt,
+    columns: SectionColumns::default(),
+    column_index: 0,
+    repeating_slots: RepeatingSlotState::default(),
+    ..flow
+  };
+  let mut y = 0.0;
+  for (index, block) in blocks.iter().enumerate() {
+    let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
+    let next = blocks.get(index + 1);
+    let (_, next_y) = layout_document_block(
+      previous,
+      block,
+      next,
+      note_flow,
+      &mut scratch,
+      &mut discarded_pages,
+      y,
+    );
+    y = next_y;
+  }
+  y
 }
 
 fn footnote_boss_format(
@@ -1334,10 +1379,10 @@ fn body_content_limits_for_page(
   let (has_header, has_footer) =
     repeating_slots_present_for_page(slots, page_number, section_page_index);
 
-  if has_header {
+  if has_header && !setup.top_margin_was_negative {
     top = top.max(header_area(setup).bottom_pt);
   }
-  if has_footer {
+  if has_footer && !setup.bottom_margin_was_negative {
     bottom = bottom.min(footer_area(setup).top_pt);
   }
   if bottom < top + DEFAULT_LINE_HEIGHT_PT {
@@ -1617,6 +1662,7 @@ impl<'a> TableFrameLayout<'a> {
 
   fn should_split_row(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
     !row.row.cant_split
+      && !row_has_vertical_merge_context(self.table, row.row_index)
       && row.bottom() > self.frame.block.content_bottom
       && !row.fits_empty_body_region()
       && row.y < self.frame.block.content_bottom
@@ -1992,6 +2038,29 @@ fn vertical_merge_content_height(
     has_continuation = true;
   }
   has_continuation.then_some(height)
+}
+
+fn row_has_vertical_merge_context(table: &Table, row_index: usize) -> bool {
+  let Some(row) = table.rows.get(row_index) else {
+    return false;
+  };
+  let mut grid_index = row.grid_before;
+  for cell in &row.cells {
+    let grid_start = grid_index;
+    grid_index += cell.grid_span.max(1);
+    if cell.vertical_merge_continue {
+      return true;
+    }
+    if table
+      .rows
+      .get(row_index + 1)
+      .and_then(|next| row_cell_at_grid(next, grid_start))
+      .is_some_and(|next_cell| next_cell.vertical_merge_continue)
+    {
+      return true;
+    }
+  }
+  false
 }
 
 fn row_cell_spacing_pt(table: &Table, row: &TableRow) -> f32 {
@@ -2549,7 +2618,6 @@ impl TextFrame {
 #[derive(Clone, Copy, Debug)]
 struct LineFrame {
   left_pt: f32,
-  right_pt: f32,
   y_pt: f32,
   height_pt: f32,
   x_pt: f32,
@@ -2564,7 +2632,6 @@ impl LineFrame {
     };
     Self {
       left_pt,
-      right_pt: text_frame.default_line_right,
       y_pt: y,
       height_pt: text_frame.base_line_height,
       x_pt: left_pt,
@@ -2865,7 +2932,12 @@ impl<'a> TextFrameLayout<'a> {
     let first_line_left = text_frame.first_line_left;
     let mut default_line_right = text_frame.default_line_right;
     let mut paragraph_left = text_frame.paragraph_left;
-    let mut wrap_exclusions = Vec::new();
+    let mut wrap_exclusions = current
+      .wrap_exclusions
+      .iter()
+      .copied()
+      .filter(|exclusion| exclusion.bottom_pt > y)
+      .collect::<Vec<_>>();
     let mut emitted = paragraph.list_label.is_some();
     let mut pending_tab: Option<ResolvedTabStop> = None;
     let mut text_state = TextFrameState::new();
@@ -2873,9 +2945,12 @@ impl<'a> TextFrameLayout<'a> {
     y = line.y_pt;
     let mut base_line_height = text_frame.base_line_height;
     let mut line_height = line.height_pt;
-    let mut line_left = line.left_pt;
-    let mut line_right = line.right_pt;
-    let mut x = line.x_pt;
+    let (mut line_left, mut line_right) =
+      self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+    if paragraph.list_label.is_some() {
+      line_left = line.left_pt.max(line_left);
+    }
+    let mut x = line.x_pt.max(line_left);
     if let Some(label) = &paragraph.list_label {
       current.items.push(PageItem::Text(TextItem {
         x_pt: first_line_left,
@@ -3229,13 +3304,15 @@ impl<'a> TextFrameLayout<'a> {
                 line_height = base_line_height;
               }
               ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
-                wrap_exclusions.push(WrapExclusion {
+                let exclusion = WrapExclusion {
                   left_pt: image_x - placement.margin_left_pt,
                   right_pt: image_x + width + placement.margin_right_pt,
                   top_pt: image_y - placement.margin_top_pt,
                   bottom_pt: image_y + height + placement.margin_bottom_pt,
                   side: placement.wrap_side,
-                });
+                };
+                wrap_exclusions.push(exclusion);
+                current.wrap_exclusions.push(exclusion);
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                 x = x.max(line_left).min(line_right);
@@ -3865,7 +3942,7 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::docx::{CellBordersModel, CellMargins};
+  use crate::docx::{CellBordersModel, CellMargins, Paragraph, ParagraphFormat, TextRun};
 
   #[test]
   fn repeating_areas_follow_word_margin_distances() {
@@ -3895,6 +3972,70 @@ mod tests {
 
     assert!(header.bottom_pt - header.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
     assert!(footer.bottom_pt - footer.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
+  }
+
+  #[test]
+  fn negative_header_footer_margins_do_not_reserve_body_space() {
+    let setup = PageSetup {
+      margin_top_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      top_margin_was_negative: true,
+      bottom_margin_was_negative: true,
+      ..Default::default()
+    };
+    let slots = RepeatingSlotState {
+      default_header: true,
+      default_footer: true,
+      ..Default::default()
+    };
+
+    let (top, bottom) = body_content_limits_for_page(setup, slots, 1, 0);
+
+    assert_eq!(top, 0.0);
+    assert_eq!(bottom, setup.height_pt);
+  }
+
+  #[test]
+  fn footnote_reservation_uses_measured_wrapped_note_height() {
+    let flow = flow_context(
+      PageSetup {
+        width_pt: 120.0,
+        height_pt: 400.0,
+        margin_left_pt: 10.0,
+        margin_right_pt: 10.0,
+        margin_top_pt: 10.0,
+        margin_bottom_pt: 10.0,
+        ..Default::default()
+      },
+      0,
+      SectionColumns::default(),
+      0,
+      DEFAULT_TAB_STOP_PT,
+    );
+    let run = TextRun {
+      text: "A long footnote body wraps into several lines when measured.".into(),
+      style: TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let blocks = vec![Block::Paragraph(Paragraph {
+      inlines: vec![InlineItem::Text(run.clone())],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      #[cfg(test)]
+      runs: vec![run],
+      format: ParagraphFormat::default(),
+      list_label: None,
+    })];
+
+    let measured = measured_note_blocks_height(&blocks, flow);
+    let estimated = blocks
+      .iter()
+      .map(|block| estimated_block_height(block, flow))
+      .sum::<f32>();
+
+    assert!(measured > DEFAULT_LINE_HEIGHT_PT);
+    assert!((measured - estimated).abs() < DEFAULT_LINE_HEIGHT_PT * 2.0);
   }
 
   #[test]
@@ -4047,6 +4188,9 @@ mod tests {
       vertical_merge_content_height(&table, &[72.0], 0, 0, 10.0),
       Some(38.0)
     );
+    assert!(row_has_vertical_merge_context(&table, 0));
+    assert!(row_has_vertical_merge_context(&table, 1));
+    assert!(row_has_vertical_merge_context(&table, 2));
   }
 
   #[test]

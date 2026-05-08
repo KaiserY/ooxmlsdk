@@ -304,12 +304,35 @@ more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
-Current Writer-parity estimate: about 27% of full LibreOffice Writer DOCX to
-PDF behavior. The main path now covers typed package import, core body flow,
-page/section basics, headers/footers, notes, images, floating anchors, and a
-Writer-shaped table/frame path, but full parity still depends on deeper
-Writer table split/border conflict behavior, exact text layout, complex
-drawing wrap, fields, revisions, compatibility modes, and print/PDF edge cases.
+Current Writer-parity estimate: about 43% of full LibreOffice Writer DOCX to
+PDF behavior. The main path now covers typed package import, section/page-style
+flow, first/default/even header/footer inheritance and selection, negative
+top/bottom margin header/footer fallback, basic column flow, paragraph/run/style
+import, shaped text measurement and PDF glyph paint, PAGE/NUMPAGES field
+refresh, page backgrounds/borders, measured footnote reservation, raster images, typed
+floating anchors with paragraph-local and page-level square/tight wrap
+influence, and a Writer-shaped table/frame path with row follows, repeated
+header rows, cell margins/spacing, vertical merge, rowspan-aware split
+guarding, and table-style cascades.
+The remaining gap is still large because LibreOffice parity depends on durable
+Writer master/follow frame state, exact line breaking and full bidi/CJK
+justification, full footnote/table/fly interaction, compatibility-mode quirks,
+full drawing and shape semantics, field/revision semantics, font
+substitution/embedding policy, accessibility/tagged PDF, and print/PDF export
+edge cases.
+
+Estimate by area, using LibreOffice Writer as the target:
+
+| Area | Current parity | Main remaining gap |
+|------|----------------|--------------------|
+| DOCX package/import backbone | ~60% | Settings, compatibility flags, more part types, theme/style defaults, revision and field metadata. |
+| Sections/page styles/repeating areas | ~58% | Full negative-margin text-frame conversion, page-master reassignment after backward moves, page numbering, mirrored/gutter pages, exact header/footer dynamic sizing. |
+| Paragraph/run properties | ~40% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
+| Text layout | ~34% | Persistent master/follow frames, backward reflow, exact line breaking, full bidi/CJK justification. |
+| Tables | ~40% | Full rowspan split recalculation, backward move/repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
+| Footnotes/endnotes | ~30% | True footnote frames, continuation separators, note/table/column interactions, separator style/settings. |
+| Drawing/floating objects | ~34% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
+| PDF paint/export quality | ~36% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, bookmarks/internal links, metadata/export options. |
 
 ### Phase 0: Freeze Non-DOCX Scope
 
@@ -396,6 +419,13 @@ Current progress:
   The reservation is page-style aware: first/default/even header and footer
   slots are resolved per body leaf, and the same slot-selection state is reused
   when section/column flow advances to a new page.
+- Negative top/bottom page margins are now preserved from generated
+  `w:pgMar` import as page-style state. When a header or footer is present,
+  body flow no longer reserves header/footer space for those negative-margin
+  sides, matching the direction of LibreOffice
+  `SectionPropertyMap::HandleMarginsHeaderFooter()` where Writer avoids body
+  overlap by converting header/footer content into anchored text-frame fallback
+  instead of expanding the ordinary body print area.
 - Section `w:cols` is now imported through generated `w::Columns` into
   `SectionColumns`, including count, gap, separator flag, and explicit
   non-equal `w:col` width/space definitions when `equalWidth` is off.
@@ -410,10 +440,11 @@ Current progress:
 - Footnotes/endnotes are now imported as typed id-to-block maps, and paragraphs
   retain generated-type-derived footnote/endnote reference ids.
 - Footnote content now uses a page footnote boss area. Referenced footnotes are
-  estimated before laying out the referencing paragraph, the body frame bottom
-  is reduced for that page, and the note separator/content is emitted near the
-  bottom margin. This follows Writer's `ftnfrm` direction but still needs true
-  continuation separators and full table/column interaction.
+  measured through the shared paragraph/table layout path before laying out the
+  referencing paragraph, the body frame bottom is reduced for that page, and the
+  note separator/content is emitted near the bottom margin. This follows
+  Writer's `ftnfrm` direction more closely than single-line estimation, but
+  still needs true continuation separators and full table/column interaction.
 - Paragraph keep properties are now imported through generated paragraph
   property types: `w:keepNext` maps to `keep_with_next`, `w:keepLines` maps to
   `keep_lines`, and `w:pageBreakBefore` remains the page-break-before signal.
@@ -525,6 +556,11 @@ Current progress:
   destination `FlowContext` to the body frame. Following blocks therefore keep
   formatting in the column/page that owns the paragraph follow, matching the
   Writer master/follow invariant rather than restarting from the old body leaf.
+- PDF text paint now consumes the same rustybuzz-shaped glyph advances used by
+  layout measurement and emits krilla glyph runs rather than relying on
+  `draw_text` auto shaping. This follows Typst's `typst-pdf/src/text.rs`
+  discipline, where shaped glyphs are the stable paint input, and reduces
+  layout/paint drift for ligatures, complex scripts, and RTL runs.
 - DrawingML anchors are imported through generated `wp::Anchor` types into a
   typed floating image placement model. The layout path consumes `positionH`,
   `positionV`, `wp:align`, wrap mode, `behindDoc`, and anchor text distances
@@ -533,21 +569,25 @@ Current progress:
   the Writer fly-frame positioning path and Typst placed-frame alignment
   technique. Square/tight wrapping now creates paragraph-local exclusion bounds
   that shorten affected text lines, matching the Writer `SwTextFly`/fly portion
-  direction. `wp:effectExtent` is now retained from typed inline/anchor values
-  and expands the image frame used for alignment, line height, and wrap bounds,
+  direction. Square/tight exclusions are now retained on the current page, so
+  following paragraphs on that page continue to avoid the fly frame instead of
+  forgetting it at the paragraph boundary. This is still an incremental
+  approximation of Writer fly influence: true page reassignment, contour wrap,
+  table/header/footer fly interactions, and full z-ordering remain fly-frame
+  work. `wp:effectExtent` is now retained from typed inline/anchor values and
+  expands the image frame used for alignment, line height, and wrap bounds,
   following LibreOffice's `GraphicImport::lcl_expandRectangleByEffectExtent()`
   direction. Wrap-level `dist*` values from `wrapSquare`, `wrapTight`,
   `wrapThrough`, and `wrapTopAndBottom` are merged with anchor distances, and
-  `wrapText` left/right/largest/both is preserved in the paragraph exclusion
-  model. Floating images are tagged as floating page items, while inline images
-  keep their line position. Floating images that import `behindDoc` are ordered
-  after page backgrounds but before body text; foreground floating images are
-  ordered after body text, matching the Writer page-object layer direction while
-  preserving Typst-style stable display-list output. Top/bottom floating images
-  that exhaust the current column/page now advance following text through the
-  same section leaf traversal as text-frame follows. Full page association,
-  contour wrapping,
-  multi-paragraph influence, and complete z-ordering remain fly-frame work.
+  `wrapText` left/right/largest/both is preserved in the paragraph/page
+  exclusion model. Floating images are tagged as floating page items, while
+  inline images keep their line position. Floating images that import
+  `behindDoc` are ordered after page backgrounds but before body text;
+  foreground floating images are ordered after body text, matching the Writer
+  page-object layer direction while preserving Typst-style stable display-list
+  output. Top/bottom floating images that exhaust the current column/page now
+  advance following text through the same section leaf traversal as text-frame
+  follows.
 - Raster image painting now follows the same broad division as Writer and
   Typst: the DOCX importer keeps image bytes/resources on image frames, layout
   places inline/floating image items, and the PDF renderer performs only paint
@@ -837,6 +877,10 @@ Implement:
   follow fragments when they fit. Remaining follow-table work is rowspan-aware
   split recalculation, exact border conflict handling across split fragments,
   and backward move/repaint invalidation.
+- Rows that participate in vertical merges are now detected before the ordinary
+  splittable-row fragment path. Those rows move as merge-aware follow units
+  instead of being cut like unrelated cells, avoiding the worst rowspan
+  corruption until full Writer-style rowspan split recalculation is implemented.
 - `cantSplit` rows now use the same one-move guard as other row follows:
   a row that still does not fit after moving to its destination leaf is laid out
   there, matching Writer's loop-control direction.
@@ -904,7 +948,9 @@ Typst technique reference:
 Implement:
 
 - Convert layout frames to paint items.
-- Render text using shaped glyph output where possible.
+- Render text using shaped glyph output where possible. The renderer now emits
+  krilla glyph runs from rustybuzz-shaped text, matching the Typst paint path
+  more closely than string-level `draw_text`.
 - Add images, fills, strokes, clipping, and transforms.
 - Raster image output is active for inline/floating DOCX images. Current scope
   covers JPEG direct output and decoded sampled-image output for PNG/GIF/WebP
@@ -960,14 +1006,25 @@ Avoid relying only on "PDF starts with `%PDF-`" once layout behavior exists.
 
 ## 8. Immediate Next Step
 
-Implement Phase 1 in small commits:
+The section/page-style backbone is now in place. Continue with Writer-frame
+alignment in small, behavior-oriented batches:
 
-1. Add a typed section collector for `w:sectPr`.
-2. Add internal section/page-style data structures.
-3. Keep existing layout output working while moving ownership into page,
-   body, column, footnote, table, text, and fly frames.
-4. Add section-focused tests before touching paragraph, table, or floating
-   layout.
+1. Preserve raw top/bottom page-margin state for sections and implement the
+   negative margin header/footer fallback described by LibreOffice
+   `SectionPropertyMap::HandleMarginsHeaderFooter()` and
+   `ConvertHeaderFooterToTextFrame()`.
+2. Replace the current one-shot paragraph/table move-forward logic with durable
+   master/follow frame state so later footnote, table, and fly-frame changes can
+   move content backward as well as forward.
+3. Promote text layout from direct `PageItem` emission to a stable line-box
+   model. PDF paint now consumes shaped glyph positions, but line boxes still
+   need to become the primary layout artifact.
+4. Extend table follow behavior around row spans, split-border ownership, and
+   repeated header repaint after row fragments.
+5. Extend floating frame influence from paragraph-local exclusions to
+   page/frame-associated fly influence that can affect following paragraphs and
+   table cell content.
 
-This establishes the page and section backbone needed for every later
-LibreOffice-aligned feature.
+The fastest route toward LibreOffice parity is to keep each batch anchored to a
+specific LibreOffice function or fixture group, then assert import/layout
+snapshots before PDF-byte smoke checks.

@@ -4766,12 +4766,14 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
 
   if let Some(margin) = &section.w_pg_mar {
     if let Some(top) = margin.top {
+      setup.top_margin_was_negative = top < 0;
       setup.margin_top_pt = units::twips_to_points(top.max(0) as f32);
     }
     if let Some(right) = margin.right {
       setup.margin_right_pt = units::twips_to_points(right as f32);
     }
     if let Some(bottom) = margin.bottom {
+      setup.bottom_margin_was_negative = bottom < 0;
       setup.margin_bottom_pt = units::twips_to_points(bottom.max(0) as f32);
     }
     if let Some(left) = margin.left {

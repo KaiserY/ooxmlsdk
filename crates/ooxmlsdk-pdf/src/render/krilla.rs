@@ -13,7 +13,7 @@ use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, Stroke};
 use krilla::surface::Surface;
-use krilla::text::{Font, TextDirection};
+use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
 
 use crate::docx::TextStyle;
@@ -21,7 +21,7 @@ use crate::error::{PdfError, Result};
 use crate::fonts::load_sans_face;
 use crate::layout::{ImageItem, LayoutDocument, PageItem};
 use crate::options::PdfOptions;
-use crate::text_metrics::measure_text;
+use crate::text_metrics::{measure_text, shape_text};
 
 pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
   let mut pdf = Document::new_with(serialize_settings(options));
@@ -63,14 +63,25 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           }
           surface.set_stroke(None);
           surface.set_fill(Some(fill(text.style)));
-          surface.draw_text(
-            Point::from_xy(text.x_pt, baseline_y),
-            fonts.select(text.style).clone(),
-            text.style.font_size_pt,
-            &text.text,
-            false,
-            TextDirection::Auto,
-          );
+          if let Some(glyphs) = shaped_pdf_glyphs(&text.text, text.style) {
+            surface.draw_glyphs(
+              Point::from_xy(text.x_pt, baseline_y),
+              &glyphs,
+              fonts.select(text.style).clone(),
+              &text.text,
+              text.style.font_size_pt,
+              false,
+            );
+          } else {
+            surface.draw_text(
+              Point::from_xy(text.x_pt, baseline_y),
+              fonts.select(text.style).clone(),
+              text.style.font_size_pt,
+              &text.text,
+              false,
+              TextDirection::Auto,
+            );
+          }
           if text.style.underline {
             surface.set_fill(None);
             surface.set_stroke(Some(Stroke {
@@ -233,6 +244,27 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
   for _ in 0..pop_count {
     surface.pop();
   }
+}
+
+fn shaped_pdf_glyphs(text: &str, style: TextStyle) -> Option<Vec<KrillaGlyph>> {
+  let shaped = shape_text(text, style)?;
+  Some(
+    shaped
+      .glyphs
+      .into_iter()
+      .map(|glyph| {
+        KrillaGlyph::new(
+          GlyphId::new(glyph.glyph_id),
+          glyph.x_advance_em,
+          glyph.x_offset_em,
+          glyph.y_offset_em,
+          glyph.y_advance_em,
+          glyph.text_range,
+          None,
+        )
+      })
+      .collect(),
+  )
 }
 
 fn image_has_crop_or_transform(image: &ImageItem) -> bool {

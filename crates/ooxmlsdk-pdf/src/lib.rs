@@ -2849,6 +2849,118 @@ mod tests {
   }
 
   #[test]
+  fn square_floating_image_wrap_influences_following_paragraphs_on_page() {
+    let intro = crate::docx::TextRun {
+      text: "Anchor ".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let follow = crate::docx::TextRun {
+      text: "Following paragraph beside float".into(),
+      style: crate::docx::TextStyle::default(),
+      hyperlink_url: None,
+      dynamic_field: None,
+    };
+    let image = crate::docx::InlineImage {
+      data: vec![0; 8],
+      content_type: Some("image/png".into()),
+      width_pt: 72.0,
+      height_pt: 60.0,
+      effect_left_pt: 0.0,
+      effect_top_pt: 0.0,
+      effect_right_pt: 0.0,
+      effect_bottom_pt: 0.0,
+      crop: crate::docx::ImageCrop::default(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      alt_text: Some("page wrap".into()),
+      placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
+        horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
+        vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
+        horizontal_alignment: None,
+        vertical_alignment: None,
+        horizontal_offset_pt: 0.0,
+        vertical_offset_pt: 0.0,
+        wrap: crate::docx::ImageWrapMode::Square,
+        wrap_side: crate::docx::ImageWrapSide::BothSides,
+        behind_text: false,
+        margin_top_pt: 0.0,
+        margin_right_pt: 6.0,
+        margin_bottom_pt: 0.0,
+        margin_left_pt: 0.0,
+      }),
+    };
+    let page = crate::docx::PageSetup {
+      width_pt: 240.0,
+      height_pt: 240.0,
+      margin_left_pt: 20.0,
+      margin_right_pt: 20.0,
+      margin_top_pt: 20.0,
+      margin_bottom_pt: 20.0,
+      ..Default::default()
+    };
+    let anchor = crate::docx::Paragraph {
+      inlines: vec![
+        crate::docx::InlineItem::Text(intro.clone()),
+        crate::docx::InlineItem::Image(image),
+      ],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      runs: vec![intro],
+      format: crate::docx::ParagraphFormat::default(),
+      list_label: None,
+    };
+    let following = crate::docx::Paragraph {
+      inlines: vec![crate::docx::InlineItem::Text(follow.clone())],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      runs: vec![follow],
+      format: crate::docx::ParagraphFormat::default(),
+      list_label: None,
+    };
+    let doc = crate::docx::DocxDocument {
+      page,
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![
+        crate::docx::Block::Paragraph(anchor),
+        crate::docx::Block::Paragraph(following),
+      ],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let following = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .find_map(|item| match item {
+        crate::layout::PageItem::Text(text) if text.text.starts_with("Following") => Some(text),
+        _ => None,
+      })
+      .expect("following paragraph text");
+
+    assert!(
+      following.x_pt >= page.margin_left_pt + 72.0,
+      "following paragraph x={}, y={}",
+      following.x_pt,
+      following.y_pt
+    );
+  }
+
+  #[test]
   fn behind_text_floating_images_are_ordered_before_body_text() {
     let before = crate::docx::TextRun {
       text: "Before image ".into(),

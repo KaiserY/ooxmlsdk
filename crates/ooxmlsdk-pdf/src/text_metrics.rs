@@ -7,6 +7,22 @@ use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 use crate::docx::TextStyle;
 use crate::fonts::{FontFaceData, load_sans_face};
 
+#[derive(Clone, Debug)]
+pub(crate) struct ShapedText {
+  pub glyphs: Vec<ShapedGlyph>,
+  pub width_pt: f32,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ShapedGlyph {
+  pub glyph_id: u32,
+  pub text_range: std::ops::Range<usize>,
+  pub x_advance_em: f32,
+  pub x_offset_em: f32,
+  pub y_offset_em: f32,
+  pub y_advance_em: f32,
+}
+
 pub(crate) fn measure_text(text: &str, style: TextStyle) -> f32 {
   if text.is_empty() {
     return 0.0;
@@ -15,6 +31,17 @@ pub(crate) fn measure_text(text: &str, style: TextStyle) -> f32 {
   FontMetricsSet::get()
     .and_then(|set| set.measure(text, style))
     .unwrap_or_else(|| approximate_text_width(text, style.font_size_pt))
+}
+
+pub(crate) fn shape_text(text: &str, style: TextStyle) -> Option<ShapedText> {
+  if text.is_empty() {
+    return Some(ShapedText {
+      glyphs: Vec::new(),
+      width_pt: 0.0,
+    });
+  }
+
+  FontMetricsSet::get()?.shape(text, style)
 }
 
 fn approximate_text_width(text: &str, font_size: f32) -> f32 {
@@ -75,6 +102,18 @@ impl FontMetricsSet {
     }
     Some(width)
   }
+
+  fn shape(&self, text: &str, style: TextStyle) -> Option<ShapedText> {
+    let font = self.select(style);
+    let mut glyphs = Vec::new();
+    let mut width_pt = 0.0;
+    for run in script_runs(text) {
+      let shaped = font.shape(run.text, style.font_size_pt, run.script, run.start)?;
+      width_pt += shaped.width_pt;
+      glyphs.extend(shaped.glyphs);
+    }
+    Some(ShapedText { glyphs, width_pt })
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +123,16 @@ struct FontMetrics {
 
 impl FontMetrics {
   fn measure(&self, text: &str, font_size: f32, script: UnicodeScriptValue) -> Option<f32> {
+    Some(self.shape(text, font_size, script, 0)?.width_pt)
+  }
+
+  fn shape(
+    &self,
+    text: &str,
+    font_size: f32,
+    script: UnicodeScriptValue,
+    text_offset: usize,
+  ) -> Option<ShapedText> {
     let face = Face::from_slice(&self.face.data, self.face.index)?;
     let units_per_em = face.units_per_em().max(1) as f32;
     let mut buffer = UnicodeBuffer::new();
@@ -97,13 +146,26 @@ impl FontMetrics {
       BidiDirection::Ltr => buffer.set_direction(Direction::LeftToRight),
       BidiDirection::Mixed => {}
     }
-    let glyphs = rustybuzz::shape(&face, &[], buffer);
-    let advance = glyphs
-      .glyph_positions()
-      .iter()
-      .map(|position| position.x_advance as f32)
-      .sum::<f32>();
-    Some(advance * font_size / units_per_em)
+    let shaped = rustybuzz::shape(&face, &[], buffer);
+    let infos = shaped.glyph_infos();
+    let positions = shaped.glyph_positions();
+    let mut glyphs = Vec::with_capacity(infos.len());
+    let mut width_pt = 0.0;
+
+    for index in 0..infos.len() {
+      let position = positions[index];
+      width_pt += position.x_advance as f32 * font_size / units_per_em;
+      glyphs.push(ShapedGlyph {
+        glyph_id: infos[index].glyph_id,
+        text_range: glyph_text_range(text, infos, index, text_offset),
+        x_advance_em: position.x_advance as f32 / units_per_em,
+        x_offset_em: position.x_offset as f32 / units_per_em,
+        y_offset_em: position.y_offset as f32 / units_per_em,
+        y_advance_em: position.y_advance as f32 / units_per_em,
+      });
+    }
+
+    Some(ShapedText { glyphs, width_pt })
   }
 }
 
@@ -118,6 +180,7 @@ fn load_font_metrics(bold: bool, italic: bool) -> Option<FontMetrics> {
 struct ScriptRun<'a> {
   text: &'a str,
   script: UnicodeScriptValue,
+  start: usize,
 }
 
 fn script_runs(text: &str) -> Vec<ScriptRun<'_>> {
@@ -135,6 +198,7 @@ fn script_runs(text: &str) -> Vec<ScriptRun<'_>> {
       runs.push(ScriptRun {
         text: &text[start..index],
         script: active,
+        start,
       });
       start = index;
       active = script;
@@ -145,6 +209,7 @@ fn script_runs(text: &str) -> Vec<ScriptRun<'_>> {
     runs.push(ScriptRun {
       text: &text[start..],
       script: active,
+      start,
     });
   }
 
@@ -171,6 +236,25 @@ fn bidi_direction(text: &str) -> BidiDirection {
   get_base_direction(text)
 }
 
+fn glyph_text_range(
+  text: &str,
+  infos: &[rustybuzz::GlyphInfo],
+  index: usize,
+  text_offset: usize,
+) -> std::ops::Range<usize> {
+  let cluster = infos[index].cluster as usize;
+  let next_cluster = infos
+    .iter()
+    .enumerate()
+    .filter_map(|(candidate_index, info)| {
+      let candidate = info.cluster as usize;
+      (candidate_index != index && candidate > cluster).then_some(candidate)
+    })
+    .min()
+    .unwrap_or(text.len());
+  text_offset + cluster.min(text.len())..text_offset + next_cluster.min(text.len())
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -189,6 +273,22 @@ mod tests {
 
     assert_eq!(runs.len(), 2);
     assert_eq!(runs[0].text, "abc, ");
+    assert_eq!(runs[0].start, 0);
     assert_eq!(runs[1].text, "商务");
+    assert_eq!(runs[1].start, "abc, ".len());
+  }
+
+  #[test]
+  fn shaped_text_exposes_glyph_advances_for_pdf_paint() {
+    let shaped = shape_text("office", TextStyle::default()).expect("shaped text");
+
+    assert!(!shaped.glyphs.is_empty());
+    assert!(shaped.width_pt > 0.0);
+    assert!(
+      shaped
+        .glyphs
+        .iter()
+        .all(|glyph| glyph.text_range.end <= "office".len())
+    );
   }
 }

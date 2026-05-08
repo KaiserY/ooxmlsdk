@@ -3258,6 +3258,16 @@ struct StyleEntry {
   based_on: Option<String>,
   paragraph_format: ParagraphFormat,
   run_style: TextStyle,
+  run_overrides: RunStyleOverrides,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct RunStyleOverrides {
+  bold: Option<bool>,
+  italic: Option<bool>,
+  underline: Option<bool>,
+  strikethrough: Option<bool>,
+  uppercase: Option<bool>,
 }
 
 impl StylesCatalog {
@@ -3302,6 +3312,7 @@ impl StylesCatalog {
           .map(|based_on| based_on.val.to_string()),
         paragraph_format: ParagraphFormat::default(),
         run_style: TextStyle::default(),
+        run_overrides: RunStyleOverrides::default(),
       };
       merge_paragraph_format(
         &mut entry.paragraph_format,
@@ -3314,6 +3325,8 @@ impl StylesCatalog {
         &mut entry.run_style,
         style.style_run_properties.as_deref().map(RunProps::Style),
       );
+      entry.run_overrides =
+        run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
       catalog.styles.insert(style_id.to_string(), entry);
     }
 
@@ -3338,6 +3351,7 @@ impl StylesCatalog {
       .or_else(|| self.default_paragraph_style_id.clone());
     for entry in self.style_chain(style_id.as_deref()) {
       merge_style_values(&mut style, entry.run_style);
+      apply_run_style_overrides(&mut style, entry.run_overrides);
     }
     style
   }
@@ -3352,6 +3366,7 @@ impl StylesCatalog {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
         matched = true;
         merge_style_values(&mut style, entry.run_style);
+        apply_run_style_overrides(&mut style, entry.run_overrides);
       }
     }
     if !matched {
@@ -3390,6 +3405,46 @@ fn merge_builtin_character_style(style: &mut TextStyle, style_id: &str) {
       g: 0x63,
       b: 0xC1,
     };
+  }
+}
+
+fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
+  let Some(properties) = properties else {
+    return RunStyleOverrides::default();
+  };
+
+  RunStyleOverrides {
+    bold: properties.bold().and_then(|value| value.val),
+    italic: properties.italic().and_then(|value| value.val),
+    underline: properties
+      .underline()
+      .map(|value| !matches!(value.val, Some(w::UnderlineValues::None))),
+    strikethrough: properties
+      .double_strike()
+      .and_then(|value| value.val)
+      .or_else(|| properties.strike().and_then(|value| value.val)),
+    uppercase: properties
+      .small_caps()
+      .and_then(|value| value.val)
+      .or_else(|| properties.caps().and_then(|value| value.val)),
+  }
+}
+
+fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides) {
+  if let Some(bold) = overrides.bold {
+    style.bold = bold;
+  }
+  if let Some(italic) = overrides.italic {
+    style.italic = italic;
+  }
+  if let Some(underline) = overrides.underline {
+    style.underline = underline;
+  }
+  if let Some(strikethrough) = overrides.strikethrough {
+    style.strikethrough = strikethrough;
+  }
+  if let Some(uppercase) = overrides.uppercase {
+    style.uppercase = uppercase;
   }
 }
 
@@ -4225,6 +4280,43 @@ mod tests {
       drawing_textbox_text(xml).as_deref(),
       Some("Modern text box\nSecond line\n")
     );
+  }
+
+  #[test]
+  fn style_chain_preserves_explicit_false_run_properties() {
+    let mut catalog = StylesCatalog::default();
+    catalog.styles.insert(
+      "Base".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Paragraph),
+        run_style: TextStyle {
+          bold: true,
+          italic: true,
+          underline: true,
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+    catalog.styles.insert(
+      "Derived".into(),
+      StyleEntry {
+        style_type: Some(w::StyleValues::Paragraph),
+        based_on: Some("Base".into()),
+        run_overrides: RunStyleOverrides {
+          bold: Some(false),
+          underline: Some(false),
+          ..Default::default()
+        },
+        ..Default::default()
+      },
+    );
+
+    let style = catalog.run_style(Some("Derived"));
+
+    assert!(!style.bold);
+    assert!(style.italic);
+    assert!(!style.underline);
   }
 
   #[test]

@@ -63,6 +63,7 @@ pub(crate) struct ImageItem {
   pub data: Vec<u8>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
+  pub behind_text: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -114,9 +115,12 @@ struct WrapExclusion {
 struct BlockArea {
   setup: PageSetup,
   section_index: usize,
+  column_index: usize,
+  columns: SectionColumns,
   content_left_pt: f32,
   content_bottom: f32,
   content_width: f32,
+  default_tab_stop_pt: f32,
 }
 
 pub(crate) fn layout(document: &DocxDocument, _options: &PdfOptions) -> Result<LayoutDocument> {
@@ -148,6 +152,7 @@ impl<'a> RootFrameLayout<'a> {
     self.finish_current_page();
 
     apply_page_backgrounds(&mut self.pages);
+    place_behind_text_images(&mut self.pages);
     apply_column_separators(self.document, &mut self.pages);
     apply_headers_and_footers(self.document, &mut self.pages);
     apply_page_borders(&mut self.pages);
@@ -641,10 +646,7 @@ fn layout_document_block(
         y,
       )
     }
-    Block::Table(table) => (
-      flow,
-      layout_table(table, block_area(flow), current, pages, y),
-    ),
+    Block::Table(table) => layout_table(table, flow, current, pages, y),
   }
 }
 
@@ -652,9 +654,25 @@ fn block_area(flow: FlowContext) -> BlockArea {
   BlockArea {
     setup: flow.setup,
     section_index: flow.section_index,
+    column_index: flow.column_index,
+    columns: flow.columns,
     content_left_pt: flow.content_left_pt,
     content_bottom: flow.content_bottom,
     content_width: flow.content_width,
+    default_tab_stop_pt: flow.default_tab_stop_pt,
+  }
+}
+
+fn flow_from_block_area(area: BlockArea) -> FlowContext {
+  FlowContext {
+    setup: area.setup,
+    section_index: area.section_index,
+    column_index: area.column_index,
+    columns: area.columns,
+    content_left_pt: area.content_left_pt,
+    content_bottom: area.content_bottom,
+    content_width: area.content_width,
+    default_tab_stop_pt: area.default_tab_stop_pt,
   }
 }
 
@@ -966,6 +984,47 @@ fn apply_page_backgrounds(pages: &mut [Page]) {
   }
 }
 
+fn place_behind_text_images(pages: &mut [Page]) {
+  for page in pages {
+    let mut behind_images = Vec::new();
+    let mut foreground_items = Vec::with_capacity(page.items.len());
+    let mut background_count = 0;
+
+    for item in page.items.drain(..) {
+      if matches!(&item, PageItem::Image(image) if image.behind_text) {
+        behind_images.push(item);
+      } else {
+        if is_page_background_item(&item, page.setup) {
+          background_count += 1;
+        }
+        foreground_items.push(item);
+      }
+    }
+
+    if behind_images.is_empty() {
+      page.items = foreground_items;
+      continue;
+    }
+
+    let mut ordered = Vec::with_capacity(foreground_items.len() + behind_images.len());
+    ordered.extend(foreground_items.drain(..background_count));
+    ordered.extend(behind_images);
+    ordered.extend(foreground_items);
+    page.items = ordered;
+  }
+}
+
+fn is_page_background_item(item: &PageItem, setup: PageSetup) -> bool {
+  matches!(
+    item,
+    PageItem::Fill(fill)
+      if fill.x_pt == 0.0
+        && fill.y_pt == 0.0
+        && (fill.width_pt - setup.width_pt).abs() <= 0.1
+        && (fill.height_pt - setup.height_pt).abs() <= 0.1
+  )
+}
+
 fn apply_page_borders(pages: &mut [Page]) {
   for page in pages {
     let borders = page.setup.borders;
@@ -1095,7 +1154,10 @@ fn layout_repeating_block(
       );
       y
     }
-    Block::Table(table) => layout_table(table, block_area(flow), page, discarded_pages, y),
+    Block::Table(table) => {
+      let (_, y) = layout_table(table, flow, page, discarded_pages, y);
+      y
+    }
   }
 }
 
@@ -1137,12 +1199,13 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
 
 fn layout_table(
   table: &Table,
-  area: BlockArea,
+  flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
   y: f32,
-) -> f32 {
-  TableFrameLayout::new(table, area).map_or(y, |layout| layout.format(current, pages, y))
+) -> (FlowContext, f32) {
+  TableFrameLayout::new(table, block_area(flow))
+    .map_or((flow, y), |layout| layout.format(current, pages, y))
 }
 
 #[derive(Clone, Debug)]
@@ -1181,20 +1244,32 @@ impl<'a> TableFrameLayout<'a> {
     })
   }
 
-  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> f32 {
+  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> (FlowContext, f32) {
+    let mut flow = flow_from_block_area(self.frame.block);
+    let mut layout = self.clone();
+    let mut rows_moved_to_follow = HashSet::new();
     for (row_index, row) in self.table.rows.iter().enumerate() {
-      let mut row_frame = self.row_frame(row, row_index, y);
-      if self.should_move_row_to_follow(&row_frame, current) {
-        self.start_follow_table(current, pages);
-        y = self.frame.block.setup.margin_top_pt;
-        y = self.format_repeated_header_rows(current, y, row_frame.height_pt);
-        row_frame = self.row_frame(row, row_index, y);
+      let mut row_frame = layout.row_frame(row, row_index, y);
+      let row_height = row_frame.height_pt;
+      let move_to_follow = layout.should_move_row_to_follow(
+        &row_frame,
+        current,
+        rows_moved_to_follow.contains(&row_index),
+      );
+      if move_to_follow {
+        rows_moved_to_follow.insert(row_index);
+        (flow, y) = advance_section_flow(flow, current, pages);
+        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+          layout = next_layout;
+        }
+        y = layout.format_repeated_header_rows(current, y, row_height);
+        row_frame = layout.row_frame(row, row_index, y);
       }
 
       y = row_frame.format(current);
     }
 
-    y + TABLE_SPACING_AFTER_PT
+    (flow, y + TABLE_SPACING_AFTER_PT)
   }
 
   fn row_frame(&self, row: &'a TableRow, row_index: usize, y: f32) -> RowFrame<'a, '_> {
@@ -1208,21 +1283,20 @@ impl<'a> TableFrameLayout<'a> {
     }
   }
 
-  fn should_move_row_to_follow(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
-    if row.bottom() <= self.frame.block.content_bottom || current.items.is_empty() {
+  fn should_move_row_to_follow(
+    &self,
+    row: &RowFrame<'_, '_>,
+    current: &Page,
+    already_moved: bool,
+  ) -> bool {
+    if already_moved || row.bottom() <= self.frame.block.content_bottom || current.items.is_empty()
+    {
       return false;
     }
 
     !row.row.cant_split
       || row.fits_empty_body_region()
       || row.y > self.frame.block.setup.margin_top_pt + 0.1
-  }
-
-  fn start_follow_table(&self, current: &mut Page, pages: &mut Vec<Page>) {
-    pages.push(std::mem::replace(
-      current,
-      empty_page(self.frame.block.setup, self.frame.block.section_index),
-    ));
   }
 
   fn format_repeated_header_rows(&self, current: &mut Page, mut y: f32, row_height: f32) -> f32 {
@@ -1984,27 +2058,24 @@ impl<'a> TextFrameLayout<'a> {
     advance: TextLineAdvance<'_>,
     y: f32,
     line_height: &mut f32,
-  ) -> (f32, f32, f32) {
+  ) -> (FlowContext, TextFrame, f32, f32, f32) {
     advance.state.finish_line(y, *line_height);
-    let page_count_before = advance.pages.len();
-    let y = next_line(
-      advance.active.frame.setup,
-      advance.current,
-      advance.pages,
-      y,
-      line_height,
-      advance.active.flow.content_bottom,
-    );
-    if advance.pages.len() > page_count_before {
-      advance.state.note_page_follow(advance.pages.len(), y);
+    let mut next_y = y + *line_height;
+    *line_height = advance.active.frame.base_line_height;
+    let mut next_flow = advance.active.flow;
+    let mut next_frame = advance.active.frame;
+    if next_y + *line_height > advance.active.flow.content_bottom
+      && !advance.current.items.is_empty()
+    {
+      (next_flow, next_y) =
+        advance_section_flow(advance.active.flow, advance.current, advance.pages);
+      next_frame = TextFrame::new(self.paragraph, next_flow);
+      *line_height = next_frame.base_line_height;
+      advance.state.note_page_follow(advance.pages.len(), next_y);
     }
-    let (line_left, line_right) = self.line_bounds(
-      advance.active.frame,
-      y,
-      *line_height,
-      advance.wrap_exclusions,
-    );
-    (y, line_left, line_right)
+    let (line_left, line_right) =
+      self.line_bounds(next_frame, next_y, *line_height, advance.wrap_exclusions);
+    (next_flow, next_frame, next_y, line_left, line_right)
   }
 
   fn force_text_page_break(
@@ -2044,11 +2115,24 @@ impl<'a> TextFrameLayout<'a> {
     )
   }
 
-  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> (FlowContext, f32) {
+  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, y: f32) -> (FlowContext, f32) {
+    self.format_with_reflow(current, pages, y, true)
+  }
+
+  fn format_with_reflow(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    mut y: f32,
+    allow_reflow: bool,
+  ) -> (FlowContext, f32) {
     let paragraph = self.paragraph;
     let mut flow = self.flow;
     let mut text_frame = self.frame;
     let start_item_index = current.items.len();
+    let start_pages_len = pages.len();
+    let start_current = current.clone();
+    let start_flow = flow;
     let paragraph_top = y;
     let default_line_left = text_frame.default_line_left;
     let first_line_left = text_frame.first_line_left;
@@ -2098,7 +2182,7 @@ impl<'a> TextFrameLayout<'a> {
                 run.hyperlink_url.as_deref(),
                 run.dynamic_field,
               );
-              (y, line_left, line_right) = self.advance_line(
+              (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
                   pages,
@@ -2112,6 +2196,9 @@ impl<'a> TextFrameLayout<'a> {
                 y,
                 &mut line_height,
               );
+              default_line_right = text_frame.default_line_right;
+              paragraph_left = text_frame.paragraph_left;
+              base_line_height = text_frame.base_line_height;
               x = line_left;
               chunk_x = x;
               pending_tab = None;
@@ -2140,7 +2227,7 @@ impl<'a> TextFrameLayout<'a> {
               );
               x = tab_stop.x_pt;
               if x > line_right {
-                (y, line_left, line_right) = self.advance_line(
+                (flow, text_frame, y, line_left, line_right) = self.advance_line(
                   TextLineAdvance {
                     current,
                     pages,
@@ -2154,6 +2241,9 @@ impl<'a> TextFrameLayout<'a> {
                   y,
                   &mut line_height,
                 );
+                default_line_right = text_frame.default_line_right;
+                paragraph_left = text_frame.paragraph_left;
+                base_line_height = text_frame.base_line_height;
                 tab_stop = next_tab_stop(
                   line_left,
                   line_left,
@@ -2189,7 +2279,7 @@ impl<'a> TextFrameLayout<'a> {
                 run.hyperlink_url.as_deref(),
                 run.dynamic_field,
               );
-              (y, line_left, line_right) = self.advance_line(
+              (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
                   pages,
@@ -2203,6 +2293,9 @@ impl<'a> TextFrameLayout<'a> {
                 y,
                 &mut line_height,
               );
+              default_line_right = text_frame.default_line_right;
+              paragraph_left = text_frame.paragraph_left;
+              base_line_height = text_frame.base_line_height;
               x = line_left;
               chunk_x = x;
               pending_tab = None;
@@ -2233,7 +2326,7 @@ impl<'a> TextFrameLayout<'a> {
                         run.hyperlink_url.as_deref(),
                         run.dynamic_field,
                       );
-                      (y, line_left, line_right) = self.advance_line(
+                      (flow, text_frame, y, line_left, line_right) = self.advance_line(
                         TextLineAdvance {
                           current,
                           pages,
@@ -2247,6 +2340,9 @@ impl<'a> TextFrameLayout<'a> {
                         y,
                         &mut line_height,
                       );
+                      default_line_right = text_frame.default_line_right;
+                      paragraph_left = text_frame.paragraph_left;
+                      base_line_height = text_frame.base_line_height;
                       x = line_left;
                       chunk_x = x;
                       pending_tab = None;
@@ -2278,7 +2374,7 @@ impl<'a> TextFrameLayout<'a> {
                     run.hyperlink_url.as_deref(),
                     run.dynamic_field,
                   );
-                  (y, line_left, line_right) = self.advance_line(
+                  (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
                       current,
                       pages,
@@ -2292,6 +2388,9 @@ impl<'a> TextFrameLayout<'a> {
                     y,
                     &mut line_height,
                   );
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
                   x = line_left;
                   chunk_x = x;
                   pending_tab = None;
@@ -2350,10 +2449,21 @@ impl<'a> TextFrameLayout<'a> {
               data: image.data.clone(),
               content_type: image.content_type.clone(),
               alt_text: image.alt_text.clone(),
+              behind_text: placement.behind_text,
             }));
             match placement.wrap {
               ImageWrapMode::TopBottom | ImageWrapMode::None => {
                 y = y.max(image_y + height + placement.margin_bottom_pt);
+                if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                  (flow, y) = advance_section_flow(flow, current, pages);
+                  text_frame = TextFrame::new(self.paragraph, flow);
+                  text_state.note_page_follow(pages.len(), y);
+                  wrap_exclusions.clear();
+                  default_line_right = text_frame.default_line_right;
+                  paragraph_left = text_frame.paragraph_left;
+                  base_line_height = text_frame.base_line_height;
+                  line_height = base_line_height;
+                }
                 (line_left, line_right) =
                   self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
                 x = line_left;
@@ -2380,7 +2490,7 @@ impl<'a> TextFrameLayout<'a> {
             continue;
           }
           if x + width > line_right && x > line_left {
-            (y, line_left, line_right) = self.advance_line(
+            (flow, text_frame, y, line_left, line_right) = self.advance_line(
               TextLineAdvance {
                 current,
                 pages,
@@ -2394,6 +2504,9 @@ impl<'a> TextFrameLayout<'a> {
               y,
               &mut line_height,
             );
+            default_line_right = text_frame.default_line_right;
+            paragraph_left = text_frame.paragraph_left;
+            base_line_height = text_frame.base_line_height;
             x = line_left;
           }
           current.items.push(PageItem::Image(ImageItem {
@@ -2404,6 +2517,7 @@ impl<'a> TextFrameLayout<'a> {
             data: image.data.clone(),
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
+            behind_text: false,
           }));
           x += width;
           line_height = line_height.max(height);
@@ -2463,6 +2577,13 @@ impl<'a> TextFrameLayout<'a> {
     debug_assert!(
       !matches!(split_decision, TextSplitDecision::Rejected) || !text_state.page_follows.is_empty()
     );
+    if allow_reflow && matches!(split_decision, TextSplitDecision::Rejected) {
+      pages.truncate(start_pages_len);
+      *current = start_current;
+      let (follow_flow, follow_y) = advance_section_flow(start_flow, current, pages);
+      return TextFrameLayout::new(paragraph, follow_flow)
+        .format_with_reflow(current, pages, follow_y, false);
+    }
 
     if paragraph.list_label.is_none() && start_item_index <= current.items.len() {
       align_paragraph_items(
@@ -2779,26 +2900,6 @@ fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
     let scale = max_width.max(1.0) / width;
     (width * scale, height * scale)
   }
-}
-
-fn next_line(
-  setup: PageSetup,
-  current: &mut Page,
-  pages: &mut Vec<Page>,
-  y: f32,
-  line_height: &mut f32,
-  content_bottom: f32,
-) -> f32 {
-  let mut next_y = y + *line_height;
-  *line_height = DEFAULT_LINE_HEIGHT_PT;
-  if next_y + *line_height > content_bottom && !current.items.is_empty() {
-    pages.push(std::mem::replace(
-      current,
-      empty_page(setup, current.section_index),
-    ));
-    next_y = setup.margin_top_pt;
-  }
-  next_y
 }
 
 fn force_page_break(setup: PageSetup, current: &mut Page, pages: &mut Vec<Page>) -> f32 {

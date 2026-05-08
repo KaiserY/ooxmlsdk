@@ -105,7 +105,7 @@ This supports smoke-level PDF generation and a set of focused features:
 - document page background color and section page borders
 - headers/footers for a single effective section
 - footnotes/endnotes/comments as appended note blocks
-- basic inline images and anchor images treated as inline images
+- basic inline images and typed floating DrawingML anchors
 - basic table rows/cells/borders/shading
 - VML and DrawingML textbox text extraction in limited cases
 
@@ -116,7 +116,8 @@ Known architectural drift:
 - Header/footer link-to-previous and even/odd variants are not modeled.
 - Header/footer dimensions are not computed like Writer page styles.
 - Footnotes do not reserve space on the current page.
-- Anchored/floating drawings are collapsed into inline images.
+- Anchored/floating drawings now keep a typed floating placement model, but
+  page-level fly influence is still partial.
 - Tables now have table/row/cell frame ownership, but row splitting and
   follow-flow-line continuation are still simplified.
 - Paragraph layout now enters through `TextFrameLayout`, `TextFrame`, and
@@ -393,9 +394,11 @@ Current progress:
   placement through `TableFrameLayout`, matching the Writer table positioning
   direction before full row split/follow behavior lands.
 - Table layout ownership now follows `SwTabFrame`/`SwRowFrame`/`SwCellFrame`:
-  `TableFrameLayout` owns follow-page moves and repeated headline rows,
-  `RowFrame` owns row bounds and horizontal borders, and `CellFrame` owns cell
-  background, leading border, and nested content formatting.
+  `TableFrameLayout` owns follow moves through the same section leaf traversal
+  as body text, repeated headline rows, and the destination `FlowContext` for
+  following body blocks. `RowFrame` owns row bounds and horizontal borders, and
+  `CellFrame` owns cell background, leading border, and nested content
+  formatting.
 - Table cell content now uses nested cell flow instead of the old one-line
   clipping path. Paragraphs and nested tables inside cells reuse the same
   paragraph/table layout functions used by body flow, so wrapping, run styles,
@@ -412,17 +415,31 @@ Current progress:
   `TextFrameFollow` entries at the split cursor so page follows can be governed
   by the text frame state instead of anonymous y advancement. The text frame
   split policy now rejects `keepLines` splits and applies the LibreOffice
-  orphan/widow minimum-line shape to recorded split candidates.
-  The current formatter still emits `PageItem`s directly, preserving behavior
-  while preparing the Writer `SwTextFrame` follow path for column/page splits.
+  orphan/widow minimum-line shape to recorded split candidates. Rejected page
+  splits now roll back the current text frame output, advance to the next
+  column/page leaf, and format the paragraph follow there once before allowing
+  a forced split. This follows the Writer `MoveFwd`/master-follow direction
+  while staying in the frame layout path. The current formatter still emits
+  `PageItem`s directly, preserving behavior while preparing the full Writer
+  `SwTextFrame` follow path for column/page splits.
+- Natural line overflow inside `TextFrameLayout` now advances through the same
+  section leaf traversal as explicit column/page movement and returns the
+  destination `FlowContext` to the body frame. Following blocks therefore keep
+  formatting in the column/page that owns the paragraph follow, matching the
+  Writer master/follow invariant rather than restarting from the old body leaf.
 - DrawingML anchors are imported through generated `wp::Anchor` types into a
   typed floating image placement model. The layout path consumes `positionH`,
   `positionV`, wrap mode, `behindDoc`, and anchor text distances for initial
   page/margin/column/paragraph-relative placement. Square/tight wrapping now
   creates paragraph-local exclusion bounds that shorten affected text lines,
-  matching the Writer `SwTextFly`/fly portion direction. Page association,
-  contour wrapping, multi-paragraph influence, and z-ordering remain fly-frame
-  work.
+  matching the Writer `SwTextFly`/fly portion direction. Floating images that
+  import `behindDoc` are kept as page image items with a behind-text layer flag
+  and are ordered after page backgrounds but before body text, matching the
+  Writer page-object layer direction while preserving Typst-style stable
+  display-list output. Top/bottom floating images that exhaust the current
+  column/page now advance following text through the same section leaf traversal
+  as text-frame follows. Full page association, contour wrapping,
+  multi-paragraph influence, and complete z-ordering remain fly-frame work.
 - Break normalization currently follows the directly applicable
   `SectionPropertyMap::CloseSectionGroup` rules:
   - missing `w:type` is treated as `nextPage`
@@ -446,6 +463,14 @@ Current progress:
   `test-data/wml/para_keep_flow.docx`.
 - Real DOCX fixture coverage includes repeated table headers across pages via
   `test-data/wml/table_header_repeat.docx`.
+- Layout model coverage checks that a table row following into the next section
+  column also moves later body blocks into that destination column, matching the
+  Writer `SwTabFrame` follow invariant before full row split/follow-flow-line
+  behavior is implemented.
+- Layout model coverage checks that a `cantSplit` row moves forward to the
+  next section column when it can fit there, and table formatting records rows
+  that have already moved so an oversized row is placed once in its destination
+  leaf instead of oscillating through empty pages.
 - Real DOCX fixture coverage includes floating DrawingML image anchor import
   and placement via `test-data/wml/image_floating.docx`.
 - Real DOCX fixture coverage includes external `w:hyperlink` relationship
@@ -490,18 +515,27 @@ Implement:
 - Move extraction toward a typed property resolver rather than ad hoc merging.
 - Preserve direct, paragraph style, character style, doc default, and numbering
   precedence.
+- Style-chain run property resolution now keeps explicit boolean overrides
+  separate from the concrete `TextStyle`, so derived paragraph/character styles
+  can turn off base-style values such as bold and underline. This matches the
+  Writer `PropertyMap` overlay direction where `w:b w:val="false"` is a real
+  override, not absence of a property.
 - Continue paragraph keep behavior beyond the current body/text-frame checks:
   line-accurate `keepLines` and widow/orphan split decisions are present as a
-  text-frame policy; next refinements should reflow/repaint rejected candidates
-  instead of only exposing the decision point.
+  text-frame policy. Rejected page splits now trigger a one-shot move-forward
+  reflow to the next column/page leaf; next refinements should replace this
+  with a persistent master/follow chain that can move lines backward as well as
+  forward when later frames change.
 - Continue the current `TextFrameLayout`/`TextFrame`/`LineFrame` path toward
   Writer-like page text follows instead of direct page-item emission. Line
   advance, page-break reset, column-break reset, and wrap-bound recalculation
   are now owned by `TextFrameLayout`, line fragments carry inline cursor split
   candidates, column-break inline continuation is active, and page overflow
   records follow starts. Widow/orphan and `keepLines` decisions are applied to
-  those split candidates; remaining work is using rejected decisions to drive
-  real backward/forward reflow.
+  those split candidates; rejected decisions now drive one forward reflow pass.
+  Natural line overflow also propagates the destination flow to subsequent
+  body blocks. Remaining work is durable master/follow state, backward reflow,
+  and repaint invalidation when following frames shrink or grow.
 - Model tabs, indents, spacing, borders, shading, bidi, and justification as
   layout properties.
 - Resolve run font properties sufficiently to choose fonts and measure text.
@@ -543,6 +577,9 @@ Implement:
 - Separate line breaking from page item emission.
 - Produce `LineBox` values with ascent/descent/width.
 - Support manual line breaks and page breaks.
+- Preserve imported paragraph line height across every formatted line in a
+  `TextFrame`, matching Writer's line-space calculation path instead of
+  resetting follows to the renderer default.
 - Preserve text shaping and bidi measurement through `rustybuzz` or equivalent.
 - Add justification as line-level adjustment, not paragraph-level item shifting.
 - Keep fallback behavior deterministic when system fonts are missing.
@@ -598,6 +635,14 @@ Implement:
   present; remaining work is true cell width negotiation and split behavior.
   Cell content now flows through the shared paragraph/table layout path instead
   of clipped single-line paint.
+- Table row overflow now advances through section leaves and returns the
+  destination flow to subsequent body blocks. Remaining follow-table work is
+  row splitting, follow-flow-line rows, cell content continuation, and backward
+  move/repaint invalidation.
+- `cantSplit` rows now use the same one-move guard as other row follows:
+  a row that still does not fit after moving to its destination leaf is laid out
+  there, matching Writer's loop-control direction before real
+  follow-flow-line splitting is added.
 - Compute row height from cell content frames.
 - Support row splitting and `cantSplit`.
 - Support table headers repeating across pages.
@@ -628,10 +673,14 @@ Implement:
   - paragraph/character/page anchored floating object
 - Preserve `wp:anchor` position and wrap properties.
 - Resolve relative horizontal/vertical positions.
+- Top/bottom wrap now moves following inline text to the next column/page when
+  the object leaves no remaining body space in the current leaf.
 - Reserve text wrap exclusion areas during line layout. Paragraph-local
   square/tight exclusion is present; multi-paragraph/page-level fly influence is
   still pending.
-- Support basic z-order and page association.
+- Support basic z-order and page association. `behindDoc` ordering is present
+  for floating image page items; foreground object ordering, page reassignment
+  after master/follow movement, and cross-paragraph wrap influence remain.
 
 Minimal tests:
 

@@ -1216,12 +1216,8 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
             _ => None,
           });
-          let field_type = any_field
-            .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
-            .transpose()?
-            .unwrap_or_else(|| {
-              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type")
-            });
+          let field_type: Type =
+            parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
           let field_attrs = module_version_cfg_attrs(
             any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,
@@ -1561,12 +1557,8 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
             _ => None,
           });
-          let field_type = any_field
-            .map(|field| type_from_decl_ref(&field.type_ref, type_graph))
-            .transpose()?
-            .unwrap_or_else(|| {
-              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type")
-            });
+          let field_type: Type =
+            parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
           let field_attrs = module_version_cfg_attrs(
             any_field.map(|field| field.version.as_str()).unwrap_or(""),
             field_version_cfg,

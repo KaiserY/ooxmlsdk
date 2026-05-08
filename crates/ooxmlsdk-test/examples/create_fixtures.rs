@@ -2452,6 +2452,7 @@ fn main() {
   create_xlsx_fixtures(&root);
   create_sml_fixtures(&root);
   create_pptx_fixtures(&root, &png);
+  create_pml_fixtures(&root);
   create_mce_fixtures(&root);
   create_opc_fixtures(&root, &png);
   create_drawingml_fixtures(&root);
@@ -2470,6 +2471,20 @@ fn main() {
   create_wml_bookmarks_fixtures(&root);
   create_wml_sdt_fixtures(&root);
   create_vba_preserve_fixtures(&root);
+  create_wml_custom_xml_fixtures(&root);
+  create_wml_embedded_fixtures(&root, &png);
+  create_sml_conditional_fixtures(&root);
+  create_sml_validation_fixtures(&root);
+  create_sml_chart_fixtures(&root);
+  create_sml_pivot_fixtures(&root);
+  create_pml_themes_fixtures(&root);
+  create_pml_media_fixtures(&root, &png);
+  create_pml_tables_fixtures(&root);
+  create_pml_animations_fixtures(&root);
+  create_dml_pattern_fill_fixtures(&root);
+  create_dml_custom_geom_fixtures(&root);
+  create_sml_vba_fixtures(&root);
+  create_pml_chart_fixtures(&root);
 }
 
 fn create_wml_headers_fixtures(root: &Path) {
@@ -4465,5 +4480,1785 @@ fn create_sml_fixtures(root: &Path) {
       ("xl/worksheets/sheet1.xml", sheet),
     ]);
     save(root, "test-data/spreadsheet/freeze_panes.xlsx", &data);
+  }
+}
+
+// ── PML layout XMLs ──────────────────────────────────────────────────────────
+
+// Title + Content layout (type="obj"): title ph at top, body ph (idx=1) below.
+const TITLE_CONTENT_LAYOUT_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             type="obj">
+  <p:cSld name="Title and Content">
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Title 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="title"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="274638"/><a:ext cx="8229600" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Content 2"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="1600200"/><a:ext cx="8229600" cy="4525963"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sldLayout>"#;
+
+fn create_pml_fixtures(root: &Path) {
+  // ── pml/placeholder_body.pptx ────────────────────────────────────────────
+  // Title-and-content layout (type="obj") with a title placeholder and a body
+  // placeholder (idx=1) containing multilevel bullet text (lvl 0/1/2).
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Title 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="title"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Slide Title</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Content 2"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Top-level bullet</a:t></a:r></a:p>
+          <a:p>
+            <a:pPr lvl="1"/>
+            <a:r><a:t>Second-level bullet</a:t></a:r>
+          </a:p>
+          <a:p>
+            <a:pPr lvl="2"/>
+            <a:r><a:t>Third-level bullet</a:t></a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let data = make_pptx(PptxParts {
+      content_types: pptx_content_types(1, ""),
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: TITLE_CONTENT_LAYOUT_XML,
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide.to_vec(),
+      slide_rels: slide_to_layout_rels("../slideLayouts/slideLayout1.xml", ""),
+      extra: vec![],
+    });
+    save(root, "test-data/pml/placeholder_body.pptx", &data);
+  }
+
+  // ── pml/text_body_props.pptx ─────────────────────────────────────────────
+  // Three text boxes each with a distinct <a:bodyPr> configuration:
+  //   1. anchor="t", <a:noAutofit/>
+  //   2. anchor="ctr", <a:spAutoFit/>
+  //   3. vert="vert", anchor="b", <a:normAutofit/>
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Box 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="t"><a:noAutofit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>No autofit, top</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Box 2"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="3200400" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Shape autofit, center</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="4" name="Box 3"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="5943600" y="457200"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr vert="vert" anchor="b"><a:normAutofit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Vert, bottom</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/text_body_props.pptx", &data);
+  }
+
+  // ── pml/shape_rotation.pptx ──────────────────────────────────────────────
+  // Two shapes: one with rot="2700000" (45°), one with flipH="1" flipV="1".
+  // EMU rotation unit: 60,000 per degree; 2,700,000 = 45°.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Rotated 1"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm rot="2700000">
+            <a:off x="1828800" y="457200"/>
+            <a:ext cx="2286000" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="Flipped 2"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm flipH="1" flipV="1">
+            <a:off x="5029200" y="457200"/>
+            <a:ext cx="2286000" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="triangle"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p/>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/shape_rotation.pptx", &data);
+  }
+
+  // ── pml/group_shape.pptx ─────────────────────────────────────────────────
+  // <p:grpSp> wrapping two child shapes.  The group transform has chOff/chExt
+  // matching the union bounding box of its children.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:grpSp>
+        <p:nvGrpSpPr>
+          <p:cNvPr id="2" name="Group 1"/>
+          <p:cNvGrpSpPr/>
+          <p:nvPr/>
+        </p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="914400" y="457200"/>
+            <a:ext cx="5486400" cy="1371600"/>
+            <a:chOff x="914400" y="457200"/>
+            <a:chExt cx="5486400" cy="1371600"/>
+          </a:xfrm>
+        </p:grpSpPr>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="3" name="Rect 1"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="914400" y="457200"/>
+              <a:ext cx="2286000" cy="1371600"/>
+            </a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr/>
+            <a:lstStyle/>
+            <a:p><a:r><a:t>Left</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+        <p:sp>
+          <p:nvSpPr>
+            <p:cNvPr id="4" name="Ellipse 2"/>
+            <p:cNvSpPr/>
+            <p:nvPr/>
+          </p:nvSpPr>
+          <p:spPr>
+            <a:xfrm>
+              <a:off x="4114800" y="457200"/>
+              <a:ext cx="2286000" cy="1371600"/>
+            </a:xfrm>
+            <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+            <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+          </p:spPr>
+          <p:txBody>
+            <a:bodyPr/>
+            <a:lstStyle/>
+            <a:p><a:r><a:t>Right</a:t></a:r></a:p>
+          </p:txBody>
+        </p:sp>
+      </p:grpSp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/pml/group_shape.pptx", &data);
+  }
+
+  // ── pml/notes_slide.pptx ─────────────────────────────────────────────────
+  // NotesSlidePart with a body placeholder containing speaker notes text.
+  // Exercises the slide → notesSlide relationship and the <p:notes> element.
+  {
+    let notes_xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+         xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+         xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Notes Placeholder 1"/>
+          <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+          <p:nvPr><p:ph type="body" idx="1"/></p:nvPr>
+        </p:nvSpPr>
+        <p:spPr/>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Speaker notes for this slide.</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:notes>"#;
+    let notes_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="../slides/slide1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/>"#,
+    );
+    let ct = pptx_content_types(
+      1,
+      r#"
+  <Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>"#,
+    );
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: blank_slide().to_vec(),
+      slide_rels,
+      extra: vec![
+        ("ppt/notesSlides/notesSlide1.xml", notes_xml.to_vec()),
+        ("ppt/notesSlides/_rels/notesSlide1.xml.rels", notes_rels),
+      ],
+    });
+    save(root, "test-data/pml/notes_slide.pptx", &data);
+  }
+
+  // ── pml/slide_transition.pptx ────────────────────────────────────────────
+  // <p:transition> as a child of <p:sld>, after <p:clrMapOvr>.
+  // Uses a fade transition at medium speed with click-to-advance.
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+  <p:transition spd="med" advClick="1">
+    <p:fade/>
+  </p:transition>
+</p:sld>"#;
+    let data = dml_pptx(slide.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_transition.pptx", &data);
+  }
+
+  // ── pml/slide_hyperlink.pptx ─────────────────────────────────────────────
+  // Text run with <a:hlinkClick r:id="rId2"/> in its <a:rPr>.
+  // The slide relationship file maps rId2 to an external URL.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="TextBox 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="914400" y="914400"/>
+            <a:ext cx="2743200" cy="1143000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p>
+            <a:r>
+              <a:rPr lang="en-US" dirty="0">
+                <a:hlinkClick r:id="rId2"/>
+              </a:rPr>
+              <a:t>Visit ooxmlsdk</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+"#,
+    );
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://github.com/KaiserY/ooxmlsdk" TargetMode="External"/>"#,
+    );
+    let data = make_pptx(PptxParts {
+      content_types: pptx_content_types(1, ""),
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide,
+      slide_rels,
+      extra: vec![],
+    });
+    save(root, "test-data/pml/slide_hyperlink.pptx", &data);
+  }
+}
+
+fn create_wml_custom_xml_fixtures(root: &Path) {
+  // ── WML-CX-01: custom_xml ────────────────────────────────────────────────
+  // Document with a CustomXmlPart (item1.xml) carrying a user namespace +
+  // a CustomXmlPropertiesPart (itemProps1.xml) declaring ds:itemID GUID and
+  // two ds:schemaRef entries. Body uses inline w:customXml block tagging
+  // with a w:customXmlPr w:attr child.
+  {
+    let doc = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:customXml w:uri="http://example.com/schema/contacts" w:element="contact">
+      <w:customXmlPr>
+        <w:attr w:uri="http://example.com/schema/contacts" w:name="id" w:val="42"/>
+      </w:customXmlPr>
+      <w:p>
+        <w:r><w:t>Alice (id=42)</w:t></w:r>
+      </w:p>
+    </w:customXml>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"#;
+
+    let item = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<contacts xmlns="http://example.com/schema/contacts">
+  <contact id="42"><name>Alice</name><email>alice@example.com</email></contact>
+</contacts>"#;
+
+    let item_props = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ds:datastoreItem ds:itemID="{D9D1AB4F-6A5F-4F8D-9EF6-0F61D62E2A98}"
+                  xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml">
+  <ds:schemaRefs>
+    <ds:schemaRef ds:uri="http://example.com/schema/contacts"/>
+    <ds:schemaRef ds:uri="http://example.com/schema/v2"/>
+  </ds:schemaRefs>
+</ds:datastoreItem>"#;
+
+    let content_types = docx_content_types(
+      r#"
+  <Override PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"/>"#,
+      "",
+    );
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/>"#,
+    );
+
+    let item_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("customXml/item1.xml", item),
+      ("customXml/_rels/item1.xml.rels", &item_rels),
+      ("customXml/itemProps1.xml", item_props),
+    ]);
+    save(root, "test-data/wml/custom_xml.docx", &data);
+  }
+}
+
+fn create_wml_embedded_fixtures(root: &Path, png: &[u8]) {
+  // ── WML-EO-01: embedded_object ───────────────────────────────────────────
+  // Document with a w:object wrapping a VML shape (icon image via rId4) and
+  // an o:OLEObject (embedded OLE2 payload via rId5). EmbeddedObjectPart at
+  // word/embeddings/oleObject1.bin carries an OLE2 magic header. Default
+  // Extension="bin" maps to oleObject content type.
+  {
+    let mut ole_bin = vec![0u8; 512];
+    ole_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    ole_bin[24] = 0x3E;
+    ole_bin[25] = 0x00;
+    ole_bin[26] = 0x03;
+    ole_bin[27] = 0x00;
+
+    let doc = br##"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:v="urn:schemas-microsoft-com:vml">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:object w:dxaOrig="1440" w:dyaOrig="1440">
+          <v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:50pt;height:50pt">
+            <v:imagedata r:id="rId4" o:title=""/>
+          </v:shape>
+          <o:OLEObject Type="Embed" ProgID="Excel.Sheet.12" ShapeID="_x0000_i1025"
+                       DrawAspect="Icon" ObjectID="_1693817012" r:id="rId5"/>
+        </w:object>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440"
+               w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>"##;
+
+    let content_types = docx_content_types(
+      "",
+      r#"
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.oleObject"/>"#,
+    );
+
+    let doc_rels = docx_doc_rels(
+      r#"
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="embeddings/oleObject1.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("word/document.xml")),
+      ("word/document.xml", doc),
+      ("word/_rels/document.xml.rels", &doc_rels),
+      ("word/media/image1.png", png),
+      ("word/embeddings/oleObject1.bin", &ole_bin),
+    ]);
+    save(root, "test-data/wml/embedded_object.docx", &data);
+  }
+}
+
+fn create_sml_conditional_fixtures(root: &Path) {
+  // ── SML-CF-01: conditional_cellis ────────────────────────────────────────
+  // Two rules in one block: cellIs greaterThan 10 (dxfId=0) + expression
+  // MOD(ROW(),2)=0 (dxfId=1). styles.xml carries 2 dxfs (font bold/red,
+  // fill yellow; font italic).
+  {
+    let styles = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:styleSheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:fonts count="1"><x:font><x:sz val="11"/><x:name val="Calibri"/></x:font></x:fonts>
+  <x:fills count="2">
+    <x:fill><x:patternFill patternType="none"/></x:fill>
+    <x:fill><x:patternFill patternType="gray125"/></x:fill>
+  </x:fills>
+  <x:borders count="1">
+    <x:border><x:left/><x:right/><x:top/><x:bottom/><x:diagonal/></x:border>
+  </x:borders>
+  <x:cellStyleXfs count="1"><x:xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></x:cellStyleXfs>
+  <x:cellXfs count="1"><x:xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></x:cellXfs>
+  <x:dxfs count="2">
+    <x:dxf>
+      <x:font><x:b/><x:color rgb="FFFF0000"/></x:font>
+      <x:fill><x:patternFill><x:bgColor rgb="FFFFFF00"/></x:patternFill></x:fill>
+    </x:dxf>
+    <x:dxf>
+      <x:font><x:i/></x:font>
+    </x:dxf>
+  </x:dxfs>
+</x:styleSheet>"#;
+
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1"><x:v>5</x:v></x:c></x:row>
+    <x:row r="2"><x:c r="A2"><x:v>15</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3"><x:v>25</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:conditionalFormatting sqref="A1:A3">
+    <x:cfRule type="cellIs" priority="1" dxfId="0" operator="greaterThan">
+      <x:formula>10</x:formula>
+    </x:cfRule>
+    <x:cfRule type="expression" priority="2" dxfId="1" stopIfTrue="0">
+      <x:formula>MOD(ROW(),2)=0</x:formula>
+    </x:cfRule>
+  </x:conditionalFormatting>
+</x:worksheet>"#;
+
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
+    );
+    let data = make_package(&[
+      (
+        "[Content_Types].xml",
+        &xlsx_content_types(
+          1,
+          r#"
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>"#,
+        ),
+      ),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/styles.xml", styles),
+    ]);
+    save(root, "test-data/spreadsheet/conditional_cellis.xlsx", &data);
+  }
+
+  // ── SML-CF-02: conditional_visual ────────────────────────────────────────
+  // Three visualisation rules across distinct ranges: 3-stop colorScale,
+  // dataBar, iconSet (3TrafficLights1).
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1"><x:v>1</x:v></x:c><x:c r="B1"><x:v>10</x:v></x:c><x:c r="C1"><x:v>33</x:v></x:c></x:row>
+    <x:row r="2"><x:c r="A2"><x:v>5</x:v></x:c><x:c r="B2"><x:v>50</x:v></x:c><x:c r="C2"><x:v>66</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3"><x:v>9</x:v></x:c><x:c r="B3"><x:v>90</x:v></x:c><x:c r="C3"><x:v>99</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:conditionalFormatting sqref="A1:A3">
+    <x:cfRule type="colorScale" priority="1">
+      <x:colorScale>
+        <x:cfvo type="min"/>
+        <x:cfvo type="percentile" val="50"/>
+        <x:cfvo type="max"/>
+        <x:color rgb="FFF8696B"/>
+        <x:color rgb="FFFFEB84"/>
+        <x:color rgb="FF63BE7B"/>
+      </x:colorScale>
+    </x:cfRule>
+  </x:conditionalFormatting>
+  <x:conditionalFormatting sqref="B1:B3">
+    <x:cfRule type="dataBar" priority="2">
+      <x:dataBar>
+        <x:cfvo type="min"/>
+        <x:cfvo type="max"/>
+        <x:color rgb="FF638EC6"/>
+      </x:dataBar>
+    </x:cfRule>
+  </x:conditionalFormatting>
+  <x:conditionalFormatting sqref="C1:C3">
+    <x:cfRule type="iconSet" priority="3">
+      <x:iconSet iconSet="3TrafficLights1">
+        <x:cfvo type="percent" val="0"/>
+        <x:cfvo type="percent" val="33"/>
+        <x:cfvo type="percent" val="67"/>
+      </x:iconSet>
+    </x:cfRule>
+  </x:conditionalFormatting>
+</x:worksheet>"#;
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/conditional_visual.xlsx", &data);
+  }
+}
+
+fn create_sml_validation_fixtures(root: &Path) {
+  // ── SML-DV-01: data_validation ───────────────────────────────────────────
+  // Three rules in one block: whole between 1..100 with prompts/errors;
+  // list with inline literal "red,green,blue"; custom with errorStyle warning.
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1"><x:v>50</x:v></x:c>
+      <x:c r="B1" t="inlineStr"><x:is><x:t>red</x:t></x:is></x:c>
+      <x:c r="C1" t="inlineStr"><x:is><x:t>short</x:t></x:is></x:c>
+    </x:row>
+  </x:sheetData>
+  <x:dataValidations count="3">
+    <x:dataValidation type="whole" operator="between" allowBlank="1"
+                      showInputMessage="1" showErrorAlert="1"
+                      errorTitle="Out of range" error="Enter 1 to 100."
+                      promptTitle="Hint" prompt="Whole number 1-100." sqref="A1:A10">
+      <x:formula1>1</x:formula1>
+      <x:formula2>100</x:formula2>
+    </x:dataValidation>
+    <x:dataValidation type="list" allowBlank="1" showDropDown="0" sqref="B1:B10">
+      <x:formula1>"red,green,blue"</x:formula1>
+    </x:dataValidation>
+    <x:dataValidation type="custom" errorStyle="warning"
+                      showErrorAlert="1" sqref="C1">
+      <x:formula1>LEN(C1)&lt;=10</x:formula1>
+    </x:dataValidation>
+  </x:dataValidations>
+</x:worksheet>"#;
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &xlsx_content_types(1, "")),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+    ]);
+    save(root, "test-data/spreadsheet/data_validation.xlsx", &data);
+  }
+}
+
+fn create_sml_chart_fixtures(root: &Path) {
+  // ── CHART-01: chart_bar ──────────────────────────────────────────────────
+  // Worksheet with a x:drawing pointing to drawing1.xml (twoCellAnchor
+  // graphicFrame referencing chart1.xml). chart1.xml has barChart with one
+  // series (cat strRef + val numRef + cached values) and a catAx/valAx pair.
+  {
+    let sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheetData>
+    <x:row r="1"><x:c r="A1" t="inlineStr"><x:is><x:t>Quarter</x:t></x:is></x:c><x:c r="B1" t="inlineStr"><x:is><x:t>Sales</x:t></x:is></x:c></x:row>
+    <x:row r="2"><x:c r="A2" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c><x:c r="B2"><x:v>10</x:v></x:c></x:row>
+    <x:row r="3"><x:c r="A3" t="inlineStr"><x:is><x:t>Q2</x:t></x:is></x:c><x:c r="B3"><x:v>20</x:v></x:c></x:row>
+    <x:row r="4"><x:c r="A4" t="inlineStr"><x:is><x:t>Q3</x:t></x:is></x:c><x:c r="B4"><x:v>30</x:v></x:c></x:row>
+  </x:sheetData>
+  <x:drawing r:id="rId2"/>
+</x:worksheet>"#;
+
+    let sheet_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let drawing = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>15</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame macro="">
+      <xdr:nvGraphicFramePr>
+        <xdr:cNvPr id="2" name="Chart 1"/>
+        <xdr:cNvGraphicFramePr/>
+      </xdr:nvGraphicFramePr>
+      <xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>
+      <a:graphic>
+        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+          <c:chart r:id="rId1"/>
+        </a:graphicData>
+      </a:graphic>
+    </xdr:graphicFrame>
+    <xdr:clientData/>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>"#;
+
+    let drawing_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let chart = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:autoTitleDeleted val="1"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        <c:varyColors val="0"/>
+        <c:ser>
+          <c:idx val="0"/>
+          <c:order val="0"/>
+          <c:tx>
+            <c:strRef>
+              <c:f>Sheet1!$B$1</c:f>
+              <c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Sales</c:v></c:pt></c:strCache>
+            </c:strRef>
+          </c:tx>
+          <c:cat>
+            <c:strRef>
+              <c:f>Sheet1!$A$2:$A$4</c:f>
+              <c:strCache>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>Q1</c:v></c:pt>
+                <c:pt idx="1"><c:v>Q2</c:v></c:pt>
+                <c:pt idx="2"><c:v>Q3</c:v></c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:cat>
+          <c:val>
+            <c:numRef>
+              <c:f>Sheet1!$B$2:$B$4</c:f>
+              <c:numCache>
+                <c:formatCode>General</c:formatCode>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>10</c:v></c:pt>
+                <c:pt idx="1"><c:v>20</c:v></c:pt>
+                <c:pt idx="2"><c:v>30</c:v></c:pt>
+              </c:numCache>
+            </c:numRef>
+          </c:val>
+        </c:ser>
+        <c:axId val="111"/>
+        <c:axId val="222"/>
+      </c:barChart>
+      <c:catAx>
+        <c:axId val="111"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:crossAx val="222"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="222"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:crossAx val="111"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/>
+    <c:dispBlanksAs val="gap"/>
+  </c:chart>
+</c:chartSpace>"#;
+
+    let content_types = xlsx_content_types(
+      1,
+      r#"
+  <Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
+  <Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &workbook_rels("")),
+      ("xl/worksheets/sheet1.xml", sheet),
+      ("xl/worksheets/_rels/sheet1.xml.rels", &sheet_rels),
+      ("xl/drawings/drawing1.xml", drawing),
+      ("xl/drawings/_rels/drawing1.xml.rels", &drawing_rels),
+      ("xl/charts/chart1.xml", chart),
+    ]);
+    save(root, "test-data/spreadsheet/chart_bar.xlsx", &data);
+  }
+}
+
+fn create_sml_pivot_fixtures(root: &Path) {
+  // ── SML-PT-01: pivot_table ───────────────────────────────────────────────
+  // Two sheets — Source data (Region/Quarter/Sales, 3 rows) and a Pivot
+  // sheet displaying a row=Region / col=Quarter / data=Sum of Sales pivot.
+  // Cache definition lists 3 cacheFields (two strings with sharedItems,
+  // one numeric); cache records carry 3 records using <x:x> for indexed
+  // strings and <x:n> for the numeric column.
+  {
+    let source_sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <x:sheetData>
+    <x:row r="1">
+      <x:c r="A1" t="inlineStr"><x:is><x:t>Region</x:t></x:is></x:c>
+      <x:c r="B1" t="inlineStr"><x:is><x:t>Quarter</x:t></x:is></x:c>
+      <x:c r="C1" t="inlineStr"><x:is><x:t>Sales</x:t></x:is></x:c>
+    </x:row>
+    <x:row r="2">
+      <x:c r="A2" t="inlineStr"><x:is><x:t>North</x:t></x:is></x:c>
+      <x:c r="B2" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c>
+      <x:c r="C2"><x:v>100</x:v></x:c>
+    </x:row>
+    <x:row r="3">
+      <x:c r="A3" t="inlineStr"><x:is><x:t>North</x:t></x:is></x:c>
+      <x:c r="B3" t="inlineStr"><x:is><x:t>Q2</x:t></x:is></x:c>
+      <x:c r="C3"><x:v>200</x:v></x:c>
+    </x:row>
+    <x:row r="4">
+      <x:c r="A4" t="inlineStr"><x:is><x:t>South</x:t></x:is></x:c>
+      <x:c r="B4" t="inlineStr"><x:is><x:t>Q1</x:t></x:is></x:c>
+      <x:c r="C4"><x:v>300</x:v></x:c>
+    </x:row>
+  </x:sheetData>
+</x:worksheet>"#;
+
+    let pivot_sheet = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheetData/>
+</x:worksheet>"#;
+
+    let pivot_sheet_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable" Target="../pivotTables/pivotTable1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let cache_def = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotCacheDefinition xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                        r:id="rId1" recordCount="3" refreshOnLoad="1"
+                        createdVersion="6" refreshedVersion="6" minRefreshableVersion="3">
+  <x:cacheSource type="worksheet">
+    <x:worksheetSource ref="A1:C4" sheet="Source"/>
+  </x:cacheSource>
+  <x:cacheFields count="3">
+    <x:cacheField name="Region" numFmtId="0">
+      <x:sharedItems count="2">
+        <x:s v="North"/>
+        <x:s v="South"/>
+      </x:sharedItems>
+    </x:cacheField>
+    <x:cacheField name="Quarter" numFmtId="0">
+      <x:sharedItems count="2">
+        <x:s v="Q1"/>
+        <x:s v="Q2"/>
+      </x:sharedItems>
+    </x:cacheField>
+    <x:cacheField name="Sales" numFmtId="0">
+      <x:sharedItems containsSemiMixedTypes="0" containsString="0"
+                     containsNumber="1" containsInteger="1"
+                     minValue="100" maxValue="300"/>
+    </x:cacheField>
+  </x:cacheFields>
+</x:pivotCacheDefinition>"#;
+
+    let cache_def_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords" Target="pivotCacheRecords1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let cache_records = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotCacheRecords xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                     count="3">
+  <x:r><x:x v="0"/><x:x v="0"/><x:n v="100"/></x:r>
+  <x:r><x:x v="0"/><x:x v="1"/><x:n v="200"/></x:r>
+  <x:r><x:x v="1"/><x:x v="0"/><x:n v="300"/></x:r>
+</x:pivotCacheRecords>"#;
+
+    let pivot_table = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:pivotTableDefinition xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                        name="PivotTable1" cacheId="1" applyNumberFormats="0"
+                        applyBorderFormats="0" applyFontFormats="0" applyPatternFormats="0"
+                        applyAlignmentFormats="0" applyWidthHeightFormats="1"
+                        dataCaption="Values" updatedVersion="6" minRefreshableVersion="3"
+                        useAutoFormatting="1" itemPrintTitles="1" createdVersion="6"
+                        indent="0" outline="1" outlineData="1" multipleFieldFilters="0">
+  <x:location ref="A1:D5" firstHeaderRow="1" firstDataRow="2" firstDataCol="1"/>
+  <x:pivotFields count="3">
+    <x:pivotField axis="axisRow" showAll="0">
+      <x:items count="3">
+        <x:item x="0"/><x:item x="1"/><x:item t="default"/>
+      </x:items>
+    </x:pivotField>
+    <x:pivotField axis="axisCol" showAll="0">
+      <x:items count="3">
+        <x:item x="0"/><x:item x="1"/><x:item t="default"/>
+      </x:items>
+    </x:pivotField>
+    <x:pivotField dataField="1" showAll="0"/>
+  </x:pivotFields>
+  <x:rowFields count="1"><x:field x="0"/></x:rowFields>
+  <x:rowItems count="3">
+    <x:i><x:x/></x:i>
+    <x:i><x:x v="1"/></x:i>
+    <x:i t="grand"><x:x/></x:i>
+  </x:rowItems>
+  <x:colFields count="1"><x:field x="1"/></x:colFields>
+  <x:colItems count="3">
+    <x:i><x:x/></x:i>
+    <x:i><x:x v="1"/></x:i>
+    <x:i t="grand"><x:x/></x:i>
+  </x:colItems>
+  <x:dataFields count="1">
+    <x:dataField name="Sum of Sales" fld="2" baseField="0" baseItem="0"/>
+  </x:dataFields>
+  <x:pivotTableStyleInfo name="PivotStyleLight16" showRowHeaders="1" showColHeaders="1"
+                         showRowStripes="0" showColStripes="0" showLastColumn="1"/>
+</x:pivotTableDefinition>"#;
+
+    let pivot_table_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="../pivotCache/pivotCacheDefinition1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let workbook = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <x:sheets>
+    <x:sheet name="Source" sheetId="1" r:id="rId1"/>
+    <x:sheet name="Pivot" sheetId="2" r:id="rId2"/>
+  </x:sheets>
+  <x:pivotCaches>
+    <x:pivotCache cacheId="1" r:id="rId10"/>
+  </x:pivotCaches>
+</x:workbook>"#;
+
+    let wb_rels = format!(
+      r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="{RELS_XMLNS}">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId10" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition" Target="pivotCache/pivotCacheDefinition1.xml"/>
+</Relationships>"#
+    )
+    .into_bytes();
+
+    let content_types = xlsx_content_types(
+      2,
+      r#"
+  <Override PartName="/xl/pivotCache/pivotCacheDefinition1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml"/>
+  <Override PartName="/xl/pivotCache/pivotCacheRecords1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>
+  <Override PartName="/xl/pivotTables/pivotTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", workbook),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", source_sheet),
+      ("xl/worksheets/sheet2.xml", pivot_sheet),
+      ("xl/worksheets/_rels/sheet2.xml.rels", &pivot_sheet_rels),
+      ("xl/pivotCache/pivotCacheDefinition1.xml", cache_def),
+      (
+        "xl/pivotCache/_rels/pivotCacheDefinition1.xml.rels",
+        &cache_def_rels,
+      ),
+      ("xl/pivotCache/pivotCacheRecords1.xml", cache_records),
+      ("xl/pivotTables/pivotTable1.xml", pivot_table),
+      (
+        "xl/pivotTables/_rels/pivotTable1.xml.rels",
+        &pivot_table_rels,
+      ),
+    ]);
+    save(root, "test-data/spreadsheet/pivot_table.xlsx", &data);
+  }
+}
+
+// ── PML-TH-02: pml/theme_colors.pptx ─────────────────────────────────────────
+// Slide with two scheme-color shapes and <a:overrideClrMapping> that swaps
+// bg1/tx1 (light background → dark) demonstrating clrMapOvr non-inherit path.
+const PML_THEME_COLORS_SLIDE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Accent1 Shape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill>
+            <a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="3" name="DK1 Shape"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="2057400"/><a:ext cx="3657600" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill>
+            <a:schemeClr val="dk1"><a:tint val="40000"/></a:schemeClr>
+          </a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:overrideClrMapping
+        bg1="dk1" tx1="lt1" bg2="lt2" tx2="dk2"
+        accent1="accent1" accent2="accent2" accent3="accent3"
+        accent4="accent4" accent5="accent5" accent6="accent6"
+        hlink="hlink" folHlink="folHlink"/>
+  </p:clrMapOvr>
+</p:sld>"#;
+
+fn create_pml_themes_fixtures(root: &Path) {
+  // PML-TH-02: theme_colors — overrideClrMapping variant
+  {
+    let theme_ct = "\n  <Override PartName=\"/ppt/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>";
+    let theme_master_rel = r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>"#;
+    let data = dml_pptx(
+      PML_THEME_COLORS_SLIDE.to_vec(),
+      theme_ct,
+      theme_master_rel,
+      vec![("ppt/theme/theme1.xml", THEME1_XML.to_vec())],
+    );
+    save(root, "test-data/pml/theme_colors.pptx", &data);
+  }
+}
+
+// ── PML-IMG-02: pml/slide_pic.pptx ───────────────────────────────────────────
+// <p:pic> with <a:srcRect> 10% crop on all four sides; picLocks noChangeAspect;
+// descr alt-text on cNvPr.  Exercises blipFill crop round-trip.
+
+fn create_pml_media_fixtures(root: &Path, png: &[u8]) {
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:pic>
+        <p:nvPicPr>
+          <p:cNvPr id="2" name="Picture 1" descr="A 1x1 red pixel"/>
+          <p:cNvPicPr>
+            <a:picLocks noChangeAspect="1"/>
+          </p:cNvPicPr>
+          <p:nvPr/>
+        </p:nvPicPr>
+        <p:blipFill>
+          <a:blip r:embed="rId2"/>
+          <a:srcRect l="10000" t="10000" r="10000" b="10000"/>
+          <a:stretch><a:fillRect/></a:stretch>
+        </p:blipFill>
+        <p:spPr>
+          <a:xfrm>
+            <a:off x="914400" y="914400"/>
+            <a:ext cx="4572000" cy="3429000"/>
+          </a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        </p:spPr>
+      </p:pic>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>"#,
+    );
+    let ct = pptx_content_types(
+      1,
+      "\n  <Default Extension=\"png\" ContentType=\"image/png\"/>",
+    );
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide.to_vec(),
+      slide_rels,
+      extra: vec![("ppt/media/image1.png", png.to_vec())],
+    });
+    save(root, "test-data/pml/slide_pic.pptx", &data);
+  }
+}
+
+// ── PML-TBL-02: pml/slide_table.pptx ─────────────────────────────────────────
+// 3-column 3-row table: firstRow/bandRow flags; tcPr bottom-border on header
+// cells; horizontal merge (gridSpan=2 leading cell + hMerge continuation).
+
+fn create_pml_tables_fixtures(root: &Path) {
+  {
+    let slide = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:graphicFrame>
+        <p:nvGraphicFramePr>
+          <p:cNvPr id="2" name="Table 1"/>
+          <p:cNvGraphicFramePr>
+            <a:graphicFrameLocks noGrp="1"/>
+          </p:cNvGraphicFramePr>
+          <p:nvPr/>
+        </p:nvGraphicFramePr>
+        <p:xfrm>
+          <a:off x="457200" y="457200"/>
+          <a:ext cx="8229600" cy="1714500"/>
+        </p:xfrm>
+        <a:graphic>
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">
+            <a:tbl>
+              <a:tblPr firstRow="1" bandRow="1"/>
+              <a:tblGrid>
+                <a:gridCol w="2743200"/>
+                <a:gridCol w="2743200"/>
+                <a:gridCol w="2743200"/>
+              </a:tblGrid>
+              <!-- header row: col A standalone; cols B+C merged -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>Header A</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr>
+                    <a:lnB w="12700" cap="flat" cmpd="sng">
+                      <a:solidFill><a:schemeClr val="accent1"/></a:solidFill>
+                      <a:prstDash val="solid"/>
+                    </a:lnB>
+                  </a:tcPr>
+                </a:tc>
+                <a:tc gridSpan="2">
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>Merged B+C</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr>
+                    <a:lnB w="12700" cap="flat" cmpd="sng">
+                      <a:solidFill><a:schemeClr val="accent1"/></a:solidFill>
+                      <a:prstDash val="solid"/>
+                    </a:lnB>
+                  </a:tcPr>
+                </a:tc>
+                <a:tc hMerge="1">
+                  <a:txBody><a:bodyPr/><a:lstStyle/><a:p/></a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+              <!-- data row 1 -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C1</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C2</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R1C3</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+              <!-- data row 2 -->
+              <a:tr h="571500">
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C1</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C2</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+                <a:tc>
+                  <a:txBody>
+                    <a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:t>R2C3</a:t></a:r></a:p>
+                  </a:txBody>
+                  <a:tcPr/>
+                </a:tc>
+              </a:tr>
+            </a:tbl>
+          </a:graphicData>
+        </a:graphic>
+      </p:graphicFrame>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+</p:sld>"#;
+    let data = dml_pptx(slide.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_table.pptx", &data);
+  }
+}
+
+// ── PML-ANIM-01: pml/slide_animation.pptx ────────────────────────────────────
+// Slide with one text box (id=2); full timing hierarchy (tmRoot→mainSeq→click);
+// <p:set> visibility + <p:animEffect filter="fade" transition="in">;
+// <p:bldLst>; <p:prevCondLst>/<p:nextCondLst> on <p:seq>.
+
+const PML_ANIMATION_SLIDE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr>
+        <p:cNvPr id="1" name=""/>
+        <p:cNvGrpSpPr/>
+        <p:nvPr/>
+      </p:nvGrpSpPr>
+      <p:grpSpPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="0" cy="0"/>
+          <a:chOff x="0" y="0"/>
+          <a:chExt cx="0" cy="0"/>
+        </a:xfrm>
+      </p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="TextBox 1"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="6400800" cy="1371600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr algn="ctr"/>
+            <a:r>
+              <a:rPr lang="en-US" sz="2400" dirty="0"/>
+              <a:t>Fade In Animation</a:t>
+            </a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr>
+    <a:masterClrMapping/>
+  </p:clrMapOvr>
+  <p:timing>
+    <p:tnLst>
+      <p:par>
+        <p:cTn id="1" dur="indefin" restart="whenNotActive" nodeType="tmRoot">
+          <p:childTnLst>
+            <p:seq concurrent="1" nextAc="seek">
+              <p:cTn id="2" dur="indefin" nodeType="mainSeq">
+                <p:childTnLst>
+                  <p:par>
+                    <p:cTn id="3" fill="hold">
+                      <p:stCondLst>
+                        <p:cond delay="indefin"/>
+                      </p:stCondLst>
+                      <p:childTnLst>
+                        <p:par>
+                          <p:cTn id="4" fill="hold">
+                            <p:stCondLst>
+                              <p:cond delay="0"/>
+                            </p:stCondLst>
+                            <p:childTnLst>
+                              <p:set>
+                                <p:cBhvr>
+                                  <p:cTn id="5" dur="1" fill="hold"/>
+                                  <p:tgtEl><p:spTgt spid="2"/></p:tgtEl>
+                                  <p:attrNameLst>
+                                    <p:attrName>style.visibility</p:attrName>
+                                  </p:attrNameLst>
+                                </p:cBhvr>
+                                <p:to><p:strVal val="visible"/></p:to>
+                              </p:set>
+                              <p:animEffect transition="in" filter="fade">
+                                <p:cBhvr>
+                                  <p:cTn id="6" dur="500" fill="hold"/>
+                                  <p:tgtEl><p:spTgt spid="2"/></p:tgtEl>
+                                </p:cBhvr>
+                              </p:animEffect>
+                            </p:childTnLst>
+                          </p:cTn>
+                        </p:par>
+                      </p:childTnLst>
+                    </p:cTn>
+                  </p:par>
+                </p:childTnLst>
+              </p:cTn>
+              <p:prevCondLst>
+                <p:cond evt="onPrev" delay="0">
+                  <p:tn val="3"/>
+                </p:cond>
+              </p:prevCondLst>
+              <p:nextCondLst>
+                <p:cond evt="onNext" delay="0">
+                  <p:tn val="3"/>
+                </p:cond>
+              </p:nextCondLst>
+            </p:seq>
+          </p:childTnLst>
+        </p:cTn>
+      </p:par>
+    </p:tnLst>
+    <p:bldLst>
+      <p:bldP spid="2" grpId="0" uiExpand="1" build="allAtOnce"/>
+    </p:bldLst>
+  </p:timing>
+</p:sld>"#;
+
+fn create_pml_animations_fixtures(root: &Path) {
+  {
+    let data = dml_pptx(PML_ANIMATION_SLIDE.to_vec(), "", "", vec![]);
+    save(root, "test-data/pml/slide_animation.pptx", &data);
+  }
+}
+
+fn create_dml_pattern_fill_fixtures(root: &Path) {
+  // ── DML-PATT-01: pattern_fill ─────────────────────────────────────────────
+  // Single shape using <a:pattFill prst="ltHorz"> with fg/bgClr srgbClr.
+  // Exercises CT_PatternFillProperties; prst, fgClr, bgClr round-trip.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="HatchRect"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="4114800" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:pattFill prst="ltHorz">
+            <a:fgClr><a:srgbClr val="4472C4"/></a:fgClr>
+            <a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>
+          </a:pattFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/pattern_fill.pptx", &data);
+  }
+}
+
+fn create_dml_custom_geom_fixtures(root: &Path) {
+  // ── DML-CUSTGEOM-01: custom_geom ─────────────────────────────────────────
+  // Shape using <a:custGeom> with a right-triangle path (3 lnTo commands +
+  // close). Exercises CT_CustomGeometry2D, pathLst, path w/h, moveTo, lnTo,
+  // close. No avLst adjustments.
+  {
+    let slide = slide_with_shapes(
+      r#"      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="2" name="Triangle"/>
+          <p:cNvSpPr/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="4114800" cy="3657600"/></a:xfrm>
+          <a:custGeom>
+            <a:avLst/>
+            <a:pathLst>
+              <a:path w="100" h="100">
+                <a:moveTo><a:pt x="0" y="100"/></a:moveTo>
+                <a:lnTo><a:pt x="100" y="100"/></a:lnTo>
+                <a:lnTo><a:pt x="0" y="0"/></a:lnTo>
+                <a:close/>
+              </a:path>
+            </a:pathLst>
+          </a:custGeom>
+          <a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody>
+      </p:sp>
+"#,
+    );
+    let data = dml_pptx(slide, "", "", vec![]);
+    save(root, "test-data/drawingml/custom_geom.pptx", &data);
+  }
+}
+
+fn create_sml_vba_fixtures(root: &Path) {
+  // ── SML-VBA-01: vba_preserve ─────────────────────────────────────────────
+  // Macro-enabled workbook (.xlsm) with a minimal OLE2 placeholder for
+  // xl/vbaProject.bin. Tests the XLSX counterpart of the WML VBA fixture:
+  // macroEnabled workbook content type; microsoft.com vbaProject rel type;
+  // <Default Extension="bin"> entry. vbaData.xml is not used (Excel-only).
+  {
+    let mut vba_bin = vec![0u8; 512];
+    vba_bin[0..8].copy_from_slice(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    vba_bin[24] = 0x3E;
+    vba_bin[25] = 0x00;
+    vba_bin[26] = 0x03;
+    vba_bin[27] = 0x00;
+
+    let content_types = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>"#
+    .to_string()
+    .into_bytes();
+
+    let wb_rels = workbook_rels(
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/>"#,
+    );
+
+    let data = make_package(&[
+      ("[Content_Types].xml", &content_types),
+      ("_rels/.rels", &root_rels("xl/workbook.xml")),
+      ("xl/workbook.xml", &workbook_xml(&[("Sheet1", 1, "rId1")])),
+      ("xl/_rels/workbook.xml.rels", &wb_rels),
+      ("xl/worksheets/sheet1.xml", empty_worksheet()),
+      ("xl/vbaProject.bin", &vba_bin),
+    ]);
+    save(root, "test-data/spreadsheet/vba_preserve.xlsm", &data);
+  }
+}
+
+fn create_pml_chart_fixtures(root: &Path) {
+  // ── PML-CHART-01: slide_chart ─────────────────────────────────────────────
+  // Single slide with a p:graphicFrame embedding a ChartPart (bar chart with
+  // 3 categories and 3 values). Tests ChartPart round-trip from within a
+  // PresentationML slide (vs the spreadsheet/chart_bar.xlsx XLSX variant).
+  {
+    let chart = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <c:chart>
+    <c:autoTitleDeleted val="1"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        <c:varyColors val="0"/>
+        <c:ser>
+          <c:idx val="0"/>
+          <c:order val="0"/>
+          <c:cat>
+            <c:strRef>
+              <c:f></c:f>
+              <c:strCache>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>Q1</c:v></c:pt>
+                <c:pt idx="1"><c:v>Q2</c:v></c:pt>
+                <c:pt idx="2"><c:v>Q3</c:v></c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:cat>
+          <c:val>
+            <c:numRef>
+              <c:f></c:f>
+              <c:numCache>
+                <c:formatCode>General</c:formatCode>
+                <c:ptCount val="3"/>
+                <c:pt idx="0"><c:v>10</c:v></c:pt>
+                <c:pt idx="1"><c:v>20</c:v></c:pt>
+                <c:pt idx="2"><c:v>30</c:v></c:pt>
+              </c:numCache>
+            </c:numRef>
+          </c:val>
+        </c:ser>
+        <c:axId val="111"/>
+        <c:axId val="222"/>
+      </c:barChart>
+      <c:catAx>
+        <c:axId val="111"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:crossAx val="222"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="222"/>
+        <c:scaling><c:orientation val="minMax"/></c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:crossAx val="111"/>
+      </c:valAx>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/>
+    <c:dispBlanksAs val="gap"/>
+  </c:chart>
+</c:chartSpace>"#;
+
+    let slide = slide_with_shapes(
+      r#"      <p:graphicFrame>
+        <p:nvGraphicFramePr>
+          <p:cNvPr id="2" name="Chart 1"/>
+          <p:cNvGraphicFramePr/>
+          <p:nvPr/>
+        </p:nvGraphicFramePr>
+        <p:xfrm>
+          <a:off x="457200" y="457200"/>
+          <a:ext cx="5943600" cy="4114800"/>
+        </p:xfrm>
+        <a:graphic>
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">
+            <c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId2"/>
+          </a:graphicData>
+        </a:graphic>
+      </p:graphicFrame>
+"#,
+    );
+
+    let slide_rels = slide_to_layout_rels(
+      "../slideLayouts/slideLayout1.xml",
+      r#"
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>"#,
+    );
+
+    let ct = pptx_content_types(
+      1,
+      r#"
+  <Override PartName="/ppt/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>"#,
+    );
+
+    let data = make_pptx(PptxParts {
+      content_types: ct,
+      pres_xml: presentation_xml(1),
+      pres_rels: presentation_rels(1),
+      master_xml: SLIDE_MASTER_XML,
+      master_rels: slide_master_rels(""),
+      layout_xml: blank_slide_layout(),
+      layout_rels: slide_layout_back_rels(),
+      slide_xml: slide,
+      slide_rels,
+      extra: vec![("ppt/charts/chart1.xml", chart.to_vec())],
+    });
+    save(root, "test-data/pml/slide_chart.pptx", &data);
   }
 }

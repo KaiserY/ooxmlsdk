@@ -77,8 +77,9 @@ structural fidelity, not rendering or layout.
 | Content controls (SDT block: plain text, alias/tag/id/lock) | ✅ | `wml/content_controls.docx` |
 | Content controls (SDT run: date picker with fullDate/dateFormat; dropDownList with listItems) | ✅ | `wml/content_controls.docx` |
 | VBA macros preserve-only (.docm; macroEnabled content type; microsoft.com rel type; OLE2 bin round-trip) | ✅ | `wml/vba_preserve.docm` |
-| Custom XML | 🔲 | |
-| Embedded objects | 🔲 | |
+| Custom XML data storage (CustomXmlPart + CustomXmlPropertiesPart with ds:datastoreItem/itemID/schemaRefs) | ✅ | `wml/custom_xml.docx` |
+| Custom XML inline tagging (w:customXml block with w:customXmlPr/w:attr) | ✅ | `wml/custom_xml.docx` |
+| Embedded OLE objects (w:object + VML shape + o:OLEObject; EmbeddedObjectPart OLE2 bin; oleObject content type via Default Extension="bin") | ✅ | `wml/embedded_object.docx` |
 
 ## SpreadsheetML (XLSX)
 
@@ -112,11 +113,12 @@ structural fidelity, not rendering or layout.
 | Custom number formats | ✅ | `spreadsheet/number_formats.xlsx` |
 | Column/row dimensions | ✅ | `spreadsheet/row_col_dims.xlsx` |
 | Freeze panes | ✅ | `spreadsheet/freeze_panes.xlsx` |
-| Conditional formatting | 🔲 | |
-| Data validation | 🔲 | |
-| Charts | 🔲 | |
-| Pivot tables | 🔲 | |
-| VBA macros (preserve-only) | 🔲 | |
+| Conditional formatting (cellIs greaterThan + expression rules with dxfId, dxfs in styles.xml) | ✅ | `spreadsheet/conditional_cellis.xlsx` |
+| Conditional formatting (3-stop colorScale, dataBar, iconSet 3TrafficLights1) | ✅ | `spreadsheet/conditional_visual.xlsx` |
+| Data validation (whole between with prompts/errors; list inline literal; custom with errorStyle warning) | ✅ | `spreadsheet/data_validation.xlsx` |
+| Charts (DrawingsPart twoCellAnchor graphicFrame; ChartPart c:barChart with strRef cat + numRef val + cached values; catAx/valAx) | ✅ | `spreadsheet/chart_bar.xlsx` |
+| Pivot tables (PivotCacheDefinition + PivotCacheRecords + PivotTableDefinition; rowFields/colFields/dataFields; sharedItems with x:s indexed records) | ✅ | `spreadsheet/pivot_table.xlsx` |
+| VBA macros (preserve-only) | ✅ | `spreadsheet/vba_preserve.xlsm` |
 
 ## PresentationML (PPTX)
 
@@ -130,12 +132,21 @@ structural fidelity, not rendering or layout.
 | Inline images | ✅ | `slideshow/minimal_image.pptx` |
 | Shapes (basic) | ✅ | `slideshow/minimal_text.pptx` |
 | Shapes (with fill/border) | ✅ | `drawingml/solid_fill.pptx`, `drawingml/shape_line.pptx` |
-| Charts | 🔲 | |
-| Slide transitions | 🔲 | |
-| Animations | 🔲 | |
-| Notes | 🔲 | |
+| Placeholder layout (title+body, multilevel bullets) | ✅ | `pml/placeholder_body.pptx` |
+| Shape rotation and flip (rot/flipH/flipV) | ✅ | `pml/shape_rotation.pptx` |
+| Group shapes (grpSp with chOff/chExt) | ✅ | `pml/group_shape.pptx` |
+| Text body properties (autofit, anchor, vert) | ✅ | `pml/text_body_props.pptx` |
+| Hyperlinks in runs (hlinkClick) | ✅ | `pml/slide_hyperlink.pptx` |
+| Slide transitions (fade, spd, advClick) | ✅ | `pml/slide_transition.pptx` |
+| Speaker notes (NotesSlidePart, body placeholder) | ✅ | `pml/notes_slide.pptx` |
+| Theme colour scheme override (`<p:clrMapOvr><a:overrideClrMapping>`) | ✅ | `pml/theme_colors.pptx` |
+| Image crop (`<a:srcRect>`) | ✅ | `pml/slide_pic.pptx` |
+| Table merged cells (`gridSpan` + `hMerge`) | ✅ | `pml/slide_table.pptx` |
+| Table cell borders (`<a:tcPr><a:lnB>`) | ✅ | `pml/slide_table.pptx` |
+| Entrance animation (`<p:timing>`, `<p:animEffect filter="fade">`) | ✅ | `pml/slide_animation.pptx` |
+| Animation build list (`<p:bldLst><p:bldP>`) | ✅ | `pml/slide_animation.pptx` |
+| Charts (ChartPart + bar series in `p:graphicFrame`) | ✅ | `pml/slide_chart.pptx` |
 | Embedded videos | 🔲 | |
-| Speaker notes | 🔲 | |
 
 ## DrawingML (shared across DOCX/XLSX/PPTX)
 
@@ -151,8 +162,8 @@ structural fidelity, not rendering or layout.
 | Paragraph properties (alignment/spacing/indent) | ✅ | `drawingml/text_run_props.pptx` |
 | Superscript / subscript (baseline) | ✅ | `drawingml/text_run_props.pptx` |
 | Theme part (clrScheme/fontScheme/fmtScheme) | ✅ | `drawingml/theme.pptx` |
-| Pattern fill | 🔲 | |
-| Custom geometry (custGeom) | 🔲 | |
+| Pattern fill (`<a:pattFill>` with `prst`, `fgClr`, `bgClr`) | ✅ | `drawingml/pattern_fill.pptx` |
+| Custom geometry (`<a:custGeom>` path commands: moveTo/lnTo/close) | ✅ | `drawingml/custom_geom.pptx` |
 | 3D effects (scene3d/sp3d) | 🔲 | |
 
 ## MCE (Markup Compatibility and Extensibility)

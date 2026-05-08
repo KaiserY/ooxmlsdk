@@ -125,7 +125,20 @@ fn collect_doc_files_recursive(dir: &Path, rel_root: &Path, files: &mut Vec<Stri
 fn is_supported_document_path(path: &Path) -> bool {
   matches!(
     path.extension().and_then(|ext| ext.to_str()),
-    Some("docx" | "docm" | "dotx" | "xlsx" | "xltx" | "pptx" | "potx")
+    Some(
+      "docx"
+        | "dotx"
+        | "docm"
+        | "dotm"
+        | "xlsx"
+        | "xltx"
+        | "xlsm"
+        | "xltm"
+        | "pptx"
+        | "potx"
+        | "pptm"
+        | "potm"
+    )
   )
 }
 

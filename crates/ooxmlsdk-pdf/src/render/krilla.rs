@@ -33,6 +33,9 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   debug_assert!(document.frames.iter().all(|frame| {
     let _kind = frame.kind;
     let _block_index = frame.block_index;
+    let _split_start = frame.split_start;
+    let _split_end = frame.split_end;
+    let _invalidation = frame.invalidation;
     frame.page_index < document.pages.len()
       && frame.section_index == document.pages[frame.page_index].section_index
       && frame.section_page_index == document.pages[frame.page_index].section_page_index
@@ -51,6 +54,50 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
           && line.x_pt.is_finite()
           && line.y_pt.is_finite()
       })
+      && frame.fragments.iter().all(|fragment| {
+        let _fragment_kind = fragment.kind;
+        fragment.item_start >= frame.item_start
+          && fragment.item_end <= frame.item_end
+          && fragment.item_start < fragment.item_end
+          && fragment
+            .bounds
+            .is_none_or(|bounds| bounds.width_pt >= 0.0 && bounds.height_pt >= 0.0)
+      })
+  }));
+  debug_assert!(document.reflow_requests.iter().all(|request| {
+    document
+      .frames
+      .get(request.frame_index)
+      .is_some_and(|frame| {
+        let _reason = request.reason;
+        frame.kind == request.kind
+          && frame.page_index == request.page_index
+          && frame.section_page_index == request.section_page_index
+          && frame.column_index == request.column_index
+          && frame.split_start == request.restart
+      })
+  }));
+  debug_assert!(document.page_invalidations.iter().all(|invalidation| {
+    document
+      .frames
+      .get(invalidation.first_frame_index)
+      .is_some_and(|frame| {
+        let _reason = invalidation.reason;
+        frame.page_index == invalidation.page_index
+          && frame.section_page_index == invalidation.section_page_index
+      })
+  }));
+  debug_assert!(document.reflow_executions.iter().all(|execution| {
+    let _action = execution.action;
+    execution.request_count > 0 && execution.first_page_index < document.pages.len()
+  }));
+  debug_assert!(document.restart_plan.as_ref().is_none_or(|plan| {
+    document.frames.get(plan.frame_index).is_some_and(|frame| {
+      let _reason = plan.reason;
+      frame.page_index == plan.page_index
+        && frame.block_index == plan.block_index
+        && frame.split_start == plan.cursor
+    })
   }));
   let mut pdf = Document::new_with(serialize_settings(options));
   let fonts = FontSet::load()?;

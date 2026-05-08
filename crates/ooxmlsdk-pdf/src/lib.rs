@@ -3522,7 +3522,13 @@ mod tests {
       &[
         "pages=",
         "frames=",
+        "page_invalidations=",
+        "reflow_executions=",
+        "reflow_requests=",
+        "restart_plan=",
         "frame kind=Paragraph block=Some(0)",
+        "fragments=",
+        "invalidation=",
         "Cluster section header",
         "Cluster sections first body",
         "Cluster section footer",
@@ -3543,7 +3549,12 @@ mod tests {
         "pages=2",
         "follows=1",
         "frames=3",
+        "page_invalidations=",
+        "reflow_executions=",
+        "reflow_requests=",
+        "restart_plan=",
         "frame kind=Paragraph block=Some(0)",
+        "fragment kind=ParagraphLine",
         "follow kind=Paragraph reason=ExplicitBreak block=Some(2) from=0:0/0 to=1:1/0",
         "\"Cluster\"",
         "\"paragraph\"",
@@ -3564,7 +3575,11 @@ mod tests {
       &snapshot,
       &[
         "frames=3",
+        "page_invalidations=",
+        "reflow_executions=",
         "frame kind=Table block=Some(1)",
+        "fragment kind=TableCell",
+        "fragment kind=TableRow",
         "Cluster table before",
         "\"head 1\"",
         "\"rowspan \"",
@@ -3603,6 +3618,7 @@ mod tests {
       &[
         "frame kind=Paragraph block=Some(0)",
         "frame kind=Paragraph block=Some(1)",
+        "fragment kind=ParagraphLine",
         "Cluster drawing before floating",
         "I x=36.0 y=",
         "floating=true",
@@ -3629,6 +3645,8 @@ mod tests {
         "frames=",
         "frame kind=Paragraph block=Some(0)",
         "frame kind=Notes block=Some(0)",
+        "fragment kind=ParagraphLine",
+        "fragment kind=NoteLine",
         "Cluster notes body with footnote",
         "Cluster notes following body text",
         "Cluster footnote",
@@ -3656,6 +3674,25 @@ mod tests {
     snapshot.push_str(&format!("pages={}\n", layout.pages.len()));
     snapshot.push_str(&format!("follows={}\n", layout.follows.len()));
     snapshot.push_str(&format!("frames={}\n", layout.frames.len()));
+    snapshot.push_str(&format!(
+      "page_invalidations={}\n",
+      layout.page_invalidations.len()
+    ));
+    snapshot.push_str(&format!(
+      "reflow_executions={}\n",
+      layout.reflow_executions.len()
+    ));
+    snapshot.push_str(&format!(
+      "reflow_requests={}\n",
+      layout.reflow_requests.len()
+    ));
+    match &layout.restart_plan {
+      Some(plan) => snapshot.push_str(&format!(
+        "restart_plan page={} frame={} block={:?} cursor={:?} reason={:?}\n",
+        plan.page_index, plan.frame_index, plan.block_index, plan.cursor.kind, plan.reason
+      )),
+      None => snapshot.push_str("restart_plan=none\n"),
+    }
     for follow in &layout.follows {
       snapshot.push_str(&format!(
         "follow kind={:?} reason={:?} block={:?} from={}:{}{}{} to={}:{}{}{}\n",
@@ -3672,6 +3709,33 @@ mod tests {
         follow.to_column_index
       ));
     }
+    for invalidation in &layout.page_invalidations {
+      snapshot.push_str(&format!(
+        "invalid_page page={} section_page={} first_frame={} reason={:?}\n",
+        invalidation.page_index,
+        invalidation.section_page_index,
+        invalidation.first_frame_index,
+        invalidation.reason
+      ));
+    }
+    for execution in &layout.reflow_executions {
+      snapshot.push_str(&format!(
+        "reflow_execution first_page={} requests={} action={:?}\n",
+        execution.first_page_index, execution.request_count, execution.action
+      ));
+    }
+    for request in &layout.reflow_requests {
+      snapshot.push_str(&format!(
+        "reflow frame={} kind={:?} reason={:?} page={} section_page={} column={} restart={:?}\n",
+        request.frame_index,
+        request.kind,
+        request.reason,
+        request.page_index,
+        request.section_page_index,
+        request.column_index,
+        request.restart.kind
+      ));
+    }
     for frame in &layout.frames {
       let bounds = frame
         .bounds
@@ -3683,7 +3747,7 @@ mod tests {
         })
         .unwrap_or_else(|| "none".to_string());
       snapshot.push_str(&format!(
-        "frame kind={:?} block={:?} page={} section={} section_page={} column={} items={}..{} retained={} bounds={} lines={}\n",
+        "frame kind={:?} block={:?} page={} section={} section_page={} column={} items={}..{} retained={} bounds={} lines={} fragments={} invalidation={:?} split={:?}->{:?}\n",
         frame.kind,
         frame.block_index,
         frame.page_index,
@@ -3694,12 +3758,37 @@ mod tests {
         frame.item_end,
         frame.items.len(),
         bounds,
-        frame.lines.len()
+        frame.lines.len(),
+        frame.fragments.len(),
+        frame.invalidation,
+        frame.split_start.kind,
+        frame.split_end.kind
       ));
       for line in frame.lines.iter().take(6) {
         snapshot.push_str(&format!(
           "  line x={:.1} y={:.1} w={:.1} h={:.1} items={}..{}\n",
           line.x_pt, line.y_pt, line.width_pt, line.height_pt, line.item_start, line.item_end
+        ));
+      }
+      for fragment in frame.fragments.iter().take(6) {
+        let bounds = fragment
+          .bounds
+          .map(|bounds| {
+            format!(
+              "{:.1},{:.1} {:.1}x{:.1}",
+              bounds.x_pt, bounds.y_pt, bounds.width_pt, bounds.height_pt
+            )
+          })
+          .unwrap_or_else(|| "none".to_string());
+        snapshot.push_str(&format!(
+          "  fragment kind={:?} index={} row={} cell={:?} items={}..{} bounds={}\n",
+          fragment.kind,
+          fragment.index,
+          fragment.row_index,
+          fragment.cell_index,
+          fragment.item_start,
+          fragment.item_end,
+          bounds
         ));
       }
     }

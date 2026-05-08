@@ -41,6 +41,10 @@ pub(crate) struct LayoutDocument {
   pub pages: Vec<Page>,
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
+  pub page_invalidations: Vec<PageInvalidation>,
+  pub reflow_executions: Vec<ReflowExecution>,
+  pub reflow_requests: Vec<ReflowRequest>,
+  pub restart_plan: Option<RestartPlan>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -74,6 +78,8 @@ pub(crate) struct FrameFollow {
 pub(crate) struct LayoutFrame {
   pub kind: FollowFrameKind,
   pub block_index: Option<usize>,
+  pub split_start: FrameCursor,
+  pub split_end: FrameCursor,
   pub page_index: usize,
   pub section_index: usize,
   pub section_page_index: usize,
@@ -83,6 +89,99 @@ pub(crate) struct LayoutFrame {
   pub item_end: usize,
   pub bounds: Option<FrameBounds>,
   pub lines: Vec<LineBox>,
+  pub fragments: Vec<FrameFragment>,
+  pub invalidation: FrameInvalidation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct FrameCursor {
+  pub block_index: Option<usize>,
+  pub kind: FrameCursorKind,
+  pub inline_index: usize,
+  pub text_offset: usize,
+  pub row_index: usize,
+  pub cell_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameCursorKind {
+  BlockStart,
+  Inline,
+  TableRow,
+  TableCell,
+  BlockEnd,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameFragmentKind {
+  ParagraphLine,
+  TableRow,
+  TableCell,
+  NoteLine,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FrameFragment {
+  pub kind: FrameFragmentKind,
+  pub index: usize,
+  pub row_index: usize,
+  pub cell_index: Option<usize>,
+  pub item_start: usize,
+  pub item_end: usize,
+  pub bounds: Option<FrameBounds>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameInvalidation {
+  Clean,
+  PageItemsDecorated,
+  NeedsReflow,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ReflowRequest {
+  pub frame_index: usize,
+  pub kind: FollowFrameKind,
+  pub reason: ReflowReason,
+  pub restart: FrameCursor,
+  pub page_index: usize,
+  pub section_page_index: usize,
+  pub column_index: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ReflowReason {
+  DecorationChangedItems,
+  InvalidBounds,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PageInvalidation {
+  pub page_index: usize,
+  pub section_page_index: usize,
+  pub first_frame_index: usize,
+  pub reason: ReflowReason,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ReflowExecution {
+  pub first_page_index: usize,
+  pub request_count: usize,
+  pub action: ReflowAction,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ReflowAction {
+  StabilizedRetainedDecorationItems,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct RestartPlan {
+  pub page_index: usize,
+  pub frame_index: usize,
+  pub block_index: Option<usize>,
+  pub cursor: FrameCursor,
+  pub reason: ReflowReason,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -109,6 +208,7 @@ pub(crate) struct Page {
   pub section_index: usize,
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
+  frame_fragments: Vec<FrameFragment>,
   wrap_exclusions: Vec<WrapExclusion>,
 }
 
@@ -257,17 +357,36 @@ impl<'a> RootFrameLayout<'a> {
     self.format_trailing_note_frames();
     self.finish_current_page();
 
+    let page_item_counts_before_decoration = self
+      .pages
+      .iter()
+      .map(|page| page.items.len())
+      .collect::<Vec<_>>();
     apply_page_backgrounds(&mut self.pages);
     place_floating_images(&mut self.pages);
     apply_column_separators(self.document, &mut self.pages);
     apply_headers_and_footers(self.document, &mut self.pages);
     apply_page_borders(&mut self.pages);
     resolve_dynamic_fields(&mut self.pages);
+    mark_decorated_frame_invalidations(
+      &mut self.frames,
+      &self.pages,
+      &page_item_counts_before_decoration,
+    );
+    let reflow_requests = reflow_requests_for_frames(&self.frames);
+    let (reflow_requests, reflow_executions) =
+      execute_reflow_requests(&mut self.frames, reflow_requests);
+    let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
+    let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
 
     LayoutDocument {
       pages: self.pages,
       follows: self.follows,
       frames: self.frames,
+      page_invalidations,
+      reflow_executions,
+      reflow_requests,
+      restart_plan,
     }
   }
 
@@ -609,9 +728,15 @@ impl<'a> RootFrameLayout<'a> {
       let items = page.items[item_start..item_end].to_vec();
       let bounds = frame_bounds_for_items(&items);
       let lines = line_boxes_for_items(&page.items, item_start, item_end);
+      let mut fragments = page_frame_fragments(kind, &page.frame_fragments, item_start, item_end);
+      if fragments.is_empty() {
+        fragments = frame_fragments_for(kind, &lines);
+      }
       self.frames.push(LayoutFrame {
         kind,
         block_index,
+        split_start: frame_cursor(block_index, kind, item_start, &lines, true),
+        split_end: frame_cursor(block_index, kind, item_end, &lines, false),
         page_index,
         section_index: page.section_index,
         section_page_index: page.section_page_index,
@@ -625,6 +750,8 @@ impl<'a> RootFrameLayout<'a> {
         item_end,
         bounds,
         lines,
+        fragments,
+        invalidation: FrameInvalidation::Clean,
       });
     }
   }
@@ -711,6 +838,262 @@ fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) 
   lines
 }
 
+fn frame_fragments_for(kind: FollowFrameKind, lines: &[LineBox]) -> Vec<FrameFragment> {
+  lines
+    .iter()
+    .enumerate()
+    .map(|(index, line)| FrameFragment {
+      kind: match kind {
+        FollowFrameKind::Paragraph => FrameFragmentKind::ParagraphLine,
+        FollowFrameKind::Table => FrameFragmentKind::TableRow,
+        FollowFrameKind::Notes => FrameFragmentKind::NoteLine,
+      },
+      index,
+      row_index: index,
+      cell_index: None,
+      item_start: line.item_start,
+      item_end: line.item_end,
+      bounds: Some(FrameBounds {
+        x_pt: line.x_pt,
+        y_pt: line.y_pt,
+        width_pt: line.width_pt,
+        height_pt: line.height_pt,
+      }),
+    })
+    .collect()
+}
+
+fn page_frame_fragments(
+  frame_kind: FollowFrameKind,
+  fragments: &[FrameFragment],
+  item_start: usize,
+  item_end: usize,
+) -> Vec<FrameFragment> {
+  fragments
+    .iter()
+    .filter(|fragment| fragment.item_start < item_end && fragment.item_end > item_start)
+    .cloned()
+    .map(|mut fragment| {
+      if matches!(frame_kind, FollowFrameKind::Notes)
+        && matches!(fragment.kind, FrameFragmentKind::ParagraphLine)
+      {
+        fragment.kind = FrameFragmentKind::NoteLine;
+      }
+      fragment
+    })
+    .collect()
+}
+
+fn push_page_fragment(
+  page: &mut Page,
+  kind: FrameFragmentKind,
+  index: usize,
+  row_index: usize,
+  cell_index: Option<usize>,
+  item_start: usize,
+  item_end: usize,
+) {
+  if item_start >= item_end {
+    return;
+  }
+  let bounds = frame_bounds_for_items(&page.items[item_start..item_end]);
+  page.frame_fragments.push(FrameFragment {
+    kind,
+    index,
+    row_index,
+    cell_index,
+    item_start,
+    item_end,
+    bounds,
+  });
+}
+
+fn frame_cursor(
+  block_index: Option<usize>,
+  frame_kind: FollowFrameKind,
+  item_index: usize,
+  lines: &[LineBox],
+  start: bool,
+) -> FrameCursor {
+  if let Some((line_index, _line)) = lines.iter().enumerate().find(|(_, line)| {
+    if start {
+      item_index <= line.item_end
+    } else {
+      item_index <= line.item_end.saturating_add(1)
+    }
+  }) {
+    return FrameCursor {
+      block_index,
+      kind: match frame_kind {
+        FollowFrameKind::Paragraph | FollowFrameKind::Notes => FrameCursorKind::Inline,
+        FollowFrameKind::Table => {
+          if start {
+            FrameCursorKind::TableRow
+          } else {
+            FrameCursorKind::TableCell
+          }
+        }
+      },
+      inline_index: if matches!(
+        frame_kind,
+        FollowFrameKind::Paragraph | FollowFrameKind::Notes
+      ) {
+        line_index
+      } else {
+        0
+      },
+      text_offset: 0,
+      row_index: if matches!(frame_kind, FollowFrameKind::Table) {
+        line_index
+      } else {
+        0
+      },
+      cell_index: 0,
+    };
+  }
+
+  FrameCursor {
+    block_index,
+    kind: if start {
+      FrameCursorKind::BlockStart
+    } else {
+      FrameCursorKind::BlockEnd
+    },
+    inline_index: 0,
+    text_offset: 0,
+    row_index: 0,
+    cell_index: 0,
+  }
+}
+
+fn mark_decorated_frame_invalidations(
+  frames: &mut [LayoutFrame],
+  pages: &[Page],
+  original_page_item_counts: &[usize],
+) {
+  for frame in frames {
+    let Some(page) = pages.get(frame.page_index) else {
+      frame.invalidation = FrameInvalidation::NeedsReflow;
+      continue;
+    };
+    let original_count = original_page_item_counts
+      .get(frame.page_index)
+      .copied()
+      .unwrap_or(page.items.len());
+    if page.items.len() != original_count {
+      frame.invalidation = FrameInvalidation::PageItemsDecorated;
+    }
+    if frame
+      .bounds
+      .is_none_or(|bounds| bounds.width_pt <= 0.0 || bounds.height_pt <= 0.0)
+    {
+      frame.invalidation = FrameInvalidation::NeedsReflow;
+    }
+  }
+}
+
+fn reflow_requests_for_frames(frames: &[LayoutFrame]) -> Vec<ReflowRequest> {
+  frames
+    .iter()
+    .enumerate()
+    .filter_map(|(frame_index, frame)| {
+      let reason = match frame.invalidation {
+        FrameInvalidation::Clean => return None,
+        FrameInvalidation::PageItemsDecorated => ReflowReason::DecorationChangedItems,
+        FrameInvalidation::NeedsReflow => ReflowReason::InvalidBounds,
+      };
+      Some(ReflowRequest {
+        frame_index,
+        kind: frame.kind,
+        reason,
+        restart: frame.split_start,
+        page_index: frame.page_index,
+        section_page_index: frame.section_page_index,
+        column_index: frame.column_index,
+      })
+    })
+    .collect()
+}
+
+fn execute_reflow_requests(
+  frames: &mut [LayoutFrame],
+  requests: Vec<ReflowRequest>,
+) -> (Vec<ReflowRequest>, Vec<ReflowExecution>) {
+  let mut remaining = Vec::new();
+  let mut stabilized_count = 0usize;
+  let mut first_stabilized_page = usize::MAX;
+
+  for request in requests {
+    match request.reason {
+      ReflowReason::DecorationChangedItems => {
+        if let Some(frame) = frames.get_mut(request.frame_index)
+          && frame.items.len() == frame.item_end.saturating_sub(frame.item_start)
+        {
+          frame.invalidation = FrameInvalidation::Clean;
+          stabilized_count += 1;
+          first_stabilized_page = first_stabilized_page.min(request.page_index);
+          continue;
+        }
+        remaining.push(request);
+      }
+      ReflowReason::InvalidBounds => remaining.push(request),
+    }
+  }
+
+  let executions = if stabilized_count > 0 {
+    vec![ReflowExecution {
+      first_page_index: first_stabilized_page,
+      request_count: stabilized_count,
+      action: ReflowAction::StabilizedRetainedDecorationItems,
+    }]
+  } else {
+    Vec::new()
+  };
+
+  (remaining, executions)
+}
+
+fn page_invalidations_for_reflow_requests(requests: &[ReflowRequest]) -> Vec<PageInvalidation> {
+  let mut invalidations = Vec::<PageInvalidation>::new();
+  for request in requests {
+    match invalidations
+      .iter_mut()
+      .find(|invalidation| invalidation.page_index == request.page_index)
+    {
+      Some(invalidation) => {
+        invalidation.first_frame_index = invalidation.first_frame_index.min(request.frame_index);
+        if matches!(request.reason, ReflowReason::InvalidBounds) {
+          invalidation.reason = ReflowReason::InvalidBounds;
+        }
+      }
+      None => invalidations.push(PageInvalidation {
+        page_index: request.page_index,
+        section_page_index: request.section_page_index,
+        first_frame_index: request.frame_index,
+        reason: request.reason,
+      }),
+    }
+  }
+  invalidations
+    .sort_by_key(|invalidation| (invalidation.page_index, invalidation.first_frame_index));
+  invalidations
+}
+
+fn restart_plan_for_page_invalidations(
+  frames: &[LayoutFrame],
+  invalidations: &[PageInvalidation],
+) -> Option<RestartPlan> {
+  let invalidation = invalidations.first()?;
+  let frame = frames.get(invalidation.first_frame_index)?;
+  Some(RestartPlan {
+    page_index: invalidation.page_index,
+    frame_index: invalidation.first_frame_index,
+    block_index: frame.block_index,
+    cursor: frame.split_start,
+    reason: invalidation.reason,
+  })
+}
+
 fn item_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
@@ -795,6 +1178,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_index,
     section_page_index,
     items: Vec::new(),
+    frame_fragments: Vec::new(),
     wrap_exclusions: Vec::new(),
   }
 }
@@ -1866,6 +2250,10 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
     pages: output_pages,
     follows: Vec::new(),
     frames: Vec::new(),
+    page_invalidations: Vec::new(),
+    reflow_executions: Vec::new(),
+    reflow_requests: Vec::new(),
+    restart_plan: None,
   }
 }
 
@@ -2081,10 +2469,12 @@ impl RowFrame<'_, '_> {
     row_bottom: f32,
     content_offset: f32,
   ) {
+    let row_item_start = current.items.len();
     let cell_spacing_pt = self.cell_spacing_pt();
     let mut cell_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     let mut grid_index = self.row.grid_before;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
+      let cell_item_start = current.items.len();
       let grid_start = grid_index;
       let cell_frame = match self.cell_frame(
         cell,
@@ -2102,11 +2492,29 @@ impl RowFrame<'_, '_> {
       } else {
         cell_frame.format(current, row_top, row_bottom, content_offset);
       }
+      push_page_fragment(
+        current,
+        FrameFragmentKind::TableCell,
+        self.row_index,
+        self.row_index,
+        Some(cell_index),
+        cell_item_start,
+        current.items.len(),
+      );
       cell_left += cell_frame.width_pt + cell_spacing_pt;
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
     self.paint_trailing_border(current, row_top, row_bottom);
+    push_page_fragment(
+      current,
+      FrameFragmentKind::TableRow,
+      self.row_index,
+      self.row_index,
+      None,
+      row_item_start,
+      current.items.len(),
+    );
   }
 
   fn cell_frame<'s>(
@@ -3211,6 +3619,15 @@ impl<'a> TextFrameLayout<'a> {
         advance.line_right,
       );
     }
+    push_page_fragment(
+      advance.current,
+      FrameFragmentKind::ParagraphLine,
+      advance.state.line_fragments.len(),
+      advance.state.line_fragments.len(),
+      None,
+      *advance.line_item_start_index,
+      advance.current.items.len(),
+    );
     advance.state.finish_line(y, *line_height);
     let mut next_y = y + *line_height;
     *line_height = advance.active.frame.base_line_height;
@@ -3771,6 +4188,15 @@ impl<'a> TextFrameLayout<'a> {
 
     let paragraph_bottom;
     if emitted {
+      push_page_fragment(
+        current,
+        FrameFragmentKind::ParagraphLine,
+        text_state.line_fragments.len(),
+        text_state.line_fragments.len(),
+        None,
+        line_item_start_index,
+        current.items.len(),
+      );
       text_state.finish_paragraph(y, line_height, emitted);
       paragraph_bottom = y + line_height;
       y = paragraph_bottom + self.spacing_after_pt;

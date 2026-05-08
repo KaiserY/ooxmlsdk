@@ -113,7 +113,10 @@ The current `crates/ooxmlsdk-pdf` DOCX path is:
 docx::extract
   -> DocxDocument { page, blocks, headers, footers, notes }
   -> layout::layout
-  -> LayoutDocument { pages, frames, follows }
+  -> LayoutDocument {
+       pages, frames, follows, page_invalidations,
+       reflow_executions, reflow_requests, restart_plan
+     }
   -> render::krilla::render
 ```
 
@@ -332,9 +335,15 @@ paragraph, table, drawing, and notes lanes so broad regressions are easier to
 catch before pixel/PDF-byte comparison exists. `LayoutDocument` now carries
 concrete frame records and block-level follow metadata for paragraph, table,
 and note frame transitions: each frame has a page/column owner, display-list
-range, bounds, and synthesized line boxes. This moves the renderer past a
-flat display-list-only model and gives the next Writer-style rollback and
-backward invalidation work something concrete to operate on.
+range, retained display-list items, bounds, synthesized line boxes, split
+cursors, paragraph/table/note fragments, invalidation state, page-level
+invalidations, a first reflow-request queue, and a conservative execution pass
+that stabilizes post-decoration requests against retained frame items. Remaining
+requests are reduced to a first invalid page/frame restart plan, matching the
+shape of Writer's first-invalid-page loop and Typst's relayout checkpoint. This
+moves the renderer past a flat display-list-only model and gives the next
+Writer-style rollback and backward invalidation work something concrete to
+operate on.
 The remaining gap is still large because LibreOffice parity depends on durable
 Writer master/follow frame state, exact line breaking and full bidi/CJK
 justification, full footnote/table/fly interaction, compatibility-mode quirks,
@@ -1034,15 +1043,14 @@ The section/page-style backbone, DOCX/PDF cluster snapshots, and concrete
 layout frame records are now in place. Continue with Writer-frame alignment in
 larger behavior batches:
 
-1. Extend `LayoutFrame`/`FrameFollow` with split start/end cursors and
-   invalidation state, then use those records for the first backward move when
-   footnotes or fly frames shrink the usable region after initial placement.
+1. Extend `LayoutFrame` reflow execution from retained-decoration stabilization
+   to the first backward move when footnotes or fly frames shrink the usable
+   region after initial placement.
 2. Promote line boxes from synthesized metadata to the primary text layout
    artifact, so PDF paint consumes frame/line/glyph records instead of scanning
    `PageItem::Text`.
-3. Extend table frame records with row and cell fragment ranges, then use them
-   for row-span split recalculation, split-border ownership, and repeated
-   header repaint after row fragments.
+3. Use table row/cell fragment ranges for row-span split recalculation,
+   split-border ownership, and repeated header repaint after row fragments.
 4. Extend floating frame influence from paragraph-local exclusions to
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.

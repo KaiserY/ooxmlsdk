@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -7,7 +8,7 @@ use krilla::action::{Action, LinkAction};
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::color::rgb;
 use krilla::configure::{Configuration, PdfVersion};
-use krilla::destination::XyzDestination;
+use krilla::destination::{Destination, XyzDestination};
 use krilla::geom::{PathBuilder, Point, Rect, Size, Transform};
 use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use krilla::num::NormalizedF32;
@@ -163,6 +164,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     })
   }));
   let paint = PaintDocument::from_layout(document);
+  let internal_links = InternalLinkTargets::from_paint(&paint);
   debug_assert_eq!(paint.pages.len(), document.pages.len());
   debug_assert!(paint.pages.iter().all(|page| {
     page.width_pt >= 3.0
@@ -221,7 +223,13 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     let mut surface = pdf_page.surface();
     let mut link_annotations = Vec::new();
     for item in &page.items {
-      draw_paint_item(&mut surface, item, &fonts, &mut link_annotations);
+      draw_paint_item(
+        &mut surface,
+        item,
+        &fonts,
+        &internal_links,
+        &mut link_annotations,
+      );
     }
     surface.finish();
     for annotation in link_annotations {
@@ -331,6 +339,71 @@ struct PaintLink {
   width_pt: f32,
   height_pt: f32,
   url: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct InternalLinkPosition {
+  page_index: usize,
+  x_pt: f32,
+  y_pt: f32,
+}
+
+#[derive(Clone, Debug, Default)]
+struct InternalLinkTargets {
+  positions: HashMap<String, InternalLinkPosition>,
+}
+
+impl InternalLinkTargets {
+  fn from_paint(paint: &PaintDocument) -> Self {
+    let mut positions = HashMap::new();
+    for (page_index, page) in paint.pages.iter().enumerate() {
+      for item in &page.items {
+        match item {
+          PaintItem::Text(text) => {
+            if let Some(url) = &text.item.hyperlink_url
+              && is_internal_link_url(url)
+            {
+              positions
+                .entry(url.clone())
+                .or_insert(InternalLinkPosition {
+                  page_index,
+                  x_pt: text.item.x_pt,
+                  y_pt: (text.baseline_y - 10.0).max(0.0),
+                });
+            }
+          }
+          PaintItem::Image(_) | PaintItem::Fill(_) | PaintItem::Line(_) => {}
+        }
+      }
+    }
+    Self { positions }
+  }
+
+  fn target_for_url(&self, url: &str) -> Option<Target> {
+    let target_url = reciprocal_internal_link_url(url)?;
+    let position = self.positions.get(&target_url)?;
+    Some(Target::Destination(Destination::Xyz(XyzDestination::new(
+      position.page_index,
+      Point::from_xy(position.x_pt, position.y_pt),
+    ))))
+  }
+}
+
+fn is_internal_link_url(url: &str) -> bool {
+  url.starts_with("ooxmlsdk-pdf:")
+}
+
+fn reciprocal_internal_link_url(url: &str) -> Option<String> {
+  let rest = url.strip_prefix("ooxmlsdk-pdf:")?;
+  let (kind, id) = rest.rsplit_once(':')?;
+  let target_kind = if let Some(note_kind) = kind.strip_suffix("-reference") {
+    format!("{note_kind}-backlink")
+  } else if let Some(note_kind) = kind.strip_suffix("-backlink") {
+    format!("{note_kind}-reference")
+  } else {
+    return None;
+  };
+  Some(format!("ooxmlsdk-pdf:{target_kind}:{id}"))
 }
 
 impl PaintDocument {
@@ -651,11 +724,12 @@ fn draw_paint_item(
   surface: &mut Surface<'_>,
   item: &PaintItem,
   fonts: &FontSet,
+  internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
 ) {
   match item {
     PaintItem::Text(text) if !text.item.text.is_empty() => {
-      draw_text_item(surface, text, fonts, link_annotations);
+      draw_text_item(surface, text, fonts, internal_links, link_annotations);
     }
     PaintItem::Text(_) => {}
     PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
@@ -664,6 +738,18 @@ fn draw_paint_item(
       match decode_image(&image.data, image.content_type.as_deref()) {
         Ok(pdf_image) => draw_image_item(surface, image, pdf_image),
         Err(_) => draw_missing_image(surface, image),
+      }
+      if let Some(url) = image.hyperlink_url.as_deref()
+        && let Some(annotation) = link_annotation_for_rect(
+          image.x_pt,
+          image.y_pt,
+          image.width_pt,
+          image.height_pt,
+          url,
+          internal_links,
+        )
+      {
+        link_annotations.push(annotation);
       }
     }
     PaintItem::Line(line) => draw_line_item(surface, line),
@@ -701,6 +787,7 @@ fn draw_text_item(
   surface: &mut Surface<'_>,
   text: &PaintText,
   fonts: &FontSet,
+  internal_links: &InternalLinkTargets,
   link_annotations: &mut Vec<Annotation>,
 ) {
   let item = &text.item;
@@ -737,21 +824,41 @@ fn draw_text_item(
       draw_paint_stroke_line(surface, strikethrough);
     }
     if let Some(link) = &portion.link
-      && let Some(rect) = Rect::from_ltrb(
+      && let Some(annotation) = link_annotation_for_rect(
         link.x_pt,
         link.y_pt,
-        link.x_pt + link.width_pt,
-        link.y_pt + link.height_pt,
+        link.width_pt,
+        link.height_pt,
+        &link.url,
+        internal_links,
       )
     {
-      let target = Target::Action(Action::Link(LinkAction::new(link.url.clone())));
-      let link = LinkAnnotation::new(rect, target);
-      link_annotations.push(Annotation::new_link(link, None));
+      link_annotations.push(annotation);
     }
     if clipped {
       surface.pop();
     }
   }
+}
+
+fn link_annotation_for_rect(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  url: &str,
+  internal_links: &InternalLinkTargets,
+) -> Option<Annotation> {
+  let rect = Rect::from_ltrb(x_pt, y_pt, x_pt + width_pt, y_pt + height_pt)?;
+  let target = if is_internal_link_url(url) {
+    internal_links.target_for_url(url)?
+  } else {
+    Target::Action(Action::Link(LinkAction::new(url.to_string())))
+  };
+  Some(Annotation::new_link(
+    LinkAnnotation::new(rect, target),
+    None,
+  ))
 }
 
 fn push_paint_clip(surface: &mut Surface<'_>, clip: Option<&PaintClipRect>) -> bool {

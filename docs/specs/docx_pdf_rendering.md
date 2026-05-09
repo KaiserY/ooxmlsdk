@@ -168,8 +168,8 @@ Known architectural gaps before the 100% close:
   revision metadata, more field metadata, and complete property overlay
   centralization.
 - PDF export still needs font embedding/substitution policy, page labels,
-  internal document links, metadata/export options, and tagged/PDF-A behavior
-  when those are in scope.
+  general bookmark/document target mapping, metadata/export options, and
+  tagged/PDF-A behavior when those are in scope.
 
 ## 4. Target Internal Model
 
@@ -460,8 +460,10 @@ crates/ooxmlsdk-pdf-test/
 test-data/ooxmlsdk-pdf-test/
   README.md
   libreoffice-ooxmlexport-1_page.docx
-  tolerances/
-    libreoffice-ooxmlexport-1_page.toml
+  libreoffice-ooxmlexport-footnote.docx
+  libreoffice-ooxmlexport-multi-column-separator-with-line.docx
+  libreoffice-ooxmlexport-table-auto-nested.docx
+  libreoffice-ooxmlexport-tdf78657-picture-hyperlink.docx
 ```
 
 This lane currently has two layers:
@@ -476,10 +478,14 @@ This lane currently has two layers:
 Latest inventory run:
 
 - command: `cargo test -p ooxmlsdk-pdf-test -- --nocapture`
-- scope: `test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx`
-- source: `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`
-- expected result: fixture reaches LibreOffice-vs-Rust PDF comparison and
-  passes the current first-pass summary checks
+- scope: 5 LibreOffice Writer QA fixtures under
+  `test-data/ooxmlsdk-pdf-test/`
+- sources:
+  `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`,
+  `footnote.docx`, `multi-column-separator-with-line.docx`,
+  `table-auto-nested.docx`, and `tdf78657_picture_hyperlink.docx`
+- expected result: all fixtures reach LibreOffice-vs-Rust PDF comparison with
+  zero first-pass summary differences; there is no known-issue whitelist
 
 Today's implementation order:
 
@@ -570,9 +576,9 @@ the frame/paint technique reference:
 | Paragraph/run properties | 50% | A dedicated property resolver matches Writer overlay order for doc defaults, styles, numbering, table style, direct `pPr/rPr`, tabs, numbering, bidi/CJK options, fields, and compatibility flags. |
 | Text layout | 81% | Writer-like `SwTextFrame` master/follow state, exact line breaking, bidi, CJK/kana justification, glyph-level artifacts, keep/widow/orphan, tabs, fields, and repaint invalidation match calibrated fixtures. |
 | Tables | 56% | `SwTabFrame`/row/cell follow behavior covers full grid conflict resolution, rowspan split recalculation, repeated headers, nested/floating interactions, row height, cell spacing, and complete border conflict precedence. |
-| Footnotes/endnotes | 43% | True Writer footnote/endnote continuation frames, separators, continuation separators, note areas, table/column interactions, and separator settings are validated against LibreOffice output. |
-| Drawing/floating objects | 46% | Fly-frame import/layout covers inline/as-character/paragraph/character/page anchors, page association, contour wrap, z-order, effects, textboxes/shapes, SVG/PDF images, and table/header/footer interactions. |
-| PDF paint/export quality | 82% | Paint output covers font embedding/substitution policy, internal links, metadata/page labels/options, tagging/PDF-UA/PDF-A where in scope, image transforms, clipping, transparency, and LibreOffice-like export edge cases. |
+| Footnotes/endnotes | 46% | True Writer footnote/endnote continuation frames, separators, continuation separators, note areas, table/column interactions, and separator settings are validated against LibreOffice output. |
+| Drawing/floating objects | 49% | Fly-frame import/layout covers inline/as-character/paragraph/character/page anchors, page association, contour wrap, z-order, effects, textboxes/shapes, SVG/PDF images, and table/header/footer interactions. |
+| PDF paint/export quality | 85% | Paint output covers font embedding/substitution policy, internal links, metadata/page labels/options, tagging/PDF-UA/PDF-A where in scope, image transforms, clipping, transparency, and LibreOffice-like export edge cases. |
 
 100% close order:
 
@@ -1204,9 +1210,10 @@ Implement:
   rotation/flip paint transforms, VML `v:imagedata` crop, and VML style
   rotation/flip/absolute floating placement; SVG/PDF image embedding, artistic
   effects, and full graphic attributes remain later paint quality work.
-- Carry external hyperlink relationships into text layout and emit PDF link
-  annotations. Export paragraph outline levels as a hierarchical PDF
-  outline/bookmark tree. Internal clicked bookmark destinations remain future
+- Carry external hyperlink relationships into text/image layout and emit PDF
+  link annotations. Footnote/endnote reference backlinks now use internal PDF
+  destinations. Export paragraph outline levels as a hierarchical PDF
+  outline/bookmark tree. General clicked bookmark destinations remain future
   work and should follow LibreOffice's document target mapping rather than
   ad-hoc anchors.
 - Add tagging/PDF-UA/PDF-A only after structure and font policy are ready.
@@ -1254,9 +1261,10 @@ Avoid relying only on "PDF starts with `%PDF-`" once layout behavior exists.
 
 ## 8. Immediate Next Step
 
-The section/page-style backbone, upstream DOCX/PDF calibration fixture lane, and concrete
-layout frame records are now in place. Continue with Writer-frame alignment in
-larger behavior batches:
+The section/page-style backbone, upstream DOCX/PDF calibration fixture lane,
+link annotation parity for the current 5-fixture set, and concrete layout frame
+records are now in place. Continue with Writer-frame alignment in larger
+behavior batches:
 
 1. Make checkpoint reruns influence-aware by feeding fly/footnote/table
    reservations back into the rerun's available region before formatting the
@@ -1269,7 +1277,8 @@ larger behavior batches:
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.
 5. Expand `test-data/ooxmlsdk-pdf-test/` with focused LibreOffice QA DOCX files
-   and compare them against LibreOffice-generated PDF/layout observations.
+   only when the next behavior batch is ready to make those fixtures pass
+   without known-issue whitelists.
 
 The fastest route toward LibreOffice parity is to keep each batch anchored to a
 specific LibreOffice function or fixture group, then assert import/layout

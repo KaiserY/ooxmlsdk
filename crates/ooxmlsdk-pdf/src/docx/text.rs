@@ -84,5 +84,6 @@ pub(super) fn paragraph_model_with_base(
     runs,
     format,
     list_label,
+    list_label_hyperlink_url: None,
   }
 }

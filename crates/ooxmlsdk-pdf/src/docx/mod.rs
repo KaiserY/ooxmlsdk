@@ -661,7 +661,10 @@ fn footnotes(
     let mut blocks = Vec::new();
     append_note_blocks(
       &mut blocks,
-      format!("{} ", footnote.id),
+      NoteLabel::new(
+        format!("{} ", footnote.id),
+        Some(note_backlink_url("footnote", footnote.id)),
+      ),
       footnote
         .footnote_choice
         .iter()
@@ -706,7 +709,10 @@ fn endnotes(
     let mut blocks = Vec::new();
     append_note_blocks(
       &mut blocks,
-      format!("{} ", endnote.id),
+      NoteLabel::new(
+        format!("{} ", endnote.id),
+        Some(note_backlink_url("endnote", endnote.id)),
+      ),
       endnote
         .endnote_choice
         .iter()
@@ -749,7 +755,7 @@ fn comment_blocks(
   for comment in &comments.w_comment {
     append_note_blocks(
       &mut blocks,
-      format!("[{}] ", comment.id),
+      NoteLabel::new(format!("[{}] ", comment.id), None),
       comment
         .comment_choice
         .iter()
@@ -767,9 +773,24 @@ fn comment_blocks(
   Ok(blocks)
 }
 
+#[derive(Clone, Debug)]
+struct NoteLabel {
+  text: String,
+  hyperlink_url: Option<String>,
+}
+
+impl NoteLabel {
+  fn new(text: impl Into<String>, hyperlink_url: Option<String>) -> Self {
+    Self {
+      text: text.into(),
+      hyperlink_url,
+    }
+  }
+}
+
 fn append_note_blocks<'a>(
   blocks: &mut Vec<Block>,
-  label: impl Into<String>,
+  label: NoteLabel,
   paragraphs: impl Iterator<Item = &'a w::Paragraph>,
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
@@ -777,11 +798,11 @@ fn append_note_blocks<'a>(
   hyperlinks: &HyperlinkCatalog,
 ) {
   let mut is_first_paragraph = true;
-  let label = label.into();
   for paragraph in paragraphs {
     let mut model = paragraph_model(paragraph, styles, numbering, images, hyperlinks);
     if is_first_paragraph {
-      model.list_label = Some(label.clone());
+      model.list_label = Some(label.text.clone());
+      model.list_label_hyperlink_url = label.hyperlink_url.clone();
       is_first_paragraph = false;
     }
     blocks.push(Block::Paragraph(model));
@@ -1619,8 +1640,11 @@ fn paragraph_inlines(
           run,
           &mut inlines,
           base_style,
-          styles,
-          images,
+          RunImportContext {
+            styles,
+            images,
+            hyperlinks,
+          },
           None,
           &mut complex_field,
         );
@@ -1636,8 +1660,11 @@ fn paragraph_inlines(
               run,
               &mut inlines,
               base_style,
-              styles,
-              images,
+              RunImportContext {
+                styles,
+                images,
+                hyperlinks,
+              },
               hyperlink_url.as_deref(),
               &mut complex_field,
             );
@@ -1646,7 +1673,15 @@ fn paragraph_inlines(
       }
       w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
         w::ParagraphChoice2::WIns(inserted) => {
-          push_inserted_run(inserted, &mut inlines, base_style, styles, images, None);
+          push_inserted_run(
+            inserted,
+            &mut inlines,
+            base_style,
+            styles,
+            images,
+            hyperlinks,
+            None,
+          );
         }
         w::ParagraphChoice2::WDel(_)
         | w::ParagraphChoice2::WMoveFrom(_)
@@ -1679,21 +1714,35 @@ struct ComplexFieldState {
   hyperlink_url: Option<String>,
 }
 
+#[derive(Clone, Copy)]
+struct RunImportContext<'a> {
+  styles: &'a StylesCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+}
+
 fn push_run_or_complex_field(
   run: &w::Run,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
+  context: RunImportContext<'_>,
   hyperlink_url: Option<&str>,
   state: &mut Option<ComplexFieldState>,
 ) {
   if state.is_none() && !run_starts_complex_field(run) {
-    push_run(run, inlines, base_style, styles, images, hyperlink_url);
+    push_run(
+      run,
+      inlines,
+      base_style,
+      context.styles,
+      context.images,
+      context.hyperlinks,
+      hyperlink_url,
+    );
     return;
   }
 
-  let style = properties::run_style(run.run_properties.as_deref(), base_style, styles);
+  let style = properties::run_style(run.run_properties.as_deref(), base_style, context.styles);
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::WFldChar(field_char)
@@ -1735,8 +1784,9 @@ fn push_run_or_complex_field(
             run,
             &mut state.result,
             base_style,
-            styles,
-            images,
+            context.styles,
+            context.images,
+            context.hyperlinks,
             hyperlink_url,
           );
           break;
@@ -1880,7 +1930,9 @@ fn push_simple_field(
 
   for choice in &field.simple_field_choice {
     match choice {
-      w::SimpleFieldChoice::WR(run) => push_run(run, inlines, base_style, styles, images, None),
+      w::SimpleFieldChoice::WR(run) => {
+        push_run(run, inlines, base_style, styles, images, hyperlinks, None)
+      }
       w::SimpleFieldChoice::WHyperlink(hyperlink) => {
         let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
         for item in &hyperlink.hyperlink_choice {
@@ -1891,6 +1943,7 @@ fn push_simple_field(
               base_style,
               styles,
               images,
+              hyperlinks,
               hyperlink_url.as_deref(),
             );
           }
@@ -1913,6 +1966,7 @@ fn push_run(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
   let style = properties::run_style(run.run_properties.as_deref(), base_style, styles);
@@ -1951,11 +2005,21 @@ fn push_run(
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::WFootnoteReference(reference) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        push_note_reference(inlines, reference.id, style);
+        push_note_reference(
+          inlines,
+          reference.id,
+          style,
+          Some(note_reference_url("footnote", reference.id)),
+        );
       }
       w::RunChoice::WEndnoteReference(reference) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        push_note_reference(inlines, reference.id, style);
+        push_note_reference(
+          inlines,
+          reference.id,
+          style,
+          Some(note_reference_url("endnote", reference.id)),
+        );
       }
       w::RunChoice::WCommentReference(reference) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
@@ -1963,7 +2027,7 @@ fn push_run(
       }
       w::RunChoice::WDrawing(drawing) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        if let Some(image) = drawing::inline_image(drawing, images) {
+        if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
         drawing::push_drawing_textboxes(drawing, inlines, style);
@@ -1978,7 +2042,15 @@ fn push_run(
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::WRuby(ruby) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        push_ruby_base(ruby, inlines, base_style, styles, images, hyperlink_url);
+        push_ruby_base(
+          ruby,
+          inlines,
+          base_style,
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
       }
       _ => {}
     }
@@ -1993,15 +2065,30 @@ fn push_ruby_base(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
   for choice in &ruby.ruby_base.ruby_base_choice {
     match choice {
-      w::RubyBaseChoice::WR(run) => {
-        push_run(run, inlines, base_style, styles, images, hyperlink_url)
-      }
+      w::RubyBaseChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style,
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       w::RubyBaseChoice::WIns(inserted) => {
-        push_inserted_run(inserted, inlines, base_style, styles, images, hyperlink_url);
+        push_inserted_run(
+          inserted,
+          inlines,
+          base_style,
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
       }
       _ => {}
     }
@@ -2029,6 +2116,7 @@ fn push_sdt_run(
         base_style,
         styles,
         images,
+        hyperlinks,
         hyperlink_url,
       ),
       w::SdtContentRunChoice::WFldSimple(field) => {
@@ -2052,6 +2140,7 @@ fn push_sdt_run(
               base_style,
               styles,
               images,
+              hyperlinks,
               nested_url.as_deref(),
             );
           }
@@ -2073,6 +2162,7 @@ fn push_sdt_run(
           base_style,
           styles,
           images,
+          hyperlinks,
           hyperlink_url,
         );
       }
@@ -2090,16 +2180,31 @@ fn push_inserted_run(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WR(run) => {
-        push_run(run, inlines, base_style, styles, images, hyperlink_url)
-      }
+      w::InsertedRunChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style,
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
         w::InsertedRunChoice2::WIns(nested) => {
-          push_inserted_run(nested, inlines, base_style, styles, images, hyperlink_url);
+          push_inserted_run(
+            nested,
+            inlines,
+            base_style,
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url,
+          );
         }
         w::InsertedRunChoice2::WDel(_)
         | w::InsertedRunChoice2::WMoveFrom(_)
@@ -2111,7 +2216,12 @@ fn push_inserted_run(
   }
 }
 
-fn push_note_reference(inlines: &mut Vec<InlineItem>, id: i64, style: TextStyle) {
+fn push_note_reference(
+  inlines: &mut Vec<InlineItem>,
+  id: i64,
+  style: TextStyle,
+  hyperlink_url: Option<String>,
+) {
   if id < 1 {
     return;
   }
@@ -2121,9 +2231,17 @@ fn push_note_reference(inlines: &mut Vec<InlineItem>, id: i64, style: TextStyle)
       font_size_pt: (style.font_size_pt * 0.75).max(1.0),
       ..style
     },
-    hyperlink_url: None,
+    hyperlink_url,
     dynamic_field: None,
   }));
+}
+
+fn note_reference_url(kind: &str, id: i64) -> String {
+  format!("ooxmlsdk-pdf:{kind}-reference:{id}")
+}
+
+fn note_backlink_url(kind: &str, id: i64) -> String {
+  format!("ooxmlsdk-pdf:{kind}-backlink:{id}")
 }
 
 fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextStyle) {
@@ -2353,12 +2471,29 @@ fn wingdings_symbol(code: u32) -> Option<char> {
   })
 }
 
-fn inline_image_impl(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
+fn inline_image_impl(
+  drawing: &w::Drawing,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineImage> {
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => {
       let properties = drawing_image_properties(&inline.graphic.graphic_data)?;
       let relationship_id = properties.relationship_id?;
       let resource = images.by_relationship_id.get(&relationship_id)?;
+      let hyperlink_url = inline
+        .doc_properties
+        .hyperlink_on_click
+        .as_deref()
+        .and_then(|hyperlink| hyperlink.id.as_deref())
+        .and_then(|relationship_id| hyperlinks.target(relationship_id))
+        .or_else(|| {
+          properties
+            .hyperlink_relationship_id
+            .as_deref()
+            .and_then(|relationship_id| hyperlinks.target(relationship_id))
+        })
+        .map(ToString::to_string);
       Some(InlineImage {
         data: resource.data.clone(),
         content_type: resource.content_type.clone(),
@@ -2373,6 +2508,7 @@ fn inline_image_impl(drawing: &w::Drawing, images: &ImageCatalog) -> Option<Inli
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
         alt_text: inline.doc_properties.description.clone(),
+        hyperlink_url,
         placement: ImagePlacement::Inline,
       })
     }
@@ -2382,6 +2518,19 @@ fn inline_image_impl(drawing: &w::Drawing, images: &ImageCatalog) -> Option<Inli
       let properties = drawing_image_properties(&graphic.graphic_data)?;
       let relationship_id = properties.relationship_id?;
       let resource = images.by_relationship_id.get(&relationship_id)?;
+      let hyperlink_url = anchor
+        .wp_doc_pr
+        .as_ref()
+        .and_then(|doc_pr| doc_pr.hyperlink_on_click.as_deref())
+        .and_then(|hyperlink| hyperlink.id.as_deref())
+        .and_then(|relationship_id| hyperlinks.target(relationship_id))
+        .or_else(|| {
+          properties
+            .hyperlink_relationship_id
+            .as_deref()
+            .and_then(|relationship_id| hyperlinks.target(relationship_id))
+        })
+        .map(ToString::to_string);
       Some(InlineImage {
         data: resource.data.clone(),
         content_type: resource.content_type.clone(),
@@ -2399,6 +2548,7 @@ fn inline_image_impl(drawing: &w::Drawing, images: &ImageCatalog) -> Option<Inli
           .wp_doc_pr
           .as_ref()
           .and_then(|properties| properties.description.clone()),
+        hyperlink_url,
         placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
     }
@@ -2932,6 +3082,7 @@ fn vml_image_data(
     flip_horizontal: style.flip_horizontal,
     flip_vertical: style.flip_vertical,
     alt_text: alt_text.or_else(|| data.title.clone()),
+    hyperlink_url: None,
     placement: style.placement(),
   })
 }
@@ -3175,6 +3326,7 @@ fn vml_measure_to_points(value: &str) -> Option<f32> {
 #[derive(Clone, Debug, Default)]
 struct DrawingImageProperties {
   relationship_id: Option<String>,
+  hyperlink_relationship_id: Option<String>,
   crop: ImageCrop,
   rotation_deg: f32,
   flip_horizontal: bool,
@@ -3200,6 +3352,18 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
         for attr in event.attributes().with_checks(false).flatten() {
           if attr.key.as_ref().ends_with(b":embed") || attr.key.as_ref() == b"embed" {
             properties.relationship_id = attr
+              .decode_and_unescape_value(reader.decoder())
+              .ok()
+              .map(|value| value.into_owned());
+          }
+        }
+      }
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"hlinkClick") =>
+      {
+        for attr in event.attributes().with_checks(false).flatten() {
+          if attr.key.as_ref().ends_with(b":id") || attr.key.as_ref() == b"id" {
+            properties.hyperlink_relationship_id = attr
               .decode_and_unescape_value(reader.decoder())
               .ok()
               .map(|value| value.into_owned());
@@ -4540,6 +4704,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
       None,
     );
 
@@ -5140,6 +5305,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
       None,
     );
 
@@ -5186,6 +5352,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
       None,
     );
 
@@ -5229,6 +5396,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &catalog,
+      &HyperlinkCatalog::default(),
       None,
     );
 
@@ -5327,6 +5495,7 @@ mod tests {
       TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
       None,
     );
 

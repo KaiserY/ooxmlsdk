@@ -86,6 +86,7 @@ pub(crate) struct Paragraph {
   pub runs: Vec<TextRun>,
   pub format: ParagraphFormat,
   pub list_label: Option<String>,
+  pub list_label_hyperlink_url: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -287,6 +288,7 @@ pub(crate) struct InlineImage {
   pub flip_horizontal: bool,
   pub flip_vertical: bool,
   pub alt_text: Option<String>,
+  pub hyperlink_url: Option<String>,
   pub placement: ImagePlacement,
 }
 

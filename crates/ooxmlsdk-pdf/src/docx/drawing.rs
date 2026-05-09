@@ -1,9 +1,13 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
-use super::{ImageCatalog, InlineImage, InlineItem, StylesCatalog, TextStyle};
+use super::{HyperlinkCatalog, ImageCatalog, InlineImage, InlineItem, StylesCatalog, TextStyle};
 
-pub(super) fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
-  super::inline_image_impl(drawing, images)
+pub(super) fn inline_image(
+  drawing: &w::Drawing,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineImage> {
+  super::inline_image_impl(drawing, images, hyperlinks)
 }
 
 pub(super) fn push_drawing_textboxes(

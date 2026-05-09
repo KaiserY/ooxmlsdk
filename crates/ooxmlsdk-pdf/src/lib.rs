@@ -163,6 +163,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -236,6 +237,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_hyperlink_url: None,
       })],
     };
 
@@ -288,6 +290,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_hyperlink_url: None,
       })],
     };
 
@@ -358,6 +361,7 @@ mod tests {
         runs: vec![base, shifted, next],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       })],
     };
 
@@ -423,6 +427,7 @@ mod tests {
             ..Default::default()
           },
           list_label: None,
+          list_label_hyperlink_url: None,
         })],
       };
 
@@ -457,6 +462,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -542,6 +548,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       })],
     };
 
@@ -605,6 +612,7 @@ mod tests {
           runs: vec![intro],
           format: crate::docx::ParagraphFormat::default(),
           list_label: None,
+          list_label_hyperlink_url: None,
         }),
         crate::docx::Block::Paragraph(crate::docx::Paragraph {
           inlines: vec![crate::docx::InlineItem::Text(kept.clone())],
@@ -613,6 +621,7 @@ mod tests {
           runs: vec![kept],
           format: keep_format,
           list_label: None,
+          list_label_hyperlink_url: None,
         }),
       ],
     };
@@ -661,6 +670,7 @@ mod tests {
       runs: vec![long],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     });
     let after_block = crate::docx::Block::Paragraph(crate::docx::Paragraph {
       inlines: vec![crate::docx::InlineItem::Text(after.clone())],
@@ -669,6 +679,7 @@ mod tests {
       runs: vec![after],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     });
     let doc = crate::docx::DocxDocument {
       page,
@@ -727,6 +738,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -836,6 +848,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -918,6 +931,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1021,6 +1035,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1152,6 +1167,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1235,6 +1251,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1306,6 +1323,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1417,6 +1435,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1530,6 +1549,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -1637,6 +1657,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -1709,6 +1730,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format,
         list_label: None,
+        list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -2101,6 +2123,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -2154,6 +2177,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -2216,6 +2240,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_hyperlink_url: None,
       }
     }
 
@@ -2322,6 +2347,7 @@ mod tests {
       runs: vec![before, after],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let block = crate::docx::Block::Paragraph(paragraph);
     let doc = crate::docx::DocxDocument {
@@ -2669,6 +2695,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       alt_text: Some("page wrap".into()),
+      hyperlink_url: None,
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
@@ -2704,6 +2731,7 @@ mod tests {
       runs: vec![intro],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let following = crate::docx::Paragraph {
       inlines: vec![crate::docx::InlineItem::Text(follow.clone())],
@@ -2712,6 +2740,7 @@ mod tests {
       runs: vec![follow],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let doc = crate::docx::DocxDocument {
       page,
@@ -2781,6 +2810,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       alt_text: Some("behind".into()),
+      hyperlink_url: None,
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
@@ -2808,6 +2838,7 @@ mod tests {
       runs: vec![before, after],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let block = crate::docx::Block::Paragraph(paragraph);
     let doc = crate::docx::DocxDocument {
@@ -2874,6 +2905,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       alt_text: Some("foreground".into()),
+      hyperlink_url: None,
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
@@ -2901,6 +2933,7 @@ mod tests {
       runs: vec![before, after],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
@@ -2960,6 +2993,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       alt_text: Some("aligned".into()),
+      hyperlink_url: None,
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Margin,
         vertical_relative_to: crate::docx::VerticalImageReference::Margin,
@@ -3009,6 +3043,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       })],
     };
 
@@ -3058,6 +3093,7 @@ mod tests {
       flip_horizontal: false,
       flip_vertical: false,
       alt_text: Some("top bottom".into()),
+      hyperlink_url: None,
       placement: crate::docx::ImagePlacement::Floating(crate::docx::FloatingImagePlacement {
         horizontal_relative_to: crate::docx::HorizontalImageReference::Column,
         vertical_relative_to: crate::docx::VerticalImageReference::Paragraph,
@@ -3085,6 +3121,7 @@ mod tests {
       runs: vec![before, after],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     };
     let page = crate::docx::PageSetup {
       width_pt: 300.0,

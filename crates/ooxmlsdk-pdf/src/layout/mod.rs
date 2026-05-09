@@ -377,6 +377,7 @@ pub(crate) struct ImageItem {
   pub data: Vec<u8>,
   pub content_type: Option<String>,
   pub alt_text: Option<String>,
+  pub hyperlink_url: Option<String>,
   pub floating: bool,
   pub behind_text: bool,
 }
@@ -4760,7 +4761,7 @@ impl<'a> TextFrameLayout<'a> {
         y_pt: y,
         text: label.clone(),
         style: TextStyle::default(),
-        hyperlink_url: None,
+        hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
       }));
       x = default_line_left;
@@ -5085,6 +5086,7 @@ impl<'a> TextFrameLayout<'a> {
               data: image.data.clone(),
               content_type: image.content_type.clone(),
               alt_text: image.alt_text.clone(),
+              hyperlink_url: image.hyperlink_url.clone(),
               floating: true,
               behind_text: placement.behind_text,
             }));
@@ -5188,6 +5190,7 @@ impl<'a> TextFrameLayout<'a> {
             data: image.data.clone(),
             content_type: image.content_type.clone(),
             alt_text: image.alt_text.clone(),
+            hyperlink_url: image.hyperlink_url.clone(),
             floating: false,
             behind_text: false,
           }));
@@ -5864,6 +5867,7 @@ mod tests {
       runs: vec![run],
       format: ParagraphFormat::default(),
       list_label: None,
+      list_label_hyperlink_url: None,
     })];
 
     let measured = measured_note_blocks_height(&blocks, flow);
@@ -6047,6 +6051,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_hyperlink_url: None,
       })
     }
 

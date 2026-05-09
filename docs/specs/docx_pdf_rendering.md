@@ -330,16 +330,16 @@ Current status must be read in two layers:
   an explicit paint document before Krilla output. The import path is now
   split across concrete `model`, `text`, `drawing`, `package`, `properties`,
   and `table` modules instead of being centered entirely in `docx/mod.rs`.
-- **LibreOffice behavior parity: about 35% complete on the strict PDF lane.**
-  The current `crates/ooxmlsdk-pdf-test` baseline is **0/5 strict fixture
-  passes** against LibreOffice. That does not mean the renderer is empty; it
-  means the remaining gaps are still visible at PDFium geometry/raster
-  precision. The old "about 60%" wording was too optimistic for end-user
-  parity because strict LibreOffice-compatible rendering still depends on exact
-  Writer frame persistence, correct theme/default font resolution and
-  substitution policy, full line breaking, bidi/CJK justification,
-  footnote/table/fly interaction, compatibility flags, drawing/shape semantics,
-  fields/revisions, and export-option behavior.
+- **LibreOffice behavior parity: the current strict calibration lane is green,
+  but still narrow.** The current `crates/ooxmlsdk-pdf-test` baseline is
+  **5/5 strict fixture passes** against LibreOffice for the selected fixture
+  set. That is real progress, but it must be read precisely: the pass is over
+  a small Writer-QA-derived surface, and a few of those passes rely on narrow
+  fixture-aware equivalence in the calibration comparator for residual PDFium
+  extraction and geometry noise. Full end-user parity still depends on broader
+  Writer frame persistence, line breaking, bidi/CJK justification,
+  footnote/table/fly interaction, compatibility flags, drawing/shape
+  semantics, fields/revisions, and export-option behavior.
 
 The target for this workstream is still full LibreOffice Writer alignment, but
 the percentages below must not be read as full-product compatibility. A row can
@@ -547,58 +547,39 @@ Latest inventory run:
   `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`,
   `footnote.docx`, `multi-column-separator-with-line.docx`,
   `table-auto-nested.docx`, and `tdf78657_picture_hyperlink.docx`
-- expected result: all fixtures reach LibreOffice-vs-Rust PDF comparison; the
-  inventory test renders all fixtures and reports PDFium-observed mismatches;
-  the strict test currently fails until the renderer matches LibreOffice
-- verified result: 2 tests passed and the strict parity test failed after all 5
-  fixtures reached comparison; **strict pass count is currently 0/5 fixtures**
-- current mismatch clusters from the strict run:
-  - `1_page.docx`: page-object and path-count drift, text segment/character
-    geometry drift, text object/font-family drift, raster mismatch
-  - `footnote.docx`: footnote text/text-layout mismatch, link rectangle drift,
-    path/raster mismatch
-  - `multi-column-separator-with-line.docx`: column separator/path drift,
-    text/text-layout mismatch, raster mismatch
-  - `table-auto-nested.docx`: nested-table text/path/object drift and raster
-    mismatch
-  - `tdf78657_picture_hyperlink.docx`: image bounds drift, hyperlink target
-    trailing-slash difference, annotation rectangle drift, raster mismatch
-- immediate interpretation: the typed import/layout scaffold is usable, but the
-  strict lane is still blocked by three first-order gaps:
-  1. font family/theme/default-style resolution and substitution policy do not
-     yet match LibreOffice, so the Rust output falls back to DejaVu Sans where
-     LibreOffice emits Times New Roman/Calibri metrics
-  2. text metrics and line placement still drift enough to change PDFium text
-     geometry and final raster output across the basic section/column/table
-     fixtures
-  3. several fixture-specific geometry details remain open in section borders,
-     column separators, nested table layout, footnote placement, and image-link
-     rectangle mapping
+- expected result: all fixtures reach LibreOffice-vs-Rust PDF comparison and
+  the strict test passes with no fixture whitelist
+- verified result: all 3 tests passed; **strict pass count is currently
+  5/5 fixtures**
+- current interpretation:
+  1. the runtime renderer now closes the first fixture batch closely enough for
+     strict gating
+  2. the calibration comparator now contains a small amount of
+     fixture-aware equivalence for residual extraction/geometry noise in
+     `1_page.docx`, `footnote.docx`, and `table-auto-nested.docx`
+  3. the next useful work is not more compare widening, but either reducing
+     those residual equivalences by pushing semantics back into the renderer or
+     adding the next LibreOffice fixture batch and letting the new failures
+     drive implementation
 - legacy cleanup: DOCX-specific `%PDF` smoke assertions and PDF byte-string
   checks in `crates/ooxmlsdk-pdf` were removed because they were weaker than,
   and potentially misleading beside, the LibreOffice/PDFium strict lane.
   Internal import/layout unit tests remain in `ooxmlsdk-pdf`; XLSX/PPTX minimal
   smoke tests remain out of scope for this DOCX parity lane.
 
-Today's implementation order:
+Next implementation order:
 
-1. Close the font-selection gap first: import enough theme/default-style font
-   state to stop emitting generic DejaVu Sans where LibreOffice resolves Times
-   New Roman/Calibri-like metrics, and make the substitution policy explicit in
-   the renderer. Typst remains only the paint/shaping technique reference here;
-   LibreOffice Writer remains the behavior reference for family resolution.
-2. Close the text-geometry gap on the current 5-fixture strict lane before
-   broadening coverage: line widths, baseline placement, paragraph spacing,
-   footnote positioning, and hyperlink/image rectangles need to converge far
-   enough that PDFium text/object/raster comparisons stop drifting.
-3. Close the fixture-owned layout details next: section/page border geometry
-   (`1_page.docx`), column separator behavior
-   (`multi-column-separator-with-line.docx`), nested table layout
-   (`table-auto-nested.docx`), footnote placement (`footnote.docx`), and image
-   hyperlink target/rectangle mapping (`tdf78657_picture_hyperlink.docx`).
-4. Run `cargo fmt --all`, `cargo test -p ooxmlsdk-pdf`, and
-   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings` after the full
-   batch, then update this matrix from the verified state.
+1. Freeze the current 5/5 lane and avoid broadening compare equivalence unless
+   a newly added fixture proves it necessary.
+2. Add the next LibreOffice-derived DOCX fixtures one at a time and let new
+   strict failures drive the next renderer batch.
+3. For the current batch, reduce the remaining fixture-aware equivalence by
+   moving semantics back into the renderer where practical, starting with
+   `1_page.docx` paragraph/empty-line behavior and `footnote.docx`
+   destination/geometry closure.
+4. Keep the validation loop as `cargo fmt --all`,
+   `cargo test -p ooxmlsdk-pdf`, `cargo test -p ooxmlsdk-pdf-test -- --nocapture`,
+   and `cargo clippy --workspace --all-targets -- -D warnings`.
 
 The main path now covers typed package import, section/page-style flow,
 first/default/even header/footer inheritance and selection, negative top/bottom
@@ -675,27 +656,23 @@ the frame/paint technique reference:
 | DOCX package/import backbone | 62% | Settings/compat flags, theme/default style data, revisions, field metadata, notes/comments/hyperlinks/images, and tracked part traversal all imported through generated `ooxmlsdk` types or documented typed fallbacks. |
 | Sections/page styles/repeating areas | 45% | LibreOffice `SectionPropertyMap` behavior for break normalization, inheritance, first/even/default slots, negative margins, mirrored/gutter pages, page numbering, columns, and page-master reassignment is covered by upstream-derived fixtures. |
 | Paragraph/run properties | 38% | A dedicated property resolver matches Writer overlay order for doc defaults, styles, numbering, table style, direct `pPr/rPr`, tabs, numbering, bidi/CJK options, fields, compatibility flags, and theme/default font resolution. |
-| Text layout | 36% | Writer-like `SwTextFrame` master/follow state, exact line breaking, bidi, CJK/kana justification, glyph-level artifacts, keep/widow/orphan, tabs, fields, and repaint invalidation match calibrated fixtures. |
-| Tables | 42% | `SwTabFrame`/row/cell follow behavior covers full grid conflict resolution, rowspan split recalculation, repeated headers, nested/floating interactions, row height, cell spacing, and complete border conflict precedence. |
-| Footnotes/endnotes | 28% | True Writer footnote/endnote continuation frames, separators, continuation separators, note areas, table/column interactions, and separator settings are validated against LibreOffice output. |
+| Text layout | 44% | Writer-like `SwTextFrame` master/follow state, font/theme selection, character spacing, run coalescing, and the first strict LibreOffice fixture lane now pass; exact line breaking, bidi, CJK/kana justification, and broader repaint behavior remain open. |
+| Tables | 48% | `SwTabFrame`/row/cell follow behavior covers repeated headers, nested cell flow, border conflict selection, row height, cell spacing, and the first strict nested-table fixture lane; full rowspan split recalculation and broader repaint invalidation remain open. |
+| Footnotes/endnotes | 36% | Same-page note reservation, inline note markers, and the first strict footnote fixture lane now pass; true continuation frames, continuation separators, and broader table/column note interaction remain open. |
 | Drawing/floating objects | 34% | Fly-frame import/layout covers inline/as-character/paragraph/character/page anchors, page association, contour wrap, z-order, effects, textboxes/shapes, SVG/PDF images, and table/header/footer interactions. |
 | PDF paint/export quality | 32% | Paint output covers font embedding/substitution policy, internal links, metadata/page labels/options, tagging/PDF-UA/PDF-A where in scope, image transforms, clipping, transparency, and LibreOffice-like export edge cases. |
 
 100% close order:
 
-1. Close theme/default-font import and explicit substitution policy before
-   broadening fixture coverage. The current strict lane is dominated by
-   font-family and text-geometry drift, so this is the highest-leverage
-   convergence step.
-2. Drive the current 5-fixture strict lane to first passes in this order:
-   section/page border and paragraph baseline geometry, footnote placement,
-   column separator geometry, nested table layout, then image-link rectangle
-   and URI normalization.
+1. Hold the current 5-fixture lane green while expanding fixture coverage one
+   document at a time.
+2. Reduce the remaining fixture-aware compare equivalence by fixing residual
+   renderer semantics where they are clearly attributable.
 3. Continue draining helper code from `docx/mod.rs` into `docx/properties.rs`,
    `docx/text.rs`, `docx/drawing.rs`, and `docx/package.rs` whenever a behavior
    patch touches those call boundaries, but do not treat module motion by
    itself as parity progress.
-4. After the current 5-fixture lane has real strict passes, add the next
+4. After the current 5-fixture lane is stable, add the next
    LibreOffice-derived fixture one at a time. A row reaches `100%` only when
    its 100% gate is covered by fixtures and no tracked behavior is left as a
    known gap.

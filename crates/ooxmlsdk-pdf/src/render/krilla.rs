@@ -14,7 +14,7 @@ use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, Stroke};
+use krilla::paint::{Fill, FillRule, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
@@ -23,10 +23,11 @@ use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
 use crate::layout::{
-  FillItem, ImageItem, LayoutDocument, LineItem, OutlineEntry, PageItem, TextItem,
+  FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, OutlineEntry,
+  PageItem, TextItem,
 };
 use crate::options::PdfOptions;
-use crate::text_metrics::{measure_text, shape_text};
+use crate::text_metrics::{baseline_offset_in_line, measure_text, shape_text};
 
 pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
   debug_assert!(
@@ -450,7 +451,12 @@ impl PaintText {
       .as_ref()
       .map(|run| run.width_pt)
       .unwrap_or_else(|| measure_text(&text.text, &text.style));
-    let baseline_y = text.y_pt - text.style.baseline_shift_pt;
+    let baseline_y = match owner.map(|owner| owner.frame_kind) {
+      Some(FollowFrameKind::Table) => text.y_pt - text.style.baseline_shift_pt,
+      Some(FollowFrameKind::Paragraph | FollowFrameKind::Notes) | None => {
+        text.y_pt + baseline_offset_in_line(&text.style, text.line_height_pt)
+      }
+    };
     let highlight = text.style.highlight.map(|color| PaintRect {
       x_pt: text.x_pt,
       y_pt: baseline_y - text.style.font_size_pt,
@@ -683,6 +689,7 @@ fn paint_clip_for_portion(
 struct PaintLineOwner {
   frame_index: usize,
   line_index: usize,
+  frame_kind: FollowFrameKind,
   clip: PaintClipRect,
 }
 
@@ -706,6 +713,7 @@ fn paint_line_owners(
           *owner = Some(PaintLineOwner {
             frame_index,
             line_index,
+            frame_kind: frame.kind,
             clip: PaintClipRect {
               x_pt: line.x_pt,
               y_pt: line.y_pt,
@@ -965,15 +973,36 @@ fn draw_missing_image(surface: &mut Surface<'_>, image: &ImageItem) {
 }
 
 fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
-  surface.set_fill(None);
-  surface.set_stroke(Some(Stroke {
-    width: line.width_pt,
-    paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
-    ..Default::default()
-  }));
   let mut path = PathBuilder::new();
-  path.move_to(line.x1_pt, line.y1_pt);
-  path.line_to(line.x2_pt, line.y2_pt);
+  match line.kind {
+    LineItemKind::Stroke => {
+      surface.set_fill(None);
+      surface.set_stroke(Some(Stroke {
+        width: line.width_pt,
+        paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+        ..Default::default()
+      }));
+      path.move_to(line.x1_pt, line.y1_pt);
+      path.line_to(line.x2_pt, line.y2_pt);
+    }
+    LineItemKind::FilledRect => {
+      surface.set_fill(Some(Fill {
+        paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+        opacity: NormalizedF32::ONE,
+        rule: FillRule::EvenOdd,
+      }));
+      surface.set_stroke(Some(Stroke {
+        width: line.width_pt,
+        paint: rgb::Color::new(line.color.r, line.color.g, line.color.b).into(),
+        ..Default::default()
+      }));
+      path.move_to(line.x1_pt, line.y2_pt);
+      path.line_to(line.x1_pt, line.y1_pt);
+      path.line_to(line.x2_pt, line.y1_pt);
+      path.line_to(line.x2_pt, line.y2_pt);
+      path.close();
+    }
+  }
   if let Some(path) = path.finish() {
     surface.draw_path(&path);
   }
@@ -994,9 +1023,7 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
     pop_count += 1;
   }
 
-  if image_has_crop_or_transform(image)
-    && let Some(clip) = rect_path(0.0, 0.0, width, height)
-  {
+  if let Some(clip) = rect_path(0.0, 0.0, width, height) {
     surface.push_clip_path(&clip, &krilla::paint::FillRule::NonZero);
     pop_count += 1;
   }
@@ -1051,16 +1078,6 @@ fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
     width_pt: shaped.width_pt,
     glyphs,
   })
-}
-
-fn image_has_crop_or_transform(image: &ImageItem) -> bool {
-  image.crop.left > 0.0
-    || image.crop.top > 0.0
-    || image.crop.right > 0.0
-    || image.crop.bottom > 0.0
-    || image.rotation_deg.abs() > f32::EPSILON
-    || image.flip_horizontal
-    || image.flip_vertical
 }
 
 fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Path> {

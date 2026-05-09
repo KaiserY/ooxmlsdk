@@ -13,7 +13,6 @@ use crate::docx::{
 use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
-
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
@@ -400,6 +399,13 @@ pub(crate) struct LineItem {
   pub y2_pt: f32,
   pub width_pt: f32,
   pub color: RgbColor,
+  pub kind: LineItemKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum LineItemKind {
+  Stroke,
+  FilledRect,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -535,7 +541,7 @@ impl<'a> RootFrameLayout<'a> {
       .collect::<Vec<_>>();
     apply_page_backgrounds(&mut self.pages);
     place_floating_images(&mut self.pages);
-    apply_column_separators(self.document, &mut self.pages);
+    apply_column_separators(self.document, &mut self.pages, &self.frames);
     apply_headers_and_footers(self.document, &mut self.pages);
     apply_page_borders(&mut self.pages);
     resolve_dynamic_fields(&mut self.pages);
@@ -2399,8 +2405,8 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
       }
       InlineItem::Image(image) => {
         let (width, height) = fit_image_to_line(
-          image_frame_width(image),
-          image_frame_height(image),
+          visible_image_width(image),
+          visible_image_height(image),
           content_width,
         );
         if x + width > content_width && x > 0.0 {
@@ -2445,6 +2451,9 @@ fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -
 }
 
 fn paragraph_spacing_before(previous: Option<&Block>, paragraph: &crate::docx::Paragraph) -> f32 {
+  if previous.is_none() {
+    return 0.0;
+  }
   if let Some(Block::Paragraph(previous)) = previous
     && suppress_contextual_spacing(previous, paragraph)
   {
@@ -2593,9 +2602,10 @@ fn layout_note_separator(
     x1_pt: setup.margin_left_pt,
     y1_pt: y,
     x2_pt: setup.margin_left_pt + 120.0,
-    y2_pt: y,
+    y2_pt: y + 0.5,
     width_pt: 0.5,
     color: RgbColor { r: 0, g: 0, b: 0 },
+    kind: LineItemKind::FilledRect,
   }));
   y + 8.0
 }
@@ -3031,27 +3041,60 @@ fn resolve_dynamic_fields(pages: &mut [Page]) {
   }
 }
 
-fn apply_column_separators(document: &DocxDocument, pages: &mut [Page]) {
-  for page in pages {
-    let Some(section) = document.sections.get(page.section_index) else {
+fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: &[LayoutFrame]) {
+  let mut section_bounds = HashMap::<(usize, usize), (f32, f32)>::new();
+  for frame in frames
+    .iter()
+    .filter(|frame| matches!(frame.kind, FollowFrameKind::Paragraph))
+  {
+    let Some(section) = document.sections.get(frame.section_index) else {
       continue;
     };
-    let columns = section.columns;
-    if !columns.separator || columns.count <= 1 {
+    if !section.columns.separator || section.columns.count <= 1 {
       continue;
     }
-    let geometry = column_geometry(page.setup, columns);
-    for column_index in 1..geometry.widths.len() {
-      let gap = geometry.gaps.get(column_index - 1).copied().unwrap_or(0.0);
-      let x = geometry.lefts[column_index] - gap / 2.0;
-      page.items.push(PageItem::Line(LineItem {
-        x1_pt: x,
-        y1_pt: page.setup.margin_top_pt,
-        x2_pt: x,
-        y2_pt: page.setup.height_pt - page.setup.margin_bottom_pt,
-        width_pt: 0.5,
-        color: RgbColor { r: 0, g: 0, b: 0 },
-      }));
+    for line in &frame.lines {
+      let top = line.y_pt;
+      let bottom = line.y_pt + line.height_pt;
+      section_bounds
+        .entry((frame.page_index, frame.section_index))
+        .and_modify(|bounds| {
+          bounds.0 = bounds.0.min(top);
+          bounds.1 = bounds.1.max(bottom);
+        })
+        .or_insert((top, bottom));
+    }
+  }
+
+  for (page_index, page) in pages.iter_mut().enumerate() {
+    for section_index in 0..document.sections.len() {
+      let Some(&(top, bottom)) = section_bounds.get(&(page_index, section_index)) else {
+        continue;
+      };
+      let Some(section) = document.sections.get(section_index) else {
+        continue;
+      };
+      let columns = section.columns;
+      if !columns.separator || columns.count <= 1 || bottom <= top {
+        continue;
+      }
+      let separator_top = top + ((bottom - top) - DEFAULT_LINE_HEIGHT_PT).max(0.0);
+      let separator_bottom = (bottom - 0.1).max(separator_top);
+      let geometry = column_geometry(page.setup, columns);
+      for column_index in 1..geometry.widths.len() {
+        let gap = geometry.gaps.get(column_index - 1).copied().unwrap_or(0.0);
+        let x_left = geometry.lefts[column_index] - gap / 2.0;
+        let x_right = x_left + 0.1;
+        page.items.push(PageItem::Line(LineItem {
+          x1_pt: x_left,
+          y1_pt: separator_top,
+          x2_pt: x_right,
+          y2_pt: separator_bottom,
+          width_pt: 0.2,
+          color: RgbColor { r: 0, g: 0, b: 0 },
+          kind: LineItemKind::FilledRect,
+        }));
+      }
     }
   }
 }
@@ -3714,8 +3757,7 @@ impl RowFrame<'_, '_> {
     let first_cell = self.row.cells.first()?;
     let border = vertical_border(self.table, self.row, 0, true)
       .or(first_cell.borders.left)
-      .or_else(|| self.table.borders.and_then(|borders| borders.left))
-      .or(Some(BorderStyle::default()))?;
+      .or_else(|| self.table.borders.and_then(|borders| borders.left))?;
     Some(PendingBorderSegment {
       x_pt: row_grid_left(self.table_frame, self.row, self.cell_spacing_pt()),
       start_y_pt: row_top,
@@ -3730,8 +3772,7 @@ impl RowFrame<'_, '_> {
       .cells
       .last()
       .and_then(|cell| cell.borders.right)
-      .or_else(|| self.table.borders.and_then(|borders| borders.right))
-      .or(Some(BorderStyle::default()))?;
+      .or_else(|| self.table.borders.and_then(|borders| borders.right))?;
     Some(PendingBorderSegment {
       x_pt: self.table_frame.right_pt,
       start_y_pt: row_top,
@@ -4021,7 +4062,6 @@ fn cell_horizontal_border(
         })
         .or_else(|| borders.and_then(|borders| borders.top)),
     )
-    .or(Some(BorderStyle::default()))
   } else {
     let table_border = borders.and_then(|borders| {
       if row_index + 1 == table.rows.len() {
@@ -4039,7 +4079,6 @@ fn cell_horizontal_border(
         .and_then(|next_cell| next_cell.borders.top),
     )
     .or(table_border)
-    .or(Some(BorderStyle::default()))
   }
 }
 
@@ -4060,31 +4099,25 @@ fn vertical_border(
     } else {
       None
     };
-    stronger_border(cell.borders.left, neighbor)
-      .or_else(|| {
-        borders.and_then(|borders| {
-          if cell_index == 0 && row.grid_before == 0 {
-            borders.left
-          } else {
-            borders.inside_vertical
-          }
-        })
+    stronger_border(cell.borders.left, neighbor).or_else(|| {
+      borders.and_then(|borders| {
+        if cell_index == 0 && row.grid_before == 0 {
+          borders.left
+        } else {
+          borders.inside_vertical
+        }
       })
-      .or(Some(BorderStyle::default()))
+    })
   } else {
-    cell
-      .borders
-      .right
-      .or_else(|| {
-        borders.and_then(|borders| {
-          if cell_index + 1 == row.cells.len() && row.grid_after == 0 {
-            borders.right
-          } else {
-            borders.inside_vertical
-          }
-        })
+    cell.borders.right.or_else(|| {
+      borders.and_then(|borders| {
+        if cell_index + 1 == row.cells.len() && row.grid_after == 0 {
+          borders.right
+        } else {
+          borders.inside_vertical
+        }
       })
-      .or(Some(BorderStyle::default()))
+    })
   }
 }
 
@@ -5196,12 +5229,12 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::Image(image) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
-          let (width, height) = fit_image_to_line(
-            image_frame_width(image),
-            image_frame_height(image),
-            flow.content_width,
-          );
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
+            let (width, height) = fit_image_to_line(
+              image_frame_width(image),
+              image_frame_height(image),
+              flow.content_width,
+            );
             let (image_x, image_y) = floating_image_position(placement, flow, x, y, width, height);
             let image_item_start = current.items.len();
             current.items.push(PageItem::Image(ImageItem {
@@ -5284,6 +5317,11 @@ impl<'a> TextFrameLayout<'a> {
             emitted = true;
             continue;
           }
+          let (width, height) = fit_image_to_line(
+            visible_image_width(image),
+            visible_image_height(image),
+            flow.content_width,
+          );
           if x + width > line_right && x > line_left {
             (flow, text_frame, y, line_left, line_right) = self.advance_line(
               TextLineAdvance {
@@ -5854,6 +5892,14 @@ fn image_frame_height(image: &crate::docx::InlineImage) -> f32 {
   (image.height_pt + image.effect_top_pt + image.effect_bottom_pt).max(1.0)
 }
 
+fn visible_image_width(image: &crate::docx::InlineImage) -> f32 {
+  image.width_pt.max(1.0)
+}
+
+fn visible_image_height(image: &crate::docx::InlineImage) -> f32 {
+  image.height_pt.max(1.0)
+}
+
 fn force_page_break(
   flow: FlowContext,
   current: &mut Page,
@@ -5931,6 +5977,7 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
     y2_pt: y2,
     width_pt: border.width_pt,
     color: border.color,
+    kind: LineItemKind::Stroke,
   }));
 }
 

@@ -802,12 +802,31 @@ fn append_note_blocks<'a>(
   for paragraph in paragraphs {
     let mut model = paragraph_model(paragraph, styles, numbering, images, hyperlinks);
     if is_first_paragraph {
-      model.list_label = Some(label.text.clone());
-      model.list_label_hyperlink_url = label.hyperlink_url.clone();
+      prepend_note_marker(&mut model, &label);
       is_first_paragraph = false;
     }
     blocks.push(Block::Paragraph(model));
   }
+}
+
+fn prepend_note_marker(paragraph: &mut Paragraph, label: &NoteLabel) {
+  let base_style = paragraph
+    .inlines
+    .iter()
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) => Some(run.style.clone()),
+      _ => None,
+    })
+    .unwrap_or_default();
+  paragraph.inlines.insert(
+    0,
+    InlineItem::Text(TextRun {
+      text: label.text.clone(),
+      style: note_reference_style(&base_style),
+      hyperlink_url: label.hyperlink_url.clone(),
+      dynamic_field: None,
+    }),
+  );
 }
 
 fn table_model(
@@ -2023,6 +2042,10 @@ fn push_run(
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
+      w::RunChoice::WLastRenderedPageBreak => {
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        inlines.push(InlineItem::ColumnBreak);
+      }
       w::RunChoice::WSym(symbol) => {
         if let Some(symbol) = symbol_text(symbol) {
           text.push(symbol);
@@ -2263,13 +2286,20 @@ fn push_note_reference(
   }
   inlines.push(InlineItem::Text(TextRun {
     text: id.to_string(),
-    style: TextStyle {
-      font_size_pt: (style.font_size_pt * 0.75).max(1.0),
-      ..style
-    },
+    style: note_reference_style(&style),
     hyperlink_url,
     dynamic_field: None,
   }));
+}
+
+fn note_reference_style(style: &TextStyle) -> TextStyle {
+  if style.baseline_shift_pt.abs() > f32::EPSILON {
+    return style.clone();
+  }
+  let mut reference_style = style.clone();
+  reference_style.baseline_shift_pt = style.font_size_pt * 0.35;
+  reference_style.font_size_pt = (style.font_size_pt * 0.58).max(1.0);
+  reference_style
 }
 
 fn note_reference_url(kind: &str, id: i64) -> String {

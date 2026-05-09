@@ -1182,7 +1182,10 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
-      borders: Some(crate::docx::TableBordersModel::default()),
+      borders: Some(crate::docx::TableBordersModel {
+        inside_vertical: Some(crate::docx::BorderStyle::default()),
+        ..crate::docx::TableBordersModel::default()
+      }),
       cell_spacing_pt: 12.0,
       rows: vec![crate::docx::TableRow {
         cells: vec![cell("A"), cell("B")],
@@ -1977,6 +1980,23 @@ mod tests {
   }
 
   #[test]
+  fn rendered_page_breaks_import_as_column_breaks() {
+    let path = fixture_path(
+      "test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-multi-column-separator-with-line.docx",
+    );
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let paragraph = paragraph_at(&doc, 1);
+
+    assert!(
+      paragraph
+        .inlines
+        .iter()
+        .any(|item| matches!(item, crate::docx::InlineItem::ColumnBreak))
+    );
+  }
+
+  #[test]
   fn numbering_labels_and_indents_are_extracted() {
     let path = fixture_path("test-data/wml/numbering_ordered.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -2504,6 +2524,16 @@ mod tests {
     assert_eq!(paragraph_at(&doc, 0).footnote_reference_ids, [1, 2]);
     assert_eq!(doc.footnotes.len(), 2);
     assert_eq!(doc.footnote_blocks.len(), 2);
+    let first_footnote = match &doc.footnotes[&1][0] {
+      crate::docx::Block::Paragraph(paragraph) => paragraph,
+      crate::docx::Block::Table(_) => panic!("expected footnote paragraph"),
+    };
+    assert!(first_footnote.list_label.is_none());
+    assert!(matches!(
+      first_footnote.inlines.first(),
+      Some(crate::docx::InlineItem::Text(run))
+        if run.text == "1 " && run.style.baseline_shift_pt > 0.0
+    ));
     assert!(find_text_item(&layout, "1").is_some());
     assert!(find_text_item(&layout, "2").is_some());
     assert!(find_text_item(&layout, " First footnote content.").is_some());
@@ -2599,6 +2629,68 @@ mod tests {
         )
       })
     }));
+  }
+
+  #[test]
+  fn inline_image_effect_extent_does_not_expand_visible_bounds() {
+    let image = crate::docx::InlineImage {
+      data: vec![0; 8],
+      content_type: Some("image/png".into()),
+      width_pt: 36.0,
+      height_pt: 24.0,
+      effect_left_pt: 5.0,
+      effect_top_pt: 10.0,
+      effect_right_pt: 15.0,
+      effect_bottom_pt: 20.0,
+      crop: crate::docx::ImageCrop::default(),
+      rotation_deg: 0.0,
+      flip_horizontal: false,
+      flip_vertical: false,
+      alt_text: Some("inline effect".into()),
+      hyperlink_url: Some("http://example.com".into()),
+      placement: crate::docx::ImagePlacement::Inline,
+    };
+    let doc = crate::docx::DocxDocument {
+      page: crate::docx::PageSetup::default(),
+      default_tab_stop_pt: 36.0,
+      even_and_odd_headers: false,
+      sections: Vec::new(),
+      title_page: false,
+      header_blocks: Vec::new(),
+      first_header_blocks: Vec::new(),
+      footer_blocks: Vec::new(),
+      first_footer_blocks: Vec::new(),
+      footnote_blocks: Vec::new(),
+      footnotes: Default::default(),
+      endnote_blocks: Vec::new(),
+      endnotes: Default::default(),
+      comment_blocks: Vec::new(),
+      blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
+        inlines: vec![crate::docx::InlineItem::Image(image)],
+        footnote_reference_ids: Vec::new(),
+        endnote_reference_ids: Vec::new(),
+        runs: Vec::new(),
+        format: crate::docx::ParagraphFormat::default(),
+        list_label: None,
+        list_label_hyperlink_url: None,
+      })],
+    };
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let image = layout.pages[0]
+      .items
+      .iter()
+      .find_map(|item| match item {
+        crate::layout::PageItem::Image(image) => Some(image),
+        crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Fill(_)
+        | crate::layout::PageItem::Line(_) => None,
+      })
+      .expect("inline image");
+
+    assert!(!image.floating);
+    assert!((image.width_pt - 36.0).abs() < 0.1);
+    assert!((image.height_pt - 24.0).abs() < 0.1);
   }
 
   #[test]
@@ -3191,7 +3283,7 @@ mod tests {
         })
       }));
     }
-    assert!(layout.pages.iter().any(|page| {
+    assert!(!layout.pages.iter().any(|page| {
       page
         .items
         .iter()
@@ -3240,6 +3332,32 @@ mod tests {
           item,
           crate::layout::PageItem::Line(line)
             if line.color.r == 0xFF && line.width_pt == 1.0
+        )
+      })
+    }));
+  }
+
+  #[test]
+  fn tables_without_resolved_borders_do_not_paint_default_grid_lines() {
+    let path =
+      fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-table-auto-nested.docx");
+    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let outer_table = match &doc.blocks[1] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected outer table"),
+    };
+
+    assert!(outer_table.borders.is_none());
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    assert!(!layout.pages.iter().any(|page| {
+      page.items.iter().any(|item| {
+        matches!(
+          item,
+          crate::layout::PageItem::Line(line)
+            if line.x1_pt <= doc.page.margin_left_pt + 0.5
+              && line.x2_pt >= doc.page.width_pt - doc.page.margin_right_pt - 0.5
         )
       })
     }));

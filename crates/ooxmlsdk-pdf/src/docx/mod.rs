@@ -7,6 +7,7 @@ mod text;
 mod units;
 
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
@@ -1060,7 +1061,7 @@ fn table_cell_model(
         hyperlinks,
         ParagraphImportBase {
           format: style.paragraph_format.clone(),
-          run_style: style.run_style,
+          run_style: style.run_style.clone(),
           run_overrides: style.run_overrides,
         },
       ))),
@@ -1639,7 +1640,7 @@ fn paragraph_inlines(
         push_run_or_complex_field(
           run,
           &mut inlines,
-          base_style,
+          base_style.clone(),
           RunImportContext {
             styles,
             images,
@@ -1650,7 +1651,14 @@ fn paragraph_inlines(
         );
       }
       w::ParagraphChoice::WFldSimple(field) => {
-        push_simple_field(field, &mut inlines, base_style, styles, images, hyperlinks);
+        push_simple_field(
+          field,
+          &mut inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
         let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
@@ -1659,7 +1667,7 @@ fn paragraph_inlines(
             push_run_or_complex_field(
               run,
               &mut inlines,
-              base_style,
+              base_style.clone(),
               RunImportContext {
                 styles,
                 images,
@@ -1676,7 +1684,7 @@ fn paragraph_inlines(
           push_inserted_run(
             inserted,
             &mut inlines,
-            base_style,
+            base_style.clone(),
             styles,
             images,
             hyperlinks,
@@ -1691,7 +1699,7 @@ fn paragraph_inlines(
       w::ParagraphChoice::WSdt(sdt) => push_sdt_run(
         sdt,
         &mut inlines,
-        base_style,
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -1742,7 +1750,11 @@ fn push_run_or_complex_field(
     return;
   }
 
-  let style = properties::run_style(run.run_properties.as_deref(), base_style, context.styles);
+  let style = properties::run_style(
+    run.run_properties.as_deref(),
+    base_style.clone(),
+    context.styles,
+  );
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::WFldChar(field_char)
@@ -1752,7 +1764,7 @@ fn push_run_or_complex_field(
           instr: String::new(),
           result: Vec::new(),
           in_result: false,
-          style,
+          style: style.clone(),
           hyperlink_url: hyperlink_url.map(ToString::to_string),
         });
       }
@@ -1783,7 +1795,7 @@ fn push_run_or_complex_field(
           push_run(
             run,
             &mut state.result,
-            base_style,
+            base_style.clone(),
             context.styles,
             context.images,
             context.hyperlinks,
@@ -1930,9 +1942,15 @@ fn push_simple_field(
 
   for choice in &field.simple_field_choice {
     match choice {
-      w::SimpleFieldChoice::WR(run) => {
-        push_run(run, inlines, base_style, styles, images, hyperlinks, None)
-      }
+      w::SimpleFieldChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        None,
+      ),
       w::SimpleFieldChoice::WHyperlink(hyperlink) => {
         let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
         for item in &hyperlink.hyperlink_choice {
@@ -1940,7 +1958,7 @@ fn push_simple_field(
             push_run(
               run,
               inlines,
-              base_style,
+              base_style.clone(),
               styles,
               images,
               hyperlinks,
@@ -1950,11 +1968,24 @@ fn push_simple_field(
         }
       }
       w::SimpleFieldChoice::WFldSimple(field) => {
-        push_simple_field(field, inlines, base_style, styles, images, hyperlinks);
+        push_simple_field(
+          field,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
-      w::SimpleFieldChoice::WSdt(sdt) => {
-        push_sdt_run(sdt, inlines, base_style, styles, images, hyperlinks, None)
-      }
+      w::SimpleFieldChoice::WSdt(sdt) => push_sdt_run(
+        sdt,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        None,
+      ),
       _ => {}
     }
   }
@@ -1969,7 +2000,7 @@ fn push_run(
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
-  let style = properties::run_style(run.run_properties.as_deref(), base_style, styles);
+  let style = properties::run_style(run.run_properties.as_deref(), base_style.clone(), styles);
   let mut text = String::new();
 
   for choice in &run.run_choice {
@@ -1983,11 +2014,11 @@ fn push_run(
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
         Some(w::BreakValues::Page) => {
-          flush_run_text(inlines, &mut text, style, hyperlink_url);
+          flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
           inlines.push(InlineItem::PageBreak);
         }
         Some(w::BreakValues::Column) => {
-          flush_run_text(inlines, &mut text, style, hyperlink_url);
+          flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
           inlines.push(InlineItem::ColumnBreak);
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
@@ -1998,54 +2029,59 @@ fn push_run(
         }
       }
       w::RunChoice::WPgNum => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
-        push_dynamic_field(inlines, DynamicFieldKind::Page, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        push_dynamic_field(
+          inlines,
+          DynamicFieldKind::Page,
+          style.clone(),
+          hyperlink_url,
+        );
       }
       w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::WFootnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         push_note_reference(
           inlines,
           reference.id,
-          style,
+          style.clone(),
           Some(note_reference_url("footnote", reference.id)),
         );
       }
       w::RunChoice::WEndnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         push_note_reference(
           inlines,
           reference.id,
-          style,
+          style.clone(),
           Some(note_reference_url("endnote", reference.id)),
         );
       }
       w::RunChoice::WCommentReference(reference) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
-        push_comment_reference(inlines, &reference.id, style);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        push_comment_reference(inlines, &reference.id, style.clone());
       }
       w::RunChoice::WDrawing(drawing) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_drawing_textboxes(drawing, inlines, style);
+        drawing::push_drawing_textboxes(drawing, inlines, style.clone());
       }
       w::RunChoice::WPict(picture) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         if let Some(image) = drawing::pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_pict_textboxes(picture, inlines, base_style, styles, images);
+        drawing::push_pict_textboxes(picture, inlines, base_style.clone(), styles, images);
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::WRuby(ruby) => {
-        flush_run_text(inlines, &mut text, style, hyperlink_url);
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         push_ruby_base(
           ruby,
           inlines,
-          base_style,
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
@@ -2073,7 +2109,7 @@ fn push_ruby_base(
       w::RubyBaseChoice::WR(run) => push_run(
         run,
         inlines,
-        base_style,
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -2083,7 +2119,7 @@ fn push_ruby_base(
         push_inserted_run(
           inserted,
           inlines,
-          base_style,
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
@@ -2113,7 +2149,7 @@ fn push_sdt_run(
       w::SdtContentRunChoice::WR(run) => push_run(
         run.as_ref(),
         inlines,
-        base_style,
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -2123,7 +2159,7 @@ fn push_sdt_run(
         push_simple_field(
           field.as_ref(),
           inlines,
-          base_style,
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
@@ -2137,7 +2173,7 @@ fn push_sdt_run(
             push_run(
               run,
               inlines,
-              base_style,
+              base_style.clone(),
               styles,
               images,
               hyperlinks,
@@ -2149,7 +2185,7 @@ fn push_sdt_run(
       w::SdtContentRunChoice::WSdt(sdt) => push_sdt_run(
         sdt.as_ref(),
         inlines,
-        base_style,
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -2159,7 +2195,7 @@ fn push_sdt_run(
         push_inserted_run(
           inserted.as_ref(),
           inlines,
-          base_style,
+          base_style.clone(),
           styles,
           images,
           hyperlinks,
@@ -2188,7 +2224,7 @@ fn push_inserted_run(
       w::InsertedRunChoice::WR(run) => push_run(
         run,
         inlines,
-        base_style,
+        base_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -2199,7 +2235,7 @@ fn push_inserted_run(
           push_inserted_run(
             nested,
             inlines,
-            base_style,
+            base_style.clone(),
             styles,
             images,
             hyperlinks,
@@ -2269,7 +2305,7 @@ fn flush_run_text(
 ) {
   if !text.is_empty() {
     inlines.push(InlineItem::Text(TextRun {
-      text: run_display_text(std::mem::take(text), style),
+      text: run_display_text(std::mem::take(text), style.clone()),
       style,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
@@ -2797,7 +2833,7 @@ fn push_drawing_textboxes_impl(
     if let Some(text) = drawing_textbox_text(child) {
       inlines.push(InlineItem::Text(TextRun {
         text,
-        style,
+        style: style.clone(),
         hyperlink_url: None,
         dynamic_field: None,
       }));
@@ -2827,7 +2863,7 @@ fn push_pict_textboxes_impl(
   images: &ImageCatalog,
 ) {
   for choice in &picture.picture_choice {
-    push_picture_choice_textboxes(choice, inlines, base_style, styles, images);
+    push_picture_choice_textboxes(choice, inlines, base_style.clone(), styles, images);
   }
 }
 
@@ -2885,16 +2921,16 @@ fn push_group_textboxes(
   for choice in &group.group_choice {
     match choice {
       v::GroupChoice::VGroup(group) => {
-        push_group_textboxes(group, inlines, base_style, styles, images);
+        push_group_textboxes(group, inlines, base_style.clone(), styles, images);
       }
       v::GroupChoice::VImage(image) => {
-        push_image_file_textboxes(image, inlines, base_style, styles, images);
+        push_image_file_textboxes(image, inlines, base_style.clone(), styles, images);
       }
       v::GroupChoice::VRect(rectangle) => {
-        push_rectangle_textboxes(rectangle, inlines, base_style, styles, images);
+        push_rectangle_textboxes(rectangle, inlines, base_style.clone(), styles, images);
       }
       v::GroupChoice::VShape(shape) => {
-        push_shape_textboxes(shape, inlines, base_style, styles, images);
+        push_shape_textboxes(shape, inlines, base_style.clone(), styles, images);
       }
       _ => {}
     }
@@ -2925,7 +2961,7 @@ fn push_image_file_textboxes(
 ) {
   for choice in &image.image_file_choice {
     if let v::ImageFileChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style, styles, images);
+      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
     }
   }
 }
@@ -2954,7 +2990,7 @@ fn push_rectangle_textboxes(
 ) {
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style, styles, images);
+      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
     }
   }
 }
@@ -2980,7 +3016,7 @@ fn push_shape_textboxes(
 ) {
   for choice in &shape.shape_choice {
     if let v::ShapeChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style, styles, images);
+      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
     }
   }
 }
@@ -3014,14 +3050,14 @@ fn push_textbox_content(
         inlines.extend(paragraph.inlines);
         inlines.push(InlineItem::Text(TextRun {
           text: "\n".into(),
-          style: base_style,
+          style: base_style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
         }));
       }
       w::TextBoxContentChoice::WTbl(table) => {
         let table = table_model(table, styles, &mut numbering, images, &hyperlinks);
-        push_table_text(&table, inlines, base_style);
+        push_table_text(&table, inlines, base_style.clone());
       }
       _ => {}
     }
@@ -3034,7 +3070,7 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
       if index > 0 {
         inlines.push(InlineItem::Text(TextRun {
           text: "\t".into(),
-          style,
+          style: style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
         }));
@@ -3044,13 +3080,13 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
           Block::Paragraph(paragraph) => {
             inlines.extend(paragraph.inlines.clone());
           }
-          Block::Table(table) => push_table_text(table, inlines, style),
+          Block::Table(table) => push_table_text(table, inlines, style.clone()),
         }
       }
     }
     inlines.push(InlineItem::Text(TextRun {
       text: "\n".into(),
-      style,
+      style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
     }));
@@ -3501,7 +3537,20 @@ struct StylesCatalog {
   doc_default_paragraph: ParagraphFormat,
   doc_default_run: TextStyle,
   default_paragraph_style_id: Option<String>,
+  theme_fonts: ThemeFonts,
   styles: HashMap<String, StyleEntry>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ThemeFonts {
+  major_ascii: Option<Arc<str>>,
+  major_high_ansi: Option<Arc<str>>,
+  major_east_asia: Option<Arc<str>>,
+  major_bidi: Option<Arc<str>>,
+  minor_ascii: Option<Arc<str>>,
+  minor_high_ansi: Option<Arc<str>>,
+  minor_east_asia: Option<Arc<str>>,
+  minor_bidi: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -3570,10 +3619,23 @@ struct TableImportContext<'a> {
 impl StylesCatalog {
   fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Result<Self> {
     let Some(styles_part) = main.style_definitions_part(package) else {
-      return Ok(Self::default());
+      let mut catalog = Self {
+        theme_fonts: ThemeFonts::load(package, main),
+        ..Self::default()
+      };
+      catalog.doc_default_run.font_size_pt = 10.0;
+      if catalog.doc_default_run.font_family.is_none() {
+        catalog.doc_default_run.font_family = Some(Arc::<str>::from("Calibri"));
+      }
+      return Ok(catalog);
     };
+    let theme_fonts = ThemeFonts::load(package, main);
     let styles = styles_part.root_element(package)?;
-    let mut catalog = Self::default();
+    let mut catalog = Self {
+      theme_fonts,
+      ..Self::default()
+    };
+    catalog.doc_default_run.font_size_pt = 10.0;
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
       merge_paragraph_format(
@@ -3591,6 +3653,7 @@ impl StylesCatalog {
           .as_deref()
           .and_then(|default| default.run_properties_base_style.as_deref())
           .map(RunProps::BaseStyle),
+        &catalog.theme_fonts,
       );
     }
 
@@ -3624,11 +3687,21 @@ impl StylesCatalog {
       properties::merge_run_style(
         &mut entry.run_style,
         style.style_run_properties.as_deref().map(RunProps::Style),
+        &catalog.theme_fonts,
       );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
-      entry.table_style = table_style_model(style);
+      entry.table_style = table_style_model(style, &catalog.theme_fonts);
       catalog.styles.insert(style_id.to_string(), entry);
+    }
+
+    if catalog.doc_default_run.font_family.is_none() {
+      catalog.doc_default_run.font_family = catalog
+        .theme_fonts
+        .minor_high_ansi
+        .clone()
+        .or_else(|| catalog.theme_fonts.minor_ascii.clone())
+        .or_else(|| Some(Arc::<str>::from("Calibri")));
     }
 
     Ok(catalog)
@@ -3656,14 +3729,14 @@ impl StylesCatalog {
     base_style: TextStyle,
     base_overrides: RunStyleOverrides,
   ) -> TextStyle {
-    let mut style = self.doc_default_run;
+    let mut style = self.doc_default_run.clone();
     merge_style_values(&mut style, base_style);
     apply_run_style_overrides(&mut style, base_overrides);
     let style_id = style_id
       .map(str::to_string)
       .or_else(|| self.default_paragraph_style_id.clone());
     for entry in self.style_chain(style_id.as_deref()) {
-      merge_style_values(&mut style, entry.run_style);
+      merge_style_values(&mut style, entry.run_style.clone());
       apply_run_style_overrides(&mut style, entry.run_overrides);
     }
     style
@@ -3678,7 +3751,7 @@ impl StylesCatalog {
     for entry in self.style_chain(Some(style_id)) {
       if matches!(entry.style_type, Some(w::StyleValues::Character)) {
         matched = true;
-        merge_style_values(&mut style, entry.run_style);
+        merge_style_values(&mut style, entry.run_style.clone());
         apply_run_style_overrides(&mut style, entry.run_overrides);
       }
     }
@@ -3720,7 +3793,50 @@ impl StylesCatalog {
   }
 }
 
-fn table_style_model(style: &w::Style) -> TableStyleModel {
+impl ThemeFonts {
+  fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
+    let Some(theme_part) = main.theme_part(package) else {
+      return Self::default();
+    };
+    let Ok(theme) = theme_part.root_element(package) else {
+      return Self::default();
+    };
+    let scheme = &theme.theme_elements.font_scheme;
+    Self {
+      major_ascii: major_font_family(&scheme.major_font.latin_font.typeface),
+      major_high_ansi: major_font_family(&scheme.major_font.latin_font.typeface),
+      major_east_asia: major_font_family(&scheme.major_font.east_asian_font.typeface),
+      major_bidi: major_font_family(&scheme.major_font.complex_script_font.typeface),
+      minor_ascii: major_font_family(&scheme.minor_font.latin_font.typeface),
+      minor_high_ansi: major_font_family(&scheme.minor_font.latin_font.typeface),
+      minor_east_asia: major_font_family(&scheme.minor_font.east_asian_font.typeface),
+      minor_bidi: major_font_family(&scheme.minor_font.complex_script_font.typeface),
+    }
+  }
+
+  fn resolve(&self, value: Option<w::ThemeFontValues>) -> Option<Arc<str>> {
+    match value? {
+      w::ThemeFontValues::MajorAscii => self.major_ascii.clone(),
+      w::ThemeFontValues::MajorHighAnsi => self.major_high_ansi.clone(),
+      w::ThemeFontValues::MajorEastAsia => self.major_east_asia.clone(),
+      w::ThemeFontValues::MajorBidi => self.major_bidi.clone(),
+      w::ThemeFontValues::MinorAscii => self.minor_ascii.clone(),
+      w::ThemeFontValues::MinorHighAnsi => self.minor_high_ansi.clone(),
+      w::ThemeFontValues::MinorEastAsia => self.minor_east_asia.clone(),
+      w::ThemeFontValues::MinorBidi => self.minor_bidi.clone(),
+    }
+  }
+}
+
+fn major_font_family(value: &Option<String>) -> Option<Arc<str>> {
+  value
+    .as_deref()
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+    .map(Arc::<str>::from)
+}
+
+fn table_style_model(style: &w::Style, theme_fonts: &ThemeFonts) -> TableStyleModel {
   let mut model = TableStyleModel::default();
   if let Some(properties) = style.style_table_properties.as_deref() {
     merge_table_level_style(
@@ -3753,6 +3869,7 @@ fn table_style_model(style: &w::Style) -> TableStyleModel {
   properties::merge_run_style(
     &mut model.whole_table.run_style,
     style.style_run_properties.as_deref().map(RunProps::Style),
+    theme_fonts,
   );
   model.whole_table.run_overrides =
     run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
@@ -3771,6 +3888,7 @@ fn table_style_model(style: &w::Style) -> TableStyleModel {
         .run_properties_base_style
         .as_deref()
         .map(RunProps::BaseStyle),
+      theme_fonts,
     );
     cell_style.run_overrides = run_style_overrides(
       conditional
@@ -3993,7 +4111,7 @@ fn merge_table_cell_style(target: &mut TableCellStyle, source: &TableCellStyle) 
     &mut target.paragraph_format,
     source.paragraph_format.clone(),
   );
-  merge_style_values(&mut target.run_style, source.run_style);
+  merge_style_values(&mut target.run_style, source.run_style.clone());
   target.run_overrides = merge_run_style_overrides(target.run_overrides, source.run_overrides);
 }
 
@@ -4155,8 +4273,14 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
 }
 
 fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
+  if values.font_family.is_some() {
+    target.font_family = values.font_family.clone();
+  }
   if (values.font_size_pt - TextStyle::default().font_size_pt).abs() > f32::EPSILON {
     target.font_size_pt = values.font_size_pt;
+  }
+  if values.character_spacing_pt.abs() > f32::EPSILON {
+    target.character_spacing_pt = values.character_spacing_pt;
   }
   if values.baseline_shift_pt.abs() > f32::EPSILON {
     target.baseline_shift_pt = values.baseline_shift_pt;
@@ -4511,6 +4635,14 @@ pub(super) enum RunProps<'a> {
 }
 
 impl<'a> RunProps<'a> {
+  fn run_fonts(&self) -> Option<&'a w::RunFonts> {
+    match self {
+      Self::Direct(properties) => properties.run_fonts.as_ref(),
+      Self::Style(properties) => properties.run_fonts.as_ref(),
+      Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
+    }
+  }
+
   fn bold(&self) -> Option<&'a w::Bold> {
     match self {
       Self::Direct(properties) => properties.bold.as_ref(),
@@ -4588,6 +4720,14 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.vertical_text_alignment.as_ref(),
       Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
       Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
+    }
+  }
+
+  fn spacing(&self) -> Option<&'a w::Spacing> {
+    match self {
+      Self::Direct(properties) => properties.spacing.as_ref(),
+      Self::Style(properties) => properties.spacing.as_ref(),
+      Self::BaseStyle(properties) => properties.spacing.as_ref(),
     }
   }
 
@@ -4786,38 +4926,41 @@ mod tests {
       }
     }
 
-    let style = table_style_model(&w::Style {
-      r#type: Some(w::StyleValues::Table),
-      style_table_cell_properties: Some(Box::new(w::StyleTableCellProperties {
-        shading: Some(shading("EEEEEE")),
-        ..Default::default()
-      })),
-      w_tbl_style_pr: vec![w::TableStyleProperties {
-        r#type: w::TableStyleOverrideValues::FirstRow,
-        style_paragraph_properties: Some(Box::new(w::StyleParagraphProperties {
-          justification: Some(w::Justification {
-            val: w::JustificationValues::Center,
-          }),
+    let style = table_style_model(
+      &w::Style {
+        r#type: Some(w::StyleValues::Table),
+        style_table_cell_properties: Some(Box::new(w::StyleTableCellProperties {
+          shading: Some(shading("EEEEEE")),
           ..Default::default()
         })),
-        run_properties_base_style: Some(Box::new(w::RunPropertiesBaseStyle {
-          bold: Some(w::Bold { val: None }),
-          color: Some(w::Color {
-            val: "FFFFFF".into(),
+        w_tbl_style_pr: vec![w::TableStyleProperties {
+          r#type: w::TableStyleOverrideValues::FirstRow,
+          style_paragraph_properties: Some(Box::new(w::StyleParagraphProperties {
+            justification: Some(w::Justification {
+              val: w::JustificationValues::Center,
+            }),
             ..Default::default()
-          }),
+          })),
+          run_properties_base_style: Some(Box::new(w::RunPropertiesBaseStyle {
+            bold: Some(w::Bold { val: None }),
+            color: Some(w::Color {
+              val: "FFFFFF".into(),
+              ..Default::default()
+            }),
+            ..Default::default()
+          })),
+          table_style_conditional_formatting_table_cell_properties: Some(Box::new(
+            w::TableStyleConditionalFormattingTableCellProperties {
+              shading: Some(shading("4472C4")),
+              ..Default::default()
+            },
+          )),
           ..Default::default()
-        })),
-        table_style_conditional_formatting_table_cell_properties: Some(Box::new(
-          w::TableStyleConditionalFormattingTableCellProperties {
-            shading: Some(shading("4472C4")),
-            ..Default::default()
-          },
-        )),
+        }],
         ..Default::default()
-      }],
-      ..Default::default()
-    });
+      },
+      &ThemeFonts::default(),
+    );
 
     let first_row = table_cell_style_for(
       &style,
@@ -5044,32 +5187,35 @@ mod tests {
 
   #[test]
   fn table_style_row_properties_apply_and_direct_row_properties_override() {
-    let style = table_style_model(&w::Style {
-      r#type: Some(w::StyleValues::Table),
-      w_tbl_style_pr: vec![w::TableStyleProperties {
-        r#type: w::TableStyleOverrideValues::FirstRow,
-        table_style_conditional_formatting_table_row_properties: Some(
-          w::TableStyleConditionalFormattingTableRowProperties {
-            table_style_conditional_formatting_table_row_properties_choice: vec![
-              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(Box::new(
-                w::TableHeader { val: None },
-              )),
-              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(Box::new(
-                w::CantSplit { val: None },
-              )),
-              w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(
-                Box::new(w::TableCellSpacing {
-                  width: Some("240".into()),
-                  r#type: Some(w::TableWidthUnitValues::Dxa),
-                }),
-              ),
-            ],
-          },
-        ),
+    let style = table_style_model(
+      &w::Style {
+        r#type: Some(w::StyleValues::Table),
+        w_tbl_style_pr: vec![w::TableStyleProperties {
+          r#type: w::TableStyleOverrideValues::FirstRow,
+          table_style_conditional_formatting_table_row_properties: Some(
+            w::TableStyleConditionalFormattingTableRowProperties {
+              table_style_conditional_formatting_table_row_properties_choice: vec![
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblHeader(Box::new(
+                  w::TableHeader { val: None },
+                )),
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WCantSplit(Box::new(
+                  w::CantSplit { val: None },
+                )),
+                w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(
+                  Box::new(w::TableCellSpacing {
+                    width: Some("240".into()),
+                    r#type: Some(w::TableWidthUnitValues::Dxa),
+                  }),
+                ),
+              ],
+            },
+          ),
+          ..Default::default()
+        }],
         ..Default::default()
-      }],
-      ..Default::default()
-    });
+      },
+      &ThemeFonts::default(),
+    );
 
     let mut first_row = table_row_style_for(
       &style,
@@ -5111,30 +5257,33 @@ mod tests {
 
   #[test]
   fn table_style_conditional_table_properties_apply_to_table_level_model() {
-    let style = table_style_model(&w::Style {
-      r#type: Some(w::StyleValues::Table),
-      w_tbl_style_pr: vec![w::TableStyleProperties {
-        r#type: w::TableStyleOverrideValues::WholeTable,
-        table_style_conditional_formatting_table_properties: Some(Box::new(
-          w::TableStyleConditionalFormattingTableProperties {
-            table_justification: Some(w::TableJustification {
-              val: w::TableRowAlignmentValues::Center,
-            }),
-            table_indentation: Some(w::TableIndentation {
-              width: Some(720),
-              r#type: Some(w::TableWidthUnitValues::Dxa),
-            }),
-            table_cell_spacing: Some(w::TableCellSpacing {
-              width: Some("120".into()),
-              r#type: Some(w::TableWidthUnitValues::Dxa),
-            }),
-            ..Default::default()
-          },
-        )),
+    let style = table_style_model(
+      &w::Style {
+        r#type: Some(w::StyleValues::Table),
+        w_tbl_style_pr: vec![w::TableStyleProperties {
+          r#type: w::TableStyleOverrideValues::WholeTable,
+          table_style_conditional_formatting_table_properties: Some(Box::new(
+            w::TableStyleConditionalFormattingTableProperties {
+              table_justification: Some(w::TableJustification {
+                val: w::TableRowAlignmentValues::Center,
+              }),
+              table_indentation: Some(w::TableIndentation {
+                width: Some(720),
+                r#type: Some(w::TableWidthUnitValues::Dxa),
+              }),
+              table_cell_spacing: Some(w::TableCellSpacing {
+                width: Some("120".into()),
+                r#type: Some(w::TableWidthUnitValues::Dxa),
+              }),
+              ..Default::default()
+            },
+          )),
+          ..Default::default()
+        }],
         ..Default::default()
-      }],
-      ..Default::default()
-    });
+      },
+      &ThemeFonts::default(),
+    );
 
     assert_eq!(style.alignment, Some(TableAlignment::Center));
     assert_eq!(style.indent_left_pt, Some(36.0));

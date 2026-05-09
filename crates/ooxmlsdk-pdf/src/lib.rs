@@ -1900,6 +1900,7 @@ mod tests {
 
     let normal = paragraph_at(&doc, 0);
     assert_eq!(normal.runs[0].style.font_size_pt, 11.0);
+    assert_eq!(normal.runs[0].style.font_family.as_deref(), Some("Calibri"));
     assert_eq!(normal.format.spacing_after_pt, 8.0);
 
     let body_text = paragraph_at(&doc, 1);
@@ -1918,6 +1919,18 @@ mod tests {
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let paragraph = paragraph_at(&doc, 0);
+    assert_eq!(
+      paragraph.runs[0].style.font_family.as_deref(),
+      Some("Arial")
+    );
+    assert_eq!(
+      paragraph.runs[1].style.font_family.as_deref(),
+      Some("SimSun")
+    );
+    assert_eq!(
+      paragraph.runs[2].style.font_family.as_deref(),
+      Some("Times New Roman")
+    );
     assert!(
       paragraph
         .runs
@@ -1941,6 +1954,25 @@ mod tests {
         .runs
         .iter()
         .any(|run| run.text == "character-styled word" && run.style.italic)
+    );
+  }
+
+  #[test]
+  fn pdf_fixture_job_title_style_resolves_font_family() {
+    let path = fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx");
+    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let table = match &doc.blocks[0] {
+      crate::docx::Block::Table(table) => table,
+      crate::docx::Block::Paragraph(_) => panic!("expected table fixture"),
+    };
+    let paragraph = match &table.rows[1].cells[0].blocks[1] {
+      crate::docx::Block::Paragraph(paragraph) => paragraph,
+      crate::docx::Block::Table(_) => panic!("expected paragraph in table cell"),
+    };
+    assert_eq!(
+      paragraph.runs[0].style.font_family.as_deref(),
+      Some("Arial Black")
     );
   }
 
@@ -2513,7 +2545,7 @@ mod tests {
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
 
-    assert!(find_text_item(&layout, "inserted words").is_some());
+    assert!(layout_contains_text(&layout, "inserted words"));
     assert!(find_text_item(&layout, "deleted text").is_none());
     assert_eq!(
       paragraph_at(&doc, 3).format.alignment,
@@ -2528,9 +2560,9 @@ mod tests {
     let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
 
-    assert!(find_text_item(&layout, "Jane Smith").is_some());
-    assert!(find_text_item(&layout, "5/2/2026").is_some());
-    assert!(find_text_item(&layout, "Active").is_some());
+    assert!(layout_contains_text(&layout, "Jane Smith"));
+    assert!(layout_contains_text(&layout, "5/2/2026"));
+    assert!(layout_contains_text(&layout, "Active"));
   }
 
   #[test]

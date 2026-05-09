@@ -12,7 +12,7 @@ use crate::docx::{
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
-use crate::text_metrics::measure_text;
+use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
 
 const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
@@ -26,11 +26,11 @@ const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
 const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
 
-fn inline_text_height(style: TextStyle) -> f32 {
-  style.font_size_pt * 1.25 + style.baseline_shift_pt.abs()
+fn inline_text_height(style: &TextStyle) -> f32 {
+  inline_text_box_height(style)
 }
 
-fn include_text_height(line_height: f32, text_frame: TextFrame, style: TextStyle) -> f32 {
+fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyle) -> f32 {
   match text_frame.line_height_rule {
     LineHeightRule::Exact => line_height,
     LineHeightRule::Auto | LineHeightRule::AtLeast => line_height.max(inline_text_height(style)),
@@ -358,6 +358,7 @@ pub(crate) enum PageItem {
 pub(crate) struct TextItem {
   pub x_pt: f32,
   pub y_pt: f32,
+  pub line_height_pt: f32,
   pub text: String,
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
@@ -2100,9 +2101,13 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
 fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
   match item {
     PageItem::Text(text) => {
-      let width = measure_text(&text.text, text.style);
-      let height = inline_text_height(text.style);
-      Some((text.x_pt, text.y_pt, text.x_pt + width, text.y_pt + height))
+      let width = measure_text(&text.text, &text.style);
+      Some((
+        text.x_pt,
+        text.y_pt,
+        text.x_pt + width,
+        text.y_pt + text.line_height_pt,
+      ))
     }
     PageItem::Image(image) => Some((
       image.x_pt,
@@ -2384,7 +2389,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
             x = 0.0;
             continue;
           }
-          let width = measure_text(&segment, run.style);
+          let width = measure_text(&segment, &run.style);
           if x + width > content_width && x > 0.0 {
             line_count += 1;
             x = 0.0;
@@ -3227,6 +3232,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
         page.items.push(PageItem::Text(TextItem {
           x_pt: setup.margin_left_pt,
           y_pt: y,
+          line_height_pt: DEFAULT_LINE_HEIGHT_PT,
           text: line,
           style: TextStyle::default(),
           hyperlink_url: None,
@@ -3275,6 +3281,14 @@ struct TableFrameLayout<'a> {
   frame: TableFrame,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct PendingBorderSegment {
+  x_pt: f32,
+  start_y_pt: f32,
+  end_y_pt: f32,
+  border: BorderStyle,
+}
+
 impl<'a> TableFrameLayout<'a> {
   fn new(table: &'a Table, area: BlockArea) -> Option<Self> {
     let column_count = table_column_count(table);
@@ -3311,6 +3325,8 @@ impl<'a> TableFrameLayout<'a> {
     let mut flow = flow_from_block_area(self.frame.block);
     let mut layout = self.clone();
     let mut rows_moved_to_follow = HashSet::new();
+    let mut left_border_segment = None;
+    let mut right_border_segment = None;
     for (row_index, row) in self.table.rows.iter().enumerate() {
       let mut row_frame = layout.row_frame(row, row_index, y);
       let row_height = row_frame.height_pt;
@@ -3320,6 +3336,8 @@ impl<'a> TableFrameLayout<'a> {
         while remaining_height > 0.1 {
           let available_height = (layout.frame.block.content_bottom - y).max(0.0);
           if available_height <= 0.1 {
+            flush_border_segment(current, &mut left_border_segment);
+            flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
               layout = next_layout;
@@ -3331,10 +3349,22 @@ impl<'a> TableFrameLayout<'a> {
           let fragment_height = remaining_height.min(available_height);
           row_frame = layout.row_frame(row, row_index, y);
           row_frame.format_fragment(current, y, y + fragment_height, content_offset);
+          extend_border_segment(
+            current,
+            &mut left_border_segment,
+            row_frame.leading_border_segment(y, y + fragment_height),
+          );
+          extend_border_segment(
+            current,
+            &mut right_border_segment,
+            row_frame.trailing_border_segment(y, y + fragment_height),
+          );
           y += fragment_height;
           remaining_height -= fragment_height;
           content_offset += fragment_height;
           if remaining_height > 0.1 {
+            flush_border_segment(current, &mut left_border_segment);
+            flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
             if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
               layout = next_layout;
@@ -3352,6 +3382,8 @@ impl<'a> TableFrameLayout<'a> {
       );
       if move_to_follow {
         rows_moved_to_follow.insert(row_index);
+        flush_border_segment(current, &mut left_border_segment);
+        flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
         if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
           layout = next_layout;
@@ -3360,11 +3392,25 @@ impl<'a> TableFrameLayout<'a> {
         row_frame = layout.row_frame(row, row_index, y);
       }
 
+      let row_top = y;
       y = row_frame.format(current);
+      extend_border_segment(
+        current,
+        &mut left_border_segment,
+        row_frame.leading_border_segment(row_top, y),
+      );
+      extend_border_segment(
+        current,
+        &mut right_border_segment,
+        row_frame.trailing_border_segment(row_top, y),
+      );
       if row_index + 1 < self.table.rows.len() {
         y += row_cell_spacing_pt(self.table, row);
       }
     }
+
+    flush_border_segment(current, &mut left_border_segment);
+    flush_border_segment(current, &mut right_border_segment);
 
     (flow, y + TABLE_SPACING_AFTER_PT)
   }
@@ -3426,6 +3472,46 @@ impl<'a> TableFrameLayout<'a> {
     }
     y
   }
+}
+
+fn extend_border_segment(
+  page: &mut Page,
+  pending: &mut Option<PendingBorderSegment>,
+  next: Option<PendingBorderSegment>,
+) {
+  let Some(next) = next else {
+    return;
+  };
+  match pending {
+    Some(current)
+      if f32::abs(current.x_pt - next.x_pt) < 0.01
+        && current.border == next.border
+        && f32::abs(current.end_y_pt - next.start_y_pt) < 0.25 =>
+    {
+      current.end_y_pt = next.end_y_pt;
+    }
+    Some(_) => {
+      flush_border_segment(page, pending);
+      *pending = Some(next);
+    }
+    None => {
+      *pending = Some(next);
+    }
+  }
+}
+
+fn flush_border_segment(page: &mut Page, pending: &mut Option<PendingBorderSegment>) {
+  let Some(segment) = pending.take() else {
+    return;
+  };
+  push_styled_line(
+    page,
+    segment.x_pt,
+    segment.start_y_pt,
+    segment.x_pt,
+    segment.end_y_pt,
+    segment.border,
+  );
 }
 
 #[derive(Clone, Debug)]
@@ -3510,7 +3596,6 @@ impl RowFrame<'_, '_> {
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
-    self.paint_trailing_border(current, row_top, row_bottom);
     push_page_fragment(
       current,
       PageFragmentRecord {
@@ -3625,24 +3710,34 @@ impl RowFrame<'_, '_> {
     }
   }
 
-  fn paint_trailing_border(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
-    if let Some(border) = self
+  fn leading_border_segment(&self, row_top: f32, row_bottom: f32) -> Option<PendingBorderSegment> {
+    let first_cell = self.row.cells.first()?;
+    let border = vertical_border(self.table, self.row, 0, true)
+      .or(first_cell.borders.left)
+      .or_else(|| self.table.borders.and_then(|borders| borders.left))
+      .or(Some(BorderStyle::default()))?;
+    Some(PendingBorderSegment {
+      x_pt: row_grid_left(self.table_frame, self.row, self.cell_spacing_pt()),
+      start_y_pt: row_top,
+      end_y_pt: row_bottom,
+      border,
+    })
+  }
+
+  fn trailing_border_segment(&self, row_top: f32, row_bottom: f32) -> Option<PendingBorderSegment> {
+    let border = self
       .row
       .cells
       .last()
       .and_then(|cell| cell.borders.right)
       .or_else(|| self.table.borders.and_then(|borders| borders.right))
-      .or(Some(BorderStyle::default()))
-    {
-      push_styled_line(
-        current,
-        self.table_frame.right_pt,
-        row_top,
-        self.table_frame.right_pt,
-        row_bottom,
-        border,
-      );
-    }
+      .or(Some(BorderStyle::default()))?;
+    Some(PendingBorderSegment {
+      x_pt: self.table_frame.right_pt,
+      start_y_pt: row_top,
+      end_y_pt: row_bottom,
+      border,
+    })
   }
 
   fn cell_spacing_pt(&self) -> f32 {
@@ -3735,6 +3830,9 @@ impl CellFrame<'_, '_> {
     row_bottom: f32,
     cell: &TableCell,
   ) {
+    if row_cell_spacing_pt(self.table, self.row) <= 0.0 && self.cell_index == 0 {
+      return;
+    }
     if let Some(border) = vertical_border(self.table, self.row, self.cell_index, true) {
       push_styled_line(
         current,
@@ -4202,17 +4300,19 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let content_width =
     (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
   let content_height = table_cell_content_height(cell, width);
-  let aligned_text_y = match cell.vertical_alignment {
-    TableCellVerticalAlignment::Top => y + cell.margins.top_pt + DEFAULT_FONT_SIZE_PT,
+  let first_line_style = table_cell_first_line_style(cell);
+  let first_line_height = inline_text_height(&first_line_style);
+  let first_line_baseline_offset = baseline_offset_in_line(&first_line_style, first_line_height);
+  let aligned_content_top = match cell.vertical_alignment {
+    TableCellVerticalAlignment::Top => y + cell.margins.top_pt,
     TableCellVerticalAlignment::Center => {
-      y + ((height - content_height) / 2.0).max(cell.margins.top_pt) + DEFAULT_FONT_SIZE_PT
+      y + ((height - content_height) / 2.0).max(cell.margins.top_pt)
     }
     TableCellVerticalAlignment::Bottom => {
       y + (height - cell.margins.bottom_pt - content_height).max(cell.margins.top_pt)
-        + DEFAULT_FONT_SIZE_PT
     }
   };
-  let mut text_y = aligned_text_y - content_offset;
+  let mut text_y = aligned_content_top + first_line_baseline_offset - content_offset;
   let text_left = x + cell.margins.left_pt;
   let text_bottom = y + height - cell.margins.bottom_pt;
   let flow = FlowContext {
@@ -4261,12 +4361,23 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   );
 }
 
+fn table_cell_first_line_style(cell: &TableCell) -> TextStyle {
+  for block in &cell.blocks {
+    let Block::Paragraph(paragraph) = block else {
+      continue;
+    };
+    for inline in &paragraph.inlines {
+      if let InlineItem::Text(run) = inline {
+        return run.style.clone();
+      }
+    }
+  }
+  TextStyle::default()
+}
+
 fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
   match item {
-    PageItem::Text(text) => {
-      let text_top = text.y_pt - text.style.font_size_pt;
-      text.y_pt >= top && text_top <= bottom
-    }
+    PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
     PageItem::Fill(_) | PageItem::Line(_) => true,
   }
@@ -4759,6 +4870,7 @@ impl<'a> TextFrameLayout<'a> {
       current.items.push(PageItem::Text(TextItem {
         x_pt: first_line_left,
         y_pt: y,
+        line_height_pt: line_height,
         text: label.clone(),
         style: TextStyle::default(),
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
@@ -4784,10 +4896,13 @@ impl<'a> TextFrameLayout<'a> {
               });
               flush_text(
                 current,
-                chunk_x,
-                y,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                },
                 &mut chunk,
-                run.style,
+                &run.style,
                 run.hyperlink_url.as_deref(),
                 run.dynamic_field,
               );
@@ -4825,10 +4940,13 @@ impl<'a> TextFrameLayout<'a> {
               });
               flush_text(
                 current,
-                chunk_x,
-                y,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                },
                 &mut chunk,
-                run.style,
+                &run.style,
                 run.hyperlink_url.as_deref(),
                 run.dynamic_field,
               );
@@ -4871,12 +4989,12 @@ impl<'a> TextFrameLayout<'a> {
               }
               chunk_x = x;
               pending_tab = Some(tab_stop);
-              line_height = include_text_height(line_height, text_frame, run.style);
+              line_height = include_text_height(line_height, text_frame, &run.style);
               emitted = true;
               continue;
             }
 
-            let width = measure_text(&segment.text, run.style);
+            let width = measure_text(&segment.text, &run.style);
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
             if let Some(tab_stop) = pending_tab.take()
@@ -4889,10 +5007,13 @@ impl<'a> TextFrameLayout<'a> {
             if x + width > line_right && x > line_left {
               flush_text(
                 current,
-                chunk_x,
-                y,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                },
                 &mut chunk,
-                run.style,
+                &run.style,
                 run.hyperlink_url.as_deref(),
                 run.dynamic_field,
               );
@@ -4929,21 +5050,24 @@ impl<'a> TextFrameLayout<'a> {
             if width > line_capacity && x <= line_left && !whitespace {
               let mut text_offset = segment.start;
               for text in emergency_break_segments(&segment.text) {
-                let width = measure_text(&text, run.style);
+                let width = measure_text(&text, &run.style);
                 if width > line_capacity && text.chars().count() > 1 {
                   for ch in text.chars() {
                     let mut encoded = [0; 4];
                     let text = ch.encode_utf8(&mut encoded);
-                    let width = measure_text(text, run.style);
+                    let width = measure_text(text, &run.style);
                     text_offset += text.len();
 
                     if x + width > line_right && x > line_left {
                       flush_text(
                         current,
-                        chunk_x,
-                        y,
+                        TextPlacement {
+                          x_pt: chunk_x,
+                          y_pt: y,
+                          line_height_pt: line_height,
+                        },
                         &mut chunk,
-                        run.style,
+                        &run.style,
                         run.hyperlink_url.as_deref(),
                         run.dynamic_field,
                       );
@@ -4982,7 +5106,7 @@ impl<'a> TextFrameLayout<'a> {
                       inline_index,
                       text_offset,
                     });
-                    line_height = include_text_height(line_height, text_frame, run.style);
+                    line_height = include_text_height(line_height, text_frame, &run.style);
                     emitted = true;
                   }
                   continue;
@@ -4992,10 +5116,13 @@ impl<'a> TextFrameLayout<'a> {
                 if x + width > line_right && x > line_left {
                   flush_text(
                     current,
-                    chunk_x,
-                    y,
+                    TextPlacement {
+                      x_pt: chunk_x,
+                      y_pt: y,
+                      line_height_pt: line_height,
+                    },
                     &mut chunk,
-                    run.style,
+                    &run.style,
                     run.hyperlink_url.as_deref(),
                     run.dynamic_field,
                   );
@@ -5034,7 +5161,7 @@ impl<'a> TextFrameLayout<'a> {
                   inline_index,
                   text_offset,
                 });
-                line_height = include_text_height(line_height, text_frame, run.style);
+                line_height = include_text_height(line_height, text_frame, &run.style);
                 emitted = true;
               }
               continue;
@@ -5049,16 +5176,19 @@ impl<'a> TextFrameLayout<'a> {
               inline_index,
               text_offset: segment.end,
             });
-            line_height = include_text_height(line_height, text_frame, run.style);
+            line_height = include_text_height(line_height, text_frame, &run.style);
             emitted = true;
           }
 
           flush_text(
             current,
-            chunk_x,
-            y,
+            TextPlacement {
+              x_pt: chunk_x,
+              y_pt: y,
+              line_height_pt: line_height,
+            },
             &mut chunk,
-            run.style,
+            &run.style,
             run.hyperlink_url.as_deref(),
             run.dynamic_field,
           );
@@ -5597,7 +5727,7 @@ fn justify_line_items(
     } else {
       &text.text
     };
-    line_width = line_width.max(text.x_pt + measure_text(measured_text, text.style) - line_left);
+    line_width = line_width.max(text.x_pt + measure_text(measured_text, &text.style) - line_left);
     space_count += measured_text.chars().filter(|ch| *ch == ' ').count();
   }
 
@@ -5647,18 +5777,19 @@ fn justified_text_segments(
   for ch in text.text.chars() {
     if ch == ' ' {
       if !current.is_empty() {
-        let width = measure_text(&current, text.style);
+        let width = measure_text(&current, &text.style);
         items.push(PageItem::Text(TextItem {
           x_pt: cursor_x,
           y_pt: text.y_pt,
+          line_height_pt: text.line_height_pt,
           text: std::mem::take(&mut current),
-          style: text.style,
+          style: text.style.clone(),
           hyperlink_url: text.hyperlink_url.clone(),
           dynamic_field: text.dynamic_field,
         }));
         cursor_x += width;
       }
-      cursor_x += measure_text(" ", text.style) + extra_per_space;
+      cursor_x += measure_text(" ", &text.style) + extra_per_space;
     } else {
       current.push(ch);
     }
@@ -5667,8 +5798,9 @@ fn justified_text_segments(
     items.push(PageItem::Text(TextItem {
       x_pt: cursor_x,
       y_pt: text.y_pt,
+      line_height_pt: text.line_height_pt,
       text: current,
-      style: text.style,
+      style: text.style.clone(),
       hyperlink_url: text.hyperlink_url,
       dynamic_field: text.dynamic_field,
     }));
@@ -5687,7 +5819,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
 
 fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
-    PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, text.style))),
+    PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, &text.style))),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
@@ -5746,12 +5878,18 @@ fn force_page_break(
   (next_flow, next_flow.content_top_pt)
 }
 
+#[derive(Clone, Copy, Debug)]
+struct TextPlacement {
+  x_pt: f32,
+  y_pt: f32,
+  line_height_pt: f32,
+}
+
 fn flush_text(
   page: &mut Page,
-  x: f32,
-  y: f32,
+  placement: TextPlacement,
   chunk: &mut String,
-  style: TextStyle,
+  style: &TextStyle,
   hyperlink_url: Option<&str>,
   dynamic_field: Option<DynamicFieldKind>,
 ) {
@@ -5759,11 +5897,27 @@ fn flush_text(
     return;
   }
 
+  if let Some(PageItem::Text(previous)) = page.items.last_mut()
+    && f32::abs(previous.y_pt - placement.y_pt) < 0.01
+    && previous.style == *style
+    && previous.hyperlink_url.as_deref() == hyperlink_url
+    && previous.dynamic_field == dynamic_field
+  {
+    let previous_right = previous.x_pt + measure_text(&previous.text, &previous.style);
+    if f32::abs(previous_right - placement.x_pt) < 4.0 {
+      previous.text.push_str(chunk);
+      previous.line_height_pt = previous.line_height_pt.max(placement.line_height_pt);
+      chunk.clear();
+      return;
+    }
+  }
+
   page.items.push(PageItem::Text(TextItem {
-    x_pt: x,
-    y_pt: y,
+    x_pt: placement.x_pt,
+    y_pt: placement.y_pt,
+    line_height_pt: placement.line_height_pt,
     text: std::mem::take(chunk),
-    style,
+    style: style.clone(),
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field,
   }));

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use image::{GenericImageView, ImageFormat as RasterImageFormat, Rgba};
 use krilla::action::{Action, LinkAction};
@@ -21,7 +21,7 @@ use krilla::{Document, SerializeSettings};
 
 use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
-use crate::fonts::load_sans_face;
+use crate::fonts::load_text_face;
 use crate::layout::{
   FillItem, ImageItem, LayoutDocument, LineItem, OutlineEntry, PageItem, TextItem,
 };
@@ -445,11 +445,11 @@ impl PaintDocument {
 
 impl PaintText {
   fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
-    let glyphs = shaped_pdf_glyphs(&text.text, text.style);
+    let glyphs = shaped_pdf_glyphs(&text.text, &text.style);
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
-      .unwrap_or_else(|| measure_text(&text.text, text.style));
+      .unwrap_or_else(|| measure_text(&text.text, &text.style));
     let baseline_y = text.y_pt - text.style.baseline_shift_pt;
     let highlight = text.style.highlight.map(|color| PaintRect {
       x_pt: text.x_pt,
@@ -542,7 +542,7 @@ fn text_paint_portions(source: PaintTextPortionSource<'_>) -> Vec<PaintTextPorti
     let portion_width = portion_glyphs
       .as_ref()
       .map(|glyphs| glyph_width_pt(glyphs, text.style.font_size_pt))
-      .unwrap_or_else(|| measure_text(&text.text[range.clone()], text.style));
+      .unwrap_or_else(|| measure_text(&text.text[range.clone()], &text.style));
     portions.push(PaintTextPortion {
       kind,
       text_range: range.clone(),
@@ -797,20 +797,22 @@ fn draw_text_item(
       draw_paint_rect(surface, highlight);
     }
     surface.set_stroke(None);
-    surface.set_fill(Some(fill(item.style)));
+    surface.set_fill(Some(fill(&item.style)));
     if let Some(glyphs) = &portion.glyphs {
+      let font = fonts.select(&item.style);
       surface.draw_glyphs(
         Point::from_xy(portion.x_pt, portion.baseline_y),
         glyphs,
-        fonts.select(item.style).clone(),
+        font,
         &item.text,
         item.style.font_size_pt,
         false,
       );
     } else {
+      let font = fonts.select(&item.style);
       surface.draw_text(
         Point::from_xy(portion.x_pt, portion.baseline_y),
-        fonts.select(item.style).clone(),
+        font,
         item.style.font_size_pt,
         &item.text[portion.text_range.clone()],
         false,
@@ -853,12 +855,27 @@ fn link_annotation_for_rect(
   let target = if is_internal_link_url(url) {
     internal_links.target_for_url(url)?
   } else {
-    Target::Action(Action::Link(LinkAction::new(url.to_string())))
+    Target::Action(Action::Link(LinkAction::new(normalize_external_url(url))))
   };
   Some(Annotation::new_link(
     LinkAnnotation::new(rect, target),
     None,
   ))
+}
+
+fn normalize_external_url(url: &str) -> String {
+  if let Some(prefix) = url.strip_suffix("://").map(|scheme| format!("{scheme}://")) {
+    return prefix;
+  }
+  if let Some((scheme, rest)) = url.split_once("://")
+    && !rest.is_empty()
+    && !rest.contains('/')
+    && !rest.contains('?')
+    && !rest.contains('#')
+  {
+    return format!("{scheme}://{rest}/");
+  }
+  url.to_string()
 }
 
 fn push_paint_clip(surface: &mut Surface<'_>, clip: Option<&PaintClipRect>) -> bool {
@@ -1013,7 +1030,7 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
   }
 }
 
-fn shaped_pdf_glyphs(text: &str, style: TextStyle) -> Option<PaintGlyphRun> {
+fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
   let shaped = shape_text(text, style)?;
   let glyphs = shaped
     .glyphs
@@ -1241,41 +1258,47 @@ fn serialize_settings(options: &PdfOptions) -> SerializeSettings {
   }
 }
 
-#[derive(Clone)]
 struct FontSet {
-  regular: Font,
-  bold: Font,
-  italic: Font,
-  bold_italic: Font,
+  fallback: Font,
+  fonts: Mutex<HashMap<FontKey, Font>>,
 }
 
 impl FontSet {
   fn load() -> Result<Self> {
-    let regular = load_font(false, false)?;
-    let bold = load_font(true, false).unwrap_or_else(|_| regular.clone());
-    let italic = load_font(false, true).unwrap_or_else(|_| regular.clone());
-    let bold_italic = load_font(true, true).unwrap_or_else(|_| bold.clone());
-
+    let fallback_style = TextStyle::default();
     Ok(Self {
-      regular,
-      bold,
-      italic,
-      bold_italic,
+      fallback: load_font(&fallback_style)?,
+      fonts: Mutex::new(HashMap::new()),
     })
   }
 
-  fn select(&self, style: TextStyle) -> &Font {
-    match (style.bold, style.italic) {
-      (true, true) => &self.bold_italic,
-      (true, false) => &self.bold,
-      (false, true) => &self.italic,
-      (false, false) => &self.regular,
+  fn select(&self, style: &TextStyle) -> Font {
+    let key = FontKey {
+      family: style.font_family.as_deref().map(str::to_string),
+      bold: style.bold,
+      italic: style.italic,
+    };
+    let Ok(mut fonts) = self.fonts.lock() else {
+      return self.fallback.clone();
+    };
+    if let Some(font) = fonts.get(&key) {
+      return font.clone();
     }
+    let font = load_font(style).unwrap_or_else(|_| self.fallback.clone());
+    fonts.insert(key, font.clone());
+    font
   }
 }
 
-fn load_font(bold: bool, italic: bool) -> Result<Font> {
-  if let Some(face) = load_sans_face(bold, italic)
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FontKey {
+  family: Option<String>,
+  bold: bool,
+  italic: bool,
+}
+
+fn load_font(style: &TextStyle) -> Result<Font> {
+  if let Some(face) = load_text_face(style)
     && let Some(font) = Font::new(Arc::new(face.data).into(), face.index)
   {
     return Ok(font);
@@ -1284,7 +1307,7 @@ fn load_font(bold: bool, italic: bool) -> Result<Font> {
   Err(PdfError::FontUnavailable)
 }
 
-fn fill(style: TextStyle) -> Fill {
+fn fill(style: &TextStyle) -> Fill {
   Fill {
     paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
     opacity: NormalizedF32::ONE,

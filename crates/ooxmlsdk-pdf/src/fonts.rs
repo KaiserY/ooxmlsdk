@@ -1,19 +1,29 @@
+use crate::docx::TextStyle;
+
 #[derive(Clone, Debug)]
 pub(crate) struct FontFaceData {
   pub data: Vec<u8>,
   pub index: u32,
 }
 
-pub(crate) fn load_sans_face(bold: bool, italic: bool) -> Option<FontFaceData> {
+pub(crate) fn load_text_face(style: &TextStyle) -> Option<FontFaceData> {
+  load_face(style.font_family.as_deref(), style.bold, style.italic)
+}
+
+fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceData> {
   let mut db = fontdb::Database::new();
   db.load_system_fonts();
+
+  let mut families = Vec::new();
+  if let Some(family) = family.filter(|family| !family.trim().is_empty()) {
+    families.push(fontdb::Family::Name(family));
+    push_font_aliases(&mut families, family);
+  }
+  families.push(fontdb::Family::SansSerif);
+
   if let Some(id) = db.query(&fontdb::Query {
-    families: &[fontdb::Family::SansSerif],
-    weight: if bold {
-      fontdb::Weight::BOLD
-    } else {
-      fontdb::Weight::NORMAL
-    },
+    families: &families,
+    weight: query_weight(family, bold),
     style: if italic {
       fontdb::Style::Italic
     } else {
@@ -25,7 +35,7 @@ pub(crate) fn load_sans_face(bold: bool, italic: bool) -> Option<FontFaceData> {
     return Some(FontFaceData { data, index });
   }
 
-  for path in fallback_font_paths(bold, italic) {
+  for path in fallback_font_paths(family, bold, italic) {
     let Ok(data) = std::fs::read(path) else {
       continue;
     };
@@ -37,7 +47,100 @@ pub(crate) fn load_sans_face(bold: bool, italic: bool) -> Option<FontFaceData> {
   None
 }
 
-fn fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static str] {
+fn query_weight(family: Option<&str>, bold: bool) -> fontdb::Weight {
+  if family.is_some_and(|family| family.eq_ignore_ascii_case("Arial Black")) {
+    return fontdb::Weight::BLACK;
+  }
+  if bold {
+    fontdb::Weight::BOLD
+  } else {
+    fontdb::Weight::NORMAL
+  }
+}
+
+fn push_font_aliases<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str) {
+  match family.trim().to_ascii_lowercase().as_str() {
+    "calibri" => families.extend([
+      fontdb::Family::Name("Carlito"),
+      fontdb::Family::Name("Liberation Sans"),
+    ]),
+    "cambria" => families.extend([
+      fontdb::Family::Name("Caladea"),
+      fontdb::Family::Name("Liberation Serif"),
+    ]),
+    "times new roman" => families.extend([
+      fontdb::Family::Name("Liberation Serif"),
+      fontdb::Family::Name("Nimbus Roman"),
+    ]),
+    "arial" => families.extend([
+      fontdb::Family::Name("Liberation Sans"),
+      fontdb::Family::Name("Arimo"),
+    ]),
+    "arial black" => families.extend([
+      fontdb::Family::Name("Arial"),
+      fontdb::Family::Name("Liberation Sans"),
+    ]),
+    _ => {}
+  }
+}
+
+fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'static [&'static str] {
+  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Calibri")) {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibriz.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-BoldItalic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibrib.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibrii.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/calibri.ttf",
+        "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",
+      ],
+    };
+  }
+
+  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Times New Roman")) {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesbi.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-BoldItalic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesbd.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+      ],
+    };
+  }
+
+  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Arial Black")) {
+    return match italic {
+      true => &[
+        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-BoldItalic.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+      ],
+      false => &[
+        "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+      ],
+    };
+  }
+
   match (bold, italic) {
     (true, true) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",

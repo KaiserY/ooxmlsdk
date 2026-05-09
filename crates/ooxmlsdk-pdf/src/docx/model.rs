@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
@@ -376,9 +377,11 @@ pub(crate) enum ImageWrapMode {
   None,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TextStyle {
+  pub font_family: Option<Arc<str>>,
   pub font_size_pt: f32,
+  pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
   pub bold: bool,
   pub italic: bool,
@@ -392,7 +395,9 @@ pub(crate) struct TextStyle {
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
+      font_family: None,
       font_size_pt: 11.0,
+      character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
       bold: false,
       italic: false,

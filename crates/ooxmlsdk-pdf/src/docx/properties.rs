@@ -1,6 +1,6 @@
 use super::{
   ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle,
-  merge_paragraph_format, parse_hex_color,
+  ThemeFonts, merge_paragraph_format, parse_hex_color,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
@@ -41,14 +41,37 @@ pub(super) fn run_style(
       .map(|run_style| run_style.val.as_str()),
     style,
   );
-  merge_run_style(&mut style, Some(RunProps::Direct(properties)));
+  merge_run_style(
+    &mut style,
+    Some(RunProps::Direct(properties)),
+    &styles.theme_fonts,
+  );
   style
 }
 
-pub(super) fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps<'_>>) {
+pub(super) fn merge_run_style(
+  style: &mut TextStyle,
+  properties: Option<RunProps<'_>>,
+  theme_fonts: &ThemeFonts,
+) {
   let Some(properties) = properties else {
     return;
   };
+
+  if let Some(fonts) = properties.run_fonts() {
+    style.font_family = fonts
+      .ascii
+      .as_deref()
+      .or(fonts.high_ansi.as_deref())
+      .or(fonts.east_asia.as_deref())
+      .or(fonts.complex_script.as_deref())
+      .filter(|value| !value.trim().is_empty())
+      .map(std::sync::Arc::<str>::from)
+      .or_else(|| theme_fonts.resolve(fonts.ascii_theme))
+      .or_else(|| theme_fonts.resolve(fonts.high_ansi_theme))
+      .or_else(|| theme_fonts.resolve(fonts.east_asia_theme))
+      .or_else(|| theme_fonts.resolve(fonts.complex_script_theme));
+  }
 
   if let Some(bold) = properties.bold() {
     style.bold = bold.val.is_none_or(|value| value.as_bool());
@@ -65,6 +88,9 @@ pub(super) fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps
     && let Some(rgb) = parse_hex_color(&color.val)
   {
     style.color = rgb;
+  }
+  if let Some(spacing) = properties.spacing() {
+    style.character_spacing_pt = spacing.val as f32 / 20.0;
   }
   if let Some(underline) = properties.underline() {
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));

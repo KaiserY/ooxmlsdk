@@ -1,16 +1,38 @@
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 use rustybuzz::{Direction, Face, Script, UnicodeBuffer};
 use unicode_bidi::{Direction as BidiDirection, get_base_direction};
 use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 
 use crate::docx::TextStyle;
-use crate::fonts::{FontFaceData, load_sans_face};
+use crate::fonts::{FontFaceData, load_text_face};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedText {
   pub glyphs: Vec<ShapedGlyph>,
   pub width_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TextVerticalMetrics {
+  pub ascent_pt: f32,
+  pub descent_pt: f32,
+  pub line_gap_pt: f32,
+}
+
+impl TextVerticalMetrics {
+  pub(crate) fn ink_height_pt(self) -> f32 {
+    self.ascent_pt + self.descent_pt
+  }
+
+  pub(crate) fn line_height_pt(self) -> f32 {
+    self.ink_height_pt() + self.line_gap_pt
+  }
+
+  pub(crate) fn leading_above_pt(self) -> f32 {
+    self.line_gap_pt / 2.0
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -23,17 +45,17 @@ pub(crate) struct ShapedGlyph {
   pub y_advance_em: f32,
 }
 
-pub(crate) fn measure_text(text: &str, style: TextStyle) -> f32 {
+pub(crate) fn measure_text(text: &str, style: &TextStyle) -> f32 {
   if text.is_empty() {
     return 0.0;
   }
 
-  FontMetricsSet::get()
-    .and_then(|set| set.measure(text, style))
+  FontMetricsCache::get()
+    .measure(text, style)
     .unwrap_or_else(|| approximate_text_width(text, style.font_size_pt))
 }
 
-pub(crate) fn shape_text(text: &str, style: TextStyle) -> Option<ShapedText> {
+pub(crate) fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
   if text.is_empty() {
     return Some(ShapedText {
       glyphs: Vec::new(),
@@ -41,7 +63,27 @@ pub(crate) fn shape_text(text: &str, style: TextStyle) -> Option<ShapedText> {
     });
   }
 
-  FontMetricsSet::get()?.shape(text, style)
+  FontMetricsCache::get().shape(text, style)
+}
+
+pub(crate) fn vertical_metrics(style: &TextStyle) -> TextVerticalMetrics {
+  normalize_vertical_metrics(
+    FontMetricsCache::get()
+      .vertical_metrics(style)
+      .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt)),
+    style.font_size_pt,
+  )
+}
+
+pub(crate) fn inline_text_box_height(style: &TextStyle) -> f32 {
+  vertical_metrics(style).line_height_pt() + style.baseline_shift_pt.abs()
+}
+
+pub(crate) fn baseline_offset_in_line(style: &TextStyle, line_height_pt: f32) -> f32 {
+  let metrics = vertical_metrics(style);
+  let natural_height_pt = metrics.line_height_pt() + style.baseline_shift_pt.abs();
+  let extra_leading_pt = (line_height_pt - natural_height_pt).max(0.0) / 2.0;
+  extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt
 }
 
 fn approximate_text_width(text: &str, font_size: f32) -> f32 {
@@ -57,79 +99,122 @@ fn approximate_text_width(text: &str, font_size: f32) -> f32 {
     .sum()
 }
 
-#[derive(Clone, Debug)]
-struct FontMetricsSet {
-  regular: FontMetrics,
-  bold: FontMetrics,
-  italic: FontMetrics,
-  bold_italic: FontMetrics,
+fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
+  TextVerticalMetrics {
+    ascent_pt: font_size * 0.8,
+    descent_pt: font_size * 0.2,
+    line_gap_pt: font_size * 0.05,
+  }
 }
 
-impl FontMetricsSet {
-  fn get() -> Option<&'static Self> {
-    static METRICS: OnceLock<Option<FontMetricsSet>> = OnceLock::new();
-    METRICS.get_or_init(Self::load).as_ref()
+fn normalize_vertical_metrics(
+  mut metrics: TextVerticalMetrics,
+  font_size: f32,
+) -> TextVerticalMetrics {
+  let min_line_height_pt = font_size * 1.25;
+  if metrics.line_height_pt() < min_line_height_pt {
+    metrics.line_gap_pt += min_line_height_pt - metrics.line_height_pt();
+  }
+  metrics
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FontKey {
+  family: Option<String>,
+  bold: bool,
+  italic: bool,
+}
+
+#[derive(Default)]
+struct FontMetricsCache {
+  fonts: Mutex<HashMap<FontKey, Option<FontMetrics>>>,
+}
+
+impl FontMetricsCache {
+  fn get() -> &'static Self {
+    static METRICS: OnceLock<FontMetricsCache> = OnceLock::new();
+    METRICS.get_or_init(Self::default)
   }
 
-  fn load() -> Option<Self> {
-    let regular = load_font_metrics(false, false)?;
-    let bold = load_font_metrics(true, false).unwrap_or_else(|| regular.clone());
-    let italic = load_font_metrics(false, true).unwrap_or_else(|| regular.clone());
-    let bold_italic = load_font_metrics(true, true).unwrap_or_else(|| bold.clone());
-
-    Some(Self {
-      regular,
-      bold,
-      italic,
-      bold_italic,
-    })
-  }
-
-  fn select(&self, style: TextStyle) -> &FontMetrics {
-    match (style.bold, style.italic) {
-      (true, true) => &self.bold_italic,
-      (true, false) => &self.bold,
-      (false, true) => &self.italic,
-      (false, false) => &self.regular,
-    }
-  }
-
-  fn measure(&self, text: &str, style: TextStyle) -> Option<f32> {
-    let font = self.select(style);
+  fn measure(&self, text: &str, style: &TextStyle) -> Option<f32> {
+    let font = self.select(style)?;
     let mut width = 0.0;
     for run in script_runs(text) {
-      width += font.measure(run.text, style.font_size_pt, run.script)?;
+      width += font.measure(
+        run.text,
+        style.font_size_pt,
+        style.character_spacing_pt,
+        run.script,
+      )?;
     }
     Some(width)
   }
 
-  fn shape(&self, text: &str, style: TextStyle) -> Option<ShapedText> {
-    let font = self.select(style);
+  fn shape(&self, text: &str, style: &TextStyle) -> Option<ShapedText> {
+    let font = self.select(style)?;
     let mut glyphs = Vec::new();
     let mut width_pt = 0.0;
     for run in script_runs(text) {
-      let shaped = font.shape(run.text, style.font_size_pt, run.script, run.start)?;
+      let shaped = font.shape(
+        run.text,
+        style.font_size_pt,
+        style.character_spacing_pt,
+        run.script,
+        run.start,
+      )?;
       width_pt += shaped.width_pt;
       glyphs.extend(shaped.glyphs);
     }
     Some(ShapedText { glyphs, width_pt })
+  }
+
+  fn vertical_metrics(&self, style: &TextStyle) -> Option<TextVerticalMetrics> {
+    let font = self.select(style)?;
+    Some(font.vertical_metrics(style.font_size_pt))
+  }
+
+  fn select(&self, style: &TextStyle) -> Option<FontMetrics> {
+    let key = FontKey {
+      family: style.font_family.as_deref().map(str::to_string),
+      bold: style.bold,
+      italic: style.italic,
+    };
+    let mut fonts = self.fonts.lock().ok()?;
+    if let Some(font) = fonts.get(&key) {
+      return font.clone();
+    }
+    let font = load_font_metrics(style);
+    fonts.insert(key, font.clone());
+    font
   }
 }
 
 #[derive(Clone, Debug)]
 struct FontMetrics {
   face: FontFaceData,
+  vertical: FaceVerticalMetrics,
 }
 
 impl FontMetrics {
-  fn measure(&self, text: &str, font_size: f32, script: UnicodeScriptValue) -> Option<f32> {
-    Some(self.shape(text, font_size, script, 0)?.width_pt)
+  fn measure(
+    &self,
+    text: &str,
+    font_size: f32,
+    character_spacing_pt: f32,
+    script: UnicodeScriptValue,
+  ) -> Option<f32> {
+    Some(
+      self
+        .shape(text, font_size, character_spacing_pt, script, 0)?
+        .width_pt,
+    )
   }
 
   fn shape(
     &self,
     text: &str,
     font_size: f32,
+    character_spacing_pt: f32,
     script: UnicodeScriptValue,
     text_offset: usize,
   ) -> Option<ShapedText> {
@@ -151,14 +236,23 @@ impl FontMetrics {
     let positions = shaped.glyph_positions();
     let mut glyphs = Vec::with_capacity(infos.len());
     let mut width_pt = 0.0;
+    let tracking_em = if font_size.abs() > f32::EPSILON {
+      character_spacing_pt / font_size
+    } else {
+      0.0
+    };
 
     for index in 0..infos.len() {
       let position = positions[index];
-      width_pt += position.x_advance as f32 * font_size / units_per_em;
+      let mut x_advance_em = position.x_advance as f32 / units_per_em;
+      if tracking_em.abs() > f32::EPSILON && index + 1 < infos.len() {
+        x_advance_em += tracking_em;
+      }
+      width_pt += x_advance_em * font_size;
       glyphs.push(ShapedGlyph {
         glyph_id: infos[index].glyph_id,
         text_range: glyph_text_range(text, infos, index, text_offset),
-        x_advance_em: position.x_advance as f32 / units_per_em,
+        x_advance_em,
         x_offset_em: position.x_offset as f32 / units_per_em,
         y_offset_em: position.y_offset as f32 / units_per_em,
         y_advance_em: position.y_advance as f32 / units_per_em,
@@ -167,13 +261,53 @@ impl FontMetrics {
 
     Some(ShapedText { glyphs, width_pt })
   }
+
+  fn vertical_metrics(&self, font_size: f32) -> TextVerticalMetrics {
+    let scale = font_size / self.vertical.units_per_em;
+    TextVerticalMetrics {
+      ascent_pt: self.vertical.ascent_units * scale,
+      descent_pt: self.vertical.descent_units * scale,
+      line_gap_pt: self.vertical.line_gap_units * scale,
+    }
+  }
 }
 
-fn load_font_metrics(bold: bool, italic: bool) -> Option<FontMetrics> {
-  load_sans_face(bold, italic).and_then(|face| {
-    Face::from_slice(&face.data, face.index)?;
-    Some(FontMetrics { face })
+fn load_font_metrics(style: &TextStyle) -> Option<FontMetrics> {
+  load_text_face(style).and_then(|face| {
+    let parsed = Face::from_slice(&face.data, face.index)?;
+    Some(FontMetrics {
+      vertical: FaceVerticalMetrics::from_face(&parsed),
+      face,
+    })
   })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FaceVerticalMetrics {
+  units_per_em: f32,
+  ascent_units: f32,
+  descent_units: f32,
+  line_gap_units: f32,
+}
+
+impl FaceVerticalMetrics {
+  fn from_face(face: &Face<'_>) -> Self {
+    let units_per_em = face.units_per_em().max(1) as f32;
+    let ascent_units = face.ascender().max(0) as f32;
+    let descent_units = (-face.descender()).max(0) as f32;
+    let line_gap_units = face.line_gap().max(0) as f32;
+    let fallback_gap = (units_per_em - (ascent_units + descent_units)).max(0.0);
+    Self {
+      units_per_em,
+      ascent_units,
+      descent_units,
+      line_gap_units: if line_gap_units > 0.0 {
+        line_gap_units
+      } else {
+        fallback_gap
+      },
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -263,8 +397,8 @@ mod tests {
   fn shaped_measurement_handles_ligatures_and_cjk() {
     let style = TextStyle::default();
 
-    assert!(measure_text("office", style) > 0.0);
-    assert!(measure_text("商务文档", style) > measure_text("abc", style));
+    assert!(measure_text("office", &style) > 0.0);
+    assert!(measure_text("商务文档", &style) > measure_text("abc", &style));
   }
 
   #[test]
@@ -280,7 +414,8 @@ mod tests {
 
   #[test]
   fn shaped_text_exposes_glyph_advances_for_pdf_paint() {
-    let shaped = shape_text("office", TextStyle::default()).expect("shaped text");
+    let style = TextStyle::default();
+    let shaped = shape_text("office", &style).expect("shaped text");
 
     assert!(!shaped.glyphs.is_empty());
     assert!(shaped.width_pt > 0.0);

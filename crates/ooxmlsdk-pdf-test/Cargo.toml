@@ -1,0 +1,10 @@
+[package]
+name = "ooxmlsdk-pdf-test"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+ooxmlsdk-pdf = { workspace = true }
+thiserror = { workspace = true }
+walkdir = { workspace = true }

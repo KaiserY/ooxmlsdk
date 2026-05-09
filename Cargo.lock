@@ -811,6 +811,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ooxmlsdk-pdf-test"
+version = "0.6.2"
+dependencies = [
+ "ooxmlsdk-pdf",
+ "thiserror",
+ "walkdir",
+]
+
+[[package]]
 name = "ooxmlsdk-test"
 version = "0.6.2"
 dependencies = [

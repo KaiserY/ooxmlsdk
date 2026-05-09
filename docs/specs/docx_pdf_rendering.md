@@ -111,57 +111,65 @@ The current `crates/ooxmlsdk-pdf` DOCX path is:
 
 ```text
 docx::extract
-  -> DocxDocument { page, blocks, headers, footers, notes }
+  -> DocxDocument { sections, page, blocks, headers, footers, notes }
   -> layout::layout
   -> LayoutDocument {
-       pages, frames, follows, page_invalidations,
-       reflow_executions, reflow_requests, restart_plan
+       pages, frames, follows, page_replays, backward_moves,
+       layout_reruns, page_invalidations, reflow_executions,
+       reflow_requests, restart_plan, outline_entries
      }
   -> render::krilla::render
 ```
 
-This supports smoke-level PDF generation and a set of focused features:
+This now supports more than smoke-level PDF generation:
 
-- text extraction
-- basic run styling
-- paragraph spacing, indentation, tabs, and alignment
-- styles, numbering, simple fields, SDT content, hyperlink text styling, and
-  external hyperlink PDF annotations
-- PAGE/NUMPAGES fields resolved against layout page numbers for complex
-  fields, simple fields, and legacy `w:pgNum`
-- document page background color and section page borders
-- headers/footers for a single effective section
-- footnotes as reserved bottom note areas, with endnotes/comments still emitted
-  through simplified trailing note blocks
-- basic inline images and typed floating DrawingML anchors
-- basic table rows/cells/borders/shading
-- VML and DrawingML textbox text extraction in limited cases
+- typed ordered section import from paragraph-level and body-level `sectPr`
+- section break normalization for directly applicable Writer rules
+- section-scoped page setup, columns, title page state, and repeating areas
+- default/first/even header/footer import with link-to-previous inheritance
+- settings-derived even/odd header selection and default tab stop
+- paragraph/run/style import, numbering, tabs, fields, SDT content, hyperlinks,
+  comments, notes, and dynamic PAGE/NUMPAGES refresh
+- page backgrounds, page borders, header/footer body reservation, and
+  negative top/bottom margin fallback direction
+- page footnote boss reservation, note frames, and endnote/comment trailing
+  fallback
+- typed inline/floating DrawingML image anchors, VML image fallback, textboxes,
+  crop/transform state, wrap distances, behind/in-front ordering, and retained
+  page fly exclusions
+- table/row/cell frame ownership, grid/span/merge, row follows, repeated
+  headers, cell spacing/margins, border conflict selection, table styles, and
+  nested cell flow
+- `TextFrameLayout`, `TextFrame`, and `LineFrame` line ownership with follow
+  records, split cursors, keep/widow/orphan decisions, replay, invalidation,
+  backward-move checkpoints, and restart planning
+- explicit layout-to-paint conversion before Krilla output, shaped glyph PDF
+  paint, link annotations, outline/bookmark export, image paint, clipping, and
+  basic transforms
 
-Known architectural drift:
+Known architectural gaps before the 100% close:
 
-- Only the final body-level `sectPr` is treated as the page setup.
-- Mid-document section breaks are not modeled as section boundaries.
-- Header/footer link-to-previous and even/odd variants are not modeled.
-- Header/footer dimensions are not computed like Writer page styles.
-- Footnotes reserve measured space on the current page, but do not yet have
-  true Writer continuation frames.
-- Anchored/floating drawings now keep a typed floating placement model, but
-  page-level fly influence is still partial.
-- Tables now have table/row/cell frame ownership, but row splitting and
-  follow-flow-line continuation are still simplified.
-- Paragraph layout now enters through `TextFrameLayout`, `TextFrame`, and
-  `LineFrame`; column continuation, page follow recording, and the minimum
-  widow/orphan/keepLines split policy now live in the text frame state. The
-  final `LayoutDocument` also has frame records with display-list ranges and
-  synthesized line boxes, so line layout can now be snapshotted independently
-  from PDF paint. Full follow-frame repaint/reflow remains incremental work.
-- The public internal `LayoutDocument` now records `LayoutFrame` and
-  `FrameFollow` data for paragraph, table, and note blocks. Frame records carry
-  source block id, page/section-page/column, display-list item range, bounds,
-  and line boxes; follow records carry source block, reason, source
-  page/section-page/column, and destination page/section-page/column. This is
-  the first concrete master/follow substrate; PDF paint still consumes the
-  display list.
+- `docx/mod.rs` still hosts helper implementations that now have module
+  facades; these must continue draining into `properties`, `text`, `drawing`,
+  and `package`.
+- Footnotes reserve measured same-page areas, but true Writer continuation
+  frames, continuation separators, and full table/column interactions are not
+  complete.
+- Fly frames have typed anchors, placement, z-order direction, and retained
+  square/tight exclusions, but full page reassignment, contour wrap,
+  shape/textbox semantics, and table/header/footer fly interactions remain.
+- Tables have Writer-shaped row/cell/follow ownership, but full rowspan split
+  recalculation, split-fragment border conflict handling, and repaint
+  invalidation still need closure.
+- Text layout has durable frame records and line boxes, but exact Writer line
+  breaking, bidi, CJK/kana justification, glyph adjustability, and backward
+  line reflow are still open.
+- Package/property import needs settings/compat flags, theme defaults,
+  revision metadata, more field metadata, and complete property overlay
+  centralization.
+- PDF export still needs font embedding/substitution policy, page labels,
+  internal document links, metadata/export options, and tagged/PDF-A behavior
+  when those are in scope.
 
 ## 4. Target Internal Model
 
@@ -285,47 +293,211 @@ decisions.
 
 ### Fixture and Verification Strategy
 
-The DOCX/PDF lane should optimize for large LibreOffice-aligned coverage
-increments, not one fixture per tiny property. New coverage should prefer
-feature-cluster fixtures that exercise a whole Writer behavior area at once.
+The DOCX/PDF lane should optimize for real LibreOffice-aligned coverage rather
+than hand-crafted renderer fixtures. New PDF calibration fixtures live only in
+`test-data/ooxmlsdk-pdf-test/` and should be copied from upstream compatibility
+suites, starting with LibreOffice Writer QA files under `../core/sw/qa/`.
 
-Default fixture groups:
+Default fixture policy:
 
-- `docx_pdf_sections_cluster.docx`: section breaks, page size/orientation, page
-  parity, first/default/even header/footer inheritance, columns, hard column
-  breaks, and explicit non-equal column definitions.
-- `docx_pdf_paragraph_flow_cluster.docx`: spacing, indents, tabs, borders/shading,
-  page-break-before, keep-next, keep-lines, widow/orphan scenarios, numbering,
-  and common run properties.
-- `docx_pdf_table_layout_cluster.docx`: table width/indent/alignment, grid/span/merge,
-  cell margins, row height, cantSplit, repeated header rows, row/page splitting,
-  borders, shading, and nested tables.
-- `docx_pdf_drawing_flow_cluster.docx`: inline drawings, anchors, relative positioning,
-  wrap modes, behind/in-front state, VML fallback, and text boxes.
-- `docx_pdf_notes_cluster.docx`: footnote/endnote references, separators,
-  continuation separators, bottom note areas, notes in columns/tables, and
-  fallback ordering.
+- prefer real LibreOffice Writer fixtures from `sw/qa/extras/ooxmlimport/data/`,
+  `sw/qa/extras/ooxmlexport/data/`, `sw/qa/extras/ww8import/data/`, and
+  `sw/qa/filter/ww8/data/`
+- keep `ooxmlsdk-pdf-test` focused on `.docx`, `.docm`, `.dotx`, and `.dotm`
+  until a deliberate `.doc` conversion path exists
+- do not add hand-crafted DOCX files just to exercise a renderer feature; add a
+  LibreOffice regression fixture that already captures the behavior
+- record each copied fixture's upstream source path next to the fixture
 
-Small single-purpose DOCX fixtures are reserved for bug regressions or cases
-where a minimal isolated document is necessary to expose an import/layout
-failure. Existing small fixtures can remain while behavior is unstable, but new
-coverage should be added to the clustered fixtures first. Tests should assert a
-layout snapshot for the cluster: page count, key text positions, repeated
-content counts, line/fill/image counts, and note/header/table placement. This
-keeps verification broad enough for rapid development while preserving the path
-to precise LibreOffice parity.
+The initial real fixture is
+`test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx`, copied from
+`../core/sw/qa/extras/ooxmlexport/data/1_page.docx`.
 
 Implementation work should also happen in feature batches. A batch may import
 more properties than layout consumes immediately, provided the model fields are
 typed, source-backed by generated `ooxmlsdk` types, documented in this file,
 and marked as pending layout consumption in the matrix/status text.
 
-Current Writer-parity estimate: about 90% of full LibreOffice Writer DOCX to
-PDF behavior. The main path now covers typed package import, section/page-style
-flow, first/default/even header/footer inheritance and selection, negative
-top/bottom margin header/footer fallback, basic column flow, paragraph/run/style
-import, shaped text measurement and PDF glyph paint, PAGE/NUMPAGES field
-refresh, page backgrounds/borders, measured footnote reservation, raster images, typed
+Current status must be read in two layers:
+
+- **Architecture substrate: about 92% ready.** The main path now has typed DOCX
+  package import, section/page-style flow, first/default/even header/footer
+  inheritance and selection, basic column flow, paragraph/run/style import,
+  shaped text measurement, PDF glyph paint, PAGE/NUMPAGES refresh, page
+  backgrounds/borders, measured footnote reservation, raster images, typed
+  floating anchors, a Writer-shaped table/frame path, frame/follow records,
+  invalidation records, page replay, executable backward-move checkpoints, and
+  an explicit paint document before Krilla output. The import path is now
+  split across concrete `model`, `text`, `drawing`, `package`, `properties`,
+  and `table` modules instead of being centered entirely in `docx/mod.rs`.
+- **LibreOffice behavior parity: about 60% complete.** This is the evidence
+  average from the feature areas below. The old single "about 90%"
+  wording was too optimistic for end-user parity because LibreOffice-compatible
+  rendering still depends on exact Writer frame persistence, full line breaking,
+  bidi/CJK justification, footnote/table/fly interaction, compatibility flags,
+  drawing/shape semantics, fields/revisions, font policy, tagged PDF, and export
+  option behavior.
+
+The target for this workstream is still full LibreOffice Writer alignment, but
+the percentages below must not be read as full-product compatibility. A row can
+temporarily reach `100%` only for its explicitly checked tracked surface. Full
+LibreOffice parity remains blocked until the full-parity blocker list below is
+closed or explicitly declared out of scope.
+
+### Today Tracked-Surface 100% Target
+
+For today's work, `100%` means **100% of the checked DOCX/PDF tracked surface**,
+not complete LibreOffice Writer DOCX-to-PDF compatibility. The tracked surface
+is:
+
+1. **Sections/page styles:** section boundaries, break normalization,
+   first/default/even header/footer inheritance, body reservation, columns,
+   page backgrounds, and page borders match the selected LibreOffice Writer QA
+   fixtures in `test-data/ooxmlsdk-pdf-test/`.
+2. **Paragraph/text:** paragraph/run property overlay, numbering, tabs, fields,
+   page/column breaks, keep/widow/orphan behavior, shaped text measurement, and
+   paint portions match the selected LibreOffice Writer QA fixtures.
+3. **Tables:** table width/alignment/indent, grid/span/merge, cell margins and
+   spacing, row follows, repeated headers, nested cell flow, and border
+   conflict behavior match the selected LibreOffice Writer QA fixtures.
+4. **Drawing/fly frames:** inline/floating images, DrawingML/VML fallback,
+   anchor reference areas, wrap distances, behind/in-front order, retained page
+   exclusions, crop/transform state, and textbox fallback match the selected
+   LibreOffice Writer QA fixtures.
+5. **Notes:** footnote/endnote references, same-page note reservation, note
+   frame ordering, separator behavior, body-area shrinkage, and trailing
+   fallback match the selected LibreOffice Writer QA fixtures.
+6. **PDF paint:** layout-owned paint items, shaped glyphs, clipping,
+   decorations, images, links, outlines, and basic metadata/output validity
+   match the current LibreOffice-calibrated expectations.
+
+Do not raise any row to `100%` unless the corresponding upstream-derived
+fixtures have concrete assertions for page count, frame/follow ownership, key text/image/note
+positions, replay/invalidation behavior when relevant, and PDF output validity.
+If a LibreOffice behavior is intentionally outside today's tracked surface,
+move it to "deferred parity" with a specific reason instead of leaving it as an
+unbounded gap.
+
+### Full LibreOffice Parity Blockers
+
+The renderer is not fully LibreOffice-compatible until these blockers are
+closed:
+
+- **Footnotes/endnotes:** true Writer continuation frames, continuation
+  separators, multi-page notes, notes inside tables/columns, and separator
+  style/settings.
+- **Fly frames/drawing:** page reassignment, contour wrap, all anchor classes,
+  object formatter behavior, shapes/textboxes, effects, complex z-order,
+  header/footer/table fly interactions, SVG/PDF image handling, and OLE-like
+  fallbacks where applicable.
+- **Text layout:** exact Writer line breaking, bidi ordering, CJK/kana
+  justification, glyph-level adjustment, compatibility-mode line spacing,
+  hyphenation, fallback fonts, and backward reflow when later frames change.
+- **Tables:** full grid conflict resolution, rowspan-aware split
+  recalculation, split-fragment borders, compatibility border-distance quirks,
+  table/fly/footnote interactions, nested follow tables, and repaint
+  invalidation.
+- **Sections/page styles:** mirrored/gutter pages, page numbering and labels,
+  page-master reassignment after backward moves, dynamic header/footer sizing,
+  and negative-margin text-frame fallback.
+- **Properties/import:** settings and compatibility flags, theme/default style
+  resolution, revision metadata, comments/fields beyond the current dynamic
+  subset, complete `PropertyMap` overlay order, and all tracked part metadata.
+- **PDF export:** font embedding and substitution policy, metadata and export
+  options, page labels, internal links/destinations, tagged PDF/PDF-UA/PDF-A
+  where in scope, transparency/export edge cases, and deterministic output
+  comparison.
+- **Calibration harness:** systematic LibreOffice reference rendering,
+  extraction of comparable page/text/image/annotation geometry, and golden diff
+  reporting for upstream-derived samples.
+
+### LibreOffice Calibration Crate
+
+Add a separate `crates/ooxmlsdk-pdf-test` crate for full parity calibration.
+Keep it separate from `ooxmlsdk-pdf` because the calibration lane needs
+LibreOffice installed, temporary reference PDFs, PDF text/geometry extraction,
+optional raster comparison, and golden artifacts that should not slow the
+runtime crate's ordinary unit tests.
+
+Implemented crate responsibilities:
+
+- discover Word fixtures from `test-data/ooxmlsdk-pdf-test/` (`.docx`,
+  `.docm`, `.dotx`, `.dotm`)
+- render each fixture with LibreOffice headless, for example
+  `soffice --headless --convert-to pdf --outdir <tmp> <fixture.docx>`
+- render the same fixture through `ooxmlsdk-pdf`
+- extract comparable metadata from both PDFs: current first pass covers page
+  count, MediaBox count, image count, link annotation count, outline markers,
+  and EOF presence
+- emit a concise inventory report that separates render failures from
+  comparison issues
+
+Open crate responsibilities:
+
+- extract text strings, approximate text boxes, image boxes, annotation boxes,
+  outline trees, page labels, metadata, and geometry tolerances
+- compare with tolerance files so intentional differences are explicit and
+  reviewable
+- optionally rasterize pages for pixel/image comparison once deterministic font
+  and rasterization policy is stable
+- emit a concise failure report that names the fixture, page, object kind,
+  LibreOffice value, Rust value, delta, and owning parity area
+
+Suggested layout:
+
+```text
+crates/ooxmlsdk-pdf-test/
+  Cargo.toml
+  src/
+    lib.rs
+    libreoffice.rs
+    render.rs
+    pdf_extract.rs
+    compare.rs
+    report.rs
+  tests/
+    libreoffice_fixtures.rs
+test-data/ooxmlsdk-pdf-test/
+  README.md
+  libreoffice-ooxmlexport-1_page.docx
+  tolerances/
+    libreoffice-ooxmlexport-1_page.toml
+```
+
+This lane currently has two layers:
+
+- a non-ignored smoke test that skips cleanly when `soffice` is not available
+  and strongly gates every fixture in `test-data/ooxmlsdk-pdf-test/`
+- a non-ignored inventory test that records render failures plus first-pass
+  summary differences for that directory; it currently requires running outside
+  this sandbox because LibreOffice cannot create its runtime files from the
+  sandboxed test process
+
+Latest inventory run:
+
+- command: `cargo test -p ooxmlsdk-pdf-test -- --nocapture`
+- scope: `test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx`
+- source: `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`
+- expected result: fixture reaches LibreOffice-vs-Rust PDF comparison and
+  passes the current first-pass summary checks
+
+Today's implementation order:
+
+1. Finish moving import helpers behind the active `properties`, `text`,
+   `drawing`, and `package` module boundaries.
+2. Close notes and drawing first because they are the lowest parity rows and
+   exercise Writer's footnote boss and fly-frame interaction model.
+3. Close table rowspan/follow and paragraph property resolver gaps next because
+   they affect pagination and replay stability.
+4. Run `cargo fmt --all`, `cargo test -p ooxmlsdk-pdf`, and
+   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings` after the full
+   batch, then update this matrix from the verified state.
+
+The main path now covers typed package import, section/page-style flow,
+first/default/even header/footer inheritance and selection, negative top/bottom
+margin header/footer fallback, basic column flow, paragraph/run/style import,
+shaped text measurement and PDF glyph paint, PAGE/NUMPAGES field refresh, page
+backgrounds/borders, measured footnote reservation, raster images, typed
 floating anchors with paragraph-local and page-level square/tight wrap
 influence, and a Writer-shaped table/frame path with row follows, repeated
 header rows, cell margins/spacing, vertical merge, rowspan-aware split
@@ -371,30 +543,48 @@ resolution, retained as layout outline entries with page coordinates, and
 exported as a hierarchical PDF outline/bookmark tree through Krilla
 destinations, matching Writer's PDF navigation export shape for outline-level
 paragraphs.
+
+The import architecture is no longer only a plan. `docx/text.rs` owns paragraph
+model assembly and the paragraph/run import boundary; `docx/drawing.rs` owns the
+DrawingML/VML entry points consumed by text import; `docx/package.rs` owns image
+and external hyperlink relationship catalogs for main/header/footer/notes/
+comments parts; and `docx/properties.rs` now owns paragraph format resolution
+plus direct run-style resolution. Some helper code still remains in `docx/mod.rs`
+while it is drained toward those modules, but the call graph now follows the
+LibreOffice-style import boundaries rather than adding new behavior directly to
+the root module.
+
 Remaining requests are reduced to a first invalid page/frame restart plan with
 frame/column/page scope, matching the shape of Writer's first-invalid-page loop
 and Typst's relayout checkpoint. This moves the renderer past a flat
 display-list-only model and gives the next Writer-style rollback and backward
 invalidation work something concrete to operate on.
-The remaining gap is still large because LibreOffice parity depends on durable
-Writer master/follow frame state, exact line breaking and full bidi/CJK
-justification, full footnote/table/fly interaction, compatibility-mode quirks,
-full drawing and shape semantics, field/revision semantics, font
-substitution/embedding policy, accessibility/tagged PDF, and print/PDF export
-edge cases.
 
-Estimate by area, using LibreOffice Writer as the target:
+Progress matrix, using LibreOffice Writer as the behavior target and Typst as
+the frame/paint technique reference:
 
-| Area | Current parity | Main remaining gap |
-|------|----------------|--------------------|
-| DOCX package/import backbone | ~60% | Settings, compatibility flags, more part types, theme/style defaults, revision and field metadata. |
-| Sections/page styles/repeating areas | ~58% | Full negative-margin text-frame conversion, page-master reassignment after backward moves, page numbering, mirrored/gutter pages, exact header/footer dynamic sizing. |
-| Paragraph/run properties | ~45% | Full property resolver, numbering/tab nuance, bidi and CJK line rules, complex fields, revisions, compatibility options. |
-| Text layout | ~81% | Exact line breaking, full bidi/CJK justification, richer glyph-level line artifacts. |
-| Tables | ~56% | Full rowspan split recalculation, repaint invalidation, complete border conflict rules, nested/floating/table interactions. |
-| Footnotes/endnotes | ~43% | True continuation frames, continuation separators, note/table/column interactions, separator style/settings. |
-| Drawing/floating objects | ~42% | Full page association, contour wrap, shapes/textboxes, z-order, effects, SVG/PDF images, table/header/footer fly interaction. |
-| PDF paint/export quality | ~82% | Font embedding/substitution policy, tagged PDF/PDF-UA/PDF-A, internal links, metadata/export options. |
+| Area | Current parity | 100% gate |
+|------|----------------|-----------|
+| DOCX package/import backbone | 64% | Settings/compat flags, theme/default style data, revisions, field metadata, notes/comments/hyperlinks/images, and tracked part traversal all imported through generated `ooxmlsdk` types or documented typed fallbacks. |
+| Sections/page styles/repeating areas | 58% | LibreOffice `SectionPropertyMap` behavior for break normalization, inheritance, first/even/default slots, negative margins, mirrored/gutter pages, page numbering, columns, and page-master reassignment is covered by upstream-derived fixtures. |
+| Paragraph/run properties | 50% | A dedicated property resolver matches Writer overlay order for doc defaults, styles, numbering, table style, direct `pPr/rPr`, tabs, numbering, bidi/CJK options, fields, and compatibility flags. |
+| Text layout | 81% | Writer-like `SwTextFrame` master/follow state, exact line breaking, bidi, CJK/kana justification, glyph-level artifacts, keep/widow/orphan, tabs, fields, and repaint invalidation match calibrated fixtures. |
+| Tables | 56% | `SwTabFrame`/row/cell follow behavior covers full grid conflict resolution, rowspan split recalculation, repeated headers, nested/floating interactions, row height, cell spacing, and complete border conflict precedence. |
+| Footnotes/endnotes | 43% | True Writer footnote/endnote continuation frames, separators, continuation separators, note areas, table/column interactions, and separator settings are validated against LibreOffice output. |
+| Drawing/floating objects | 46% | Fly-frame import/layout covers inline/as-character/paragraph/character/page anchors, page association, contour wrap, z-order, effects, textboxes/shapes, SVG/PDF images, and table/header/footer interactions. |
+| PDF paint/export quality | 82% | Paint output covers font embedding/substitution policy, internal links, metadata/page labels/options, tagging/PDF-UA/PDF-A where in scope, image transforms, clipping, transparency, and LibreOffice-like export edge cases. |
+
+100% close order:
+
+1. Continue draining `docx/mod.rs` into `docx/properties.rs`, `docx/text.rs`,
+   `docx/drawing.rs`, and `docx/package.rs`; these modules are now active call
+   boundaries, but several helper implementations still need to move behind
+   them.
+2. Drive the lowest parity rows first: footnotes/endnotes, drawing/fly frames,
+   paragraph/run resolution, and tables.
+3. For each row, add one LibreOffice-calibrated upstream fixture before moving
+   the percentage up. A row reaches `100%` only when its 100% gate is covered
+   by fixtures and no tracked behavior is left as a known gap.
 
 ### Phase 0: Freeze Non-DOCX Scope
 
@@ -696,19 +886,11 @@ Current progress:
 - Tests cover paragraph-level/body-level section collection, continuous
   same-orientation behavior, orientation-change normalization, and next-column
   normalization.
-- Real DOCX fixture coverage includes section header/footer inheritance and
-  even-page header selection via `test-data/wml/header_section_inheritance.docx`.
-- Real DOCX fixture coverage includes first-page header/footer selection on a later
-  section via `test-data/wml/header_section_first_page.docx`.
-- Real DOCX fixture coverage includes block-level section column flow, a hard
-  column break, and explicit non-equal column definitions via
-  `test-data/wml/section_columns_flow.docx`,
-  `test-data/wml/section_column_break.docx`, and
-  `test-data/wml/section_columns_explicit.docx`.
-- Real DOCX fixture coverage includes keep-next page migration via
-  `test-data/wml/para_keep_flow.docx`.
-- Real DOCX fixture coverage includes repeated table headers across pages via
-  `test-data/wml/table_header_repeat.docx`.
+- The former hand-authored PDF-layout WML fixtures for section inheritance,
+  column flow, keep-next pagination, repeated table headers, page background,
+  and borders were removed. Future PDF parity coverage for these behaviors
+  should come from LibreOffice QA fixtures copied into
+  `test-data/ooxmlsdk-pdf-test/`.
 - Layout model coverage checks that a table row following into the next section
   column also moves later body blocks into that destination column, matching the
   Writer `SwTabFrame` follow invariant before full row split/follow-flow-line
@@ -728,11 +910,10 @@ Current progress:
   import keeps a dynamic field marker and resolves visible text after body flow
   and repeating header/footer layout, following Writer's field-expansion
   direction while avoiding stale cached results.
-- Real DOCX fixture coverage includes document-level `w:background` color and
-  section `w:pgBorders` via `test-data/wml/page_background_borders.docx`.
-  Layout paints the page background before content and page frame borders after
-  repeating header/footer content, matching Writer's page frame paint order at
-  the page-frame level.
+- Layout support for document-level `w:background` color and section
+  `w:pgBorders` remains in the renderer, but PDF parity tests for those
+  behaviors should be reintroduced from upstream LibreOffice fixtures rather
+  than locally generated WML samples.
 - Verification for DOCX/PDF iteration currently includes
   `cargo test -p ooxmlsdk-pdf` and
   `cargo clippy -p ooxmlsdk-pdf --all-targets -- -D warnings`. Broader
@@ -1073,7 +1254,7 @@ Avoid relying only on "PDF starts with `%PDF-`" once layout behavior exists.
 
 ## 8. Immediate Next Step
 
-The section/page-style backbone, DOCX/PDF cluster snapshots, and concrete
+The section/page-style backbone, upstream DOCX/PDF calibration fixture lane, and concrete
 layout frame records are now in place. Continue with Writer-frame alignment in
 larger behavior batches:
 
@@ -1087,9 +1268,8 @@ larger behavior batches:
 4. Extend floating frame influence from paragraph-local exclusions to
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.
-5. Start comparing the cluster fixture snapshots against LibreOffice-generated
-   PDF/layout observations, then split only the failing cases into focused
-   regression fixtures.
+5. Expand `test-data/ooxmlsdk-pdf-test/` with focused LibreOffice QA DOCX files
+   and compare them against LibreOffice-generated PDF/layout observations.
 
 The fastest route toward LibreOffice parity is to keep each batch anchored to a
 specific LibreOffice function or fixture group, then assert import/layout

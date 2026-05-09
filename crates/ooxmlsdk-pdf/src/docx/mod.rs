@@ -1,22 +1,21 @@
+mod drawing;
 mod model;
+mod package;
+mod properties;
 mod table;
+mod text;
 mod units;
 
 use std::collections::{BTreeMap, HashMap};
 
-use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
-  endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
-  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
-  wordprocessing_comments_part::WordprocessingCommentsPart,
-  wordprocessing_document::WordprocessingDocument,
+  main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_vml as v,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
-use ooxmlsdk::sdk::SdkPart;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -24,7 +23,9 @@ use crate::error::Result;
 use crate::options::PdfOptions;
 
 pub(crate) use model::*;
+use package::{HyperlinkCatalog, ImageCatalog};
 use table::{TableConditionalStyleMask, TableLookModel};
+use text::{ParagraphImportBase, paragraph_model, paragraph_model_with_base};
 
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 
@@ -784,86 +785,6 @@ fn append_note_blocks<'a>(
       is_first_paragraph = false;
     }
     blocks.push(Block::Paragraph(model));
-  }
-}
-
-fn paragraph_model(
-  paragraph: &w::Paragraph,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-) -> Paragraph {
-  paragraph_model_with_base(
-    paragraph,
-    styles,
-    numbering,
-    images,
-    hyperlinks,
-    ParagraphImportBase::default(),
-  )
-}
-
-#[derive(Clone, Debug, Default)]
-struct ParagraphImportBase {
-  format: ParagraphFormat,
-  run_style: TextStyle,
-  run_overrides: RunStyleOverrides,
-}
-
-fn paragraph_model_with_base(
-  paragraph: &w::Paragraph,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  base: ParagraphImportBase,
-) -> Paragraph {
-  let style_id = paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.paragraph_style_id.as_ref())
-    .map(|style| style.val.as_str());
-  let mut format = styles.paragraph_format_with_base(style_id, base.format);
-  merge_paragraph_format(
-    &mut format,
-    paragraph
-      .paragraph_properties
-      .as_deref()
-      .map(ParagraphProps::Direct),
-  );
-  let list_label = paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.numbering_properties.as_deref())
-    .and_then(|properties| numbering.next_label(properties, &mut format));
-
-  let inlines = paragraph_inlines(
-    paragraph,
-    styles.run_style_with_base(style_id, base.run_style, base.run_overrides),
-    styles,
-    images,
-    hyperlinks,
-  );
-  let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
-  #[cfg(test)]
-  let runs = inlines
-    .iter()
-    .filter_map(|item| match item {
-      InlineItem::Text(run) => Some(run.clone()),
-      InlineItem::Image(_) => None,
-      InlineItem::PageBreak | InlineItem::ColumnBreak => None,
-    })
-    .collect();
-
-  Paragraph {
-    inlines,
-    footnote_reference_ids,
-    endnote_reference_ids,
-    #[cfg(test)]
-    runs,
-    format,
-    list_label,
   }
 }
 
@@ -1772,7 +1693,7 @@ fn push_run_or_complex_field(
     return;
   }
 
-  let style = run_style(run.run_properties.as_deref(), base_style, styles);
+  let style = properties::run_style(run.run_properties.as_deref(), base_style, styles);
   for choice in &run.run_choice {
     match choice {
       w::RunChoice::WFldChar(field_char)
@@ -1994,7 +1915,7 @@ fn push_run(
   images: &ImageCatalog,
   hyperlink_url: Option<&str>,
 ) {
-  let style = run_style(run.run_properties.as_deref(), base_style, styles);
+  let style = properties::run_style(run.run_properties.as_deref(), base_style, styles);
   let mut text = String::new();
 
   for choice in &run.run_choice {
@@ -2042,17 +1963,17 @@ fn push_run(
       }
       w::RunChoice::WDrawing(drawing) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        if let Some(image) = inline_image(drawing, images) {
+        if let Some(image) = drawing::inline_image(drawing, images) {
           inlines.push(InlineItem::Image(image));
         }
-        push_drawing_textboxes(drawing, inlines, style);
+        drawing::push_drawing_textboxes(drawing, inlines, style);
       }
       w::RunChoice::WPict(picture) => {
         flush_run_text(inlines, &mut text, style, hyperlink_url);
-        if let Some(image) = pict_image(picture, images) {
+        if let Some(image) = drawing::pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
-        push_pict_textboxes(picture, inlines, base_style, styles, images);
+        drawing::push_pict_textboxes(picture, inlines, base_style, styles, images);
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::WRuby(ruby) => {
@@ -2432,7 +2353,7 @@ fn wingdings_symbol(code: u32) -> Option<char> {
   })
 }
 
-fn inline_image(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
+fn inline_image_impl(drawing: &w::Drawing, images: &ImageCatalog) -> Option<InlineImage> {
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => {
       let properties = drawing_image_properties(&inline.graphic.graphic_data)?;
@@ -2713,7 +2634,11 @@ fn wrap_text_side(value: wp::WrapTextValues) -> ImageWrapSide {
   }
 }
 
-fn push_drawing_textboxes(drawing: &w::Drawing, inlines: &mut Vec<InlineItem>, style: TextStyle) {
+fn push_drawing_textboxes_impl(
+  drawing: &w::Drawing,
+  inlines: &mut Vec<InlineItem>,
+  style: TextStyle,
+) {
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
@@ -2737,14 +2662,14 @@ fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::G
   }
 }
 
-fn pict_image(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
+fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
   picture
     .picture_choice
     .iter()
     .find_map(|choice| picture_choice_image(choice, images))
 }
 
-fn push_pict_textboxes(
+fn push_pict_textboxes_impl(
   picture: &w::Picture,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
@@ -3408,194 +3333,6 @@ fn qname_ends_with(qname: &[u8], local_name: &[u8]) -> bool {
 }
 
 #[derive(Clone, Debug, Default)]
-struct ImageCatalog {
-  by_relationship_id: HashMap<String, ImageResource>,
-}
-
-#[derive(Clone, Debug, Default)]
-struct HyperlinkCatalog {
-  by_relationship_id: HashMap<String, String>,
-}
-
-impl HyperlinkCatalog {
-  fn load<P>(package: &WordprocessingDocument, part: &P) -> Self
-  where
-    P: SdkPart,
-  {
-    let by_relationship_id = part
-      .hyperlink_relationships(package)
-      .filter(|relationship| relationship.target_kind() == RelationshipTargetKind::External)
-      .map(|relationship| {
-        (
-          relationship.id().to_string(),
-          relationship.target().to_string(),
-        )
-      })
-      .collect();
-    Self { by_relationship_id }
-  }
-
-  fn target(&self, relationship_id: &str) -> Option<&str> {
-    self
-      .by_relationship_id
-      .get(relationship_id)
-      .map(String::as_str)
-  }
-}
-
-#[derive(Clone, Debug)]
-struct ImageResource {
-  data: Vec<u8>,
-  content_type: Option<String>,
-}
-
-impl ImageCatalog {
-  fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
-    Self::from_image_parts(package, main.image_parts(package), |image_part| {
-      main.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
-    Self::from_image_parts(package, header.image_parts(package), |image_part| {
-      header.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn load_from_footer(package: &WordprocessingDocument, footer: &FooterPart) -> Self {
-    Self::from_image_parts(package, footer.image_parts(package), |image_part| {
-      footer.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn load_from_footnotes(package: &WordprocessingDocument, footnotes: &FootnotesPart) -> Self {
-    Self::from_image_parts(package, footnotes.image_parts(package), |image_part| {
-      footnotes.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn load_from_endnotes(package: &WordprocessingDocument, endnotes: &EndnotesPart) -> Self {
-    Self::from_image_parts(package, endnotes.image_parts(package), |image_part| {
-      endnotes.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn load_from_comments(
-    package: &WordprocessingDocument,
-    comments: &WordprocessingCommentsPart,
-  ) -> Self {
-    Self::from_image_parts(package, comments.image_parts(package), |image_part| {
-      comments.get_id_of_part(package, image_part)
-    })
-  }
-
-  fn from_image_parts<'a>(
-    package: &WordprocessingDocument,
-    image_parts: impl Iterator<Item = ImagePart> + 'a,
-    relationship_id: impl Fn(&ImagePart) -> Option<&'a str>,
-  ) -> Self {
-    let mut by_relationship_id = HashMap::new();
-    for image_part in image_parts {
-      let Some(relationship_id) = relationship_id(&image_part) else {
-        continue;
-      };
-      let Some(data) = image_part.data_to_vec(package) else {
-        continue;
-      };
-      by_relationship_id.insert(
-        relationship_id.to_string(),
-        ImageResource {
-          data,
-          content_type: image_part.content_type(package).map(str::to_string),
-        },
-      );
-    }
-
-    Self { by_relationship_id }
-  }
-}
-
-fn run_style(
-  properties: Option<&w::RunProperties>,
-  base_style: TextStyle,
-  styles: &StylesCatalog,
-) -> TextStyle {
-  let mut style = base_style;
-  let Some(properties) = properties else {
-    return style;
-  };
-
-  style = styles.character_run_style(
-    properties
-      .run_style
-      .as_ref()
-      .map(|run_style| run_style.val.as_str()),
-    style,
-  );
-  merge_run_style(&mut style, Some(RunProps::Direct(properties)));
-  style
-}
-
-fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps<'_>>) {
-  let Some(properties) = properties else {
-    return;
-  };
-
-  if let Some(bold) = properties.bold() {
-    style.bold = bold.val.unwrap_or(true);
-  }
-  if let Some(italic) = properties.italic() {
-    style.italic = italic.val.unwrap_or(true);
-  }
-  if let Some(font_size) = properties.font_size()
-    && let Ok(half_points) = font_size.val.parse::<f32>()
-  {
-    style.font_size_pt = (half_points / 2.0).max(1.0);
-  }
-  if let Some(color) = properties.color()
-    && let Some(rgb) = parse_hex_color(&color.val)
-  {
-    style.color = rgb;
-  }
-  if let Some(underline) = properties.underline() {
-    style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
-  }
-  if let Some(strike) = properties.strike() {
-    style.strikethrough = strike.val.unwrap_or(true);
-  }
-  if let Some(double_strike) = properties.double_strike() {
-    style.strikethrough = double_strike.val.unwrap_or(true);
-  }
-  if let Some(caps) = properties.caps() {
-    style.uppercase = caps.val.unwrap_or(true);
-  }
-  if let Some(small_caps) = properties.small_caps()
-    && small_caps.val.unwrap_or(true)
-  {
-    style.uppercase = true;
-    style.font_size_pt = (style.font_size_pt * 0.85).max(1.0);
-  }
-  if let Some(vertical_alignment) = properties.vertical_text_alignment() {
-    match vertical_alignment.val {
-      w::VerticalPositionValues::Superscript => {
-        style.baseline_shift_pt = style.font_size_pt * 0.35;
-        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
-      }
-      w::VerticalPositionValues::Subscript => {
-        style.baseline_shift_pt = -(style.font_size_pt * 0.2);
-        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
-      }
-      w::VerticalPositionValues::Baseline => {
-        style.baseline_shift_pt = 0.0;
-      }
-    }
-  }
-  if let Some(highlight) = properties.highlight() {
-    style.highlight = highlight_color(highlight.val);
-  }
-}
-
-#[derive(Clone, Debug, Default)]
 struct StylesCatalog {
   doc_default_paragraph: ParagraphFormat,
   doc_default_run: TextStyle,
@@ -3683,7 +3420,7 @@ impl StylesCatalog {
           .and_then(|default| default.paragraph_properties_base_style.as_deref())
           .map(ParagraphProps::BaseStyle),
       );
-      merge_run_style(
+      properties::merge_run_style(
         &mut catalog.doc_default_run,
         defaults
           .run_properties_default
@@ -3718,7 +3455,7 @@ impl StylesCatalog {
           .as_deref()
           .map(ParagraphProps::Style),
       );
-      merge_run_style(
+      properties::merge_run_style(
         &mut entry.run_style,
         style.style_run_properties.as_deref().map(RunProps::Style),
       );
@@ -3847,7 +3584,7 @@ fn table_style_model(style: &w::Style) -> TableStyleModel {
       .as_deref()
       .map(ParagraphProps::Style),
   );
-  merge_run_style(
+  properties::merge_run_style(
     &mut model.whole_table.run_style,
     style.style_run_properties.as_deref().map(RunProps::Style),
   );
@@ -3862,7 +3599,7 @@ fn table_style_model(style: &w::Style) -> TableStyleModel {
         .as_deref()
         .map(ParagraphProps::Style),
     );
-    merge_run_style(
+    properties::merge_run_style(
       &mut cell_style.run_style,
       conditional
         .run_properties_base_style
@@ -4269,64 +4006,6 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   }
 }
 
-fn highlight_color(value: w::HighlightColorValues) -> Option<RgbColor> {
-  Some(match value {
-    w::HighlightColorValues::Black => RgbColor { r: 0, g: 0, b: 0 },
-    w::HighlightColorValues::Blue => RgbColor { r: 0, g: 0, b: 255 },
-    w::HighlightColorValues::Cyan => RgbColor {
-      r: 0,
-      g: 255,
-      b: 255,
-    },
-    w::HighlightColorValues::Green => RgbColor { r: 0, g: 255, b: 0 },
-    w::HighlightColorValues::Magenta => RgbColor {
-      r: 255,
-      g: 0,
-      b: 255,
-    },
-    w::HighlightColorValues::Red => RgbColor { r: 255, g: 0, b: 0 },
-    w::HighlightColorValues::Yellow => RgbColor {
-      r: 255,
-      g: 255,
-      b: 0,
-    },
-    w::HighlightColorValues::White => RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    },
-    w::HighlightColorValues::DarkBlue => RgbColor { r: 0, g: 0, b: 128 },
-    w::HighlightColorValues::DarkCyan => RgbColor {
-      r: 0,
-      g: 128,
-      b: 128,
-    },
-    w::HighlightColorValues::DarkGreen => RgbColor { r: 0, g: 128, b: 0 },
-    w::HighlightColorValues::DarkMagenta => RgbColor {
-      r: 128,
-      g: 0,
-      b: 128,
-    },
-    w::HighlightColorValues::DarkRed => RgbColor { r: 128, g: 0, b: 0 },
-    w::HighlightColorValues::DarkYellow => RgbColor {
-      r: 128,
-      g: 128,
-      b: 0,
-    },
-    w::HighlightColorValues::DarkGray => RgbColor {
-      r: 128,
-      g: 128,
-      b: 128,
-    },
-    w::HighlightColorValues::LightGray => RgbColor {
-      r: 192,
-      g: 192,
-      b: 192,
-    },
-    w::HighlightColorValues::None => return None,
-  })
-}
-
 #[derive(Clone, Debug, Default)]
 struct NumberingCatalog {
   nums: HashMap<i32, NumberingInstance>,
@@ -4647,7 +4326,7 @@ impl<'a> ParagraphProps<'a> {
   }
 }
 
-enum RunProps<'a> {
+pub(super) enum RunProps<'a> {
   Direct(&'a w::RunProperties),
   Style(&'a w::StyleRunProperties),
   BaseStyle(&'a w::RunPropertiesBaseStyle),
@@ -5518,7 +5197,7 @@ mod tests {
     let mut catalog = ImageCatalog::default();
     catalog.by_relationship_id.insert(
       "rId1".into(),
-      ImageResource {
+      package::ImageResource {
         data: vec![1, 2, 3],
         content_type: Some("image/png".into()),
       },

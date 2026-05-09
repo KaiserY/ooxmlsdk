@@ -5,6 +5,7 @@ members = [
   "crates/ooxmlsdk-build",
   "crates/ooxmlsdk-derive",
   "crates/ooxmlsdk-pdf",
+  "crates/ooxmlsdk-pdf-test",
   "crates/ooxmlsdk-test",
 ]
 
@@ -26,6 +27,7 @@ ooxmlsdk = { version = "0.6.2", path = "crates/ooxmlsdk", default-features = fal
 ooxmlsdk-build = { version = "0.6.2", path = "crates/ooxmlsdk-build" }
 ooxmlsdk-derive = { version = "0.6.2", path = "crates/ooxmlsdk-derive" }
 ooxmlsdk-pdf = { version = "0.6.2", path = "crates/ooxmlsdk-pdf" }
+ooxmlsdk-pdf-test = { version = "0.6.2", path = "crates/ooxmlsdk-pdf-test" }
 ooxmlsdk-test = { version = "0.6.2", path = "crates/ooxmlsdk-test" }
 base64 = "0.22.1"
 quick-xml = "0.39.3"

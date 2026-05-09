@@ -89,15 +89,6 @@ mod tests {
   use super::*;
 
   #[test]
-  fn convert_docx_writes_pdf_document() {
-    let path = fixture_path("test-data/document/minimal_empty.docx");
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-
-    assert!(pdf.starts_with(b"%PDF-"));
-    assert!(pdf.ends_with(b"%%EOF\n") || pdf.ends_with(b"%%EOF"));
-  }
-
-  #[test]
   fn convert_xlsx_writes_pdf_document() {
     let path = fixture_path("test-data/spreadsheet/minimal_values.xlsx");
     let pdf = convert_xlsx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
@@ -2077,9 +2068,6 @@ mod tests {
         )
       })
     }));
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -2102,9 +2090,6 @@ mod tests {
     assert!(footer.y_pt > body.y_pt);
     assert!(header.x_pt > doc.page.margin_left_pt);
     assert!(footer.x_pt > doc.page.margin_left_pt);
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -2302,9 +2287,6 @@ mod tests {
     assert!(find_text_item(&layout, "First Page Header").is_some());
     assert!(find_text_item(&layout, "Default Header (odd pages)").is_none());
     assert!(find_text_item(&layout, "Default Footer").is_some());
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -2458,19 +2440,6 @@ mod tests {
       text_item(&layout, "Go to target section").hyperlink_url,
       None
     );
-
-    let pdf = convert_docx(
-      File::open(path).unwrap(),
-      PdfOptions {
-        compress_content_streams: false,
-        ..PdfOptions::default()
-      },
-    )
-    .unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
-    let pdf_text = String::from_utf8_lossy(&pdf);
-    assert!(pdf_text.contains("/Annots"));
-    assert!(pdf_text.contains("https://example.com"));
   }
 
   #[test]
@@ -2491,9 +2460,6 @@ mod tests {
         .count(),
       2
     );
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -2601,10 +2567,6 @@ mod tests {
         )
       })
     }));
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
-    assert!(pdf_contains_image_xobject(&pdf));
   }
 
   #[test]
@@ -2661,10 +2623,6 @@ mod tests {
     assert_eq!(laid_out_image.y_pt, 72.0);
     let wrapped_text = text_item(&layout, "Text beside the floating image.");
     assert!(wrapped_text.x_pt >= laid_out_image.x_pt + laid_out_image.width_pt);
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
-    assert!(pdf_contains_image_xobject(&pdf));
   }
 
   #[test]
@@ -3253,9 +3211,6 @@ mod tests {
         )
       })
     }));
-
-    let pdf = convert_docx(File::open(path).unwrap(), PdfOptions::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-"));
   }
 
   #[test]
@@ -3373,10 +3328,5 @@ mod tests {
       }
     }
     flattened
-  }
-
-  fn pdf_contains_image_xobject(pdf: &[u8]) -> bool {
-    let text = String::from_utf8_lossy(pdf);
-    text.contains("/Subtype /Image")
   }
 }

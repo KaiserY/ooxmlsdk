@@ -5,6 +5,9 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+crc32fast = { workspace = true }
+flate2 = { workspace = true }
 ooxmlsdk-pdf = { workspace = true }
+pdfium-render = { workspace = true }
 thiserror = { workspace = true }
 walkdir = { workspace = true }

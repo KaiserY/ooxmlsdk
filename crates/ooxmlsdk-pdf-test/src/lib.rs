@@ -27,6 +27,8 @@ pub enum CalibrationError {
   Io(#[from] std::io::Error),
   #[error("ooxmlsdk-pdf conversion failed: {0}")]
   Pdf(#[from] ooxmlsdk_pdf::PdfError),
+  #[error("PDFium extraction failed: {0}")]
+  PdfiumExtraction(String),
   #[error("LibreOffice failed for {fixture}: status={status} stdout={stdout} stderr={stderr}")]
   LibreOfficeFailed {
     fixture: PathBuf,
@@ -60,8 +62,10 @@ pub fn calibration_fixtures() -> Vec<PathBuf> {
 
 pub fn calibration_for_fixture(fixture: &Path) -> Result<CalibrationComparison> {
   let rendered = render_pair(fixture)?;
-  let libreoffice = PdfSummary::from_bytes(&rendered.libreoffice_pdf);
-  let rust = PdfSummary::from_bytes(&rendered.rust_pdf);
+  let libreoffice = PdfSummary::from_bytes(&rendered.libreoffice_pdf)
+    .map_err(CalibrationError::PdfiumExtraction)?;
+  let rust =
+    PdfSummary::from_bytes(&rendered.rust_pdf).map_err(CalibrationError::PdfiumExtraction)?;
   Ok(compare_pdf_summaries(fixture, &libreoffice, &rust))
 }
 

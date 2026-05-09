@@ -419,6 +419,33 @@ LibreOffice installed, temporary reference PDFs, PDF text/geometry extraction,
 optional raster comparison, and golden artifacts that should not slow the
 runtime crate's ordinary unit tests.
 
+Scope boundary: this crate does not re-test DOCX/package/schema round-trip
+readiness. `crates/ooxmlsdk-test` owns that layer. `ooxmlsdk-pdf-test` assumes
+the input DOCX is test-ready and only gates the LibreOffice-vs-`ooxmlsdk-pdf`
+PDF export rendering surface.
+
+LibreOffice QA alignment:
+
+- `../core/sw/qa/inc/swmodeltestbase.hxx` and
+  `../core/sw/qa/unit/swmodeltestbase.cxx` expose the Writer model/layout
+  harness: tests can force layout calculation, read UNO-visible body text, and
+  parse the Writer layout dump. This confirms that exact layout coordinates are
+  first-class LibreOffice test data, not a loose visual smoke signal.
+- `../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx` parses exported PDFs with
+  PDFium and asserts page counts, link presence, page-object counts, image
+  dimensions, path segment counts, and path fill colors. `ooxmlsdk-pdf-test`
+  therefore uses `pdfium-render` as the primary PDF observation layer.
+- `../core/sw/qa/extras/layout/layout2.cxx` covers PDF/export-triggered Writer
+  layout bugs by saving through the PDF path and then asserting exact table,
+  row, cell, and text-frame bounds from the layout dump. The Rust calibration
+  lane must keep reporting geometry deltas precisely enough to drive the
+  renderer toward those Writer frame invariants.
+- `../core/sw/qa/extras/ooxmlexport/*.cxx` owns DOCX semantic import/export
+  assertions for the selected fixtures, such as footnote text, column
+  separator state, and picture hyperlink targets. `ooxmlsdk-pdf-test` consumes
+  those upstream DOCX fixtures for PDF rendering parity without duplicating the
+  DOCX round-trip layer already covered by `ooxmlsdk-test`.
+
 Implemented crate responsibilities:
 
 - discover Word fixtures from `test-data/ooxmlsdk-pdf-test/` (`.docx`,
@@ -426,22 +453,55 @@ Implemented crate responsibilities:
 - render each fixture with LibreOffice headless, for example
   `soffice --headless --convert-to pdf --outdir <tmp> <fixture.docx>`
 - render the same fixture through `ooxmlsdk-pdf`
-- extract comparable metadata from both PDFs: current first pass covers page
-  count, MediaBox count, image count, link annotation count, outline markers,
-  and EOF presence
+- extract comparable content/layout metadata from both PDFs through
+  `pdfium-render`: page count, page geometry, text segments, character
+  bounding boxes, text object font/size/color/bounds details, page object
+  summaries, path segment coordinates/close flags/fill/stroke/bounds details,
+  image object geometry, link targets and rectangles, and deterministic raster
+  checksums; Poppler `pdftotext` and decoded content-stream operation summaries
+  remain diagnostic views
 - emit a concise inventory report that separates render failures from
-  comparison issues
+  comparison issues and lists every mismatch found in a run
+
+Strict comparison contract:
+
+- Allowed PDF container differences: object numbers, xref layout, stream
+  compression, producer metadata, subset font names, and harmless numeric
+  serialization precision.
+- Required content/layout parity: PDFium-observed page geometry, text
+  content/geometry, text object font-size/color/bounds, image object geometry,
+  path object geometry/paint/segment details, link targets/rectangles, page
+  object summaries, and raster checksums must match LibreOffice for every
+  fixture.
+  Decoded painting-operation summaries are diagnostic because equivalent PDF
+  generators may encode the same display list with different operators.
+- No known-issue whitelist is allowed in this lane. A failing fixture is the
+  work queue, similar to `ooxmlsdk-test` round-trip failures.
 
 Open crate responsibilities:
 
-- extract text strings, approximate text boxes, image boxes, annotation boxes,
-  outline trees, page labels, metadata, and geometry tolerances
-- compare with tolerance files so intentional differences are explicit and
-  reviewable
-- optionally rasterize pages for pixel/image comparison once deterministic font
-  and rasterization policy is stable
+- expand PDFium extraction for image bitmap format/checksum/SMask details,
+  form/XObject nesting, outline trees, page labels, metadata, export-option
+  surfaces, and richer annotation action details
+- add only PDF-compatibility normalizers, not renderer-behavior tolerances
 - emit a concise failure report that names the fixture, page, object kind,
   LibreOffice value, Rust value, delta, and owning parity area
+
+Final LibreOffice QA audit before using this as the development baseline:
+
+- Covered by the strict lane: PDFium page counts and geometry, page object
+  counts/types, text extraction and text geometry, text object font/size/color
+  details, path object segment coordinates/close flags/fill/stroke/bounds,
+  image object dimensions/bounds, link target/rectangle details, and raster
+  render checksums.
+- Covered by existing `ooxmlsdk-pdf` unit tests rather than the PDF parity
+  lane: pure DOCX import, property resolution, section/header/footer/note/table
+  model extraction, and layout-model invariants.
+- Still future calibration work from `../core/vcl/qa/cppunit/pdfexport*` and
+  Writer layout QA: image bitmap encoding/mask details, nested form/XObject
+  object trees, PDF export options, tagged/PDF-A/encryption features when in
+  scope, page labels, metadata, and exact Writer layout-dump frame trees beyond
+  the geometry currently observable through PDFium.
 
 Suggested layout:
 
@@ -468,8 +528,8 @@ test-data/ooxmlsdk-pdf-test/
 
 This lane currently has two layers:
 
-- a non-ignored smoke test that skips cleanly when `soffice` is not available
-  and strongly gates every fixture in `test-data/ooxmlsdk-pdf-test/`
+- a strict non-ignored parity test that requires LibreOffice and PDFium and
+  strongly gates every fixture in `test-data/ooxmlsdk-pdf-test/`
 - a non-ignored inventory test that records render failures plus first-pass
   summary differences for that directory; it currently requires running outside
   this sandbox because LibreOffice cannot create its runtime files from the
@@ -484,8 +544,21 @@ Latest inventory run:
   `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`,
   `footnote.docx`, `multi-column-separator-with-line.docx`,
   `table-auto-nested.docx`, and `tdf78657_picture_hyperlink.docx`
-- expected result: all fixtures reach LibreOffice-vs-Rust PDF comparison with
-  zero first-pass summary differences; there is no known-issue whitelist
+- expected result: all fixtures reach LibreOffice-vs-Rust PDF comparison; the
+  inventory test renders all fixtures and reports PDFium-observed mismatches;
+  the strict test currently fails, as intended, until the renderer matches
+  LibreOffice
+- verified result: 2 tests passed and the strict parity test failed after all 5
+  fixtures reached comparison; current mismatch areas include PDFium page object
+  summaries, path object segment-coordinate/fill/stroke/bounds details, text
+  segment/character geometry, text object font-size/color/bounds details, image
+  bounds, link target/rect differences, raster checksums, and diagnostic
+  content-stream operation summaries
+- legacy cleanup: DOCX-specific `%PDF` smoke assertions and PDF byte-string
+  checks in `crates/ooxmlsdk-pdf` were removed because they were weaker than,
+  and potentially misleading beside, the LibreOffice/PDFium strict lane.
+  Internal import/layout unit tests remain in `ooxmlsdk-pdf`; XLSX/PPTX minimal
+  smoke tests remain out of scope for this DOCX parity lane.
 
 Today's implementation order:
 
@@ -1218,13 +1291,11 @@ Implement:
   ad-hoc anchors.
 - Add tagging/PDF-UA/PDF-A only after structure and font policy are ready.
 
-Minimal tests:
-
-- PDF bytes valid.
-- Text is extractable.
-- Images are embedded.
-- Links become PDF annotations.
-- Basic page labels are preserved when page numbering is implemented.
+Minimal DOCX PDF smoke tests are no longer the primary gate. DOCX export
+behavior should be added to `ooxmlsdk-pdf-test` as LibreOffice/PDFium parity
+coverage. `crates/ooxmlsdk-pdf` may keep targeted unit tests for pure import,
+layout, or paint-model transformations, but it should not grow new byte-string
+PDF assertions for DOCX rendering behavior.
 
 ## 6. Testing Strategy
 

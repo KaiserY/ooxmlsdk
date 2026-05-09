@@ -1,3 +1,10 @@
+use std::io::Read;
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use flate2::read::ZlibDecoder;
+use pdfium_render::prelude::*;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PdfSummary {
   pub page_count: usize,
@@ -6,54 +13,557 @@ pub struct PdfSummary {
   pub outline_marker_count: usize,
   pub media_box_count: usize,
   pub contains_eof: bool,
+  pub media_boxes: Vec<String>,
+  pub text: Option<String>,
+  pub text_error: Option<String>,
+  pub text_segments: Vec<TextSegmentSummary>,
+  pub text_chars: Vec<TextCharSummary>,
+  pub text_objects: Vec<TextObjectSummary>,
+  pub images: Vec<ImageSummary>,
+  pub paths: Vec<PathObjectSummary>,
+  pub links: Vec<LinkSummary>,
+  pub page_objects: Vec<PageObjectSummary>,
+  pub rendered_pages: Vec<RenderedPageSummary>,
+  pub content: ContentSummary,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImageSummary {
+  pub page_index: usize,
+  pub width: Option<String>,
+  pub height: Option<String>,
+  pub bounds: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PathObjectSummary {
+  pub page_index: usize,
+  pub segments: u32,
+  pub fill_mode: Option<String>,
+  pub stroked: Option<bool>,
+  pub fill_color: Option<String>,
+  pub stroke_color: Option<String>,
+  pub bounds: Option<String>,
+  pub segment_details: Vec<PathSegmentSummary>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PathSegmentSummary {
+  pub segment_type: String,
+  pub x: String,
+  pub y: String,
+  pub closed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LinkSummary {
+  pub page_index: usize,
+  pub target_kind: LinkTargetKind,
+  pub target: Option<String>,
+  pub rect: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LinkTargetKind {
+  ExternalUri,
+  InternalDestination,
+  Action,
+  Unknown,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ContentSummary {
+  pub stream_count: usize,
+  pub decoded_stream_count: usize,
+  pub text_show_ops: usize,
+  pub image_draw_ops: usize,
+  pub path_paint_ops: usize,
+  pub clipping_ops: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextSegmentSummary {
+  pub page_index: usize,
+  pub text: String,
+  pub bounds: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextCharSummary {
+  pub page_index: usize,
+  pub text: String,
+  pub bounds: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextObjectSummary {
+  pub page_index: usize,
+  pub text: String,
+  pub font_name: String,
+  pub font_family: String,
+  pub scaled_font_size: String,
+  pub unscaled_font_size: String,
+  pub fill_color: Option<String>,
+  pub bounds: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PageObjectSummary {
+  pub page_index: usize,
+  pub text_objects: usize,
+  pub path_objects: usize,
+  pub image_objects: usize,
+  pub shading_objects: usize,
+  pub form_objects: usize,
+  pub unsupported_objects: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RenderedPageSummary {
+  pub page_index: usize,
+  pub width_px: u32,
+  pub height_px: u32,
+  pub rgba_crc32: String,
 }
 
 impl PdfSummary {
-  pub fn from_bytes(pdf: &[u8]) -> Self {
+  pub fn from_bytes(pdf: &[u8]) -> Result<Self, String> {
     let text = String::from_utf8_lossy(pdf);
-    Self {
-      page_count: count_pdf_pages(&text),
-      image_count: count_pdf_name_value(&text, "/Subtype", "Image"),
-      link_annotation_count: count_pdf_name_value(&text, "/Subtype", "Link"),
+    let streams = pdf_streams(pdf);
+    let pdfium_summary = pdfium_summary(pdf)?;
+    Ok(Self {
+      page_count: pdfium_summary.page_count,
+      image_count: pdfium_summary.images.len(),
+      link_annotation_count: pdfium_summary.links.len(),
       outline_marker_count: text.matches("/Outlines").count() + text.matches("/Title").count(),
-      media_box_count: text.matches("/MediaBox").count(),
+      media_box_count: pdfium_summary.media_boxes.len(),
       contains_eof: pdf.strip_suffix_ascii_whitespace().ends_with(b"%%EOF"),
-    }
+      media_boxes: pdfium_summary.media_boxes,
+      text: pdftotext(pdf).ok(),
+      text_error: pdftotext(pdf).err(),
+      text_segments: pdfium_summary.text_segments,
+      text_chars: pdfium_summary.text_chars,
+      text_objects: pdfium_summary.text_objects,
+      images: pdfium_summary.images,
+      paths: pdfium_summary.paths,
+      links: pdfium_summary.links,
+      page_objects: pdfium_summary.page_objects,
+      rendered_pages: pdfium_summary.rendered_pages,
+      content: content_summary(&streams),
+    })
   }
 }
 
-fn count_pdf_pages(text: &str) -> usize {
-  count_pdf_name_value(text, "/Type", "Page")
+struct PdfiumSummary {
+  page_count: usize,
+  media_boxes: Vec<String>,
+  text_segments: Vec<TextSegmentSummary>,
+  text_chars: Vec<TextCharSummary>,
+  text_objects: Vec<TextObjectSummary>,
+  images: Vec<ImageSummary>,
+  paths: Vec<PathObjectSummary>,
+  links: Vec<LinkSummary>,
+  page_objects: Vec<PageObjectSummary>,
+  rendered_pages: Vec<RenderedPageSummary>,
 }
 
-fn count_pdf_name_value(text: &str, key: &str, value: &str) -> usize {
-  text
-    .match_indices(key)
-    .filter(|(index, _)| has_pdf_name_value(text.as_bytes(), *index + key.len(), value))
+fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
+  let pdfium = bind_pdfium()?;
+  let document = pdfium
+    .load_pdf_from_byte_vec(pdf.to_vec(), None)
+    .map_err(|error| format!("PDFium could not load PDF bytes: {error}"))?;
+
+  let mut media_boxes = Vec::new();
+  let mut text_segments = Vec::new();
+  let mut text_chars = Vec::new();
+  let mut text_objects = Vec::new();
+  let mut images = Vec::new();
+  let mut paths = Vec::new();
+  let mut links = Vec::new();
+  let mut page_objects = Vec::new();
+  let mut rendered_pages = Vec::new();
+
+  for (page_index, page) in document.pages().iter().enumerate() {
+    media_boxes.push(format!(
+      "[0.0 0.0 {:.1} {:.1}]",
+      page.width().value,
+      page.height().value
+    ));
+
+    let text = page
+      .text()
+      .map_err(|error| format!("PDFium could not extract page {page_index} text: {error}"))?;
+    for segment in text.segments().iter() {
+      text_segments.push(TextSegmentSummary {
+        page_index,
+        text: normalize_extracted_text(&segment.text()),
+        bounds: format_rect(segment.bounds(), 2),
+      });
+    }
+    for char in text.chars().iter() {
+      if let Some(value) = char.unicode_string() {
+        let bounds = char
+          .loose_bounds()
+          .map_err(|error| format!("PDFium could not read char bounds: {error}"))?;
+        text_chars.push(TextCharSummary {
+          page_index,
+          text: value,
+          bounds: format_rect(bounds, 2),
+        });
+      }
+    }
+
+    let mut object_summary = PageObjectSummary {
+      page_index,
+      ..PageObjectSummary::default()
+    };
+    for object in page.objects().iter() {
+      match object.object_type() {
+        PdfPageObjectType::Text => {
+          object_summary.text_objects += 1;
+          if let Some(text) = object.as_text_object() {
+            let font = text.font();
+            text_objects.push(TextObjectSummary {
+              page_index,
+              text: normalize_extracted_text(&text.text()),
+              font_name: normalize_pdf_font_name(&font.name()),
+              font_family: normalize_pdf_font_name(&font.family()),
+              scaled_font_size: format_points(text.scaled_font_size(), 2),
+              unscaled_font_size: format_points(text.unscaled_font_size(), 2),
+              fill_color: object.fill_color().ok().map(format_color),
+              bounds: object
+                .bounds()
+                .ok()
+                .map(|bounds| format_rect(bounds.to_rect(), 2)),
+            });
+          }
+        }
+        PdfPageObjectType::Path => {
+          object_summary.path_objects += 1;
+          if let Some(path) = object.as_path_object() {
+            let segments = path.segments();
+            paths.push(PathObjectSummary {
+              page_index,
+              segments: segments.len(),
+              fill_mode: path.fill_mode().ok().map(|value| format!("{value:?}")),
+              stroked: path.is_stroked().ok(),
+              fill_color: object.fill_color().ok().map(format_color),
+              stroke_color: object.stroke_color().ok().map(format_color),
+              bounds: object
+                .bounds()
+                .ok()
+                .map(|bounds| format_rect(bounds.to_rect(), 2)),
+              segment_details: segments
+                .iter()
+                .map(|segment| PathSegmentSummary {
+                  segment_type: format!("{:?}", segment.segment_type()),
+                  x: format_points(segment.x(), 2),
+                  y: format_points(segment.y(), 2),
+                  closed: segment.is_close(),
+                })
+                .collect(),
+            });
+          }
+        }
+        PdfPageObjectType::Image => {
+          object_summary.image_objects += 1;
+          if let Some(image) = object.as_image_object() {
+            images.push(ImageSummary {
+              page_index,
+              width: image.width().ok().map(|value| value.to_string()),
+              height: image.height().ok().map(|value| value.to_string()),
+              bounds: object
+                .bounds()
+                .ok()
+                .map(|bounds| format_rect(bounds.to_rect(), 2)),
+            });
+          }
+        }
+        PdfPageObjectType::Shading => object_summary.shading_objects += 1,
+        PdfPageObjectType::XObjectForm => object_summary.form_objects += 1,
+        PdfPageObjectType::Unsupported => object_summary.unsupported_objects += 1,
+      }
+    }
+    page_objects.push(object_summary);
+
+    for link in page.links().iter() {
+      let (target_kind, target) = pdfium_link_target(&link);
+      links.push(LinkSummary {
+        page_index,
+        target_kind,
+        target,
+        rect: link.rect().ok().map(|rect| format_rect(rect, 2)),
+      });
+    }
+
+    rendered_pages.push(rendered_page_summary(page_index, &page)?);
+  }
+
+  Ok(PdfiumSummary {
+    page_count: document.pages().len() as usize,
+    media_boxes,
+    text_segments,
+    text_chars,
+    text_objects,
+    images,
+    paths,
+    links,
+    page_objects,
+    rendered_pages,
+  })
+}
+
+fn bind_pdfium() -> Result<Pdfium, String> {
+  if let Some(path) = std::env::var_os("PDFIUM_DYNAMIC_LIB_PATH") {
+    match Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&path)) {
+      Ok(bindings) => return Ok(Pdfium::new(bindings)),
+      Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => return Ok(Pdfium::default()),
+      Err(error) => {
+        return Err(format!(
+          "could not bind PDFium from PDFIUM_DYNAMIC_LIB_PATH={}: {error}",
+          std::path::PathBuf::from(path).display()
+        ));
+      }
+    }
+  }
+
+  match Pdfium::bind_to_system_library() {
+    Ok(bindings) => Ok(Pdfium::new(bindings)),
+    Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium::default()),
+    Err(error) => Err(format!(
+      "could not bind system PDFium library; install libpdfium.so or set PDFIUM_DYNAMIC_LIB_PATH: {error}"
+    )),
+  }
+}
+
+fn pdfium_link_target(link: &PdfLink<'_>) -> (LinkTargetKind, Option<String>) {
+  if let Some(action) = link.action() {
+    if let Some(uri) = action.as_uri_action() {
+      return (
+        LinkTargetKind::ExternalUri,
+        uri.uri().ok().map(|value| normalize_extracted_text(&value)),
+      );
+    }
+    if let Some(local) = action.as_local_destination_action() {
+      return (
+        LinkTargetKind::InternalDestination,
+        local
+          .destination()
+          .ok()
+          .and_then(|dest| format_destination(&dest)),
+      );
+    }
+    return (
+      LinkTargetKind::Action,
+      Some(format!("{:?}", action.action_type())),
+    );
+  }
+
+  if let Some(destination) = link.destination() {
+    return (
+      LinkTargetKind::InternalDestination,
+      format_destination(&destination),
+    );
+  }
+
+  (LinkTargetKind::Unknown, None)
+}
+
+fn format_destination(destination: &PdfDestination<'_>) -> Option<String> {
+  let page = destination.page_index().ok()?;
+  let view = destination
+    .view_settings()
+    .map(|value| format!("{value:?}"))
+    .unwrap_or_else(|_| "Unknown".to_string());
+  Some(format!("page={page} view={view}"))
+}
+
+fn rendered_page_summary(
+  page_index: usize,
+  page: &PdfPage<'_>,
+) -> Result<RenderedPageSummary, String> {
+  let bitmap = page
+    .render_with_config(&PdfRenderConfig::new().set_target_width(1200))
+    .map_err(|error| format!("PDFium could not render page {page_index}: {error}"))?;
+  let width_px = bitmap.width() as u32;
+  let height_px = bitmap.height() as u32;
+  let image = bitmap
+    .as_image()
+    .map_err(|error| format!("PDFium could not convert rendered page {page_index}: {error}"))?;
+  let rgba = image.to_rgba8();
+  let mut crc = crc32fast::Hasher::new();
+  crc.update(rgba.as_raw());
+  Ok(RenderedPageSummary {
+    page_index,
+    width_px,
+    height_px,
+    rgba_crc32: format!("{:08x}", crc.finalize()),
+  })
+}
+
+fn format_color(color: PdfColor) -> String {
+  format!(
+    "#{:02x}{:02x}{:02x}@{:02x}",
+    color.red(),
+    color.green(),
+    color.blue(),
+    color.alpha()
+  )
+}
+
+fn format_points(points: PdfPoints, precision: usize) -> String {
+  format!("{value:.precision$}", value = points.value)
+}
+
+fn format_rect(rect: PdfRect, precision: usize) -> String {
+  format!(
+    "[{left:.precision$} {bottom:.precision$} {right:.precision$} {top:.precision$}]",
+    left = rect.left().value,
+    bottom = rect.bottom().value,
+    right = rect.right().value,
+    top = rect.top().value,
+  )
+}
+
+struct PdfStream {
+  dictionary: String,
+  decoded: Option<Vec<u8>>,
+}
+
+fn pdf_streams(pdf: &[u8]) -> Vec<PdfStream> {
+  let mut streams = Vec::new();
+  let mut search_start = 0usize;
+  while let Some(stream_offset) = find_bytes(&pdf[search_start..], b"stream") {
+    let stream_keyword = search_start + stream_offset;
+    let dict_start =
+      rfind_bytes(&pdf[..stream_keyword], b"<<").unwrap_or(stream_keyword.saturating_sub(512));
+    let dictionary = String::from_utf8_lossy(&pdf[dict_start..stream_keyword]).to_string();
+    let mut data_start = stream_keyword + "stream".len();
+    if pdf.get(data_start) == Some(&b'\r') {
+      data_start += 1;
+    }
+    if pdf.get(data_start) == Some(&b'\n') {
+      data_start += 1;
+    }
+    let Some(end_offset) = find_bytes(&pdf[data_start..], b"endstream") else {
+      break;
+    };
+    let mut data_end = data_start + end_offset;
+    while data_end > data_start && matches!(pdf[data_end - 1], b'\r' | b'\n') {
+      data_end -= 1;
+    }
+    let data = &pdf[data_start..data_end];
+    let decoded = if dictionary.contains("/FlateDecode") {
+      let mut decoder = ZlibDecoder::new(data);
+      let mut output = Vec::new();
+      decoder.read_to_end(&mut output).ok().map(|_| output)
+    } else if dictionary.contains("/Filter") {
+      None
+    } else {
+      Some(data.to_vec())
+    };
+    streams.push(PdfStream {
+      dictionary,
+      decoded,
+    });
+    search_start = data_end + "endstream".len();
+  }
+  streams
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+  haystack
+    .windows(needle.len())
+    .position(|window| window == needle)
+}
+
+fn rfind_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+  haystack
+    .windows(needle.len())
+    .rposition(|window| window == needle)
+}
+
+fn content_summary(streams: &[PdfStream]) -> ContentSummary {
+  let mut summary = ContentSummary {
+    stream_count: streams.len(),
+    ..ContentSummary::default()
+  };
+  for stream in streams {
+    if !stream.dictionary.contains("/Length") {
+      continue;
+    }
+    let Some(decoded) = &stream.decoded else {
+      continue;
+    };
+    summary.decoded_stream_count += 1;
+    let content = String::from_utf8_lossy(decoded);
+    summary.text_show_ops += operator_count(&content, &["Tj", "TJ", "'", "\""]);
+    summary.image_draw_ops += operator_count(&content, &["Do"]);
+    summary.path_paint_ops += operator_count(&content, &["S", "s", "f", "F", "f*", "B", "B*"]);
+    summary.clipping_ops += operator_count(&content, &["W", "W*"]);
+  }
+  summary
+}
+
+fn operator_count(content: &str, operators: &[&str]) -> usize {
+  content
+    .split_ascii_whitespace()
+    .filter(|token| operators.contains(token))
     .count()
 }
 
-fn has_pdf_name_value(bytes: &[u8], mut index: usize, value: &str) -> bool {
-  while matches!(bytes.get(index), Some(b' ' | b'\t' | b'\r' | b'\n')) {
-    index += 1;
+fn pdftotext(pdf: &[u8]) -> std::result::Result<String, String> {
+  let path = temp_pdf_path();
+  std::fs::write(&path, pdf).map_err(|error| error.to_string())?;
+  let output = Command::new("pdftotext")
+    .args(["-layout", "-nopgbrk"])
+    .arg(&path)
+    .arg("-")
+    .output();
+  let _ = std::fs::remove_file(&path);
+  let output = output.map_err(|error| format!("pdftotext failed to start: {error}"))?;
+  if !output.status.success() {
+    return Err(format!(
+      "pdftotext failed: status={} stderr={}",
+      output.status,
+      String::from_utf8_lossy(&output.stderr)
+    ));
   }
-  if bytes.get(index) != Some(&b'/') {
-    return false;
-  }
-  index += 1;
+  Ok(normalize_extracted_text(&String::from_utf8_lossy(
+    &output.stdout,
+  )))
+}
 
-  let value_bytes = value.as_bytes();
-  let Some(end) = index.checked_add(value_bytes.len()) else {
-    return false;
+fn temp_pdf_path() -> std::path::PathBuf {
+  let nanos = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_default()
+    .as_nanos();
+  std::env::temp_dir().join(format!(
+    "ooxmlsdk-pdf-extract-{}-{nanos}.pdf",
+    std::process::id()
+  ))
+}
+
+fn normalize_extracted_text(text: &str) -> String {
+  text
+    .lines()
+    .map(|line| line.trim_end())
+    .collect::<Vec<_>>()
+    .join("\n")
+    .trim()
+    .to_string()
+}
+
+fn normalize_pdf_font_name(name: &str) -> String {
+  let Some((prefix, rest)) = name.split_once('+') else {
+    return name.to_string();
   };
-  if bytes.get(index..end) != Some(value_bytes) {
-    return false;
+  if prefix.len() == 6 && prefix.bytes().all(|byte| byte.is_ascii_uppercase()) {
+    rest.to_string()
+  } else {
+    name.to_string()
   }
-
-  !matches!(
-    bytes.get(end),
-    Some(b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-')
-  )
 }
 
 trait PdfBytesExt {

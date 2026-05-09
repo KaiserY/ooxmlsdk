@@ -1,10 +1,21 @@
+use std::sync::{Mutex, MutexGuard};
+
 use ooxmlsdk_pdf_test::{
   LibreOffice, LibreOfficeStatus, calibration_fixtures, calibration_for_fixture, format_report,
   workspace_relative_path,
 };
 
+static CALIBRATION_LOCK: Mutex<()> = Mutex::new(());
+
+fn calibration_guard() -> MutexGuard<'static, ()> {
+  CALIBRATION_LOCK
+    .lock()
+    .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[test]
 fn libreoffice_smoke_skips_when_soffice_is_missing() {
+  let _guard = calibration_guard();
   match LibreOffice::discover() {
     LibreOfficeStatus::Available(path) => assert!(path.exists()),
     LibreOfficeStatus::Missing => {}
@@ -12,10 +23,10 @@ fn libreoffice_smoke_skips_when_soffice_is_missing() {
 }
 
 #[test]
-fn libreoffice_pdf_fixtures_match_basics() {
+fn libreoffice_pdf_fixtures_match_strict_content_and_layout() {
+  let _guard = calibration_guard();
   if matches!(LibreOffice::discover(), LibreOfficeStatus::Missing) {
-    eprintln!("skipping: LibreOffice executable not found; set LIBREOFFICE or install soffice");
-    return;
+    panic!("LibreOffice executable not found; set LIBREOFFICE or install soffice");
   }
 
   let fixtures = calibration_fixtures();
@@ -38,6 +49,7 @@ fn libreoffice_pdf_fixtures_match_basics() {
 
 #[test]
 fn libreoffice_pdf_fixtures_have_calibration_inventory() {
+  let _guard = calibration_guard();
   if matches!(LibreOffice::discover(), LibreOfficeStatus::Missing) {
     eprintln!("skipping: LibreOffice executable not found; set LIBREOFFICE or install soffice");
     return;

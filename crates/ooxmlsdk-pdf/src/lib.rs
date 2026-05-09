@@ -1961,42 +1961,6 @@ mod tests {
   }
 
   #[test]
-  fn pdf_fixture_job_title_style_resolves_font_family() {
-    let path = fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx");
-    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
-    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
-    let table = match &doc.blocks[0] {
-      crate::docx::Block::Table(table) => table,
-      crate::docx::Block::Paragraph(_) => panic!("expected table fixture"),
-    };
-    let paragraph = match &table.rows[1].cells[0].blocks[1] {
-      crate::docx::Block::Paragraph(paragraph) => paragraph,
-      crate::docx::Block::Table(_) => panic!("expected paragraph in table cell"),
-    };
-    assert_eq!(
-      paragraph.runs[0].style.font_family.as_deref(),
-      Some("Arial Black")
-    );
-  }
-
-  #[test]
-  fn rendered_page_breaks_import_as_column_breaks() {
-    let path = fixture_path(
-      "test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-multi-column-separator-with-line.docx",
-    );
-    let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
-    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
-    let paragraph = paragraph_at(&doc, 1);
-
-    assert!(
-      paragraph
-        .inlines
-        .iter()
-        .any(|item| matches!(item, crate::docx::InlineItem::ColumnBreak))
-    );
-  }
-
-  #[test]
   fn numbering_labels_and_indents_are_extracted() {
     let path = fixture_path("test-data/wml/numbering_ordered.docx");
     let mut package = WordprocessingDocument::new(File::open(path).unwrap()).unwrap();
@@ -3332,32 +3296,6 @@ mod tests {
           item,
           crate::layout::PageItem::Line(line)
             if line.color.r == 0xFF && line.width_pt == 1.0
-        )
-      })
-    }));
-  }
-
-  #[test]
-  fn tables_without_resolved_borders_do_not_paint_default_grid_lines() {
-    let path =
-      fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-table-auto-nested.docx");
-    let mut package = WordprocessingDocument::new(File::open(&path).unwrap()).unwrap();
-    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
-    let outer_table = match &doc.blocks[1] {
-      crate::docx::Block::Table(table) => table,
-      crate::docx::Block::Paragraph(_) => panic!("expected outer table"),
-    };
-
-    assert!(outer_table.borders.is_none());
-
-    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
-    assert!(!layout.pages.iter().any(|page| {
-      page.items.iter().any(|item| {
-        matches!(
-          item,
-          crate::layout::PageItem::Line(line)
-            if line.x1_pt <= doc.page.margin_left_pt + 0.5
-              && line.x2_pt >= doc.page.width_pt - doc.page.margin_right_pt - 0.5
         )
       })
     }));

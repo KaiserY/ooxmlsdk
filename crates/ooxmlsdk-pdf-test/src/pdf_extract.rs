@@ -3,6 +3,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use flate2::read::ZlibDecoder;
+use lopdf::{Document as LopdfDocument, Object as LopdfObject};
 use pdfium_render::prelude::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -10,6 +11,7 @@ pub struct PdfSummary {
   pub page_count: usize,
   pub image_count: usize,
   pub link_annotation_count: usize,
+  pub annotation_count: usize,
   pub outline_marker_count: usize,
   pub media_box_count: usize,
   pub contains_eof: bool,
@@ -22,6 +24,8 @@ pub struct PdfSummary {
   pub images: Vec<ImageSummary>,
   pub paths: Vec<PathObjectSummary>,
   pub links: Vec<LinkSummary>,
+  pub annotations: Vec<AnnotationSummary>,
+  pub raw_pages: Vec<RawPageSummary>,
   pub page_objects: Vec<PageObjectSummary>,
   pub rendered_pages: Vec<RenderedPageSummary>,
   pub content: ContentSummary,
@@ -64,6 +68,30 @@ pub struct LinkSummary {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnnotationSummary {
+  pub page_index: usize,
+  pub annotation_type: String,
+  pub bounds: Option<String>,
+  pub action_uri: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RawPageSummary {
+  pub page_index: usize,
+  pub annotation_count: usize,
+  pub annotations: Vec<RawAnnotationSummary>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RawAnnotationSummary {
+  pub page_index: usize,
+  pub type_name: Option<String>,
+  pub subtype_name: Option<String>,
+  pub rect: Option<String>,
+  pub action_uri: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkTargetKind {
   ExternalUri,
   InternalDestination,
@@ -103,6 +131,7 @@ pub struct TextObjectSummary {
   pub font_family: String,
   pub scaled_font_size: String,
   pub unscaled_font_size: String,
+  pub render_mode: String,
   pub fill_color: Option<String>,
   pub bounds: Option<String>,
 }
@@ -131,10 +160,12 @@ impl PdfSummary {
     let text = String::from_utf8_lossy(pdf);
     let streams = pdf_streams(pdf);
     let pdfium_summary = pdfium_summary(pdf)?;
+    let raw_summary = raw_pdf_summary(pdf)?;
     Ok(Self {
       page_count: pdfium_summary.page_count,
       image_count: pdfium_summary.images.len(),
       link_annotation_count: pdfium_summary.links.len(),
+      annotation_count: pdfium_summary.annotations.len(),
       outline_marker_count: text.matches("/Outlines").count() + text.matches("/Title").count(),
       media_box_count: pdfium_summary.media_boxes.len(),
       contains_eof: pdf.strip_suffix_ascii_whitespace().ends_with(b"%%EOF"),
@@ -147,6 +178,8 @@ impl PdfSummary {
       images: pdfium_summary.images,
       paths: pdfium_summary.paths,
       links: pdfium_summary.links,
+      annotations: pdfium_summary.annotations,
+      raw_pages: raw_summary.pages,
       page_objects: pdfium_summary.page_objects,
       rendered_pages: pdfium_summary.rendered_pages,
       content: content_summary(&streams),
@@ -163,8 +196,13 @@ struct PdfiumSummary {
   images: Vec<ImageSummary>,
   paths: Vec<PathObjectSummary>,
   links: Vec<LinkSummary>,
+  annotations: Vec<AnnotationSummary>,
   page_objects: Vec<PageObjectSummary>,
   rendered_pages: Vec<RenderedPageSummary>,
+}
+
+struct RawPdfSummary {
+  pages: Vec<RawPageSummary>,
 }
 
 fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
@@ -180,6 +218,7 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
   let mut images = Vec::new();
   let mut paths = Vec::new();
   let mut links = Vec::new();
+  let mut annotations = Vec::new();
   let mut page_objects = Vec::new();
   let mut rendered_pages = Vec::new();
 
@@ -230,6 +269,7 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
               font_family: normalize_pdf_font_name(&font.family()),
               scaled_font_size: format_points(text.scaled_font_size(), 2),
               unscaled_font_size: format_points(text.unscaled_font_size(), 2),
+              render_mode: format_text_render_mode(text.render_mode()),
               fill_color: object.fill_color().ok().map(format_color),
               bounds: object
                 .bounds()
@@ -296,6 +336,24 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
       });
     }
 
+    for annotation in page.annotations().iter() {
+      let action_uri = annotation
+        .as_link_annotation()
+        .and_then(|annotation| annotation.link().ok())
+        .and_then(|link| link.action())
+        .and_then(|action| action.as_uri_action().and_then(|action| action.uri().ok()))
+        .map(|value| normalize_extracted_text(&value));
+      annotations.push(AnnotationSummary {
+        page_index,
+        annotation_type: format!("{:?}", annotation.annotation_type()),
+        bounds: annotation
+          .bounds()
+          .ok()
+          .map(|bounds| format_rect_with_precision(bounds, 3)),
+        action_uri,
+      });
+    }
+
     rendered_pages.push(rendered_page_summary(page_index, &page)?);
   }
 
@@ -308,9 +366,153 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
     images,
     paths,
     links,
+    annotations,
     page_objects,
     rendered_pages,
   })
+}
+
+fn raw_pdf_summary(pdf: &[u8]) -> Result<RawPdfSummary, String> {
+  let document = LopdfDocument::load_mem(pdf)
+    .map_err(|error| format!("lopdf could not load PDF bytes: {error}"))?;
+
+  let mut pages = Vec::new();
+  for (page_number, page_id) in document.get_pages() {
+    let page_index = page_number as usize - 1;
+    pages.push(raw_page_summary(&document, page_index, page_id)?);
+  }
+  pages.sort_by_key(|page| page.page_index);
+
+  Ok(RawPdfSummary { pages })
+}
+
+fn raw_page_summary(
+  document: &LopdfDocument,
+  page_index: usize,
+  page_id: lopdf::ObjectId,
+) -> Result<RawPageSummary, String> {
+  let page = document
+    .get_dictionary(page_id)
+    .map_err(|error| format!("lopdf could not read page dictionary {page_id:?}: {error}"))?;
+
+  let mut annotation_refs = Vec::new();
+  match page.get(b"Annots") {
+    Ok(object) => {
+      let annots = lopdf_array(document, object, "page Annots")?;
+      annotation_refs.extend_from_slice(annots);
+    }
+    Err(lopdf::Error::DictKey(_)) => {}
+    Err(error) => return Err(format!("lopdf could not read page Annots: {error}")),
+  }
+
+  let mut annotations = Vec::new();
+  for annotation in &annotation_refs {
+    let dictionary = lopdf_dictionary(document, annotation, "annotation dictionary")?;
+    let action_uri = dictionary
+      .get(b"A")
+      .ok()
+      .and_then(|action| lopdf_dictionary(document, action, "annotation action").ok())
+      .and_then(|action| action.get(b"URI").ok())
+      .and_then(|uri| lopdf_text(document, uri).ok());
+
+    annotations.push(RawAnnotationSummary {
+      page_index,
+      type_name: dictionary
+        .get(b"Type")
+        .ok()
+        .and_then(|value| lopdf_name(document, value).ok()),
+      subtype_name: dictionary
+        .get(b"Subtype")
+        .ok()
+        .and_then(|value| lopdf_name(document, value).ok()),
+      rect: dictionary
+        .get(b"Rect")
+        .ok()
+        .and_then(|value| lopdf_rect(document, value).ok()),
+      action_uri,
+    });
+  }
+
+  Ok(RawPageSummary {
+    page_index,
+    annotation_count: annotation_refs.len(),
+    annotations,
+  })
+}
+
+fn lopdf_array<'a>(
+  document: &'a LopdfDocument,
+  object: &'a LopdfObject,
+  context: &str,
+) -> Result<&'a Vec<LopdfObject>, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference {context}: {error}"))?;
+  object
+    .as_array()
+    .map_err(|error| format!("lopdf expected array for {context}: {error}"))
+}
+
+fn lopdf_dictionary<'a>(
+  document: &'a LopdfDocument,
+  object: &'a LopdfObject,
+  context: &str,
+) -> Result<&'a lopdf::Dictionary, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference {context}: {error}"))?;
+  object
+    .as_dict()
+    .map_err(|error| format!("lopdf expected dictionary for {context}: {error}"))
+}
+
+fn lopdf_name(document: &LopdfDocument, object: &LopdfObject) -> Result<String, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference name: {error}"))?;
+  let name = object
+    .as_name()
+    .map_err(|error| format!("lopdf expected name object: {error}"))?;
+  Ok(String::from_utf8_lossy(name).to_string())
+}
+
+fn lopdf_text(document: &LopdfDocument, object: &LopdfObject) -> Result<String, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference string: {error}"))?;
+  match object {
+    LopdfObject::String(value, _) => Ok(normalize_extracted_text(&String::from_utf8_lossy(value))),
+    LopdfObject::Name(value) => Ok(String::from_utf8_lossy(value).to_string()),
+    _ => Err(format!(
+      "lopdf expected string-like object, found {}",
+      object.enum_variant()
+    )),
+  }
+}
+
+fn lopdf_rect(document: &LopdfDocument, object: &LopdfObject) -> Result<String, String> {
+  let values = lopdf_array(document, object, "annotation Rect")?;
+  if values.len() != 4 {
+    return Err(format!(
+      "lopdf expected four coordinates in annotation Rect, found {}",
+      values.len()
+    ));
+  }
+
+  let mut numbers = [0.0f32; 4];
+  for (index, value) in values.iter().enumerate() {
+    let (_, value) = document
+      .dereference(value)
+      .map_err(|error| format!("lopdf could not dereference Rect coordinate: {error}"))?;
+    numbers[index] = value
+      .as_float()
+      .map_err(|error| format!("lopdf expected numeric Rect coordinate: {error}"))?;
+  }
+
+  Ok(format!(
+    "[{:.6} {:.6} {:.6} {:.6}]",
+    numbers[0], numbers[1], numbers[2], numbers[3]
+  ))
 }
 
 fn bind_pdfium() -> Result<Pdfium, String> {
@@ -415,7 +617,15 @@ fn format_points(points: PdfPoints, precision: usize) -> String {
   format!("{value:.precision$}", value = points.value)
 }
 
+fn format_text_render_mode(mode: PdfPageTextRenderMode) -> String {
+  format!("{mode:?}")
+}
+
 fn format_rect(rect: PdfRect, precision: usize) -> String {
+  format_rect_with_precision(rect, precision)
+}
+
+fn format_rect_with_precision(rect: PdfRect, precision: usize) -> String {
   format!(
     "[{left:.precision$} {bottom:.precision$} {right:.precision$} {top:.precision$}]",
     left = rect.left().value,

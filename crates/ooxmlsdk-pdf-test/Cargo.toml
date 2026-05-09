@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 crc32fast = { workspace = true }
 flate2 = { workspace = true }
+lopdf = { workspace = true }
 ooxmlsdk-pdf = { workspace = true }
 pdfium-render = { workspace = true }
 thiserror = { workspace = true }

@@ -597,48 +597,36 @@ struct XmlFrame {
 }
 
 #[derive(Clone, Copy)]
+enum SchemaFloatKind {
+  Single,
+  Double,
+}
+
+#[derive(Clone, Copy)]
 struct CanonicalOptions {
-  normalize_bool_attrs: bool,
-  normalize_bool_text: bool,
-  normalize_numeric: bool,
-  ignore_empty_core_property: bool,
+  normalize_float_lexemes: bool,
   sort_package_properties: bool,
 }
 
 impl CanonicalOptions {
   fn strict() -> Self {
     Self {
-      normalize_bool_attrs: false,
-      normalize_bool_text: false,
-      normalize_numeric: false,
-      ignore_empty_core_property: false,
+      normalize_float_lexemes: false,
       sort_package_properties: false,
     }
   }
 
   fn relaxed_for_entry(entry_name: &str) -> Self {
     Self {
-      normalize_bool_attrs: true,
-      normalize_bool_text: matches!(entry_name, "docProps/app.xml" | "docProps/custom.xml"),
-      normalize_numeric: should_relax_numeric_lexemes(entry_name),
-      ignore_empty_core_property: entry_name == "docProps/core.xml",
+      normalize_float_lexemes: true,
       sort_package_properties: matches!(entry_name, "docProps/app.xml" | "docProps/core.xml"),
     }
   }
 
   fn describe(self) -> String {
     let mut enabled = Vec::new();
-    if self.normalize_bool_attrs {
-      enabled.push("bool attrs");
-    }
-    if self.normalize_bool_text {
-      enabled.push("bool text");
-    }
-    if self.normalize_numeric {
-      enabled.push("numeric lexemes");
-    }
-    if self.ignore_empty_core_property {
-      enabled.push("empty core properties");
+    if self.normalize_float_lexemes {
+      enabled.push("schema float lexemes");
     }
     if self.sort_package_properties {
       enabled.push("package property order");
@@ -795,13 +783,6 @@ fn normalize_xml_node_for_entry(
         .filter_map(|child| normalize_xml_node_for_entry(child, options, entry_name))
         .collect();
       element.children = collapse_adjacent_xml_text_nodes(element.children);
-
-      if options.ignore_empty_core_property
-        && element.children.is_empty()
-        && element.attrs.is_empty()
-      {
-        return None;
-      }
 
       if options.sort_package_properties
         && (entry_name == "docProps/core.xml"
@@ -1178,15 +1159,10 @@ fn parse_xml_node(
     } else {
       value
     };
-    let value = if options.normalize_bool_attrs
-      && should_normalize_bool_attr(file_name, entry_name, &name, &expanded_key)
-    {
-      normalize_bool_lexeme(&value)
-    } else {
-      value
-    };
-    let value = if options.normalize_numeric {
-      normalize_numeric_lexeme(&value)
+    let value = if options.normalize_float_lexemes {
+      schema_float_kind_for_attr(&name, &expanded_key)
+        .map(|kind| normalize_schema_float_lexeme(&value, kind))
+        .unwrap_or(value)
     } else {
       value
     };
@@ -1268,13 +1244,6 @@ fn render_xml_node_to_string(
     XmlNode::Declaration(XmlDeclaration::Standalone) => out.push_str("<?xml standalone=\"yes\"?>"),
     XmlNode::Text(text) => out.push_str(text),
     XmlNode::Element(element) => {
-      if options.ignore_empty_core_property
-        && element.children.is_empty()
-        && element.attrs.is_empty()
-      {
-        return out;
-      }
-
       out.push('<');
       out.push_str(&element.name);
 
@@ -1336,27 +1305,6 @@ fn escape_xml_text(value: &str) -> String {
   out
 }
 
-fn normalize_bool_lexeme(value: &str) -> String {
-  match value {
-    "" => "false".to_string(),
-    "1" | "true" => "true".to_string(),
-    "0" | "false" => "false".to_string(),
-    "t" | "T" => "true".to_string(),
-    "f" | "F" => "false".to_string(),
-    _ => value.to_string(),
-  }
-}
-
-fn should_normalize_bool_attr(
-  file_name: &str,
-  entry_name: &str,
-  element_name: &str,
-  attr_name: &str,
-) -> bool {
-  let _ = (file_name, entry_name);
-  is_schema_bool_attr(element_name, attr_name)
-}
-
 fn split_expanded_name(name: &str) -> (&str, &str) {
   if let Some(rest) = name.strip_prefix('{')
     && let Some((ns, local)) = rest.split_once('}')
@@ -1367,30 +1315,52 @@ fn split_expanded_name(name: &str) -> (&str, &str) {
   }
 }
 
-fn normalize_numeric_lexeme(value: &str) -> String {
-  if (value.contains('.') || value.contains('e') || value.contains('E'))
-    && let Ok(parsed) = value.parse::<f64>()
-  {
-    return parsed.to_string();
-  }
-
-  value.to_string()
-}
-
 fn normalize_xml_text(value: &str, options: CanonicalOptions, stack: &[XmlFrame]) -> String {
   let value = value.replace("\r\n", "\n").replace('\r', "\n");
-  if options.normalize_bool_text && should_normalize_bool_text(stack) {
-    return normalize_bool_lexeme(&value);
+  if options.normalize_float_lexemes
+    && let Some(frame) = stack.last()
+    && let Some(kind) = schema_float_kind_for_text(&frame.name)
+  {
+    return normalize_schema_float_lexeme(&value, kind);
   }
   value
 }
 
-fn should_relax_numeric_lexemes(entry_name: &str) -> bool {
-  entry_name.starts_with("word/")
-    || entry_name.starts_with("xl/")
-    || entry_name.starts_with("ppt/")
-    || entry_name == "docProps/app.xml"
-    || entry_name == "docProps/custom.xml"
+fn normalize_schema_float_lexeme(value: &str, kind: SchemaFloatKind) -> String {
+  match kind {
+    SchemaFloatKind::Single => value
+      .parse::<f32>()
+      .map(render_schema_float_f32)
+      .unwrap_or_else(|_| value.to_string()),
+    SchemaFloatKind::Double => value
+      .parse::<f64>()
+      .map(render_schema_float_f64)
+      .unwrap_or_else(|_| value.to_string()),
+  }
+}
+
+fn render_schema_float_f32(value: f32) -> String {
+  if value.is_nan() {
+    "NaN".to_string()
+  } else if value == f32::INFINITY {
+    "INF".to_string()
+  } else if value == f32::NEG_INFINITY {
+    "-INF".to_string()
+  } else {
+    value.to_string()
+  }
+}
+
+fn render_schema_float_f64(value: f64) -> String {
+  if value.is_nan() {
+    "NaN".to_string()
+  } else if value == f64::INFINITY {
+    "INF".to_string()
+  } else if value == f64::NEG_INFINITY {
+    "-INF".to_string()
+  } else {
+    value.to_string()
+  }
 }
 
 fn is_mc_ignorable_attr(attr_name: &str) -> bool {
@@ -1410,23 +1380,6 @@ fn normalize_ignorable_prefix_list(value: &str, namespaces: &BTreeMap<String, St
   values.sort();
   values.dedup();
   values.join(" ")
-}
-
-fn should_normalize_bool_text(stack: &[XmlFrame]) -> bool {
-  let Some(frame) = stack.last() else {
-    return false;
-  };
-  let (element_ns, element_local) = split_expanded_name(&frame.name);
-  let is_extended_property_bool = matches!(
-    element_local,
-    "HyperlinksChanged" | "LinksUpToDate" | "ScaleCrop" | "SharedDoc"
-  ) && (element_ns.is_empty()
-    || element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties");
-  let is_vtype_bool = element_local == "bool"
-    && (element_ns.is_empty()
-      || element_ns == "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes");
-
-  is_extended_property_bool || is_vtype_bool
 }
 
 fn normalize_relationship_type_uri(value: &str) -> String {
@@ -1529,5 +1482,5 @@ fn normalize_namespace_uri(value: &str) -> String {
   }
 }
 
-include!(concat!(env!("OUT_DIR"), "/doc_samples_bool_attrs.rs"));
+include!(concat!(env!("OUT_DIR"), "/doc_samples_float_rules.rs"));
 include!(concat!(env!("OUT_DIR"), "/doc_samples_tests.rs"));

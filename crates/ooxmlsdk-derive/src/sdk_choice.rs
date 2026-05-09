@@ -282,8 +282,6 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
       let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
         let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
-        } else if is_bool_type(&inner_ty) {
-          write_bool_tokens(value_expr.clone(), &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
             crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
@@ -848,17 +846,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         );
         let parse_from_text_tokens = if is_string_like_type(&payload_ty) {
           quote! { text.unwrap_or_default() }
-        } else if is_bool_type(&payload_ty) {
-          let parse_value_tokens = parse_bool_tokens(
-            quote! { &value },
-            &payload_ty,
-            quote! { stringify!(#ident) },
-            quote! { stringify!(#variant_ident) },
-          );
-          quote! {{
-            let value = text.unwrap_or_default();
-            #parse_value_tokens
-          }}
         } else {
           quote! {{
             let value = text.unwrap_or_default();
@@ -871,13 +858,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         };
         let empty_value_tokens = if is_string_like_type(&payload_ty) {
           quote! { Default::default() }
-        } else if is_bool_type(&payload_ty) {
-          parse_bool_tokens(
-            quote! { "" },
-            &payload_ty,
-            quote! { stringify!(#ident) },
-            quote! { stringify!(#variant_ident) },
-          )
         } else {
           quote! {
             crate::common::parse_value::<#payload_ty>(
@@ -969,8 +949,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
         let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
           write_xml_schema_float_tokens(quote! { value }, &payload_ty)
-        } else if is_bool_type(&payload_ty) {
-          write_bool_tokens(quote! { value }, &payload_ty)
         } else if is_string_like_type(&payload_ty) {
           quote! {
             crate::common::write_escaped_str(writer, value.as_ref())?;
@@ -1164,8 +1142,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let payload_ty = choice_variant_payload_type(variant)?;
         let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
           write_xml_schema_float_tokens(quote! { value }, &payload_ty)
-        } else if is_bool_type(&payload_ty) {
-          write_bool_tokens(quote! { value }, &payload_ty)
         } else if is_string_like_type(&payload_ty) {
           quote! {
             crate::common::write_escaped_str(writer, value.as_ref())?;

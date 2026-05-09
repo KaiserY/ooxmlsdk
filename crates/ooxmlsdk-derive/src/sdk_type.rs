@@ -670,17 +670,6 @@ fn build_text_child_parse_arm(
   let value_ty = unwrap_option_vec_type(field_ty);
   let parse_from_text_tokens = if is_string_like_type(&value_ty) {
     quote! { text.unwrap_or_default() }
-  } else if is_bool_type(&value_ty) {
-    let parse_value_tokens = parse_bool_tokens(
-      quote! { &value },
-      &value_ty,
-      quote! { stringify!(#owner_ident) },
-      quote! { stringify!(#field_ident) },
-    );
-    quote! {{
-      let value = text.unwrap_or_default();
-      #parse_value_tokens
-    }}
   } else {
     quote! {{
       let value = text.unwrap_or_default();
@@ -693,13 +682,6 @@ fn build_text_child_parse_arm(
   };
   let empty_value_tokens = if is_string_like_type(&value_ty) {
     quote! { Default::default() }
-  } else if is_bool_type(&value_ty) {
-    parse_bool_tokens(
-      quote! { "" },
-      &value_ty,
-      quote! { stringify!(#owner_ident) },
-      quote! { stringify!(#field_ident) },
-    )
   } else {
     quote! {
       crate::common::parse_value::<#value_ty>(
@@ -774,8 +756,6 @@ fn build_text_child_write_tokens(
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
     let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
       write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
-    } else if is_bool_type(&inner_ty) {
-      write_bool_tokens(value_expr.clone(), &inner_ty)
     } else if is_string_like_type(&inner_ty) {
       quote! {
         crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
@@ -3224,15 +3204,7 @@ fn expand_named_struct(
     let name_lit = LitStr::new(&field.name, Span::call_site());
     let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
     let parse_ty = unwrap_wrapped_type(&field.ty);
-    let parser = if is_bool_type(&parse_ty) {
-      parse_bool_attr_tokens(
-        quote! { &attr },
-        quote! { decoder },
-        &parse_ty,
-        quote! { stringify!(#ident) },
-        quote! { #name_lit },
-      )
-    } else if integer_type_kind(&parse_ty).is_some() {
+    let parser = if integer_type_kind(&parse_ty).is_some() {
       parse_integer_attr_tokens(
         quote! { &attr },
         quote! { decoder },
@@ -3271,15 +3243,6 @@ fn expand_named_struct(
     }
     let attr_write_value_tokens = if is_xml_schema_float_type(&parse_ty) {
       let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &parse_ty);
-      quote! {
-        writer.write_all(b" ")?;
-        writer.write_all(#name_lit.as_bytes())?;
-        writer.write_all(b"=\"")?;
-        #write_value_tokens
-        writer.write_all(b"\"")?;
-      }
-    } else if is_bool_type(&parse_ty) {
-      let write_value_tokens = write_bool_tokens(quote! { value }, &parse_ty);
       quote! {
         writer.write_all(b" ")?;
         writer.write_all(#name_lit.as_bytes())?;
@@ -5602,8 +5565,6 @@ fn expand_named_struct(
         let inner_ty = unwrap_wrapped_type(field_ty);
         let optional_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
-        } else if is_bool_type(&inner_ty) {
-          write_bool_tokens(quote! { value }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
             crate::common::write_escaped_str(writer, value.as_ref())?;
@@ -5615,8 +5576,6 @@ fn expand_named_struct(
         };
         let required_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
-        } else if is_bool_type(&inner_ty) {
-          write_bool_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
             crate::common::write_escaped_str(writer, self.#field_ident.as_ref())?;
@@ -5655,17 +5614,8 @@ fn expand_named_struct(
         #field_ident,
       }
     } else {
-      let parse_value_tokens = if is_bool_type(&inner_ty) {
-        parse_bool_tokens(
-          quote! { &value },
-          &inner_ty,
-          quote! { stringify!(#ident) },
-          quote! { #field_name_lit },
-        )
-      } else {
-        quote! {
-          crate::common::parse_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
-        }
+      let parse_value_tokens = quote! {
+        crate::common::parse_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
       };
       if text_field.optional {
         quote! {

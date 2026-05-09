@@ -1699,28 +1699,6 @@ fn unwrap_option_vec_type(ty: &Type) -> Type {
   ty.clone()
 }
 
-fn is_bool_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    segment.ident == "bool"
-  }))
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum BoolTypeKind {
-  PlainBool,
-}
-
-fn bool_type_kind(ty: &Type) -> Option<BoolTypeKind> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let ident = path.segments.last()?.ident.to_string();
-  Some(match ident.as_str() {
-    "bool" => BoolTypeKind::PlainBool,
-    _ => return None,
-  })
-}
-
 fn is_string_like_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
     matches!(
@@ -1808,35 +1786,6 @@ fn write_xml_schema_float_tokens(
   }
 }
 
-fn parse_bool_tokens(
-  value_expr: proc_macro2::TokenStream,
-  bool_ty: &Type,
-  owner_expr: proc_macro2::TokenStream,
-  field_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::PlainBool) => quote! {
-      crate::common::parse_bool_str(#value_expr, #owner_expr, #field_expr)?
-    },
-    None => unreachable!("parse_bool_tokens requires a bool-like type"),
-  }
-}
-
-fn parse_bool_attr_tokens(
-  attr_expr: proc_macro2::TokenStream,
-  decoder_expr: proc_macro2::TokenStream,
-  bool_ty: &Type,
-  owner_expr: proc_macro2::TokenStream,
-  field_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::PlainBool) => quote! {
-      crate::common::parse_bool_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
-    None => unreachable!("parse_bool_attr_tokens requires a bool-like type"),
-  }
-}
-
 fn parse_integer_attr_tokens(
   attr_expr: proc_macro2::TokenStream,
   decoder_expr: proc_macro2::TokenStream,
@@ -1870,18 +1819,6 @@ fn parse_integer_attr_tokens(
       crate::common::parse_i64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
     None => unreachable!("parse_integer_attr_tokens requires an integer-like type"),
-  }
-}
-
-fn write_bool_tokens(
-  value_expr: proc_macro2::TokenStream,
-  bool_ty: &Type,
-) -> proc_macro2::TokenStream {
-  match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::PlainBool) => quote! {
-      writer.write_all(if *#value_expr { b"true" } else { b"false" })?;
-    },
-    None => unreachable!("write_bool_tokens requires a bool-like type"),
   }
 }
 

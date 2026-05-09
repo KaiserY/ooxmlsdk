@@ -13,7 +13,7 @@ fn non_visual_drawing_properties_round_trip_with_embedded_xml() {
 
   assert_eq!(parsed.id, 4);
   assert_eq!(parsed.name, "[WorkArea]");
-  assert_eq!(parsed.hidden, Some(true));
+  assert_eq!(parsed.hidden.map(|value| value.as_bool()), Some(true));
   assert!(
     parsed
       .description
@@ -33,23 +33,18 @@ fn non_visual_drawing_properties_round_trip_with_embedded_xml() {
 }
 
 #[test]
-fn boolean_value_attribute_accepts_upstream_lexical_forms_and_writes_canonical_form() {
-  for (raw, expected, canonical) in [
-    ("true", true, "1"),
-    ("1", true, "1"),
-    ("false", false, "0"),
-    ("0", false, "0"),
-  ] {
+fn boolean_value_attribute_accepts_upstream_lexical_forms_and_preserves_lexical_form() {
+  for (raw, expected) in [("true", true), ("1", true), ("false", false), ("0", false)] {
     let xml = format!(
       r#"<p:cNvPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" id="+4" name="shape" hidden="{raw}"/>"#
     );
     let parsed = xml.parse::<NonVisualDrawingProperties>().unwrap();
     assert_eq!(parsed.id, 4);
-    assert_eq!(parsed.hidden, Some(expected));
+    assert_eq!(parsed.hidden.map(|value| value.as_bool()), Some(expected));
 
     let serialized = parsed.to_xml().unwrap();
     assert!(serialized.contains(r#"id="4""#));
-    assert!(serialized.contains(&format!(r#"hidden="{canonical}""#)));
+    assert!(serialized.contains(&format!(r#"hidden="{raw}""#)));
   }
 }
 
@@ -98,7 +93,10 @@ fn presentation_round_trip_from_openxml_part_test() {
       .map(|list| list.p_sld_id.len()),
     Some(2)
   );
-  assert_eq!(parsed.auto_compress_pictures, Some(false));
+  assert_eq!(
+    parsed.auto_compress_pictures.map(|value| value.as_bool()),
+    Some(false)
+  );
   assert!(
     serialized.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n")
   );

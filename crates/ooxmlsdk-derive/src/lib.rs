@@ -1701,20 +1701,13 @@ fn unwrap_option_vec_type(ty: &Type) -> Type {
 
 fn is_bool_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    matches!(
-      segment.ident.to_string().as_str(),
-      "bool" | "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
-    )
+    segment.ident == "bool"
   }))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BoolTypeKind {
   PlainBool,
-  BooleanValue,
-  OnOffValue,
-  TrueFalseBlankValue,
-  TrueFalseValue,
 }
 
 fn bool_type_kind(ty: &Type) -> Option<BoolTypeKind> {
@@ -1724,10 +1717,6 @@ fn bool_type_kind(ty: &Type) -> Option<BoolTypeKind> {
   let ident = path.segments.last()?.ident.to_string();
   Some(match ident.as_str() {
     "bool" => BoolTypeKind::PlainBool,
-    "BooleanValue" => BoolTypeKind::BooleanValue,
-    "OnOffValue" => BoolTypeKind::OnOffValue,
-    "TrueFalseBlankValue" => BoolTypeKind::TrueFalseBlankValue,
-    "TrueFalseValue" => BoolTypeKind::TrueFalseValue,
     _ => return None,
   })
 }
@@ -1749,7 +1738,10 @@ fn is_string_like_type(ty: &Type) -> bool {
 
 fn is_sdk_enum_type(ty: &Type) -> bool {
   matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    segment.ident.to_string().ends_with("Values")
+    matches!(
+      segment.ident.to_string().as_str(),
+      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
+    ) || segment.ident.to_string().ends_with("Values")
   }))
 }
 
@@ -1823,18 +1815,6 @@ fn parse_bool_tokens(
   field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::BooleanValue) => quote! {
-      crate::common::parse_boolean_value_str(#value_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::OnOffValue) => quote! {
-      crate::common::parse_on_off_str(#value_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::TrueFalseBlankValue) => quote! {
-      crate::common::parse_true_false_blank_str(#value_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::TrueFalseValue) => quote! {
-      crate::common::parse_true_false_str(#value_expr, #owner_expr, #field_expr)?
-    },
     Some(BoolTypeKind::PlainBool) => quote! {
       crate::common::parse_bool_str(#value_expr, #owner_expr, #field_expr)?
     },
@@ -1850,18 +1830,6 @@ fn parse_bool_attr_tokens(
   field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
   match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::BooleanValue) => quote! {
-      crate::common::parse_boolean_value_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::OnOffValue) => quote! {
-      crate::common::parse_on_off_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::TrueFalseBlankValue) => quote! {
-      crate::common::parse_true_false_blank_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
-    Some(BoolTypeKind::TrueFalseValue) => quote! {
-      crate::common::parse_true_false_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
-    },
     Some(BoolTypeKind::PlainBool) => quote! {
       crate::common::parse_bool_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
@@ -1910,10 +1878,7 @@ fn write_bool_tokens(
   bool_ty: &Type,
 ) -> proc_macro2::TokenStream {
   match bool_type_kind(bool_ty) {
-    Some(BoolTypeKind::BooleanValue) => quote! {
-      writer.write_all(if *#value_expr { b"1" } else { b"0" })?;
-    },
-    Some(_) => quote! {
+    Some(BoolTypeKind::PlainBool) => quote! {
       writer.write_all(if *#value_expr { b"true" } else { b"false" })?;
     },
     None => unreachable!("write_bool_tokens requires a bool-like type"),

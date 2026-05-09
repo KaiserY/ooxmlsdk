@@ -51,10 +51,10 @@ pub(super) fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps
   };
 
   if let Some(bold) = properties.bold() {
-    style.bold = bold.val.unwrap_or(true);
+    style.bold = bold.val.is_none_or(|value| value.as_bool());
   }
   if let Some(italic) = properties.italic() {
-    style.italic = italic.val.unwrap_or(true);
+    style.italic = italic.val.is_none_or(|value| value.as_bool());
   }
   if let Some(font_size) = properties.font_size()
     && let Ok(half_points) = font_size.val.parse::<f32>()
@@ -70,16 +70,16 @@ pub(super) fn merge_run_style(style: &mut TextStyle, properties: Option<RunProps
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
   }
   if let Some(strike) = properties.strike() {
-    style.strikethrough = strike.val.unwrap_or(true);
+    style.strikethrough = strike.val.is_none_or(|value| value.as_bool());
   }
   if let Some(double_strike) = properties.double_strike() {
-    style.strikethrough = double_strike.val.unwrap_or(true);
+    style.strikethrough = double_strike.val.is_none_or(|value| value.as_bool());
   }
   if let Some(caps) = properties.caps() {
-    style.uppercase = caps.val.unwrap_or(true);
+    style.uppercase = caps.val.is_none_or(|value| value.as_bool());
   }
   if let Some(small_caps) = properties.small_caps()
-    && small_caps.val.unwrap_or(true)
+    && small_caps.val.is_none_or(|value| value.as_bool())
   {
     style.uppercase = true;
     style.font_size_pt = (style.font_size_pt * 0.85).max(1.0);

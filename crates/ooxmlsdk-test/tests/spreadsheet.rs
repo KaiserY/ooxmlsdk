@@ -11,7 +11,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workb
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
-use ooxmlsdk::simple_type::{ListValue, StringValue};
+use ooxmlsdk::simple_type::{BooleanValue, ListValue, StringValue};
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
@@ -149,7 +149,12 @@ fn workbook_extension_loads_excel_2010_workbook_properties_from_m4_conformance_t
   else {
     panic!("expected x14:workbookPr");
   };
-  assert_eq!(workbook_properties.discard_image_edit_data, Some(true));
+  assert_eq!(
+    workbook_properties
+      .discard_image_edit_data
+      .map(|value| value.as_bool()),
+    Some(true)
+  );
   assert!(serialized.contains("<x14:workbookPr"));
   assert!(serialized.contains(r#"discardImageEditData="1""#));
 }
@@ -405,7 +410,7 @@ fn array_feature_property_double_text_child_uses_xml_schema_float_lexical_form()
 fn bool_feature_property_uses_boolean_value_lexical_form() {
   let value = BoolFeatureProperty {
     k: "flag".into(),
-    xml_content: Some(true),
+    xml_content: Some(BooleanValue::from(true)),
   };
 
   let xml = value.to_xml().unwrap();
@@ -416,7 +421,10 @@ fn bool_feature_property_uses_boolean_value_lexical_form() {
 
   let reparsed = serialized.parse::<BoolFeatureProperty>().unwrap();
   assert_eq!(reparsed.k.as_str(), "flag");
-  assert_eq!(reparsed.xml_content, Some(true));
+  assert_eq!(
+    reparsed.xml_content.map(|value| value.as_bool()),
+    Some(true)
+  );
 }
 
 #[test]

@@ -92,18 +92,32 @@ impl TableConditionalStyleMask {
 
   pub(super) fn from_cnf_style(style: &w::ConditionalFormatStyle) -> Self {
     let mut mask = Self::from_cnf_value(style.val.as_str());
-    mask.first_row |= style.first_row.unwrap_or(false);
-    mask.last_row |= style.last_row.unwrap_or(false);
-    mask.first_column |= style.first_column.unwrap_or(false);
-    mask.last_column |= style.last_column.unwrap_or(false);
-    mask.odd_vertical_band |= style.odd_vertical_band.unwrap_or(false);
-    mask.even_vertical_band |= style.even_vertical_band.unwrap_or(false);
-    mask.odd_horizontal_band |= style.odd_horizontal_band.unwrap_or(false);
-    mask.even_horizontal_band |= style.even_horizontal_band.unwrap_or(false);
-    mask.first_row_first_column |= style.first_row_first_column.unwrap_or(false);
-    mask.first_row_last_column |= style.first_row_last_column.unwrap_or(false);
-    mask.last_row_first_column |= style.last_row_first_column.unwrap_or(false);
-    mask.last_row_last_column |= style.last_row_last_column.unwrap_or(false);
+    mask.first_row |= style.first_row.is_some_and(|value| value.as_bool());
+    mask.last_row |= style.last_row.is_some_and(|value| value.as_bool());
+    mask.first_column |= style.first_column.is_some_and(|value| value.as_bool());
+    mask.last_column |= style.last_column.is_some_and(|value| value.as_bool());
+    mask.odd_vertical_band |= style.odd_vertical_band.is_some_and(|value| value.as_bool());
+    mask.even_vertical_band |= style
+      .even_vertical_band
+      .is_some_and(|value| value.as_bool());
+    mask.odd_horizontal_band |= style
+      .odd_horizontal_band
+      .is_some_and(|value| value.as_bool());
+    mask.even_horizontal_band |= style
+      .even_horizontal_band
+      .is_some_and(|value| value.as_bool());
+    mask.first_row_first_column |= style
+      .first_row_first_column
+      .is_some_and(|value| value.as_bool());
+    mask.first_row_last_column |= style
+      .first_row_last_column
+      .is_some_and(|value| value.as_bool());
+    mask.last_row_first_column |= style
+      .last_row_first_column
+      .is_some_and(|value| value.as_bool());
+    mask.last_row_last_column |= style
+      .last_row_last_column
+      .is_some_and(|value| value.as_bool());
     mask
   }
 

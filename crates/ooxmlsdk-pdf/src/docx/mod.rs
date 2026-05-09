@@ -129,7 +129,7 @@ fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumen
       settings
         .w_even_and_odd_headers
         .as_ref()
-        .map(|setting| setting.val.unwrap_or(true))
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
     .unwrap_or(false)
 }
@@ -292,7 +292,7 @@ fn close_section(
   let title_page = section_properties
     .as_ref()
     .and_then(|section| section.w_title_pg.as_ref())
-    .map(|title_page| title_page.val.unwrap_or(true))
+    .map(|title_page| title_page.val.is_none_or(|value| value.as_bool()))
     .unwrap_or(false);
 
   sections.push(ImportedSection {
@@ -394,7 +394,7 @@ fn section_column_count(section: &w::SectionProperties) -> i16 {
   let Some(columns) = section.w_cols.as_ref() else {
     return 1;
   };
-  if !columns.equal_width.unwrap_or(true) && !columns.w_col.is_empty() {
+  if !columns.equal_width.is_none_or(|value| value.as_bool()) && !columns.w_col.is_empty() {
     return (columns.w_col.len() as i16).max(1);
   }
   columns.column_count.unwrap_or(1).max(1)
@@ -404,7 +404,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
   let Some(columns) = section.w_cols.as_ref() else {
     return SectionColumns::default();
   };
-  let equal_width = columns.equal_width.unwrap_or(true);
+  let equal_width = columns.equal_width.is_none_or(|value| value.as_bool());
   let gap_pt = columns
     .space
     .as_deref()
@@ -449,7 +449,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
       return SectionColumns {
         count: explicit_count.max(1),
         gap_pt,
-        separator: columns.separator.unwrap_or(false),
+        separator: columns.separator.is_some_and(|value| value.as_bool()),
         explicit_count,
         explicit_widths_pt: widths,
         explicit_gaps_pt: gaps,
@@ -464,7 +464,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
   SectionColumns {
     count,
     gap_pt,
-    separator: columns.separator.unwrap_or(false),
+    separator: columns.separator.is_some_and(|value| value.as_bool()),
     explicit_count: 0,
     explicit_widths_pt: [0.0; 45],
     explicit_gaps_pt: [0.0; 44],
@@ -1492,16 +1492,16 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   };
 
   if let Some(page_break_before) = properties.page_break_before() {
-    format.page_break_before = page_break_before.val.unwrap_or(true);
+    format.page_break_before = page_break_before.val.is_none_or(|value| value.as_bool());
   }
   if let Some(keep_next) = properties.keep_next() {
-    format.keep_with_next = keep_next.val.unwrap_or(true);
+    format.keep_with_next = keep_next.val.is_none_or(|value| value.as_bool());
   }
   if let Some(keep_lines) = properties.keep_lines() {
-    format.keep_lines = keep_lines.val.unwrap_or(true);
+    format.keep_lines = keep_lines.val.is_none_or(|value| value.as_bool());
   }
   if let Some(contextual_spacing) = properties.contextual_spacing() {
-    format.contextual_spacing = contextual_spacing.val.unwrap_or(true);
+    format.contextual_spacing = contextual_spacing.val.is_none_or(|value| value.as_bool());
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
@@ -2620,7 +2620,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .as_ref()
       .map(image_wrap_side)
       .unwrap_or_default(),
-    behind_text: anchor.behind_doc,
+    behind_text: anchor.behind_doc.as_bool(),
     margin_top_pt: margins.top_pt,
     margin_right_pt: margins.right_pt,
     margin_bottom_pt: margins.bottom_pt,
@@ -3598,7 +3598,9 @@ impl StylesCatalog {
       let Some(style_id) = &style.style_id else {
         continue;
       };
-      if matches!(style.r#type, Some(w::StyleValues::Paragraph)) && style.default.unwrap_or(false) {
+      if matches!(style.r#type, Some(w::StyleValues::Paragraph))
+        && style.default.is_some_and(|value| value.as_bool())
+      {
         catalog.default_paragraph_style_id = Some(style_id.to_string());
       }
       let mut entry = StyleEntry {
@@ -4020,22 +4022,22 @@ fn merge_run_style_overrides(
 fn table_look_model(look: &w::TableLook) -> TableLookModel {
   let mut model = TableLookModel::default();
   if let Some(value) = look.first_row {
-    model.first_row = value;
+    model.first_row = value.as_bool();
   }
   if let Some(value) = look.last_row {
-    model.last_row = value;
+    model.last_row = value.as_bool();
   }
   if let Some(value) = look.first_column {
-    model.first_column = value;
+    model.first_column = value.as_bool();
   }
   if let Some(value) = look.last_column {
-    model.last_column = value;
+    model.last_column = value.as_bool();
   }
   if let Some(value) = look.no_horizontal_band {
-    model.horizontal_banding = !value;
+    model.horizontal_banding = !value.as_bool();
   }
   if let Some(value) = look.no_vertical_band {
-    model.vertical_banding = !value;
+    model.vertical_banding = !value.as_bool();
   }
   model
 }
@@ -4057,19 +4059,31 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
   };
 
   RunStyleOverrides {
-    bold: properties.bold().and_then(|value| value.val),
-    italic: properties.italic().and_then(|value| value.val),
+    bold: properties
+      .bold()
+      .and_then(|value| value.val.map(|value| value.as_bool())),
+    italic: properties
+      .italic()
+      .and_then(|value| value.val.map(|value| value.as_bool())),
     underline: properties
       .underline()
       .map(|value| !matches!(value.val, Some(w::UnderlineValues::None))),
     strikethrough: properties
       .double_strike()
-      .and_then(|value| value.val)
-      .or_else(|| properties.strike().and_then(|value| value.val)),
+      .and_then(|value| value.val.map(|value| value.as_bool()))
+      .or_else(|| {
+        properties
+          .strike()
+          .and_then(|value| value.val.map(|value| value.as_bool()))
+      }),
     uppercase: properties
       .small_caps()
-      .and_then(|value| value.val)
-      .or_else(|| properties.caps().and_then(|value| value.val)),
+      .and_then(|value| value.val.map(|value| value.as_bool()))
+      .or_else(|| {
+        properties
+          .caps()
+          .and_then(|value| value.val.map(|value| value.as_bool()))
+      }),
   }
 }
 
@@ -4996,12 +5010,12 @@ mod tests {
     };
     let row_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
       val: "100000000000".into(),
-      first_row: Some(true),
+      first_row: Some(true.into()),
       ..Default::default()
     });
     let cell_condition = TableConditionalStyleMask::from_cnf_style(&w::ConditionalFormatStyle {
       val: "000100000000".into(),
-      last_column: Some(true),
+      last_column: Some(true.into()),
       ..Default::default()
     });
 
@@ -5155,7 +5169,9 @@ mod tests {
       })),
       paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
         run_properties: Some(Box::new(w::RunProperties {
-          bold: Some(w::Bold { val: Some(false) }),
+          bold: Some(w::Bold {
+            val: Some(false.into()),
+          }),
           color: Some(w::Color {
             val: "0000FF".into(),
             ..Default::default()
@@ -5695,7 +5711,7 @@ mod tests {
     w::SectionProperties {
       w_type: Some(w::SectionType { val: break_type }),
       w_cols: Some(w::Columns {
-        equal_width: Some(false),
+        equal_width: Some(false.into()),
         w_col: vec![
           w::Column {
             width: Some("1440".into()),

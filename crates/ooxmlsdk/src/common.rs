@@ -246,31 +246,6 @@ fn package_main_part_path_matches(
     && &actual_stem[descriptor_path_prefix.len() + 1..] == descriptor_target_name
 }
 
-define_attr_parser_forwarders! {
-  parse_boolean_value_attr -> bool,
-  parse_on_off_attr -> bool,
-  parse_true_false_blank_attr -> bool,
-  parse_true_false_attr -> bool,
-}
-
-#[inline(always)]
-pub(crate) fn parse_boolean_value_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_boolean_value_str(value, ty, field)
-}
-
-#[inline(always)]
-pub(crate) fn parse_true_false_blank_str(
-  value: &str,
-  ty: &'static str,
-  field: &'static str,
-) -> Result<bool, SdkError> {
-  xml::parse_true_false_blank_str(value, ty, field)
-}
-
 #[inline(always)]
 pub(crate) fn push_xml_text(
   value: &mut Option<String>,
@@ -453,27 +428,6 @@ mod tests {
       .expect("attribute")
       .unwrap();
     f(attr, decoder)
-  }
-
-  #[test]
-  fn bool_like_attr_parsers_accept_raw_bytes_forms() {
-    let on_off = with_first_attr(r#"<x val="off"/>"#, |attr, decoder| {
-      parse_on_off_attr(&attr, decoder, "X", "val")
-    })
-    .expect("parse on_off");
-    assert!(!on_off);
-
-    let true_false_blank = with_first_attr(r#"<x val=""/>"#, |attr, decoder| {
-      parse_true_false_blank_attr(&attr, decoder, "X", "val")
-    })
-    .expect("parse true_false_blank");
-    assert!(!true_false_blank);
-
-    let true_false = with_first_attr(r#"<x val="t"/>"#, |attr, decoder| {
-      parse_true_false_attr(&attr, decoder, "X", "val")
-    })
-    .expect("parse true_false");
-    assert!(true_false);
   }
 
   #[test]

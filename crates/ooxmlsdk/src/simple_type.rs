@@ -39,7 +39,6 @@ where
 }
 
 pub type Base64BinaryValue = String;
-pub type BooleanValue = bool;
 pub type ByteValue = u8;
 pub type DateTimeValue = String;
 pub type DecimalValue = String;
@@ -49,15 +48,174 @@ pub type Int16Value = i16;
 pub type Int32Value = i32;
 pub type Int64Value = i64;
 pub type IntegerValue = i64;
-pub type OnOffValue = bool;
 pub type SByteValue = i8;
 pub type SingleValue = f32;
 pub type StringValue = String;
-pub type TrueFalseBlankValue = bool;
-pub type TrueFalseValue = bool;
 pub type UInt16Value = u16;
 pub type UInt32Value = u32;
 pub type UInt64Value = u64;
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+pub enum BooleanValue {
+  #[sdk(rename = "true")]
+  True,
+  #[sdk(rename = "false")]
+  False,
+  #[sdk(rename = "1")]
+  One,
+  #[sdk(rename = "0")]
+  #[default]
+  Zero,
+}
+
+impl BooleanValue {
+  #[inline]
+  pub const fn from_bool(value: bool) -> Self {
+    if value { Self::One } else { Self::Zero }
+  }
+
+  #[inline]
+  pub const fn as_bool(self) -> bool {
+    matches!(self, Self::True | Self::One)
+  }
+}
+
+impl From<bool> for BooleanValue {
+  #[inline]
+  fn from(value: bool) -> Self {
+    Self::from_bool(value)
+  }
+}
+
+impl From<BooleanValue> for bool {
+  #[inline]
+  fn from(value: BooleanValue) -> Self {
+    value.as_bool()
+  }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+pub enum OnOffValue {
+  #[sdk(rename = "true")]
+  True,
+  #[sdk(rename = "false")]
+  #[default]
+  False,
+  #[sdk(rename = "on")]
+  On,
+  #[sdk(rename = "off")]
+  Off,
+  #[sdk(rename = "1")]
+  One,
+  #[sdk(rename = "0")]
+  Zero,
+}
+
+impl OnOffValue {
+  #[inline]
+  pub const fn from_bool(value: bool) -> Self {
+    if value { Self::True } else { Self::False }
+  }
+
+  #[inline]
+  pub const fn as_bool(self) -> bool {
+    matches!(self, Self::True | Self::On | Self::One)
+  }
+}
+
+impl From<bool> for OnOffValue {
+  #[inline]
+  fn from(value: bool) -> Self {
+    Self::from_bool(value)
+  }
+}
+
+impl From<OnOffValue> for bool {
+  #[inline]
+  fn from(value: OnOffValue) -> Self {
+    value.as_bool()
+  }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+pub enum TrueFalseValue {
+  #[sdk(rename = "true")]
+  True,
+  #[sdk(rename = "false")]
+  #[default]
+  False,
+  #[sdk(rename = "t")]
+  T,
+  #[sdk(rename = "f")]
+  F,
+}
+
+impl TrueFalseValue {
+  #[inline]
+  pub const fn from_bool(value: bool) -> Self {
+    if value { Self::True } else { Self::False }
+  }
+
+  #[inline]
+  pub const fn as_bool(self) -> bool {
+    matches!(self, Self::True | Self::T)
+  }
+}
+
+impl From<bool> for TrueFalseValue {
+  #[inline]
+  fn from(value: bool) -> Self {
+    Self::from_bool(value)
+  }
+}
+
+impl From<TrueFalseValue> for bool {
+  #[inline]
+  fn from(value: TrueFalseValue) -> Self {
+    value.as_bool()
+  }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+pub enum TrueFalseBlankValue {
+  #[sdk(rename = "true")]
+  True,
+  #[sdk(rename = "false")]
+  #[default]
+  False,
+  #[sdk(rename = "t")]
+  T,
+  #[sdk(rename = "f")]
+  F,
+  #[sdk(rename = "")]
+  Blank,
+}
+
+impl TrueFalseBlankValue {
+  #[inline]
+  pub const fn from_bool(value: bool) -> Self {
+    if value { Self::True } else { Self::False }
+  }
+
+  #[inline]
+  pub const fn as_bool(self) -> bool {
+    matches!(self, Self::True | Self::T)
+  }
+}
+
+impl From<bool> for TrueFalseBlankValue {
+  #[inline]
+  fn from(value: bool) -> Self {
+    Self::from_bool(value)
+  }
+}
+
+impl From<TrueFalseBlankValue> for bool {
+  #[inline]
+  fn from(value: TrueFalseBlankValue) -> Self {
+    value.as_bool()
+  }
+}
 
 pub trait HexBinaryValueExt {
   fn is_valid_hex_binary(&self) -> bool;

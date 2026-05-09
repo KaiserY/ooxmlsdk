@@ -3439,13 +3439,13 @@ fn create_wml_tables_fixtures(root: &Path) {
         <w:tc>
           <w:tcPr>
             <w:tcW w:w="4320" w:type="dxa"/>
-            <w:vAlign w:val="center"/>
             <w:tcMar>
               <w:top w:w="240" w:type="dxa"/>
               <w:left w:w="360" w:type="dxa"/>
               <w:bottom w:w="240" w:type="dxa"/>
               <w:right w:w="360" w:type="dxa"/>
             </w:tcMar>
+            <w:vAlign w:val="center"/>
           </w:tcPr>
           <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Header Left (center valign)</w:t></w:r></w:p>
         </w:tc>

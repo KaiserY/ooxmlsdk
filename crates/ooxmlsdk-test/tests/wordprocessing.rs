@@ -559,13 +559,13 @@ fn document_round_trip_preserves_hyperlink_structure_from_openxml_asset() {
 
   let hyperlink = first_hyperlink(hyperlink_paragraph);
   assert_eq!(hyperlink.id.as_deref(), Some("rId4"));
-  assert_eq!(hyperlink.history, Some(true));
+  assert_eq!(hyperlink.history.map(|value| value.as_bool()), Some(true));
   let run = first_hyperlink_run(hyperlink);
   let text = first_text(run);
   assert_eq!(text.xml_content.as_deref(), Some("EricWhite.com"));
   assert!(serialized.contains("<w:hyperlink"));
   assert!(serialized.contains("r:id=\"rId4\""));
-  assert!(serialized.contains("w:history=\"true\""));
+  assert!(serialized.contains("w:history=\"1\""));
   assert!(serialized.contains("EricWhite.com"));
 
   let reparsed_body = first_body(&reparsed);
@@ -1060,7 +1060,7 @@ fn document_round_trip_preserves_rich_content_and_hyperlinks_from_openxml_asset(
     })
     .expect("expected EricWhite.com hyperlink");
   assert_eq!(hyperlink.id.as_deref(), Some("rId26"));
-  assert_eq!(hyperlink.history, Some(true));
+  assert_eq!(hyperlink.history.map(|value| value.as_bool()), Some(true));
   assert_eq!(
     first_text(first_hyperlink_run(hyperlink))
       .xml_content

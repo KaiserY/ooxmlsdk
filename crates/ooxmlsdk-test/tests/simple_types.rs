@@ -97,15 +97,25 @@ fn base64_binary_value_round_trip_test() {
 fn boolean_value_round_trip_test() {
   assert_round_trip::<BooleanValue>("true");
   assert_round_trip::<BooleanValue>("false");
+  assert_round_trip::<BooleanValue>("1");
+  assert_round_trip::<BooleanValue>("0");
 }
 
 #[test]
-fn boolean_simple_type_aliases_keep_rust_bool_lexical_form() {
-  assert!("1".parse::<BooleanValue>().is_err());
-  assert!("0".parse::<OnOffValue>().is_err());
-  assert!("on".parse::<OnOffValue>().is_err());
-  assert!("t".parse::<TrueFalseValue>().is_err());
-  assert!("".parse::<TrueFalseBlankValue>().is_err());
+fn boolean_simple_type_helpers_use_upstream_bool_defaults() {
+  assert_eq!(BooleanValue::from_bool(true).to_string(), "1");
+  assert_eq!(BooleanValue::from_bool(false).to_string(), "0");
+  assert_eq!(OnOffValue::from_bool(true).to_string(), "true");
+  assert_eq!(OnOffValue::from_bool(false).to_string(), "false");
+  assert_eq!(TrueFalseValue::from_bool(true).to_string(), "true");
+  assert_eq!(TrueFalseValue::from_bool(false).to_string(), "false");
+  assert_eq!(TrueFalseBlankValue::from_bool(true).to_string(), "true");
+  assert_eq!(TrueFalseBlankValue::from_bool(false).to_string(), "false");
+
+  assert!(BooleanValue::One.as_bool());
+  assert!(!OnOffValue::Off.as_bool());
+  assert!(TrueFalseValue::T.as_bool());
+  assert!(!TrueFalseBlankValue::Blank.as_bool());
 }
 
 #[test]
@@ -221,6 +231,10 @@ fn list_value_int32_round_trip_test() {
 fn on_off_value_round_trip_test() {
   assert_round_trip::<OnOffValue>("true");
   assert_round_trip::<OnOffValue>("false");
+  assert_round_trip::<OnOffValue>("on");
+  assert_round_trip::<OnOffValue>("off");
+  assert_round_trip::<OnOffValue>("1");
+  assert_round_trip::<OnOffValue>("0");
 }
 
 #[test]
@@ -241,12 +255,17 @@ fn single_value_round_trip_test() {
 fn true_false_value_round_trip_test() {
   assert_round_trip::<TrueFalseValue>("true");
   assert_round_trip::<TrueFalseValue>("false");
+  assert_round_trip::<TrueFalseValue>("t");
+  assert_round_trip::<TrueFalseValue>("f");
 }
 
 #[test]
 fn true_false_blank_value_round_trip_test() {
   assert_round_trip::<TrueFalseBlankValue>("true");
   assert_round_trip::<TrueFalseBlankValue>("false");
+  assert_round_trip::<TrueFalseBlankValue>("t");
+  assert_round_trip::<TrueFalseBlankValue>("f");
+  assert_round_trip::<TrueFalseBlankValue>("");
 }
 
 #[test]
@@ -274,62 +293,60 @@ fn uint64_value_round_trip_test() {
 }
 
 #[test]
-fn true_false_attribute_accepts_upstream_lexical_forms_and_writes_canonical_form() {
-  for (raw, expected, canonical) in [
-    ("true", true, "true"),
-    ("t", true, "true"),
-    ("false", false, "false"),
-    ("f", false, "false"),
-  ] {
+fn true_false_attribute_accepts_upstream_lexical_forms_and_preserves_lexical_form() {
+  for (raw, expected) in [("true", true), ("t", true), ("false", false), ("f", false)] {
     let xml = format!(
       r#"<o:shapedefaults xmlns:o="urn:schemas-microsoft-com:office:office" fill="{raw}"/>"#
     );
     let parsed = xml.parse::<ShapeDefaults>().unwrap();
-    assert_eq!(parsed.be_filled, Some(expected));
+    assert_eq!(
+      parsed.be_filled.map(|value| value.as_bool()),
+      Some(expected)
+    );
 
     let serialized = parsed.to_xml().unwrap();
-    assert!(serialized.contains(&format!(r#"fill="{canonical}""#)));
+    assert!(serialized.contains(&format!(r#"fill="{raw}""#)));
   }
 }
 
 #[test]
-fn true_false_blank_attribute_accepts_empty_string_and_writes_canonical_form() {
-  for (raw, expected, canonical) in [
-    ("true", true, "true"),
-    ("t", true, "true"),
-    ("false", false, "false"),
-    ("f", false, "false"),
-    ("", false, "false"),
+fn true_false_blank_attribute_accepts_empty_string_and_preserves_lexical_form() {
+  for (raw, expected) in [
+    ("true", true),
+    ("t", true),
+    ("false", false),
+    ("f", false),
+    ("", false),
   ] {
     let xml = format!(
       r#"<v:shape xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" o:ole="{raw}"/>"#
     );
     let parsed = xml.parse::<Shape>().unwrap();
-    assert_eq!(parsed.ole, Some(expected));
+    assert_eq!(parsed.ole.map(|value| value.as_bool()), Some(expected));
 
     let serialized = parsed.to_xml().unwrap();
-    assert!(serialized.contains(&format!(r#"o:ole="{canonical}""#)));
+    assert!(serialized.contains(&format!(r#"o:ole="{raw}""#)));
   }
 }
 
 #[test]
-fn on_off_attribute_accepts_upstream_lexical_forms_and_writes_canonical_form() {
-  for (raw, expected, canonical) in [
-    ("true", true, "true"),
-    ("1", true, "true"),
-    ("on", true, "true"),
-    ("false", false, "false"),
-    ("0", false, "false"),
-    ("off", false, "false"),
+fn on_off_attribute_accepts_upstream_lexical_forms_and_preserves_lexical_form() {
+  for (raw, expected) in [
+    ("true", true),
+    ("1", true),
+    ("on", true),
+    ("false", false),
+    ("0", false),
+    ("off", false),
   ] {
     let xml = format!(
       r#"<w15:chartTrackingRefBased xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="{raw}"/>"#
     );
     let parsed = xml.parse::<ChartTrackingRefBased>().unwrap();
-    assert_eq!(parsed.val, Some(expected));
+    assert_eq!(parsed.val.map(|value| value.as_bool()), Some(expected));
 
     let serialized = parsed.to_xml().unwrap();
-    assert!(serialized.contains(&format!(r#"w:val="{canonical}""#)));
+    assert!(serialized.contains(&format!(r#"w:val="{raw}""#)));
   }
 }
 

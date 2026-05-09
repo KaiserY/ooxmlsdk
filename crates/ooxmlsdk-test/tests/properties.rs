@@ -172,14 +172,14 @@ fn custom_properties_bool_round_trip_from_bug225919_test() {
   else {
     panic!("expected vt:bool");
   };
-  assert!(value);
+  assert!(value.as_bool());
   let serialized = trim_xml_declaration(&serialized);
   assert!(serialized.starts_with("<op:Properties"));
   assert!(serialized.contains("fmtid=\"{D5CDD505-2E9C-101B-9397-08002B2CF9AE}\""));
   assert!(serialized.contains("pid=\"2\""));
   assert!(serialized.contains("name=\"crap\""));
   assert!(serialized.contains("<vt:bool"));
-  assert!(serialized.contains(">1</vt:bool>"));
+  assert!(serialized.contains(">true</vt:bool>"));
   assert_eq!(reparsed.op_property.len(), 1);
 }
 

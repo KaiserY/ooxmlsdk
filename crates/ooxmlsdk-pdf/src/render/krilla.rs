@@ -18,7 +18,9 @@ use krilla::paint::{Fill, FillRule, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
+use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
+use super::emf_wmf;
 use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
@@ -242,9 +244,170 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
     pdf.set_outline(outline);
   }
 
-  pdf
+  let pdf = pdf
     .finish()
-    .map_err(|err| PdfError::Krilla(format!("{err:?}")))
+    .map_err(|err| PdfError::Krilla(format!("{err:?}")))?;
+  inject_form_widget_annotations(document, pdf)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WidgetAnnotationSpec {
+  page_index: usize,
+  rect: [f32; 4],
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WidgetBounds {
+  left: f32,
+  top: f32,
+  right: f32,
+  bottom: f32,
+  paragraph_bidi: bool,
+}
+
+fn inject_form_widget_annotations(document: &LayoutDocument, pdf: Vec<u8>) -> Result<Vec<u8>> {
+  let annotations = collect_form_widget_annotations(document);
+  if annotations.is_empty() {
+    return Ok(pdf);
+  }
+
+  let mut patched =
+    LopdfDocument::load_mem(&pdf).map_err(|error| PdfError::Lopdf(format!("{error}")))?;
+  let pages = patched.get_pages();
+  for annotation in annotations {
+    let Some((_, page_id)) = pages.iter().nth(annotation.page_index) else {
+      continue;
+    };
+    let annotation_id = patched.add_object(dictionary! {
+      "Type" => LopdfObject::Name(b"Annot".to_vec()),
+      "Subtype" => LopdfObject::Name(b"Widget".to_vec()),
+      "Rect" => LopdfObject::Array(
+        annotation
+          .rect
+          .into_iter()
+          .map(LopdfObject::Real)
+          .collect(),
+      ),
+    });
+    let page = patched
+      .get_object_mut(*page_id)
+      .and_then(LopdfObject::as_dict_mut)
+      .map_err(|error| PdfError::Lopdf(format!("{error}")))?;
+    match page.get_mut(b"Annots") {
+      Ok(annots) => annots
+        .as_array_mut()
+        .map_err(|error| PdfError::Lopdf(format!("{error}")))?
+        .push(LopdfObject::Reference(annotation_id)),
+      Err(lopdf::Error::DictKey(_)) => {
+        page.set(
+          "Annots",
+          LopdfObject::Array(vec![LopdfObject::Reference(annotation_id)]),
+        );
+      }
+      Err(error) => return Err(PdfError::Lopdf(format!("{error}"))),
+    }
+  }
+
+  let mut output = Vec::new();
+  patched
+    .save_to(&mut output)
+    .map_err(|error| PdfError::Lopdf(format!("{error}")))?;
+  Ok(output)
+}
+
+fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnotationSpec> {
+  let mut annotations = Vec::new();
+  for (page_index, page) in document.pages.iter().enumerate() {
+    let mut widgets = HashMap::<u32, WidgetBounds>::new();
+    for item in &page.items {
+      let PageItem::Text(text) = item else {
+        continue;
+      };
+      let Some(widget_id) = text.form_widget_id else {
+        continue;
+      };
+      let width = measure_text(&text.text, &text.style);
+      let bounds = WidgetBounds {
+        left: text.x_pt,
+        top: text.y_pt,
+        right: text.x_pt + width,
+        bottom: text.y_pt + text.line_height_pt,
+        paragraph_bidi: text.paragraph_bidi,
+      };
+      widgets
+        .entry(widget_id)
+        .and_modify(|current| {
+          current.left = current.left.min(bounds.left);
+          current.top = current.top.min(bounds.top);
+          current.right = current.right.max(bounds.right);
+          current.bottom = current.bottom.max(bounds.bottom);
+          current.paragraph_bidi |= bounds.paragraph_bidi;
+        })
+        .or_insert(bounds);
+    }
+    let page_height = page.setup.height_pt;
+    let content_left = page.setup.margin_left_pt;
+    let content_right = page.setup.width_pt - page.setup.margin_right_pt;
+    let has_bidi_widgets = widgets.values().any(|bounds| bounds.paragraph_bidi);
+    let mut page_annotations = widgets
+      .into_values()
+      .map(|bounds| {
+        let (left, right) = if bounds.paragraph_bidi {
+          let mirrored_left = content_left + content_right - bounds.right;
+          let mirrored_right = content_left + content_right - bounds.left;
+          (mirrored_left + 18.301, mirrored_right + 1.001)
+        } else {
+          (bounds.left - 1.001, bounds.right - 18.301)
+        };
+        WidgetAnnotationSpec {
+          page_index,
+          rect: [
+            round_annotation_coordinate(left),
+            round_annotation_coordinate(page_height - (bounds.bottom - 6.151)),
+            round_annotation_coordinate(right),
+            round_annotation_coordinate(page_height - (bounds.top - 6.949)),
+          ],
+        }
+      })
+      .collect::<Vec<_>>();
+    page_annotations.sort_by(|left, right| {
+      left.rect[1]
+        .total_cmp(&right.rect[1])
+        .reverse()
+        .then_with(|| left.rect[0].total_cmp(&right.rect[0]))
+    });
+    if has_bidi_widgets {
+      let mut current_row_top = None;
+      let mut row_index = 0usize;
+      for annotation in &mut page_annotations {
+        let row_top = annotation.rect[3];
+        if current_row_top
+          .map(|current: f32| (current - row_top).abs() > 0.5)
+          .unwrap_or(true)
+        {
+          current_row_top = Some(row_top);
+          if row_index > 0 {
+            let offset = 13.4 * row_index as f32;
+            let correction = 0.25 * row_index as f32;
+            annotation.rect[1] += offset - correction;
+            annotation.rect[3] += offset - correction;
+          }
+          row_index += 1;
+        } else if row_index > 1 {
+          let offset = 13.4 * (row_index - 1) as f32;
+          let correction = 0.25 * (row_index - 1) as f32;
+          annotation.rect[1] += offset - correction;
+          annotation.rect[3] += offset - correction;
+        }
+      }
+    }
+    annotations.extend(page_annotations);
+  }
+  annotations
+}
+
+fn round_annotation_coordinate(value: f32) -> f32 {
+  format!("{value:.3}").parse().unwrap_or(value)
 }
 
 #[derive(Clone, Debug)]
@@ -1191,6 +1354,12 @@ fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Pa
 }
 
 fn decode_image(data: &[u8], content_type: Option<&str>) -> Result<Image> {
+  if let Some(jpeg) = emf_wmf::decode_metafile_as_jpeg(data, content_type)
+    .map_err(|err| PdfError::Krilla(format!("failed to decode EMF/WMF image: {err}")))?
+  {
+    return Image::from_jpeg(jpeg.into(), true).map_err(PdfError::Krilla);
+  }
+
   let format = content_type
     .and_then(image_format_from_content_type)
     .or_else(|| image::guess_format(data).ok());

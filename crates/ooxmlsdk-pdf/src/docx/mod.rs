@@ -41,6 +41,7 @@ pub(crate) fn extract(
   let mut numbering = NumberingCatalog::load(package, &main)?;
   let images = ImageCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
+  let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
   let document = main.root_element(package)?;
@@ -51,7 +52,16 @@ pub(crate) fn extract(
   let mut sections = document
     .body
     .as_deref()
-    .map(|body| body_sections(body, &styles, &mut numbering, &images, &hyperlinks))
+    .map(|body| {
+      body_sections(
+        body,
+        &styles,
+        &mut numbering,
+        &images,
+        &hyperlinks,
+        &mut form_widget_ids,
+      )
+    })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
   let supplemental_graphic_blocks = supplemental_graphic_blocks(package, &main, &styles);
   if let Some(first_section) = sections.first_mut() {
@@ -62,7 +72,7 @@ pub(crate) fn extract(
   for section in &mut sections {
     section.page.background = page_background;
   }
-  resolve_section_repeating_blocks(package, &main, &styles, &mut sections);
+  resolve_section_repeating_blocks(package, &main, &styles, &mut sections, &mut form_widget_ids);
   let page = sections
     .first()
     .map(|section| section.page)
@@ -87,11 +97,11 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.first_footer_blocks.clone())
     .unwrap_or_default();
-  let footnotes = footnotes(package, &main, &styles)?;
+  let footnotes = footnotes(package, &main, &styles, &mut form_widget_ids)?;
   let footnote_blocks = flatten_note_blocks(&footnotes);
-  let endnotes = endnotes(package, &main, &styles)?;
+  let endnotes = endnotes(package, &main, &styles, &mut form_widget_ids)?;
   let endnote_blocks = flatten_note_blocks(&endnotes);
-  let comment_blocks = comment_blocks(package, &main, &styles)?;
+  let comment_blocks = comment_blocks(package, &main, &styles, &mut form_widget_ids)?;
   let title_page = sections
     .first()
     .map(|section| section.title_page)
@@ -527,6 +537,7 @@ fn resolve_section_repeating_blocks(
   main: &MainDocumentPart,
   styles: &StylesCatalog,
   sections: &mut [ImportedSection],
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) {
   let mut previous_default_header = Vec::new();
   let mut previous_default_footer = Vec::new();
@@ -556,6 +567,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Default,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_default_header.clone());
     section.footer_blocks = referenced_footer_blocks(
@@ -564,6 +576,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Default,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_default_footer.clone());
     section.first_header_blocks = referenced_header_blocks(
@@ -572,6 +585,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::First,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_first_header.clone());
     section.first_footer_blocks = referenced_footer_blocks(
@@ -580,6 +594,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::First,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_first_footer.clone());
     section.even_header_blocks = referenced_header_blocks(
@@ -588,6 +603,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Even,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_even_header.clone());
     section.even_footer_blocks = referenced_footer_blocks(
@@ -596,6 +612,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Even,
+      form_widget_ids,
     )
     .unwrap_or_else(|| previous_even_footer.clone());
 
@@ -614,6 +631,7 @@ fn body_sections(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
@@ -622,9 +640,23 @@ fn body_sections(
   for choice in &body.body_choice {
     match choice {
       w::BodyChoice::WP(paragraph) => {
-        current_blocks.push(Block::Paragraph(paragraph_model(
-          paragraph, styles, numbering, images, hyperlinks,
-        )));
+        let model = paragraph_model(
+          paragraph,
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          form_widget_ids,
+        );
+        if paragraph_is_effectively_empty(&model)
+          && (current_blocks
+            .last()
+            .is_some_and(|block| matches!(block, Block::Table(_)))
+            || paragraph_empty_font_size_pt(&model) <= 4.5)
+        {
+          continue;
+        }
+        current_blocks.push(Block::Paragraph(model));
         if let Some(section_properties) = paragraph
           .paragraph_properties
           .as_deref()
@@ -640,10 +672,22 @@ fn body_sections(
         }
       }
       w::BodyChoice::WTbl(table) => current_blocks.push(Block::Table(table_model(
-        table, styles, numbering, images, hyperlinks,
+        table,
+        styles,
+        numbering,
+        images,
+        hyperlinks,
+        form_widget_ids,
       ))),
       w::BodyChoice::WSdt(sdt) => {
-        current_blocks.extend(sdt_block_blocks(sdt, styles, numbering, images, hyperlinks));
+        current_blocks.extend(sdt_block_blocks(
+          sdt,
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          form_widget_ids,
+        ));
       }
       _ => {}
     }
@@ -659,6 +703,34 @@ fn body_sections(
   }
 
   sections
+}
+
+fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
+  paragraph.list_label.is_none()
+    && paragraph.footnote_reference_ids.is_empty()
+    && paragraph.endnote_reference_ids.is_empty()
+    && paragraph.inlines.iter().all(|inline| match inline {
+      InlineItem::Text(run) => run.text.trim().is_empty(),
+      InlineItem::Image(_) | InlineItem::Shape(_) => false,
+      InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+      InlineItem::PageBreak | InlineItem::ColumnBreak => false,
+    })
+}
+
+fn paragraph_empty_font_size_pt(paragraph: &Paragraph) -> f32 {
+  paragraph
+    .inlines
+    .iter()
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) => Some(run.style.font_size_pt),
+      InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => None,
+    })
+    .unwrap_or(TextStyle::default().font_size_pt)
 }
 
 fn close_section(
@@ -865,6 +937,7 @@ fn sdt_block_blocks(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<Block> {
   let Some(content) = sdt.sdt_content_block.as_ref() else {
     return Vec::new();
@@ -880,6 +953,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        form_widget_ids,
       ))]),
       w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
         table.as_ref(),
@@ -887,6 +961,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        form_widget_ids,
       ))]),
       w::SdtContentBlockChoice::WSdt(sdt) => Some(sdt_block_blocks(
         sdt.as_ref(),
@@ -894,6 +969,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        form_widget_ids,
       )),
       _ => None,
     })
@@ -907,6 +983,7 @@ fn header_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   header_type: w::HeaderFooterValues,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
   let relationship_id =
     section
@@ -938,6 +1015,7 @@ fn header_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          form_widget_ids,
         ))),
         w::HeaderChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
@@ -945,6 +1023,7 @@ fn header_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          form_widget_ids,
         ))),
         _ => None,
       })
@@ -958,8 +1037,9 @@ fn referenced_header_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   header_type: w::HeaderFooterValues,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
-  header_blocks(package, main, section, styles, header_type)
+  header_blocks(package, main, section, styles, header_type, form_widget_ids)
 }
 
 fn footer_blocks(
@@ -968,6 +1048,7 @@ fn footer_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   footer_type: w::HeaderFooterValues,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
   let relationship_id =
     section
@@ -999,6 +1080,7 @@ fn footer_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          form_widget_ids,
         ))),
         w::FooterChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
@@ -1006,6 +1088,7 @@ fn footer_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          form_widget_ids,
         ))),
         _ => None,
       })
@@ -1019,14 +1102,16 @@ fn referenced_footer_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   footer_type: w::HeaderFooterValues,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
-  footer_blocks(package, main, section, styles, footer_type)
+  footer_blocks(package, main, section, styles, footer_type, form_widget_ids)
 }
 
 fn footnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.footnotes_part(package) else {
     return Ok(BTreeMap::new());
@@ -1035,6 +1120,13 @@ fn footnotes(
   let hyperlinks = HyperlinkCatalog::load(package, &part);
   let footnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
+  let mut context = NoteImportContext {
+    styles,
+    numbering: &mut numbering,
+    images: &images,
+    hyperlinks: &hyperlinks,
+    form_widget_ids,
+  };
   let mut notes = BTreeMap::new();
 
   for footnote in &footnotes.w_footnote {
@@ -1060,10 +1152,7 @@ fn footnotes(
           w::FootnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
-      styles,
-      &mut numbering,
-      &images,
-      &hyperlinks,
+      &mut context,
     );
     notes.insert(footnote.id, blocks);
   }
@@ -1075,6 +1164,7 @@ fn endnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.endnotes_part(package) else {
     return Ok(BTreeMap::new());
@@ -1083,6 +1173,13 @@ fn endnotes(
   let hyperlinks = HyperlinkCatalog::load(package, &part);
   let endnotes = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
+  let mut context = NoteImportContext {
+    styles,
+    numbering: &mut numbering,
+    images: &images,
+    hyperlinks: &hyperlinks,
+    form_widget_ids,
+  };
   let mut notes = BTreeMap::new();
 
   for endnote in &endnotes.w_endnote {
@@ -1108,10 +1205,7 @@ fn endnotes(
           w::EndnoteChoice::WP(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
-      styles,
-      &mut numbering,
-      &images,
-      &hyperlinks,
+      &mut context,
     );
     notes.insert(endnote.id, blocks);
   }
@@ -1130,6 +1224,7 @@ fn comment_blocks(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<Vec<Block>> {
   let Some(part) = main.wordprocessing_comments_part(package) else {
     return Ok(Vec::new());
@@ -1138,6 +1233,13 @@ fn comment_blocks(
   let hyperlinks = HyperlinkCatalog::load(package, &part);
   let comments = part.root_element(package)?;
   let mut numbering = NumberingCatalog::default();
+  let mut context = NoteImportContext {
+    styles,
+    numbering: &mut numbering,
+    images: &images,
+    hyperlinks: &hyperlinks,
+    form_widget_ids,
+  };
   let mut blocks = Vec::new();
 
   for comment in &comments.w_comment {
@@ -1151,10 +1253,7 @@ fn comment_blocks(
           w::CommentChoice::WP(paragraph) => Some(paragraph.as_ref()),
           _ => None,
         }),
-      styles,
-      &mut numbering,
-      &images,
-      &hyperlinks,
+      &mut context,
     );
   }
 
@@ -1176,18 +1275,30 @@ impl NoteLabel {
   }
 }
 
+struct NoteImportContext<'a> {
+  styles: &'a StylesCatalog,
+  numbering: &'a mut NumberingCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
+}
+
 fn append_note_blocks<'a>(
   blocks: &mut Vec<Block>,
   label: NoteLabel,
   paragraphs: impl Iterator<Item = &'a w::Paragraph>,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
+  context: &mut NoteImportContext<'_>,
 ) {
   let mut is_first_paragraph = true;
   for paragraph in paragraphs {
-    let mut model = paragraph_model(paragraph, styles, numbering, images, hyperlinks);
+    let mut model = paragraph_model(
+      paragraph,
+      context.styles,
+      context.numbering,
+      context.images,
+      context.hyperlinks,
+      context.form_widget_ids,
+    );
     if is_first_paragraph {
       prepend_note_marker(&mut model, &label);
       is_first_paragraph = false;
@@ -1222,6 +1333,7 @@ fn table_model(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Table {
   let properties = table.w_tbl_pr.as_deref();
   let table_style_id = properties
@@ -1289,6 +1401,7 @@ fn table_model(
         numbering,
         images,
         hyperlinks,
+        form_widget_ids,
         cell_margins,
         table_style: &table_style,
         table_look,
@@ -1348,11 +1461,7 @@ fn table_row_model(
         .map(|(cell_index, cell)| {
           table_cell_model(
             cell,
-            context.styles,
-            context.numbering,
-            context.images,
-            context.hyperlinks,
-            context.cell_margins,
+            context,
             table_cell_style_for(
               context.table_style,
               TableCellStyleContext {
@@ -1447,11 +1556,7 @@ fn table_cell_style_for(
 
 fn table_cell_model(
   cell: &w::TableCell,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  default_margins: CellMargins,
+  context: &mut TableImportContext<'_>,
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
@@ -1461,10 +1566,11 @@ fn table_cell_model(
     .filter_map(|choice| match choice {
       w::TableCellChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model_with_base(
         paragraph,
-        styles,
-        numbering,
-        images,
-        hyperlinks,
+        context.styles,
+        context.numbering,
+        context.images,
+        context.hyperlinks,
+        context.form_widget_ids,
         ParagraphImportBase {
           format: style.paragraph_format.clone(),
           run_style: style.run_style.clone(),
@@ -1472,7 +1578,12 @@ fn table_cell_model(
         },
       ))),
       w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
-        table, styles, numbering, images, hyperlinks,
+        table,
+        context.styles,
+        context.numbering,
+        context.images,
+        context.hyperlinks,
+        context.form_widget_ids,
       ))),
       _ => None,
     })
@@ -1489,9 +1600,9 @@ fn table_cell_model(
       .unwrap_or(style.borders),
     margins: properties
       .and_then(|properties| properties.table_cell_margin.as_deref())
-      .map(|margins| table_cell_margin(margins, default_margins))
+      .map(|margins| table_cell_margin(margins, context.cell_margins))
       .or(style.margins)
-      .unwrap_or(default_margins),
+      .unwrap_or(context.cell_margins),
     preferred_width_pt: properties
       .and_then(|properties| properties.table_cell_width.as_ref())
       .and_then(table_cell_width_to_points),
@@ -1927,7 +2038,7 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
         None | Some(w::LineSpacingRuleValues::Auto) => {
           format.line_height_rule = LineHeightRule::Auto;
           if let Ok(value) = line.parse::<f32>() {
-            format.line_height_pt = Some(14.0 * (value / 240.0).max(0.1));
+            format.line_height_pt = Some((value / 240.0).max(0.1));
           }
         }
         Some(w::LineSpacingRuleValues::AtLeast) => {
@@ -1988,6 +2099,10 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
     };
   }
 
+  if let Some(bidi) = properties.bidi() {
+    format.bidi = bidi.val.is_none_or(|value| value.as_bool());
+  }
+
   if let Some(shading) = properties.shading() {
     format.shading = shading_fill(shading);
   }
@@ -2036,8 +2151,15 @@ fn paragraph_inlines(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<InlineItem> {
   let mut inlines = Vec::new();
+  let mut inline_context = InlineImportContext {
+    styles,
+    images,
+    hyperlinks,
+    form_widget_ids,
+  };
   let mut complex_field = None;
 
   for choice in &paragraph.paragraph_choice {
@@ -2061,9 +2183,10 @@ fn paragraph_inlines(
           field,
           &mut inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          inline_context.styles,
+          inline_context.images,
+          inline_context.hyperlinks,
+          inline_context.form_widget_ids,
         );
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
@@ -2106,10 +2229,8 @@ fn paragraph_inlines(
         sdt,
         &mut inlines,
         base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
         None,
+        &mut inline_context,
       ),
       _ => {}
     }
@@ -2133,6 +2254,13 @@ struct RunImportContext<'a> {
   styles: &'a StylesCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+}
+
+struct InlineImportContext<'a> {
+  styles: &'a StylesCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
 }
 
 fn push_run_or_complex_field(
@@ -2340,12 +2468,19 @@ fn push_simple_field(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) {
   if let Some(kind) = dynamic_field_kind(&field.instruction) {
     push_dynamic_field(inlines, kind, base_style, None);
     return;
   }
 
+  let mut inline_context = InlineImportContext {
+    styles,
+    images,
+    hyperlinks,
+    form_widget_ids,
+  };
   for choice in &field.simple_field_choice {
     match choice {
       w::SimpleFieldChoice::WR(run) => push_run(
@@ -2378,20 +2513,15 @@ fn push_simple_field(
           field,
           inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          inline_context.styles,
+          inline_context.images,
+          inline_context.hyperlinks,
+          inline_context.form_widget_ids,
         );
       }
-      w::SimpleFieldChoice::WSdt(sdt) => push_sdt_run(
-        sdt,
-        inlines,
-        base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
-        None,
-      ),
+      w::SimpleFieldChoice::WSdt(sdt) => {
+        push_sdt_run(sdt, inlines, base_style.clone(), None, &mut inline_context)
+      }
       _ => {}
     }
   }
@@ -2557,14 +2687,27 @@ fn push_sdt_run(
   sdt: &w::SdtRun,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
+  context: &mut InlineImportContext<'_>,
 ) {
   let Some(content) = sdt.sdt_content_run.as_ref() else {
     return;
   };
+  let widget_id = sdt
+    .sdt_properties
+    .as_ref()
+    .filter(|properties| {
+      properties.sdt_properties_choice.iter().any(|choice| {
+        matches!(
+          choice,
+          w::SdtPropertiesChoice::WComboBox(_) | w::SdtPropertiesChoice::WDropDownList(_)
+        )
+      })
+    })
+    .map(|_| context.form_widget_ids.next_id());
+  if let Some(widget_id) = widget_id {
+    inlines.push(InlineItem::FormWidgetStart(widget_id));
+  }
 
   for choice in &content.sdt_content_run_choice {
     match choice {
@@ -2572,9 +2715,9 @@ fn push_sdt_run(
         run.as_ref(),
         inlines,
         base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
+        context.styles,
+        context.images,
+        context.hyperlinks,
         hyperlink_url,
       ),
       w::SdtContentRunChoice::WFldSimple(field) => {
@@ -2582,13 +2725,14 @@ fn push_sdt_run(
           field.as_ref(),
           inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          context.styles,
+          context.images,
+          context.hyperlinks,
+          context.form_widget_ids,
         );
       }
       w::SdtContentRunChoice::WHyperlink(hyperlink) => {
-        let nested_url = self::hyperlink_url(hyperlink, hyperlinks)
+        let nested_url = self::hyperlink_url(hyperlink, context.hyperlinks)
           .or_else(|| hyperlink_url.map(ToString::to_string));
         for item in &hyperlink.hyperlink_choice {
           if let w::HyperlinkChoice::WR(run) = item {
@@ -2596,9 +2740,9 @@ fn push_sdt_run(
               run,
               inlines,
               base_style.clone(),
-              styles,
-              images,
-              hyperlinks,
+              context.styles,
+              context.images,
+              context.hyperlinks,
               nested_url.as_deref(),
             );
           }
@@ -2608,19 +2752,17 @@ fn push_sdt_run(
         sdt.as_ref(),
         inlines,
         base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
         hyperlink_url,
+        context,
       ),
       w::SdtContentRunChoice::WIns(inserted) => {
         push_inserted_run(
           inserted.as_ref(),
           inlines,
           base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
+          context.styles,
+          context.images,
+          context.hyperlinks,
           hyperlink_url,
         );
       }
@@ -2629,6 +2771,9 @@ fn push_sdt_run(
       | w::SdtContentRunChoice::WMoveTo(_) => {}
       _ => {}
     }
+  }
+  if let Some(widget_id) = widget_id {
+    inlines.push(InlineItem::FormWidgetEnd(widget_id));
   }
 }
 
@@ -4065,11 +4210,19 @@ fn push_textbox_content(
   images: &ImageCatalog,
 ) {
   let mut numbering = NumberingCatalog::default();
+  let mut form_widget_ids = FormWidgetIdAllocator::default();
   let hyperlinks = HyperlinkCatalog::default();
   for choice in &content.text_box_content_choice {
     match choice {
       w::TextBoxContentChoice::WP(paragraph) => {
-        let paragraph = paragraph_model(paragraph, styles, &mut numbering, images, &hyperlinks);
+        let paragraph = paragraph_model(
+          paragraph,
+          styles,
+          &mut numbering,
+          images,
+          &hyperlinks,
+          &mut form_widget_ids,
+        );
         inlines.extend(paragraph.inlines);
         inlines.push(InlineItem::Text(TextRun {
           text: "\n".into(),
@@ -4079,7 +4232,14 @@ fn push_textbox_content(
         }));
       }
       w::TextBoxContentChoice::WTbl(table) => {
-        let table = table_model(table, styles, &mut numbering, images, &hyperlinks);
+        let table = table_model(
+          table,
+          styles,
+          &mut numbering,
+          images,
+          &hyperlinks,
+          &mut form_widget_ids,
+        );
         push_table_text(&table, inlines, base_style.clone());
       }
       _ => {}
@@ -4729,6 +4889,7 @@ struct TableImportContext<'a> {
   numbering: &'a mut NumberingCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
   cell_margins: CellMargins,
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
@@ -6121,6 +6282,15 @@ impl<'a> ParagraphProps<'a> {
     }
   }
 
+  fn bidi(&self) -> Option<&'a w::BiDi> {
+    match self {
+      Self::Direct(properties) => properties.bi_di.as_ref(),
+      Self::Style(properties) => properties.bi_di.as_ref(),
+      Self::BaseStyle(properties) => properties.bi_di.as_ref(),
+      Self::Previous(properties) => properties.bi_di.as_ref(),
+    }
+  }
+
   fn paragraph_borders(&self) -> Option<&'a w::ParagraphBorders> {
     match self {
       Self::Direct(properties) => properties.paragraph_borders.as_deref(),
@@ -6881,6 +7051,7 @@ mod tests {
       &mut numbering,
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
+      &mut FormWidgetIdAllocator::default(),
       ParagraphImportBase {
         format: base_format,
         run_style: base_run_style,
@@ -6940,16 +7111,23 @@ mod tests {
       ..Default::default()
     };
     let mut numbering = NumberingCatalog::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let mut context = TableImportContext {
+      styles: &styles,
+      numbering: &mut numbering,
+      images: &images,
+      hyperlinks: &hyperlinks,
+      form_widget_ids: &mut form_widget_ids,
+      cell_margins: CellMargins::default(),
+      table_style: &TableStyleModel::default(),
+      table_look: TableLookModel::default(),
+      row_count: 1,
+    };
 
-    let cell = table_cell_model(
-      &cell,
-      &StylesCatalog::default(),
-      &mut numbering,
-      &ImageCatalog::default(),
-      &HyperlinkCatalog::default(),
-      CellMargins::default(),
-      style,
-    );
+    let cell = table_cell_model(&cell, &mut context, style);
 
     let Block::Paragraph(paragraph) = &cell.blocks[0] else {
       panic!("expected paragraph");
@@ -6986,6 +7164,7 @@ mod tests {
       &StylesCatalog::default(),
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
+      &mut FormWidgetIdAllocator::default(),
     );
 
     let InlineItem::Text(run) = &inlines[0] else {
@@ -7109,6 +7288,8 @@ mod tests {
         InlineItem::Image(image) => Some(image),
         InlineItem::Text(_)
         | InlineItem::Shape(_)
+        | InlineItem::FormWidgetStart(_)
+        | InlineItem::FormWidgetEnd(_)
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })
@@ -7295,6 +7476,7 @@ mod tests {
       &mut numbering,
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
+      &mut FormWidgetIdAllocator::default(),
     );
 
     assert_eq!(sections.len(), 2);
@@ -7425,6 +7607,8 @@ mod tests {
         InlineItem::Text(run) => Some(run.text.as_str()),
         InlineItem::Image(_)
         | InlineItem::Shape(_)
+        | InlineItem::FormWidgetStart(_)
+        | InlineItem::FormWidgetEnd(_)
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })

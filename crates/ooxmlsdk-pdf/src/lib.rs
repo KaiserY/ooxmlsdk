@@ -2589,6 +2589,9 @@ mod tests {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_) => None,
         crate::docx::InlineItem::Shape(_) => None,
+        crate::docx::InlineItem::FormWidgetStart(_) | crate::docx::InlineItem::FormWidgetEnd(_) => {
+          None
+        }
         crate::docx::InlineItem::PageBreak | crate::docx::InlineItem::ColumnBreak => None,
       })
       .expect("inline image");
@@ -2689,6 +2692,8 @@ mod tests {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_)
         | crate::docx::InlineItem::Shape(_)
+        | crate::docx::InlineItem::FormWidgetStart(_)
+        | crate::docx::InlineItem::FormWidgetEnd(_)
         | crate::docx::InlineItem::PageBreak
         | crate::docx::InlineItem::ColumnBreak => None,
       })

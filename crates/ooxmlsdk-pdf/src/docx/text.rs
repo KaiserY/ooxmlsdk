@@ -1,9 +1,9 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
 use super::{
-  HyperlinkCatalog, ImageCatalog, NumberingCatalog, Paragraph, ParagraphFormat, ParagraphProps,
-  RunStyleOverrides, StylesCatalog, TextStyle, paragraph_inlines, paragraph_note_reference_ids,
-  properties,
+  FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog, Paragraph,
+  ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
+  paragraph_inlines, paragraph_note_reference_ids, properties,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -19,6 +19,7 @@ pub(super) fn paragraph_model(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Paragraph {
   paragraph_model_with_base(
     paragraph,
@@ -26,6 +27,7 @@ pub(super) fn paragraph_model(
     numbering,
     images,
     hyperlinks,
+    form_widget_ids,
     ParagraphImportBase::default(),
   )
 }
@@ -36,6 +38,7 @@ pub(super) fn paragraph_model_with_base(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  form_widget_ids: &mut FormWidgetIdAllocator,
   base: ParagraphImportBase,
 ) -> Paragraph {
   let style_id = paragraph
@@ -58,13 +61,24 @@ pub(super) fn paragraph_model_with_base(
     .and_then(|properties| properties.numbering_properties.as_deref())
     .and_then(|properties| numbering.next_label(properties, &mut format));
 
-  let inlines = paragraph_inlines(
+  let run_style =
+    properties::paragraph_run_style(styles, style_id, base.run_style, base.run_overrides);
+  let mut inlines = paragraph_inlines(
     paragraph,
-    properties::paragraph_run_style(styles, style_id, base.run_style, base.run_overrides),
+    run_style.clone(),
     styles,
     images,
     hyperlinks,
+    form_widget_ids,
   );
+  if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
+    inlines.push(super::InlineItem::Text(TextRun {
+      text: String::new(),
+      style: run_style,
+      hyperlink_url: None,
+      dynamic_field: None,
+    }));
+  }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
   #[cfg(test)]
   let runs = inlines
@@ -73,6 +87,7 @@ pub(super) fn paragraph_model_with_base(
       super::InlineItem::Text(run) => Some(run.clone()),
       super::InlineItem::Image(_) => None,
       super::InlineItem::Shape(_) => None,
+      super::InlineItem::FormWidgetStart(_) | super::InlineItem::FormWidgetEnd(_) => None,
       super::InlineItem::PageBreak | super::InlineItem::ColumnBreak => None,
     })
     .collect();
@@ -87,4 +102,27 @@ pub(super) fn paragraph_model_with_base(
     list_label,
     list_label_hyperlink_url: None,
   }
+}
+
+fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
+  let Some(properties) = paragraph.paragraph_properties.as_deref() else {
+    return false;
+  };
+  let Some(run_properties) = properties.paragraph_mark_run_properties.as_deref() else {
+    return false;
+  };
+
+  run_properties
+    .w_sz
+    .as_ref()
+    .map(|size| size.val.as_str())
+    .or_else(|| {
+      run_properties
+        .w_sz_cs
+        .as_ref()
+        .map(|size| size.val.as_str())
+    })
+    .and_then(|value| value.parse::<f32>().ok())
+    .map(|half_points| half_points <= 9.0)
+    .unwrap_or(false)
 }

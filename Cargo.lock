@@ -1234,6 +1234,7 @@ dependencies = [
  "image",
  "krilla",
  "krilla-svg",
+ "lopdf",
  "ooxmlsdk",
  "png 0.18.1",
  "quick-xml",

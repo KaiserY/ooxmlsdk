@@ -17,8 +17,8 @@ const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
-const TABLE_ROW_MIN_HEIGHT_PT: f32 = 24.0;
-const TABLE_SPACING_AFTER_PT: f32 = 6.0;
+const TABLE_ROW_MIN_HEIGHT_PT: f32 = DEFAULT_LINE_HEIGHT_PT;
+const TABLE_SPACING_AFTER_PT: f32 = 0.0;
 const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
 const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
 const DEFAULT_ORPHAN_LINES: usize = 2;
@@ -27,6 +27,36 @@ const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
 
 fn inline_text_height(style: &TextStyle) -> f32 {
   inline_text_box_height(style)
+}
+
+fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
+  paragraph
+    .inlines
+    .iter()
+    .find_map(|inline| match inline {
+      InlineItem::Text(run) => Some(run.style.clone()),
+      InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => None,
+    })
+    .unwrap_or_default()
+}
+
+fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &TextStyle) -> f32 {
+  match paragraph.format.line_height_rule {
+    LineHeightRule::Auto => paragraph
+      .format
+      .line_height_pt
+      .map(|multiple| inline_text_height(base_line_style) * multiple)
+      .unwrap_or_else(|| inline_text_height(base_line_style)),
+    LineHeightRule::AtLeast | LineHeightRule::Exact => paragraph
+      .format
+      .line_height_pt
+      .unwrap_or_else(|| inline_text_height(base_line_style)),
+  }
 }
 
 fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyle) -> f32 {
@@ -363,6 +393,8 @@ pub(crate) struct TextItem {
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  pub form_widget_id: Option<u32>,
+  pub paragraph_bidi: bool,
   pub decoration_span_start_x_pt: Option<f32>,
 }
 
@@ -579,6 +611,10 @@ impl<'a> RootFrameLayout<'a> {
     reflow_requests.extend(remaining_decoration_reflow_requests);
     let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
     let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
+    let page_count = self.pages.len();
+    self
+      .follows
+      .retain(|follow| follow.from_page_index < page_count && follow.to_page_index < page_count);
 
     LayoutDocument {
       pages: self.pages,
@@ -1146,6 +1182,8 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
       InlineItem::Text(text) => Some(text.text.as_str()),
       InlineItem::Image(_)
       | InlineItem::Shape(_)
+      | InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
@@ -2367,7 +2405,8 @@ fn prepare_block_flow(
 fn block_should_stay_together(block: &Block, next: Option<&Block>) -> bool {
   match block {
     Block::Paragraph(paragraph) => {
-      paragraph.format.keep_lines || (paragraph.format.keep_with_next && next.is_some())
+      paragraph.format.keep_lines
+        || (paragraph.format.keep_with_next && matches!(next, Some(Block::Paragraph(_))))
     }
     Block::Table(_) => false,
   }
@@ -2377,9 +2416,9 @@ fn keep_group_height(block: &Block, next: Option<&Block>, flow: FlowContext) -> 
   let mut height = estimated_block_height(block, flow);
   if let Block::Paragraph(paragraph) = block
     && paragraph.format.keep_with_next
-    && let Some(next) = next
+    && let Some(Block::Paragraph(next)) = next
   {
-    height += estimated_block_height(next, flow);
+    height += estimated_paragraph_height(next, flow);
   }
   height
 }
@@ -2400,10 +2439,8 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
   let content_width =
     (flow.content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
       .max(DEFAULT_FONT_SIZE_PT);
-  let line_height = paragraph
-    .format
-    .line_height_pt
-    .unwrap_or(DEFAULT_LINE_HEIGHT_PT);
+  let base_line_style = paragraph_base_line_style(paragraph);
+  let line_height = paragraph_line_height(paragraph, &base_line_style);
   let mut line_count = 1usize;
   let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
 
@@ -2443,6 +2480,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         line_count += (shape.height_pt / line_height).ceil().max(1.0) as usize - 1;
         x = shape.width_pt;
       }
+      InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => {}
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
         line_count += 1;
         x = 0.0;
@@ -3308,6 +3346,8 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           style: TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          form_widget_id: None,
+          paragraph_bidi: false,
           decoration_span_start_x_pt: None,
         }));
       }
@@ -3518,7 +3558,6 @@ impl<'a> TableFrameLayout<'a> {
     !row.row.cant_split
       && !row_has_vertical_merge_context(self.table, row.row_index)
       && row.bottom() > self.frame.block.content_bottom
-      && !row.fits_empty_body_region()
       && row.y < self.frame.block.content_bottom
       && !current.items.is_empty()
   }
@@ -4466,8 +4505,21 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
   let content = cell
     .blocks
     .iter()
-    .map(|block| match block {
-      Block::Paragraph(paragraph) => estimated_paragraph_height(paragraph, flow),
+    .enumerate()
+    .map(|(index, block)| match block {
+      Block::Paragraph(paragraph) => {
+        let estimated = estimated_paragraph_height(paragraph, flow);
+        let min_height = paragraph_line_height(paragraph, &paragraph_base_line_style(paragraph));
+        let trailing_spacing = if index + 1 == cell.blocks.len() {
+          paragraph
+            .format
+            .spacing_after_pt
+            .max(PARAGRAPH_SPACING_AFTER_PT)
+        } else {
+          0.0
+        };
+        (estimated - trailing_spacing).max(min_height)
+      }
       Block::Table(table) => table
         .rows
         .iter()
@@ -4476,7 +4528,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
         .max(TABLE_ROW_MIN_HEIGHT_PT),
     })
     .sum::<f32>()
-    .max(DEFAULT_LINE_HEIGHT_PT);
+    .max(inline_text_height(&table_cell_first_line_style(cell)));
   cell.margins.top_pt + content + cell.margins.bottom_pt
 }
 
@@ -4567,15 +4619,13 @@ impl TextFrame {
     let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
     let first_line_left =
       (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
+    let base_line_style = paragraph_base_line_style(paragraph);
     Self {
       default_line_left,
       first_line_left,
       default_line_right: default_line_left + flow.content_width,
       paragraph_left: default_line_left.min(first_line_left),
-      base_line_height: paragraph
-        .format
-        .line_height_pt
-        .unwrap_or(DEFAULT_LINE_HEIGHT_PT),
+      base_line_height: paragraph_line_height(paragraph, &base_line_style),
       line_height_rule: paragraph.format.line_height_rule,
     }
   }
@@ -4938,6 +4988,8 @@ impl<'a> TextFrameLayout<'a> {
         style: TextStyle::default(),
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
+        form_widget_id: None,
+        paragraph_bidi: false,
         decoration_span_start_x_pt: None,
       }));
       x = default_line_left;
@@ -4945,12 +4997,19 @@ impl<'a> TextFrameLayout<'a> {
     let mut line_item_start_index = current.items.len();
     let justify_wrapped_lines =
       paragraph.format.alignment == ParagraphAlignment::Justify && paragraph.list_label.is_none();
+    let mut active_form_widget_ids = Vec::new();
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
         InlineItem::Text(run) => {
           let mut chunk = String::new();
           let mut chunk_x = x;
+          let meta = TextChunkMeta {
+            hyperlink_url: run.hyperlink_url.as_deref(),
+            dynamic_field: run.dynamic_field,
+            form_widget_id: active_form_widget_ids.last().copied(),
+            paragraph_bidi: paragraph.format.bidi,
+          };
 
           for segment in text_segments_with_offsets(&run.text) {
             if segment.text == "\n" {
@@ -4967,8 +5026,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                run.hyperlink_url.as_deref(),
-                run.dynamic_field,
+                meta,
               );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
@@ -5011,8 +5069,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                run.hyperlink_url.as_deref(),
-                run.dynamic_field,
+                meta,
               );
               let mut tab_stop = next_tab_stop(
                 x,
@@ -5078,8 +5135,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                run.hyperlink_url.as_deref(),
-                run.dynamic_field,
+                meta,
               );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
@@ -5132,8 +5188,7 @@ impl<'a> TextFrameLayout<'a> {
                         },
                         &mut chunk,
                         &run.style,
-                        run.hyperlink_url.as_deref(),
-                        run.dynamic_field,
+                        meta,
                       );
                       (flow, text_frame, y, line_left, line_right) = self.advance_line(
                         TextLineAdvance {
@@ -5187,8 +5242,7 @@ impl<'a> TextFrameLayout<'a> {
                     },
                     &mut chunk,
                     &run.style,
-                    run.hyperlink_url.as_deref(),
-                    run.dynamic_field,
+                    meta,
                   );
                   (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
@@ -5251,8 +5305,7 @@ impl<'a> TextFrameLayout<'a> {
               },
               &mut chunk,
               &run.style,
-              run.hyperlink_url.as_deref(),
-              run.dynamic_field,
+              meta,
             );
           }
 
@@ -5265,9 +5318,23 @@ impl<'a> TextFrameLayout<'a> {
             },
             &mut chunk,
             &run.style,
-            run.hyperlink_url.as_deref(),
-            run.dynamic_field,
+            meta,
           );
+        }
+        InlineItem::FormWidgetStart(widget_id) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+          active_form_widget_ids.push(*widget_id);
+        }
+        InlineItem::FormWidgetEnd(widget_id) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+          if let Some(position) = active_form_widget_ids
+            .iter()
+            .rposition(|active_widget_id| active_widget_id == widget_id)
+          {
+            active_form_widget_ids.truncate(position);
+          }
         }
         InlineItem::Image(image) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
@@ -5923,6 +5990,8 @@ fn justified_text_segments(
           style: text.style.clone(),
           hyperlink_url: text.hyperlink_url.clone(),
           dynamic_field: text.dynamic_field,
+          form_widget_id: text.form_widget_id,
+          paragraph_bidi: text.paragraph_bidi,
           decoration_span_start_x_pt: text.decoration_span_start_x_pt,
         }));
         cursor_x += width;
@@ -5941,6 +6010,8 @@ fn justified_text_segments(
       style: text.style.clone(),
       hyperlink_url: text.hyperlink_url,
       dynamic_field: text.dynamic_field,
+      form_widget_id: text.form_widget_id,
+      paragraph_bidi: text.paragraph_bidi,
       decoration_span_start_x_pt: text.decoration_span_start_x_pt,
     }));
   }
@@ -6035,13 +6106,20 @@ struct TextPlacement {
   line_height_pt: f32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct TextChunkMeta<'a> {
+  hyperlink_url: Option<&'a str>,
+  dynamic_field: Option<DynamicFieldKind>,
+  form_widget_id: Option<u32>,
+  paragraph_bidi: bool,
+}
+
 fn flush_text(
   page: &mut Page,
   placement: TextPlacement,
   chunk: &mut String,
   style: &TextStyle,
-  hyperlink_url: Option<&str>,
-  dynamic_field: Option<DynamicFieldKind>,
+  meta: TextChunkMeta<'_>,
 ) {
   if chunk.is_empty() {
     return;
@@ -6053,8 +6131,10 @@ fn flush_text(
     line_height_pt: placement.line_height_pt,
     text: std::mem::take(chunk),
     style: style.clone(),
-    hyperlink_url: hyperlink_url.map(ToString::to_string),
-    dynamic_field,
+    hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
+    dynamic_field: meta.dynamic_field,
+    form_widget_id: meta.form_widget_id,
+    paragraph_bidi: meta.paragraph_bidi,
     decoration_span_start_x_pt: None,
   }));
 }

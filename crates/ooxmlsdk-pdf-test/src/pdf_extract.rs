@@ -717,7 +717,7 @@ fn lopdf_rect(document: &LopdfDocument, object: &LopdfObject) -> Result<String, 
   }
 
   Ok(format!(
-    "[{:.6} {:.6} {:.6} {:.6}]",
+    "[{:.3} {:.3} {:.3} {:.3}]",
     numbers[0], numbers[1], numbers[2], numbers[3]
   ))
 }

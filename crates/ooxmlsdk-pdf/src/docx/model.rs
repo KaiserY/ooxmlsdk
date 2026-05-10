@@ -212,6 +212,7 @@ pub(crate) struct ParagraphFormat {
   pub first_line_indent_pt: f32,
   pub tab_stops: Vec<TabStop>,
   pub alignment: ParagraphAlignment,
+  pub bidi: bool,
   pub shading: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub page_break_before: bool,
@@ -260,6 +261,19 @@ pub(crate) struct TextRun {
   pub dynamic_field: Option<DynamicFieldKind>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct FormWidgetIdAllocator {
+  next_id: u32,
+}
+
+impl FormWidgetIdAllocator {
+  pub(crate) fn next_id(&mut self) -> u32 {
+    let id = self.next_id;
+    self.next_id = self.next_id.saturating_add(1);
+    id
+  }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DynamicFieldKind {
   Page,
@@ -271,6 +285,8 @@ pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
   Shape(InlineShape),
+  FormWidgetStart(u32),
+  FormWidgetEnd(u32),
   PageBreak,
   ColumnBreak,
 }

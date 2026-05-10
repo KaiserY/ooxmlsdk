@@ -349,6 +349,7 @@ pub(crate) struct Page {
 pub(crate) enum PageItem {
   Text(TextItem),
   Image(ImageItem),
+  Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
 }
@@ -362,6 +363,7 @@ pub(crate) struct TextItem {
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  pub decoration_span_start_x_pt: Option<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -380,6 +382,16 @@ pub(crate) struct ImageItem {
   pub hyperlink_url: Option<String>,
   pub floating: bool,
   pub behind_text: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RectItem {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub fill_color: Option<RgbColor>,
+  pub stroke: Option<BorderStyle>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1132,7 +1144,10 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
     .iter()
     .filter_map(|inline| match inline {
       InlineItem::Text(text) => Some(text.text.as_str()),
-      InlineItem::Image(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
+      InlineItem::Image(_)
+      | InlineItem::Shape(_)
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => None,
     })
     .collect::<String>()
     .trim()
@@ -2100,7 +2115,7 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
-    PageItem::Image(_) | PageItem::Fill(_) | PageItem::Line(_) => None,
+    PageItem::Image(_) | PageItem::Rect(_) | PageItem::Fill(_) | PageItem::Line(_) => None,
   }
 }
 
@@ -2120,6 +2135,12 @@ fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
       image.y_pt,
       image.x_pt + image.width_pt,
       image.y_pt + image.height_pt,
+    )),
+    PageItem::Rect(rect) => Some((
+      rect.x_pt,
+      rect.y_pt,
+      rect.x_pt + rect.width_pt,
+      rect.y_pt + rect.height_pt,
     )),
     PageItem::Fill(fill) => Some((
       fill.x_pt,
@@ -2414,6 +2435,13 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         }
         line_count += (height / line_height).ceil().max(1.0) as usize - 1;
         x = width;
+      }
+      InlineItem::Shape(shape) => {
+        if x + shape.width_pt > content_width && x > 0.0 {
+          line_count += 1;
+        }
+        line_count += (shape.height_pt / line_height).ceil().max(1.0) as usize - 1;
+        x = shape.width_pt;
       }
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
         line_count += 1;
@@ -3280,6 +3308,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           style: TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          decoration_span_start_x_pt: None,
         }));
       }
       y += DEFAULT_LINE_HEIGHT_PT;
@@ -4412,6 +4441,7 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
   match item {
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
+    PageItem::Rect(rect) => rect.y_pt + rect.height_pt >= top && rect.y_pt <= bottom,
     PageItem::Fill(_) | PageItem::Line(_) => true,
   }
 }
@@ -4908,6 +4938,7 @@ impl<'a> TextFrameLayout<'a> {
         style: TextStyle::default(),
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
+        decoration_span_start_x_pt: None,
       }));
       x = default_line_left;
     }
@@ -5211,6 +5242,18 @@ impl<'a> TextFrameLayout<'a> {
             });
             line_height = include_text_height(line_height, text_frame, &run.style);
             emitted = true;
+            flush_text(
+              current,
+              TextPlacement {
+                x_pt: chunk_x,
+                y_pt: y,
+                line_height_pt: line_height,
+              },
+              &mut chunk,
+              &run.style,
+              run.hyperlink_url.as_deref(),
+              run.dynamic_field,
+            );
           }
 
           flush_text(
@@ -5364,6 +5407,62 @@ impl<'a> TextFrameLayout<'a> {
           }));
           x += width;
           line_height = line_height.max(height);
+          emitted = true;
+        }
+        InlineItem::Shape(shape) => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+          let place_rect = |current: &mut Page, x_pt: f32, y_pt: f32| {
+            current.items.push(PageItem::Rect(RectItem {
+              x_pt,
+              y_pt,
+              width_pt: shape.width_pt,
+              height_pt: shape.height_pt,
+              fill_color: shape.fill_color,
+              stroke: shape.stroke,
+            }));
+          };
+
+          match shape.placement {
+            crate::docx::ImagePlacement::Floating(placement) => {
+              let (shape_x, shape_y) =
+                floating_image_position(placement, flow, x, y, shape.width_pt, shape.height_pt);
+              place_rect(
+                current,
+                shape_x + shape.offset_x_pt,
+                shape_y + shape.offset_y_pt,
+              );
+            }
+            crate::docx::ImagePlacement::Inline => {
+              if x + shape.width_pt > line_right && x > line_left {
+                (flow, text_frame, y, line_left, line_right) = self.advance_line(
+                  TextLineAdvance {
+                    current,
+                    pages,
+                    wrap_exclusions: &wrap_exclusions,
+                    state: &mut text_state,
+                    active: ActiveTextFrame {
+                      flow,
+                      frame: text_frame,
+                    },
+                    line_left,
+                    line_right,
+                    justify: justify_wrapped_lines,
+                    line_item_start_index: &mut line_item_start_index,
+                  },
+                  y,
+                  &mut line_height,
+                );
+                default_line_right = text_frame.default_line_right;
+                paragraph_left = text_frame.paragraph_left;
+                base_line_height = text_frame.base_line_height;
+                x = line_left;
+              }
+              place_rect(current, x + shape.offset_x_pt, y + shape.offset_y_pt);
+              x += shape.width_pt;
+              line_height = line_height.max(shape.height_pt);
+            }
+          }
           emitted = true;
         }
         InlineItem::PageBreak => {
@@ -5824,6 +5923,7 @@ fn justified_text_segments(
           style: text.style.clone(),
           hyperlink_url: text.hyperlink_url.clone(),
           dynamic_field: text.dynamic_field,
+          decoration_span_start_x_pt: text.decoration_span_start_x_pt,
         }));
         cursor_x += width;
       }
@@ -5841,6 +5941,7 @@ fn justified_text_segments(
       style: text.style.clone(),
       hyperlink_url: text.hyperlink_url,
       dynamic_field: text.dynamic_field,
+      decoration_span_start_x_pt: text.decoration_span_start_x_pt,
     }));
   }
   items
@@ -5850,6 +5951,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) => Some(image.y_pt),
+    PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
   }
@@ -5859,6 +5961,7 @@ fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
   match item {
     PageItem::Text(text) => Some((text.x_pt, measure_text(&text.text, &text.style))),
     PageItem::Image(image) => Some((image.x_pt, image.width_pt)),
+    PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
   }
@@ -5868,6 +5971,7 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
   match item {
     PageItem::Text(text) => text.x_pt += offset,
     PageItem::Image(image) => image.x_pt += offset,
+    PageItem::Rect(rect) => rect.x_pt += offset,
     PageItem::Fill(_) => {}
     PageItem::Line(_) => {}
   }
@@ -5943,21 +6047,6 @@ fn flush_text(
     return;
   }
 
-  if let Some(PageItem::Text(previous)) = page.items.last_mut()
-    && f32::abs(previous.y_pt - placement.y_pt) < 0.01
-    && previous.style == *style
-    && previous.hyperlink_url.as_deref() == hyperlink_url
-    && previous.dynamic_field == dynamic_field
-  {
-    let previous_right = previous.x_pt + measure_text(&previous.text, &previous.style);
-    if f32::abs(previous_right - placement.x_pt) < 4.0 {
-      previous.text.push_str(chunk);
-      previous.line_height_pt = previous.line_height_pt.max(placement.line_height_pt);
-      chunk.clear();
-      return;
-    }
-  }
-
   page.items.push(PageItem::Text(TextItem {
     x_pt: placement.x_pt,
     y_pt: placement.y_pt,
@@ -5966,6 +6055,7 @@ fn flush_text(
     style: style.clone(),
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field,
+    decoration_span_start_x_pt: None,
   }));
 }
 

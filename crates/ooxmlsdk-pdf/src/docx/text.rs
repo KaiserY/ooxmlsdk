@@ -72,6 +72,7 @@ pub(super) fn paragraph_model_with_base(
     .filter_map(|item| match item {
       super::InlineItem::Text(run) => Some(run.clone()),
       super::InlineItem::Image(_) => None,
+      super::InlineItem::Shape(_) => None,
       super::InlineItem::PageBreak | super::InlineItem::ColumnBreak => None,
     })
     .collect();

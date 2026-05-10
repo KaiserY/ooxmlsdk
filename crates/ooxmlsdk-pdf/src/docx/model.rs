@@ -270,6 +270,7 @@ pub(crate) enum DynamicFieldKind {
 pub(crate) enum InlineItem {
   Text(TextRun),
   Image(InlineImage),
+  Shape(InlineShape),
   PageBreak,
   ColumnBreak,
 }
@@ -290,6 +291,17 @@ pub(crate) struct InlineImage {
   pub flip_vertical: bool,
   pub alt_text: Option<String>,
   pub hyperlink_url: Option<String>,
+  pub placement: ImagePlacement,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineShape {
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub offset_x_pt: f32,
+  pub offset_y_pt: f32,
+  pub fill_color: Option<RgbColor>,
+  pub stroke: Option<BorderStyle>,
   pub placement: ImagePlacement,
 }
 

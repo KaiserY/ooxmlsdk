@@ -192,6 +192,7 @@ mod tests {
       .filter_map(|item| match item {
         crate::layout::PageItem::Text(text) => Some(text.text.trim().to_string()),
         crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_) => None,
       })
@@ -1689,6 +1690,7 @@ mod tests {
       .filter_map(|item| match item {
         crate::layout::PageItem::Text(text) => Some(text),
         crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_) => None,
       })
@@ -1762,6 +1764,7 @@ mod tests {
       .filter_map(|item| match item {
         crate::layout::PageItem::Text(text) => Some(text),
         crate::layout::PageItem::Image(_)
+        | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_) => None,
       })
@@ -1788,6 +1791,7 @@ mod tests {
       .filter_map(|item| match item {
         crate::layout::PageItem::Text(text) => Some(text),
         crate::layout::PageItem::Image(_) => None,
+        crate::layout::PageItem::Rect(_) => None,
         crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
       })
@@ -2584,6 +2588,7 @@ mod tests {
       .find_map(|item| match item {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_) => None,
+        crate::docx::InlineItem::Shape(_) => None,
         crate::docx::InlineItem::PageBreak | crate::docx::InlineItem::ColumnBreak => None,
       })
       .expect("inline image");
@@ -2660,6 +2665,7 @@ mod tests {
       .find_map(|item| match item {
         crate::layout::PageItem::Image(image) => Some(image),
         crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_) => None,
       })
@@ -2682,6 +2688,7 @@ mod tests {
       .find_map(|item| match item {
         crate::docx::InlineItem::Image(image) => Some(image),
         crate::docx::InlineItem::Text(_)
+        | crate::docx::InlineItem::Shape(_)
         | crate::docx::InlineItem::PageBreak
         | crate::docx::InlineItem::ColumnBreak => None,
       })
@@ -3113,6 +3120,7 @@ mod tests {
       .find_map(|item| match item {
         crate::layout::PageItem::Image(image) => Some(image),
         crate::layout::PageItem::Text(_)
+        | crate::layout::PageItem::Rect(_)
         | crate::layout::PageItem::Fill(_)
         | crate::layout::PageItem::Line(_) => None,
       })
@@ -3457,6 +3465,7 @@ mod tests {
         crate::layout::PageItem::Text(item) if item.text == text => Some(item),
         crate::layout::PageItem::Text(_) => None,
         crate::layout::PageItem::Image(_) => None,
+        crate::layout::PageItem::Rect(_) => None,
         crate::layout::PageItem::Fill(_) => None,
         crate::layout::PageItem::Line(_) => None,
       })

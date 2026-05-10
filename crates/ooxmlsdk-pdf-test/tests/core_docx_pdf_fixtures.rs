@@ -48,14 +48,6 @@ fn assert_has_text_fill_rgb(summary: &PdfSummary, expected_rgb: &str) {
   );
 }
 
-fn assert_has_text_stroke_color(summary: &PdfSummary, expected: &str) {
-  assert!(
-    text_objects(summary).any(|object| object.stroke_color.as_deref() == Some(expected)),
-    "missing text stroke color {expected}; text_objects={:?}",
-    summary.text_objects
-  );
-}
-
 fn assert_has_text_alpha(summary: &PdfSummary, expected_alpha: &str) {
   assert!(
     text_objects(summary).any(|object| {
@@ -66,6 +58,17 @@ fn assert_has_text_alpha(summary: &PdfSummary, expected_alpha: &str) {
     }),
     "missing text alpha {expected_alpha}; text_objects={:?}",
     summary.text_objects
+  );
+}
+
+fn assert_has_path_stroke_color(summary: &PdfSummary, expected: &str) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .any(|path| path.stroke_color.as_deref() == Some(expected) && path.stroked == Some(true)),
+    "missing path stroke color {expected}; paths={:?}",
+    summary.paths
   );
 }
 
@@ -105,7 +108,7 @@ fn core_docx_pdf_fixture_wordart2_preserves_fill_and_stroke_colors() {
   let summary = render_summary("tdf125885_WordArt2.docx");
   assert_has_text_fill_color(&summary, "#d7e4bd@ff");
   // LibreOffice checks LineColor=#953735 with 20% transparency.
-  assert_has_text_stroke_color(&summary, "#953735@cc");
+  assert_has_path_stroke_color(&summary, "#953735@cc");
 }
 
 #[test]

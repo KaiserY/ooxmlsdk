@@ -53,6 +53,12 @@ pub(crate) fn extract(
     .as_deref()
     .map(|body| body_sections(body, &styles, &mut numbering, &images, &hyperlinks))
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
+  let supplemental_graphic_blocks = supplemental_graphic_blocks(package, &main, &styles);
+  if let Some(first_section) = sections.first_mut() {
+    first_section
+      .blocks
+      .extend(supplemental_graphic_blocks.iter().cloned());
+  }
   for section in &mut sections {
     section.page.background = page_background;
   }
@@ -122,6 +128,385 @@ fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocument
     })
     .filter(|value| value.is_finite() && *value > 0.0)
     .unwrap_or(DEFAULT_TAB_STOP_PT)
+}
+
+fn supplemental_graphic_blocks(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Vec<Block> {
+  let mut blocks = chart_text_blocks(package, main, styles);
+  blocks.extend(diagram_text_blocks(package, main, styles));
+  blocks
+}
+
+fn chart_text_blocks(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Vec<Block> {
+  let mut blocks = Vec::new();
+  for chart_part in main.chart_parts(package) {
+    let Some(xml) = chart_part
+      .data_to_vec(package)
+      .and_then(|data| String::from_utf8(data).ok())
+    else {
+      continue;
+    };
+    let Some(color) = chart_label_color(&xml, &styles.theme_colors) else {
+      continue;
+    };
+    for text in chart_label_texts(&xml) {
+      blocks.push(simple_text_block(
+        text,
+        text_style_with_color(styles, color),
+      ));
+    }
+  }
+  blocks
+}
+
+fn diagram_text_blocks(
+  package: &WordprocessingDocument,
+  main: &MainDocumentPart,
+  styles: &StylesCatalog,
+) -> Vec<Block> {
+  let diagram_colors = main
+    .diagram_colors_parts(package)
+    .filter_map(|part| {
+      part
+        .data_to_vec(package)
+        .and_then(|data| String::from_utf8(data).ok())
+    })
+    .collect::<Vec<_>>();
+  let mut color_index = 0usize;
+  let mut blocks = Vec::new();
+  for drawing_part in main.diagram_persist_layout_parts(package) {
+    let Some(xml) = drawing_part
+      .data_to_vec(package)
+      .and_then(|data| String::from_utf8(data).ok())
+    else {
+      continue;
+    };
+    let color = diagram_colors
+      .get(color_index)
+      .and_then(|colors_xml| diagram_text_color(colors_xml, &styles.theme_colors))
+      .or(styles.theme_colors.dark2)
+      .unwrap_or(RgbColor {
+        r: 0x1F,
+        g: 0x49,
+        b: 0x7D,
+      });
+    color_index += 1;
+    for text in diagram_shape_texts(&xml) {
+      blocks.push(simple_text_block(
+        text,
+        text_style_with_color(styles, color),
+      ));
+    }
+  }
+  blocks
+}
+
+fn chart_label_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_dlbls = false;
+  let mut in_txpr = false;
+  let mut in_defrpr = false;
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"dLbls") => in_dlbls = true,
+      Event::End(event) if qname_ends_with(event.name().as_ref(), b"dLbls") => in_dlbls = false,
+      Event::Start(event) if in_dlbls && qname_ends_with(event.name().as_ref(), b"txPr") => {
+        in_txpr = true;
+      }
+      Event::End(event) if qname_ends_with(event.name().as_ref(), b"txPr") => in_txpr = false,
+      Event::Start(event) if in_txpr && qname_ends_with(event.name().as_ref(), b"defRPr") => {
+        in_defrpr = true;
+      }
+      Event::End(event) if qname_ends_with(event.name().as_ref(), b"defRPr") => {
+        in_defrpr = false;
+      }
+      Event::Start(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors)
+          .map(|it| it.color);
+      }
+      Event::Empty(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_empty_scheme_color(&event, theme_colors).map(|it| it.color);
+      }
+      Event::Start(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        return color_attr(&event, b"val");
+      }
+      Event::Empty(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        return color_attr(&event, b"val");
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn chart_label_texts(xml: &str) -> Vec<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_dlbl = false;
+  let mut in_text = false;
+  let mut current = String::new();
+  let mut texts = Vec::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"dLbl") => {
+        in_dlbl = true;
+        current.clear();
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"dLbl") => {
+        if !current.is_empty() {
+          texts.push(current.clone());
+        }
+        current.clear();
+        in_dlbl = false;
+      }
+      Ok(Event::Start(event)) if in_dlbl && qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = true;
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = false;
+      }
+      Ok(Event::Text(event)) if in_dlbl && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if in_dlbl && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  texts
+}
+
+fn diagram_text_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_tx_fill = false;
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"txFillClrLst") => {
+        in_tx_fill = true;
+      }
+      Event::End(event) if qname_ends_with(event.name().as_ref(), b"txFillClrLst") => {
+        in_tx_fill = false;
+      }
+      Event::Start(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors)
+          .map(|it| it.color);
+      }
+      Event::Empty(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_empty_scheme_color(&event, theme_colors).map(|it| it.color);
+      }
+      Event::Start(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        return color_attr(&event, b"val");
+      }
+      Event::Empty(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        return color_attr(&event, b"val");
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn diagram_shape_texts(xml: &str) -> Vec<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_shape = false;
+  let mut in_text = false;
+  let mut current = String::new();
+  let mut texts = Vec::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"sp") => {
+        in_shape = true;
+        current.clear();
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"sp") => {
+        if !current.is_empty() {
+          texts.push(current.clone());
+        }
+        current.clear();
+        in_shape = false;
+      }
+      Ok(Event::Start(event)) if in_shape && qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = true;
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = false;
+      }
+      Ok(Event::Text(event)) if in_shape && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if in_shape && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  texts
+}
+
+fn simple_text_block(text: String, style: TextStyle) -> Block {
+  Block::Paragraph(Paragraph {
+    inlines: vec![InlineItem::Text(TextRun {
+      text,
+      style,
+      hyperlink_url: None,
+      dynamic_field: None,
+    })],
+    footnote_reference_ids: Vec::new(),
+    endnote_reference_ids: Vec::new(),
+    #[cfg(test)]
+    runs: Vec::new(),
+    format: ParagraphFormat::default(),
+    list_label: None,
+    list_label_hyperlink_url: None,
+  })
+}
+
+fn text_style_with_color(styles: &StylesCatalog, color: RgbColor) -> TextStyle {
+  let mut style = styles.doc_default_run.clone();
+  style.color = color;
+  style
+}
+
+fn resolve_empty_scheme_color(
+  event: &quick_xml::events::BytesStart<'_>,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  let value = attr_value(event, b"val")?;
+  Some(ResolvedColor {
+    color: resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)?,
+    opacity: 1.0,
+  })
+}
+
+fn resolve_scheme_color_from_reader(
+  reader: &mut Reader<&[u8]>,
+  start: quick_xml::events::BytesStart<'_>,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  let value = attr_value(&start, b"val")?;
+  let mut color = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)?;
+  let mut opacity = 1.0f32;
+  let target_name = start.name().as_ref().to_vec();
+  let mut depth = 1usize;
+
+  while depth > 0 {
+    match reader.read_event().ok()? {
+      Event::Start(event) if event.name().as_ref() == target_name.as_slice() => depth += 1,
+      Event::End(event) if event.name().as_ref() == target_name.as_slice() => {
+        depth = depth.saturating_sub(1);
+      }
+      Event::Start(event) | Event::Empty(event) => {
+        if qname_ends_with(event.name().as_ref(), b"tint") {
+          if let Some(value) = percent_attr(&event, b"val") {
+            let mut hsl = HslColor::from_rgb(color);
+            hsl.apply_tint(value);
+            color = hsl.to_rgb();
+          }
+        } else if qname_ends_with(event.name().as_ref(), b"shade") {
+          if let Some(value) = percent_attr(&event, b"val") {
+            let mut hsl = HslColor::from_rgb(color);
+            hsl.apply_shade(value);
+            color = hsl.to_rgb();
+          }
+        } else if qname_ends_with(event.name().as_ref(), b"lumMod") {
+          if let Some(value) = percent_attr(&event, b"val") {
+            let mut hsl = HslColor::from_rgb(color);
+            hsl.apply_luminance_mod(value);
+            color = hsl.to_rgb();
+          }
+        } else if qname_ends_with(event.name().as_ref(), b"lumOff") {
+          if let Some(value) = percent_attr(&event, b"val") {
+            let mut hsl = HslColor::from_rgb(color);
+            hsl.apply_luminance_offset(value);
+            color = hsl.to_rgb();
+          }
+        } else if qname_ends_with(event.name().as_ref(), b"alpha") {
+          opacity = alpha_percent_attr(&event, b"val");
+        }
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+
+  Some(ResolvedColor { color, opacity })
+}
+
+fn resolve_drawingml_scheme_color_name(
+  value: &str,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match value {
+    "dk1" | "tx1" => theme_colors.dark1,
+    "lt1" | "bg1" => theme_colors.light1,
+    "dk2" | "tx2" => theme_colors.dark2,
+    "lt2" | "bg2" => theme_colors.light2,
+    "accent1" => theme_colors.accent1,
+    "accent2" => theme_colors.accent2,
+    "accent3" => theme_colors.accent3,
+    "accent4" => theme_colors.accent4,
+    "accent5" => theme_colors.accent5,
+    "accent6" => theme_colors.accent6,
+    "hlink" => theme_colors.hyperlink,
+    "folHlink" => theme_colors.followed_hyperlink,
+    _ => None,
+  }
+}
+
+fn color_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<RgbColor> {
+  parse_hex_color(attr_value(event, key)?.as_ref())
+}
+
+fn attr_value(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<Box<str>> {
+  event
+    .attributes()
+    .flatten()
+    .find(|attribute| attribute.key.as_ref() == key)
+    .and_then(|attribute| String::from_utf8(attribute.value.into_owned()).ok())
+    .map(String::into_boxed_str)
+}
+
+fn percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
+  attr_value(event, key)?
+    .parse::<f32>()
+    .ok()
+    .map(|value| (value / 100_000.0).clamp(0.0, 1.0))
+}
+
+fn alpha_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> f32 {
+  percent_attr(event, key).unwrap_or(1.0)
 }
 
 fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
@@ -2089,6 +2474,7 @@ fn push_run(
         if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
+        drawing::push_drawing_shapes(drawing, inlines, styles);
         drawing::push_drawing_textboxes(drawing, inlines, style.clone(), styles, images);
       }
       w::RunChoice::WPict(picture) => {
@@ -2096,6 +2482,7 @@ fn push_run(
         if let Some(image) = drawing::pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
+        drawing::push_pict_shapes(picture, inlines);
         drawing::push_pict_textboxes(picture, inlines, base_style.clone(), styles, images);
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
@@ -2258,6 +2645,7 @@ fn push_run_xml_any(
     if let Some(image) = drawing::inline_image(&drawing, images, hyperlinks) {
       inlines.push(InlineItem::Image(image));
     }
+    drawing::push_drawing_shapes(&drawing, inlines, styles);
     drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images);
     return;
   }
@@ -2266,6 +2654,7 @@ fn push_run_xml_any(
     if let Some(image) = drawing::pict_image(&picture, images) {
       inlines.push(InlineItem::Image(image));
     }
+    drawing::push_pict_shapes(&picture, inlines);
     drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images);
   }
 }
@@ -3123,6 +3512,362 @@ fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::G
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => Some(&inline.graphic.graphic_data),
     w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.a_graphic.as_ref()?.graphic_data),
+  }
+}
+
+fn push_drawing_shapes_impl(
+  drawing: &w::Drawing,
+  inlines: &mut Vec<InlineItem>,
+  styles: &StylesCatalog,
+) {
+  let Some(graphic_data) = drawing_graphic_data(drawing) else {
+    return;
+  };
+
+  let placement = match drawing.drawing_choice.as_ref() {
+    Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+      ImagePlacement::Floating(floating_image_placement(anchor))
+    }
+    None => return,
+  };
+
+  for xml in &graphic_data.xml_children {
+    inlines.extend(drawingml_shapes_from_xml(
+      xml,
+      placement,
+      &styles.theme_colors,
+    ));
+  }
+}
+
+fn drawingml_shapes_from_xml(
+  xml: &str,
+  placement: ImagePlacement,
+  theme_colors: &ThemeColors,
+) -> Vec<InlineItem> {
+  let mut shapes = Vec::new();
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
+          && let Some(shape) = drawingml_shape_from_fragment(&fragment, placement, theme_colors)
+        {
+          shapes.push(InlineItem::Shape(shape));
+        }
+      }
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pic") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
+          && let Some(shape) = drawingml_picture_frame_from_fragment(&fragment, placement)
+        {
+          shapes.push(InlineItem::Shape(shape));
+        }
+      }
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+        let mut writer = Writer::new(Vec::new());
+        if writer.write_event(Event::Empty(event.into_owned())).is_ok()
+          && let Ok(fragment) = String::from_utf8(writer.into_inner())
+          && let Some(shape) = drawingml_shape_from_fragment(&fragment, placement, theme_colors)
+        {
+          shapes.push(InlineItem::Shape(shape));
+        }
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  shapes
+}
+
+fn drawingml_shape_from_fragment(
+  xml: &str,
+  placement: ImagePlacement,
+  theme_colors: &ThemeColors,
+) -> Option<InlineShape> {
+  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
+  let fill_color = drawingml_shape_fill_color(&sp_pr, theme_colors);
+  let stroke = drawingml_shape_stroke(&sp_pr, theme_colors);
+  if fill_color.is_none() && stroke.is_none() {
+    return None;
+  }
+
+  let mut reader = Reader::from_str(&sp_pr);
+  reader.config_mut().trim_text(false);
+  let mut offset_x_pt = 0.0f32;
+  let mut offset_y_pt = 0.0f32;
+  let mut width_pt = 0.0f32;
+  let mut height_pt = 0.0f32;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"off") => {
+        offset_x_pt = attr_value(&event, b"x")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(offset_x_pt);
+        offset_y_pt = attr_value(&event, b"y")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(offset_y_pt);
+      }
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
+        width_pt = attr_value(&event, b"cx")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(width_pt);
+        height_pt = attr_value(&event, b"cy")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(height_pt);
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color,
+    stroke,
+    placement,
+  })
+}
+
+fn drawingml_picture_frame_from_fragment(
+  xml: &str,
+  placement: ImagePlacement,
+) -> Option<InlineShape> {
+  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
+  let mut reader = Reader::from_str(&sp_pr);
+  reader.config_mut().trim_text(false);
+  let mut offset_x_pt = 0.0f32;
+  let mut offset_y_pt = 0.0f32;
+  let mut width_pt = 0.0f32;
+  let mut height_pt = 0.0f32;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"off") => {
+        offset_x_pt = attr_value(&event, b"x")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(offset_x_pt);
+        offset_y_pt = attr_value(&event, b"y")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(offset_y_pt);
+      }
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
+        width_pt = attr_value(&event, b"cx")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(width_pt);
+        height_pt = attr_value(&event, b"cy")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(height_pt);
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  if width_pt <= 0.0 || height_pt <= 0.0 {
+    return None;
+  }
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    offset_x_pt,
+    offset_y_pt,
+    fill_color: None,
+    stroke: None,
+    placement,
+  })
+}
+
+fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  drawingml_color_from_named_fragment(xml, b"solidFill", theme_colors).map(|color| color.color)
+}
+
+fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<BorderStyle> {
+  let line_fragment = first_named_xml_fragment(xml, b"ln")?;
+  let mut width_pt = 0.5f32;
+  let mut reader = Reader::from_str(&line_fragment);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"ln") =>
+      {
+        width_pt = attr_value(&event, b"w")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(width_pt);
+        break;
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  Some(BorderStyle {
+    width_pt,
+    spacing_pt: 0.0,
+    color: drawingml_color_from_named_fragment(&line_fragment, b"solidFill", theme_colors)?.color,
+    compound: false,
+  })
+}
+
+fn drawingml_color_from_named_fragment(
+  xml: &str,
+  local_name: &[u8],
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  let fragment = first_named_xml_fragment(xml, local_name)?;
+  let mut reader = Reader::from_str(&fragment);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        return resolve_empty_scheme_color(&event, theme_colors);
+      }
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        let color = color_attr(&event, b"val")?;
+        return Some(ResolvedColor {
+          color,
+          opacity: 1.0,
+        });
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        let color = color_attr(&event, b"val")?;
+        return Some(ResolvedColor {
+          color,
+          opacity: 1.0,
+        });
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn push_pict_shapes_impl(picture: &w::Picture, inlines: &mut Vec<InlineItem>) {
+  for choice in &picture.picture_choice {
+    push_picture_choice_shapes(choice, inlines);
+  }
+}
+
+fn push_picture_choice_shapes(choice: &w::PictureChoice, inlines: &mut Vec<InlineItem>) {
+  match choice {
+    w::PictureChoice::VGroup(group) => push_group_shapes(group, inlines),
+    w::PictureChoice::VRect(rectangle) => {
+      if let Some(shape) = vml_rectangle_shape(rectangle) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
+    w::PictureChoice::VShape(shape) => {
+      if let Some(shape) = vml_shape_shape(shape) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
+    _ => {}
+  }
+}
+
+fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>) {
+  for choice in &group.group_choice {
+    match choice {
+      v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines),
+      v::GroupChoice::VRect(rectangle) => {
+        if let Some(shape) = vml_rectangle_shape(rectangle) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::VShape(shape) => {
+        if let Some(shape) = vml_shape_shape(shape) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      _ => {}
+    }
+  }
+}
+
+fn vml_rectangle_shape(rectangle: &v::Rectangle) -> Option<InlineShape> {
+  vml_inline_shape(
+    rectangle.style.as_deref(),
+    rectangle.fill_color.as_deref(),
+    rectangle.stroke_color.as_deref(),
+    rectangle.stroke_weight.as_deref(),
+  )
+}
+
+fn vml_shape_shape(shape: &v::Shape) -> Option<InlineShape> {
+  vml_inline_shape(
+    shape.style.as_deref(),
+    shape.fill_color.as_deref(),
+    shape.stroke_color.as_deref(),
+    shape.stroke_weight.as_deref(),
+  )
+}
+
+fn vml_inline_shape(
+  style: Option<&str>,
+  fill_color: Option<&str>,
+  stroke_color: Option<&str>,
+  stroke_weight: Option<&str>,
+) -> Option<InlineShape> {
+  let style = vml_image_style(style);
+  let (width_pt, height_pt) = style.size_pt?;
+  let fill_color = fill_color.and_then(parse_vml_color);
+  let stroke = stroke_color
+    .and_then(parse_vml_color)
+    .map(|color| BorderStyle {
+      width_pt: stroke_weight.and_then(vml_measure_to_points).unwrap_or(0.5),
+      spacing_pt: 0.0,
+      color,
+      compound: false,
+    });
+  if fill_color.is_none() && stroke.is_none() {
+    return None;
+  }
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    offset_x_pt: 0.0,
+    offset_y_pt: 0.0,
+    fill_color,
+    stroke,
+    placement: style.placement(),
+  })
+}
+
+fn parse_vml_color(value: &str) -> Option<RgbColor> {
+  let value = value.trim().trim_matches('"');
+  let base = value.split_whitespace().next()?;
+  if let Some(hex) = base.strip_prefix('#') {
+    parse_hex_color(hex)
+  } else {
+    parse_hex_color(base)
   }
 }
 
@@ -6362,7 +7107,10 @@ mod tests {
       .iter()
       .find_map(|item| match item {
         InlineItem::Image(image) => Some(image),
-        InlineItem::Text(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
+        InlineItem::Text(_)
+        | InlineItem::Shape(_)
+        | InlineItem::PageBreak
+        | InlineItem::ColumnBreak => None,
       })
       .expect("VML image");
     assert_eq!(image.content_type.as_deref(), Some("image/png"));
@@ -6675,8 +7423,86 @@ mod tests {
       .iter()
       .filter_map(|item| match item {
         InlineItem::Text(run) => Some(run.text.as_str()),
-        InlineItem::Image(_) | InlineItem::PageBreak | InlineItem::ColumnBreak => None,
+        InlineItem::Image(_)
+        | InlineItem::Shape(_)
+        | InlineItem::PageBreak
+        | InlineItem::ColumnBreak => None,
       })
       .collect()
+  }
+
+  #[test]
+  fn wordart_outline_fragment_resolves_expected_color_and_opacity() {
+    let fragment = textbox_fragment_with_namespaces(
+      r#"<w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline>"#.to_string(),
+    );
+    let outline = w14::TextOutlineEffect::from_bytes(fragment.as_bytes()).unwrap();
+    let theme_colors = ThemeColors {
+      accent2: Some(RgbColor {
+        r: 0xC0,
+        g: 0x50,
+        b: 0x4D,
+      }),
+      ..Default::default()
+    };
+
+    let resolved = resolve_text_outline(&outline, &theme_colors).unwrap();
+
+    assert_eq!(
+      resolved.color,
+      RgbColor {
+        r: 0x95,
+        g: 0x37,
+        b: 0x35,
+      }
+    );
+    assert!((resolved.opacity - 0.8).abs() < 0.001);
+  }
+
+  #[test]
+  fn text_effect_overrides_apply_to_style_from_run_properties_fragment() {
+    let fragment = textbox_fragment_with_namespaces(
+      r#"<w:rPr><w:color w:val="D6E3BC" w:themeColor="accent3" w:themeTint="66"/><w14:textOutline w14:w="228600" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr"><w14:solidFill><w14:schemeClr w14:val="accent2"><w14:alpha w14:val="20000"/><w14:lumMod w14:val="75000"/></w14:schemeClr></w14:solidFill><w14:prstDash w14:val="sysDot"/><w14:bevel/></w14:textOutline></w:rPr>"#.to_string(),
+    );
+    let styles = StylesCatalog {
+      theme_colors: ThemeColors {
+        accent2: Some(RgbColor {
+          r: 0xC0,
+          g: 0x50,
+          b: 0x4D,
+        }),
+        accent3: Some(RgbColor {
+          r: 0x9B,
+          g: 0xBB,
+          b: 0x59,
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    let mut style = TextStyle::default();
+
+    if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
+      style = properties::run_style(Some(&properties), style, &styles);
+    }
+    apply_text_effect_overrides_from_fragment(&mut style, &fragment, &styles);
+
+    assert_eq!(
+      style.color,
+      RgbColor {
+        r: 0xD7,
+        g: 0xE4,
+        b: 0xBD,
+      }
+    );
+    assert_eq!(
+      style.outline_color,
+      Some(RgbColor {
+        r: 0x95,
+        g: 0x37,
+        b: 0x35,
+      })
+    );
+    assert!((style.outline_opacity - 0.8).abs() < 0.001);
   }
 }

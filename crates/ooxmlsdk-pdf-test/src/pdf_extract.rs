@@ -467,8 +467,9 @@ fn raw_page_xobjects(
   page_index: usize,
   page: &lopdf::Dictionary,
 ) -> Result<Vec<RawXObjectSummary>, String> {
-  let resources = match page.get(b"Resources") {
-    Ok(object) => lopdf_dictionary(document, object, "page Resources")?,
+  let resources = match inherited_page_dictionary_value(document, page, b"Resources") {
+    Ok(Some(object)) => lopdf_dictionary_owned(document, object, "page Resources")?,
+    Ok(None) => return Ok(Vec::new()),
     Err(lopdf::Error::DictKey(_)) => return Ok(Vec::new()),
     Err(error) => return Err(format!("lopdf could not read page Resources: {error}")),
   };
@@ -483,17 +484,87 @@ fn raw_page_xobjects(
   };
 
   let mut summaries = Vec::new();
-  for (name, object) in xobjects.iter() {
-    summaries.push(raw_xobject_summary(
-      document,
-      page_index,
-      &String::from_utf8_lossy(name),
-      object,
-    )?);
-  }
+  collect_terminal_xobjects(document, page_index, None, xobjects, &mut summaries)?;
   summaries.sort_by(|left, right| left.name.cmp(&right.name));
 
   Ok(summaries)
+}
+
+fn collect_terminal_xobjects(
+  document: &LopdfDocument,
+  page_index: usize,
+  prefix: Option<&str>,
+  xobjects: &lopdf::Dictionary,
+  summaries: &mut Vec<RawXObjectSummary>,
+) -> Result<(), String> {
+  for (name, object) in xobjects.iter() {
+    let current_name = if let Some(prefix) = prefix {
+      format!("{prefix}/{}", String::from_utf8_lossy(name))
+    } else {
+      String::from_utf8_lossy(name).to_string()
+    };
+    let stream = lopdf_stream(document, object, "page XObject stream")?;
+    let subtype_name = stream
+      .dict
+      .get(b"Subtype")
+      .ok()
+      .and_then(|value| lopdf_name(document, value).ok());
+    if subtype_name.as_deref() == Some("Form")
+      && let Ok(resources_object) = stream.dict.get(b"Resources")
+      && let Ok(resources) = lopdf_dictionary(document, resources_object, "form Resources")
+      && let Ok(nested_object) = resources.get(b"XObject")
+      && let Ok(nested_xobjects) = lopdf_dictionary(document, nested_object, "form XObject")
+    {
+      collect_terminal_xobjects(
+        document,
+        page_index,
+        Some(&current_name),
+        nested_xobjects,
+        summaries,
+      )?;
+      continue;
+    }
+
+    summaries.push(raw_xobject_summary(
+      document,
+      page_index,
+      &current_name,
+      object,
+    )?);
+  }
+
+  Ok(())
+}
+
+fn inherited_page_dictionary_value(
+  document: &LopdfDocument,
+  page: &lopdf::Dictionary,
+  key: &[u8],
+) -> Result<Option<LopdfObject>, lopdf::Error> {
+  if let Ok(value) = page.get(key) {
+    return Ok(Some(value.clone()));
+  }
+
+  let mut current_parent = match page.get(b"Parent") {
+    Ok(parent) => Some(parent.clone()),
+    Err(lopdf::Error::DictKey(_)) => None,
+    Err(error) => return Err(error),
+  };
+
+  while let Some(parent) = current_parent {
+    let parent_dict = lopdf_dictionary(document, &parent, "page parent dictionary")
+      .map_err(|_| lopdf::Error::DictKey(String::from("Parent")))?;
+    if let Ok(value) = parent_dict.get(key) {
+      return Ok(Some(value.clone()));
+    }
+    current_parent = match parent_dict.get(b"Parent") {
+      Ok(next) => Some(next.clone()),
+      Err(lopdf::Error::DictKey(_)) => None,
+      Err(error) => return Err(error),
+    };
+  }
+
+  Ok(None)
 }
 
 fn raw_xobject_summary(
@@ -585,6 +656,20 @@ fn lopdf_dictionary<'a>(
     .map_err(|error| format!("lopdf could not dereference {context}: {error}"))?;
   object
     .as_dict()
+    .map_err(|error| format!("lopdf expected dictionary for {context}: {error}"))
+}
+
+fn lopdf_dictionary_owned(
+  document: &LopdfDocument,
+  object: LopdfObject,
+  context: &str,
+) -> Result<lopdf::Dictionary, String> {
+  let (_, object) = document
+    .dereference(&object)
+    .map_err(|error| format!("lopdf could not dereference {context}: {error}"))?;
+  object
+    .as_dict()
+    .cloned()
     .map_err(|error| format!("lopdf expected dictionary for {context}: {error}"))
 }
 

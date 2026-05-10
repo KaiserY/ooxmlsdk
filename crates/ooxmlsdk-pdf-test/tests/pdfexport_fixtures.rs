@@ -70,10 +70,20 @@ fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
   assert_eq!(
     actual_object_count,
     6,
-    "page_objects={:?}\ntext_objects={:?}",
+    "page_objects={:?}\ntext_objects={:?}\npath_objects={:?}\nimages={:?}",
     summary.page_objects,
     summary
       .text_objects
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>(),
+    summary
+      .paths
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>(),
+    summary
+      .images
       .iter()
       .filter(|object| object.page_index == 0)
       .collect::<Vec<_>>()
@@ -101,10 +111,20 @@ fn pdfexport_fixture_tdf156685_matches_upstream_text_object_expectations() {
   assert_eq!(
     actual_object_count,
     9,
-    "page_objects={:?}\ntext_objects={:?}",
+    "page_objects={:?}\ntext_objects={:?}\npath_objects={:?}\nimages={:?}",
     summary.page_objects,
     summary
       .text_objects
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>(),
+    summary
+      .paths
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>(),
+    summary
+      .images
       .iter()
       .filter(|object| object.page_index == 0)
       .collect::<Vec<_>>()

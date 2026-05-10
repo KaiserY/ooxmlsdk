@@ -24,7 +24,7 @@ use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, OutlineEntry,
-  PageItem, TextItem,
+  PageItem, RectItem, TextItem,
 };
 use crate::options::PdfOptions;
 use crate::text_metrics::{baseline_offset_in_line, measure_text, shape_text};
@@ -210,7 +210,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
                   .is_none_or(|link| link.width_pt >= 0.0 && link.height_pt >= 0.0)
             })
         }
-        PaintItem::Image(_) | PaintItem::Fill(_) | PaintItem::Line(_) => true,
+        PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Fill(_) | PaintItem::Line(_) => true,
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options));
@@ -259,10 +259,17 @@ struct PaintPage {
   items: Vec<PaintItem>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct DecorationRenderMetadata {
+  suppress: bool,
+  span_start_x_pt: Option<f32>,
+}
+
 #[derive(Clone, Debug)]
 enum PaintItem {
   Text(PaintText),
   Image(ImageItem),
+  Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
 }
@@ -373,7 +380,7 @@ impl InternalLinkTargets {
                 });
             }
           }
-          PaintItem::Image(_) | PaintItem::Fill(_) | PaintItem::Line(_) => {}
+          PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Fill(_) | PaintItem::Line(_) => {}
         }
       }
     }
@@ -388,6 +395,56 @@ impl InternalLinkTargets {
       Point::from_xy(position.x_pt, position.y_pt),
     ))))
   }
+}
+
+fn decoration_render_metadata(items: &[PageItem]) -> Vec<DecorationRenderMetadata> {
+  let mut metadata = vec![DecorationRenderMetadata::default(); items.len()];
+  let mut index = 0usize;
+
+  while index < items.len() {
+    let Some(PageItem::Text(text)) = items.get(index) else {
+      index += 1;
+      continue;
+    };
+
+    if !text.style.underline && !text.style.strikethrough {
+      index += 1;
+      continue;
+    }
+
+    let start_index = index;
+    let start_x_pt = text.x_pt;
+    let mut end_index = index;
+
+    while end_index + 1 < items.len() {
+      let Some(PageItem::Text(next)) = items.get(end_index + 1) else {
+        break;
+      };
+      if !decoration_compatible(text, next) {
+        break;
+      }
+      end_index += 1;
+    }
+
+    if end_index > start_index {
+      for entry in metadata.iter_mut().take(end_index).skip(start_index) {
+        entry.suppress = true;
+      }
+      metadata[end_index].span_start_x_pt = Some(start_x_pt);
+    }
+
+    index = end_index + 1;
+  }
+
+  metadata
+}
+
+fn decoration_compatible(current: &TextItem, next: &TextItem) -> bool {
+  current.style == next.style
+    && current.hyperlink_url == next.hyperlink_url
+    && current.dynamic_field == next.dynamic_field
+    && (current.y_pt - next.y_pt).abs() < 0.01
+    && (current.line_height_pt - next.line_height_pt).abs() < 0.01
 }
 
 fn is_internal_link_url(url: &str) -> bool {
@@ -415,6 +472,7 @@ impl PaintDocument {
       .enumerate()
       .map(|(page_index, page)| {
         let line_owners = paint_line_owners(document, page_index, page.items.len());
+        let decoration_metadata = decoration_render_metadata(&page.items);
         let items = page
           .items
           .iter()
@@ -422,13 +480,21 @@ impl PaintDocument {
           .map(|(item_index, item)| match item {
             PageItem::Text(text) => {
               let owner = line_owners.get(item_index).copied().flatten();
+              let mut text = text.clone();
+              let metadata = decoration_metadata[item_index];
+              if metadata.suppress {
+                text.style.underline = false;
+                text.style.strikethrough = false;
+              }
+              text.decoration_span_start_x_pt = metadata.span_start_x_pt;
               PaintItem::Text(PaintText::from_layout_text(
-                text,
+                &text,
                 owner,
                 page.setup.width_pt,
               ))
             }
             PageItem::Image(image) => PaintItem::Image(image.clone()),
+            PageItem::Rect(rect) => PaintItem::Rect(*rect),
             PageItem::Fill(fill) => PaintItem::Fill(*fill),
             PageItem::Line(line) => PaintItem::Line(*line),
           })
@@ -465,8 +531,9 @@ impl PaintText {
       color,
     });
     let decoration_width = (text.style.font_size_pt / 18.0).max(0.5);
+    let decoration_start_x_pt = text.decoration_span_start_x_pt.unwrap_or(text.x_pt);
     let underline = text.style.underline.then_some(PaintStrokeLine {
-      x1_pt: text.x_pt,
+      x1_pt: decoration_start_x_pt,
       y1_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
       x2_pt: text.x_pt + width_pt,
       y2_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
@@ -474,7 +541,7 @@ impl PaintText {
       color: text.style.color,
     });
     let strikethrough = text.style.strikethrough.then_some(PaintStrokeLine {
-      x1_pt: text.x_pt,
+      x1_pt: decoration_start_x_pt,
       y1_pt: baseline_y - (text.style.font_size_pt * 0.32),
       x2_pt: text.x_pt + width_pt,
       y2_pt: baseline_y - (text.style.font_size_pt * 0.32),
@@ -740,6 +807,7 @@ fn draw_paint_item(
       draw_text_item(surface, text, fonts, internal_links, link_annotations);
     }
     PaintItem::Text(_) => {}
+    PaintItem::Rect(rect) => draw_rect_item(surface, rect),
     PaintItem::Fill(fill_item) => draw_fill_item(surface, fill_item),
     PaintItem::Image(image) => {
       let _alt_text = image.alt_text.as_deref();
@@ -1003,6 +1071,38 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
       path.close();
     }
   }
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
+}
+
+fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
+  let mut path = PathBuilder::new();
+  if let Some(fill_color) = rect.fill_color {
+    surface.set_fill(Some(Fill {
+      paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
+      opacity: NormalizedF32::ONE,
+      rule: FillRule::EvenOdd,
+    }));
+  } else {
+    surface.set_fill(None);
+  }
+
+  if let Some(stroke) = rect.stroke {
+    surface.set_stroke(Some(Stroke {
+      width: stroke.width_pt,
+      paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+      ..Default::default()
+    }));
+  } else {
+    surface.set_stroke(None);
+  }
+
+  path.move_to(rect.x_pt, rect.y_pt + rect.height_pt);
+  path.line_to(rect.x_pt, rect.y_pt);
+  path.line_to(rect.x_pt + rect.width_pt, rect.y_pt);
+  path.line_to(rect.x_pt + rect.width_pt, rect.y_pt + rect.height_pt);
+  path.close();
   if let Some(path) = path.finish() {
     surface.draw_path(&path);
   }

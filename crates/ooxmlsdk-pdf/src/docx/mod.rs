@@ -13,11 +13,13 @@ use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
-  schemas_microsoft_com_vml as v,
+  schemas_microsoft_com_office_word_2010_wordml as w14, schemas_microsoft_com_vml as v,
+  schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
 use quick_xml::Reader;
+use quick_xml::Writer;
 use quick_xml::events::Event;
 
 use crate::error::Result;
@@ -2087,7 +2089,7 @@ fn push_run(
         if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_drawing_textboxes(drawing, inlines, style.clone());
+        drawing::push_drawing_textboxes(drawing, inlines, style.clone(), styles, images);
       }
       w::RunChoice::WPict(picture) => {
         flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
@@ -2256,7 +2258,7 @@ fn push_run_xml_any(
     if let Some(image) = drawing::inline_image(&drawing, images, hyperlinks) {
       inlines.push(InlineItem::Image(image));
     }
-    drawing::push_drawing_textboxes(&drawing, inlines, style);
+    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images);
     return;
   }
 
@@ -2888,20 +2890,231 @@ fn wrap_text_side(value: wp::WrapTextValues) -> ImageWrapSide {
 fn push_drawing_textboxes_impl(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
-  style: TextStyle,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
 ) {
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
 
   for child in &graphic_data.xml_children {
-    if let Some(text) = drawing_textbox_text(child) {
+    if push_drawing_textbox_runs_from_xml(child, inlines, base_style.clone(), styles) {
+      continue;
+    }
+    if let Some(content) = drawing_textbox_content(child) {
+      push_textbox_content(&content, inlines, base_style.clone(), styles, images);
+    } else if let Some(text) = drawing_textbox_text(child) {
       inlines.push(InlineItem::Text(TextRun {
         text,
-        style: style.clone(),
+        style: base_style.clone(),
         hyperlink_url: None,
         dynamic_field: None,
       }));
+    }
+  }
+}
+
+fn push_drawing_textbox_runs_from_xml(
+  xml: &str,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> bool {
+  if !xml.contains("txbxContent") {
+    return false;
+  }
+
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut textbox_depth = 0usize;
+  let mut paragraph_style = base_style.clone();
+  let mut run_style = paragraph_style.clone();
+  let mut paragraph_has_content = false;
+  let mut in_run = false;
+  let mut in_text = false;
+  let mut text = String::new();
+  let mut emitted = false;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
+        textbox_depth += 1;
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
+        textbox_depth = textbox_depth.saturating_sub(1);
+      }
+      Ok(Event::Start(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") =>
+      {
+        paragraph_style = base_style.clone();
+        run_style = paragraph_style.clone();
+        paragraph_has_content = false;
+      }
+      Ok(Event::End(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") =>
+      {
+        if paragraph_has_content {
+          inlines.push(InlineItem::Text(TextRun {
+            text: "\n".into(),
+            style: base_style.clone(),
+            hyperlink_url: None,
+            dynamic_field: None,
+          }));
+          emitted = true;
+        }
+      }
+      Ok(Event::Start(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"rPr") =>
+      {
+        let Some(fragment) = read_outer_xml_fragment(&mut reader, event) else {
+          continue;
+        };
+        let fragment = textbox_fragment_with_namespaces(fragment);
+        if in_run {
+          run_style = paragraph_style.clone();
+          if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
+            run_style = properties::run_style(Some(&properties), run_style, styles);
+          }
+          apply_text_effect_overrides_from_fragment(&mut run_style, &fragment, styles);
+        } else {
+          paragraph_style = base_style.clone();
+          if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
+            paragraph_style = properties::run_style(Some(&properties), paragraph_style, styles);
+          }
+          apply_text_effect_overrides_from_fragment(&mut paragraph_style, &fragment, styles);
+          run_style = paragraph_style.clone();
+        }
+      }
+      Ok(Event::Start(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"r") =>
+      {
+        in_run = true;
+        run_style = paragraph_style.clone();
+        text.clear();
+      }
+      Ok(Event::End(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"r") =>
+      {
+        let had_text = !text.is_empty();
+        flush_run_text(inlines, &mut text, run_style.clone(), None);
+        if had_text {
+          paragraph_has_content = true;
+          emitted = true;
+        }
+        in_run = false;
+      }
+      Ok(Event::Start(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") =>
+      {
+        in_text = true;
+      }
+      Ok(Event::End(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") =>
+      {
+        in_text = false;
+      }
+      Ok(Event::Empty(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"tab") =>
+      {
+        text.push('\t');
+      }
+      Ok(Event::Empty(event))
+        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"br") =>
+      {
+        text.push('\n');
+      }
+      Ok(Event::Text(event)) if textbox_depth > 0 && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          text.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if textbox_depth > 0 && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          text.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  emitted
+}
+
+fn apply_text_effect_overrides_from_fragment(
+  style: &mut TextStyle,
+  fragment: &str,
+  styles: &StylesCatalog,
+) {
+  if let Some(fill_fragment) = first_named_xml_fragment(fragment, b"textFill") {
+    let fill_fragment = textbox_fragment_with_namespaces(fill_fragment);
+    if let Ok(fill) = w14::FillTextEffect::from_bytes(fill_fragment.as_bytes())
+      && let Some(resolved) = resolve_text_fill(&fill, &styles.theme_colors)
+    {
+      style.color = resolved.color;
+      style.opacity = resolved.opacity;
+    }
+  }
+
+  if let Some(outline_fragment) = first_named_xml_fragment(fragment, b"textOutline") {
+    let outline_fragment = textbox_fragment_with_namespaces(outline_fragment);
+    if let Ok(outline) = w14::TextOutlineEffect::from_bytes(outline_fragment.as_bytes())
+      && let Some(resolved) = resolve_text_outline(&outline, &styles.theme_colors)
+    {
+      style.outline_color = Some(resolved.color);
+      style.outline_opacity = resolved.opacity;
+      style.outline_width_pt = outline
+        .line_width
+        .map(|width| units::emu_to_points(width as i64))
+        .unwrap_or(style.outline_width_pt);
+    }
+  }
+}
+
+fn read_outer_xml_fragment(
+  reader: &mut Reader<&[u8]>,
+  start: quick_xml::events::BytesStart<'_>,
+) -> Option<String> {
+  let target_name = start.name().as_ref().to_vec();
+  let mut writer = Writer::new(Vec::new());
+  writer.write_event(Event::Start(start.into_owned())).ok()?;
+  let mut depth = 1usize;
+
+  while depth > 0 {
+    let event = reader.read_event().ok()?;
+    match &event {
+      Event::Start(event) if event.name().as_ref() == target_name.as_slice() => depth += 1,
+      Event::End(event) if event.name().as_ref() == target_name.as_slice() => {
+        depth = depth.saturating_sub(1);
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+    writer.write_event(event.into_owned()).ok()?;
+  }
+
+  String::from_utf8(writer.into_inner()).ok()
+}
+
+fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), local_name) => {
+        return read_outer_xml_fragment(&mut reader, event);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), local_name) => {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Empty(event.into_owned())).ok()?;
+        return String::from_utf8(writer.into_inner()).ok();
+      }
+      Event::Eof => return None,
+      _ => {}
     }
   }
 }
@@ -3540,6 +3753,73 @@ fn xml_bool(value: &str) -> bool {
   matches!(value, "1" | "true" | "t" | "on")
 }
 
+fn drawing_textbox_content(xml: &str) -> Option<w::TextBoxContent> {
+  if !xml.contains("txbxContent") {
+    return None;
+  }
+
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Start(event.into_owned())).ok()?;
+        let mut depth = 1usize;
+
+        while depth > 0 {
+          let event = reader.read_event().ok()?;
+          match &event {
+            Event::Start(_) => depth += 1,
+            Event::End(end) if qname_ends_with(end.name().as_ref(), b"txbxContent") => {
+              depth = depth.saturating_sub(1);
+            }
+            Event::Empty(_) => {}
+            Event::Eof => return None,
+            _ => {}
+          }
+          writer.write_event(event.into_owned()).ok()?;
+        }
+
+        let xml = textbox_fragment_with_namespaces(String::from_utf8(writer.into_inner()).ok()?);
+        return w::TextBoxContent::from_bytes(xml.as_bytes()).ok();
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Empty(event.into_owned())).ok()?;
+        let xml = textbox_fragment_with_namespaces(String::from_utf8(writer.into_inner()).ok()?);
+        return w::TextBoxContent::from_bytes(xml.as_bytes()).ok();
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn textbox_fragment_with_namespaces(mut xml: String) -> String {
+  if xml.contains("xmlns:w=") {
+    return xml;
+  }
+
+  let namespaces = concat!(
+    " xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"",
+    " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"",
+    " xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\"",
+    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
+  );
+
+  if let Some(index) = xml.find('>') {
+    if xml.as_bytes().get(index.saturating_sub(1)) == Some(&b'/') {
+      xml.insert_str(index.saturating_sub(1), namespaces);
+    } else {
+      xml.insert_str(index, namespaces);
+    }
+  }
+
+  xml
+}
+
 fn drawing_textbox_text(xml: &str) -> Option<String> {
   if !xml.contains("txbxContent") {
     return None;
@@ -3603,7 +3883,14 @@ struct StylesCatalog {
   doc_default_run: TextStyle,
   default_paragraph_style_id: Option<String>,
   theme_fonts: ThemeFonts,
+  theme_colors: ThemeColors,
   styles: HashMap<String, StyleEntry>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ThemeData {
+  fonts: ThemeFonts,
+  colors: ThemeColors,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -3616,6 +3903,28 @@ struct ThemeFonts {
   minor_high_ansi: Option<Arc<str>>,
   minor_east_asia: Option<Arc<str>>,
   minor_bidi: Option<Arc<str>>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct ThemeColors {
+  dark1: Option<RgbColor>,
+  light1: Option<RgbColor>,
+  dark2: Option<RgbColor>,
+  light2: Option<RgbColor>,
+  accent1: Option<RgbColor>,
+  accent2: Option<RgbColor>,
+  accent3: Option<RgbColor>,
+  accent4: Option<RgbColor>,
+  accent5: Option<RgbColor>,
+  accent6: Option<RgbColor>,
+  hyperlink: Option<RgbColor>,
+  followed_hyperlink: Option<RgbColor>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ResolvedColor {
+  pub color: RgbColor,
+  pub opacity: f32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -3683,9 +3992,11 @@ struct TableImportContext<'a> {
 
 impl StylesCatalog {
   fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Result<Self> {
+    let theme = ThemeData::load(package, main);
     let Some(styles_part) = main.style_definitions_part(package) else {
       let mut catalog = Self {
-        theme_fonts: ThemeFonts::load(package, main),
+        theme_fonts: theme.fonts,
+        theme_colors: theme.colors,
         ..Self::default()
       };
       if catalog.doc_default_run.font_family.is_none() {
@@ -3693,10 +4004,10 @@ impl StylesCatalog {
       }
       return Ok(catalog);
     };
-    let theme_fonts = ThemeFonts::load(package, main);
     let styles = styles_part.root_element(package)?;
     let mut catalog = Self {
-      theme_fonts,
+      theme_fonts: theme.fonts,
+      theme_colors: theme.colors,
       ..Self::default()
     };
 
@@ -3717,6 +4028,7 @@ impl StylesCatalog {
           .and_then(|default| default.run_properties_base_style.as_deref())
           .map(RunProps::BaseStyle),
         &catalog.theme_fonts,
+        &catalog.theme_colors,
       );
     }
 
@@ -3751,10 +4063,11 @@ impl StylesCatalog {
         &mut entry.run_style,
         style.style_run_properties.as_deref().map(RunProps::Style),
         &catalog.theme_fonts,
+        &catalog.theme_colors,
       );
       entry.run_overrides =
         run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
-      entry.table_style = table_style_model(style, &catalog.theme_fonts);
+      entry.table_style = table_style_model(style, &catalog.theme_fonts, &catalog.theme_colors);
       catalog.styles.insert(style_id.to_string(), entry);
     }
 
@@ -3856,7 +4169,7 @@ impl StylesCatalog {
   }
 }
 
-impl ThemeFonts {
+impl ThemeData {
   fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
     let Some(theme_part) = main.theme_part(package) else {
       return Self::default();
@@ -3864,6 +4177,15 @@ impl ThemeFonts {
     let Ok(theme) = theme_part.root_element(package) else {
       return Self::default();
     };
+    Self {
+      fonts: ThemeFonts::from_theme(theme),
+      colors: ThemeColors::from_theme(theme),
+    }
+  }
+}
+
+impl ThemeFonts {
+  fn from_theme(theme: &a::Theme) -> Self {
     let scheme = &theme.theme_elements.font_scheme;
     Self {
       major_ascii: major_font_family(&scheme.major_font.latin_font.typeface),
@@ -3891,6 +4213,70 @@ impl ThemeFonts {
   }
 }
 
+impl ThemeColors {
+  fn from_theme(theme: &a::Theme) -> Self {
+    let scheme = &theme.theme_elements.color_scheme;
+    Self {
+      dark1: dark1_color_value(&scheme.dark1_color.dark1_color_choice),
+      light1: light1_color_value(&scheme.light1_color.light1_color_choice),
+      dark2: dark2_color_value(&scheme.dark2_color.dark2_color_choice),
+      light2: light2_color_value(&scheme.light2_color.light2_color_choice),
+      accent1: accent1_color_value(&scheme.accent1_color.accent1_color_choice),
+      accent2: accent2_color_value(&scheme.accent2_color.accent2_color_choice),
+      accent3: accent3_color_value(&scheme.accent3_color.accent3_color_choice),
+      accent4: accent4_color_value(&scheme.accent4_color.accent4_color_choice),
+      accent5: accent5_color_value(&scheme.accent5_color.accent5_color_choice),
+      accent6: accent6_color_value(&scheme.accent6_color.accent6_color_choice),
+      hyperlink: hyperlink_color_value(&scheme.hyperlink.hyperlink_choice),
+      followed_hyperlink: followed_hyperlink_color_value(
+        &scheme
+          .followed_hyperlink_color
+          .followed_hyperlink_color_choice,
+      ),
+    }
+  }
+
+  fn resolve_wordprocessing(&self, value: w::ThemeColorValues) -> Option<RgbColor> {
+    match value {
+      w::ThemeColorValues::Dark1 | w::ThemeColorValues::Text1 => self.dark1,
+      w::ThemeColorValues::Light1 | w::ThemeColorValues::Background1 => self.light1,
+      w::ThemeColorValues::Dark2 | w::ThemeColorValues::Text2 => self.dark2,
+      w::ThemeColorValues::Light2 | w::ThemeColorValues::Background2 => self.light2,
+      w::ThemeColorValues::Accent1 => self.accent1,
+      w::ThemeColorValues::Accent2 => self.accent2,
+      w::ThemeColorValues::Accent3 => self.accent3,
+      w::ThemeColorValues::Accent4 => self.accent4,
+      w::ThemeColorValues::Accent5 => self.accent5,
+      w::ThemeColorValues::Accent6 => self.accent6,
+      w::ThemeColorValues::Hyperlink => self.hyperlink,
+      w::ThemeColorValues::FollowedHyperlink => self.followed_hyperlink,
+      w::ThemeColorValues::None => None,
+    }
+  }
+
+  fn resolve_word2010(&self, value: w14::SchemeColorValues) -> Option<RgbColor> {
+    match value {
+      w14::SchemeColorValues::BackgroundColor => self.light1,
+      w14::SchemeColorValues::TextColor => self.dark1,
+      w14::SchemeColorValues::AdditionalBackgroundColor => self.light2,
+      w14::SchemeColorValues::AdditionalTextColor => self.dark2,
+      w14::SchemeColorValues::ExtraSchemeColor1 => self.accent1,
+      w14::SchemeColorValues::ExtraSchemeColor2 => self.accent2,
+      w14::SchemeColorValues::ExtraSchemeColor3 => self.accent3,
+      w14::SchemeColorValues::ExtraSchemeColor4 => self.accent4,
+      w14::SchemeColorValues::ExtraSchemeColor5 => self.accent5,
+      w14::SchemeColorValues::ExtraSchemeColor6 => self.accent6,
+      w14::SchemeColorValues::HyperlinkColor => self.hyperlink,
+      w14::SchemeColorValues::FollowedHyperlinkColor => self.followed_hyperlink,
+      w14::SchemeColorValues::MainDarkColor1 => self.dark1,
+      w14::SchemeColorValues::MainLightColor1 => self.light1,
+      w14::SchemeColorValues::MainDarkColor2 => self.dark2,
+      w14::SchemeColorValues::MainLightColor2 => self.light2,
+      w14::SchemeColorValues::AutoColor => None,
+    }
+  }
+}
+
 fn major_font_family(value: &Option<String>) -> Option<Arc<str>> {
   value
     .as_deref()
@@ -3899,7 +4285,332 @@ fn major_font_family(value: &Option<String>) -> Option<Arc<str>> {
     .map(Arc::<str>::from)
 }
 
-fn table_style_model(style: &w::Style, theme_fonts: &ThemeFonts) -> TableStyleModel {
+macro_rules! theme_color_choice_value {
+  ($fn_name:ident, $choice_ty:path, $srgb:path, $sys:path) => {
+    fn $fn_name(choice: &Option<$choice_ty>) -> Option<RgbColor> {
+      match choice.as_ref()? {
+        $srgb(color) => parse_hex_color(color.val.as_str()),
+        $sys(color) => color.last_color.as_deref().and_then(parse_hex_color),
+        _ => None,
+      }
+    }
+  };
+}
+
+theme_color_choice_value!(
+  dark1_color_value,
+  a::Dark1ColorChoice,
+  a::Dark1ColorChoice::ASrgbClr,
+  a::Dark1ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  light1_color_value,
+  a::Light1ColorChoice,
+  a::Light1ColorChoice::ASrgbClr,
+  a::Light1ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  dark2_color_value,
+  a::Dark2ColorChoice,
+  a::Dark2ColorChoice::ASrgbClr,
+  a::Dark2ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  light2_color_value,
+  a::Light2ColorChoice,
+  a::Light2ColorChoice::ASrgbClr,
+  a::Light2ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent1_color_value,
+  a::Accent1ColorChoice,
+  a::Accent1ColorChoice::ASrgbClr,
+  a::Accent1ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent2_color_value,
+  a::Accent2ColorChoice,
+  a::Accent2ColorChoice::ASrgbClr,
+  a::Accent2ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent3_color_value,
+  a::Accent3ColorChoice,
+  a::Accent3ColorChoice::ASrgbClr,
+  a::Accent3ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent4_color_value,
+  a::Accent4ColorChoice,
+  a::Accent4ColorChoice::ASrgbClr,
+  a::Accent4ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent5_color_value,
+  a::Accent5ColorChoice,
+  a::Accent5ColorChoice::ASrgbClr,
+  a::Accent5ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  accent6_color_value,
+  a::Accent6ColorChoice,
+  a::Accent6ColorChoice::ASrgbClr,
+  a::Accent6ColorChoice::ASysClr
+);
+theme_color_choice_value!(
+  hyperlink_color_value,
+  a::HyperlinkChoice,
+  a::HyperlinkChoice::ASrgbClr,
+  a::HyperlinkChoice::ASysClr
+);
+theme_color_choice_value!(
+  followed_hyperlink_color_value,
+  a::FollowedHyperlinkColorChoice,
+  a::FollowedHyperlinkColorChoice::ASrgbClr,
+  a::FollowedHyperlinkColorChoice::ASysClr
+);
+
+pub(super) fn resolve_run_color(color: &w::Color, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  let has_theme_transform = color.theme_tint.is_some() || color.theme_shade.is_some();
+
+  if !has_theme_transform && let Some(resolved) = parse_hex_color(&color.val) {
+    return Some(resolved);
+  }
+
+  let mut resolved = color
+    .theme_color
+    .and_then(|value| theme_colors.resolve_wordprocessing(value))
+    .or_else(|| parse_hex_color(&color.val))?;
+
+  if let Some(tint) = color.theme_tint.as_deref() {
+    resolved = apply_word_tint(resolved, tint);
+  }
+  if let Some(shade) = color.theme_shade.as_deref() {
+    resolved = apply_word_shade(resolved, shade);
+  }
+
+  Some(resolved)
+}
+
+pub(super) fn resolve_text_fill(
+  fill: &w14::FillTextEffect,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  match fill.fill_text_effect_choice.as_ref()? {
+    w14::FillTextEffectChoice::W14NoFill => None,
+    w14::FillTextEffectChoice::W14SolidFill(fill) => resolve_solid_text_fill(fill, theme_colors),
+    w14::FillTextEffectChoice::W14GradFill(_) => None,
+  }
+}
+
+pub(super) fn resolve_text_outline(
+  outline: &w14::TextOutlineEffect,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  let resolved = match outline.text_outline_effect_choice1.as_ref()? {
+    w14::TextOutlineEffectChoice::W14NoFill => return None,
+    w14::TextOutlineEffectChoice::W14SolidFill(fill) => {
+      resolve_solid_text_fill(fill, theme_colors)?
+    }
+    w14::TextOutlineEffectChoice::W14GradFill(_) => return None,
+  };
+
+  Some(ResolvedColor {
+    color: resolved.color,
+    opacity: resolved.opacity,
+  })
+}
+
+fn resolve_solid_text_fill(
+  fill: &w14::SolidColorFillProperties,
+  theme_colors: &ThemeColors,
+) -> Option<ResolvedColor> {
+  match fill.solid_color_fill_properties_choice.as_ref()? {
+    w14::SolidColorFillPropertiesChoice::W14SrgbClr(color) => Some(ResolvedColor {
+      color: parse_hex_color(color.val.as_str())?,
+      opacity: opacity_from_w14_rgb_transforms(&color.rgb_color_model_hex_choice),
+    }),
+    w14::SolidColorFillPropertiesChoice::W14SchemeClr(color) => {
+      let mut resolved = theme_colors.resolve_word2010(color.val)?;
+      resolved = apply_w14_scheme_transforms(resolved, &color.scheme_color_choice);
+      Some(ResolvedColor {
+        color: resolved,
+        opacity: opacity_from_w14_scheme_transforms(&color.scheme_color_choice),
+      })
+    }
+  }
+}
+
+fn opacity_from_w14_rgb_transforms(transforms: &[w14::RgbColorModelHexChoice]) -> f32 {
+  opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
+    w14::RgbColorModelHexChoice::W14Alpha(value) => Some(value.val),
+    _ => None,
+  }))
+}
+
+fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> f32 {
+  opacity_from_w14_alpha(transforms.iter().find_map(|transform| match transform {
+    w14::SchemeColorChoice::W14Alpha(value) => Some(value.val),
+    _ => None,
+  }))
+}
+
+fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
+  let transparency = alpha.unwrap_or(0) as f32 / 100_000.0;
+  (1.0 - transparency).clamp(0.0, 1.0)
+}
+
+fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorChoice]) -> RgbColor {
+  let mut hsl = HslColor::from_rgb(color);
+  for transform in transforms {
+    match transform {
+      w14::SchemeColorChoice::W14Tint(value) => {
+        hsl.apply_tint(value.val as f32 / 100_000.0);
+      }
+      w14::SchemeColorChoice::W14Shade(value) => {
+        hsl.apply_shade(value.val as f32 / 100_000.0);
+      }
+      w14::SchemeColorChoice::W14LumMod(value) => {
+        hsl.apply_luminance_mod(value.val as f32 / 100_000.0);
+      }
+      w14::SchemeColorChoice::W14LumOff(value) => {
+        hsl.apply_luminance_offset(value.val as f32 / 100_000.0);
+      }
+      _ => {}
+    }
+  }
+  hsl.to_rgb()
+}
+
+fn apply_word_tint(color: RgbColor, tint: &str) -> RgbColor {
+  let Some(tint) = u8::from_str_radix(tint, 16).ok() else {
+    return color;
+  };
+  let mut hsl = HslColor::from_rgb(color);
+  hsl.apply_tint(1.0 - (tint as f32 / 255.0));
+  hsl.to_rgb()
+}
+
+fn apply_word_shade(color: RgbColor, shade: &str) -> RgbColor {
+  let Some(shade) = u8::from_str_radix(shade, 16).ok() else {
+    return color;
+  };
+  let mut hsl = HslColor::from_rgb(color);
+  hsl.apply_shade(shade as f32 / 255.0);
+  hsl.to_rgb()
+}
+
+#[derive(Clone, Copy, Debug)]
+struct HslColor {
+  hue: f32,
+  saturation: f32,
+  luminance: f32,
+}
+
+impl HslColor {
+  fn from_rgb(color: RgbColor) -> Self {
+    let red = color.r as f32 / 255.0;
+    let green = color.g as f32 / 255.0;
+    let blue = color.b as f32 / 255.0;
+    let max = red.max(green.max(blue));
+    let min = red.min(green.min(blue));
+    let luminance = (max + min) / 2.0;
+
+    if (max - min).abs() < f32::EPSILON {
+      return Self {
+        hue: 0.0,
+        saturation: 0.0,
+        luminance,
+      };
+    }
+
+    let delta = max - min;
+    let saturation = if luminance > 0.5 {
+      delta / (2.0 - max - min)
+    } else {
+      delta / (max + min)
+    };
+    let hue = if (max - red).abs() < f32::EPSILON {
+      ((green - blue) / delta).rem_euclid(6.0)
+    } else if (max - green).abs() < f32::EPSILON {
+      ((blue - red) / delta) + 2.0
+    } else {
+      ((red - green) / delta) + 4.0
+    } / 6.0;
+
+    Self {
+      hue,
+      saturation,
+      luminance,
+    }
+  }
+
+  fn to_rgb(self) -> RgbColor {
+    if self.saturation <= f32::EPSILON {
+      let value = (self.luminance * 255.0).round() as u8;
+      return RgbColor {
+        r: value,
+        g: value,
+        b: value,
+      };
+    }
+
+    let q = if self.luminance < 0.5 {
+      self.luminance * (1.0 + self.saturation)
+    } else {
+      self.luminance + self.saturation - self.luminance * self.saturation
+    };
+    let p = 2.0 * self.luminance - q;
+
+    RgbColor {
+      r: hue_to_rgb(p, q, self.hue + (1.0 / 3.0)),
+      g: hue_to_rgb(p, q, self.hue),
+      b: hue_to_rgb(p, q, self.hue - (1.0 / 3.0)),
+    }
+  }
+
+  fn apply_tint(&mut self, amount: f32) {
+    self.luminance = (self.luminance * (1.0 - amount) + amount).clamp(0.0, 1.0);
+  }
+
+  fn apply_shade(&mut self, amount: f32) {
+    self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
+  }
+
+  fn apply_luminance_mod(&mut self, amount: f32) {
+    self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
+  }
+
+  fn apply_luminance_offset(&mut self, amount: f32) {
+    self.luminance = (self.luminance + amount).clamp(0.0, 1.0);
+  }
+}
+
+fn hue_to_rgb(p: f32, q: f32, mut hue: f32) -> u8 {
+  if hue < 0.0 {
+    hue += 1.0;
+  } else if hue > 1.0 {
+    hue -= 1.0;
+  }
+
+  let value = if hue < (1.0 / 6.0) {
+    p + (q - p) * 6.0 * hue
+  } else if hue < 0.5 {
+    q
+  } else if hue < (2.0 / 3.0) {
+    p + (q - p) * ((2.0 / 3.0) - hue) * 6.0
+  } else {
+    p
+  };
+
+  (value.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn table_style_model(
+  style: &w::Style,
+  theme_fonts: &ThemeFonts,
+  theme_colors: &ThemeColors,
+) -> TableStyleModel {
   let mut model = TableStyleModel::default();
   if let Some(properties) = style.style_table_properties.as_deref() {
     merge_table_level_style(
@@ -3933,6 +4644,7 @@ fn table_style_model(style: &w::Style, theme_fonts: &ThemeFonts) -> TableStyleMo
     &mut model.whole_table.run_style,
     style.style_run_properties.as_deref().map(RunProps::Style),
     theme_fonts,
+    theme_colors,
   );
   model.whole_table.run_overrides =
     run_style_overrides(style.style_run_properties.as_deref().map(RunProps::Style));
@@ -3952,6 +4664,7 @@ fn table_style_model(style: &w::Style, theme_fonts: &ThemeFonts) -> TableStyleMo
         .as_deref()
         .map(RunProps::BaseStyle),
       theme_fonts,
+      theme_colors,
     );
     cell_style.run_overrides = run_style_overrides(
       conditional
@@ -4794,6 +5507,20 @@ impl<'a> RunProps<'a> {
     }
   }
 
+  fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
+    match self {
+      Self::Direct(properties) => properties.fill_text_effect.as_deref(),
+      Self::Style(_) | Self::BaseStyle(_) => None,
+    }
+  }
+
+  fn text_outline(&self) -> Option<&'a w14::TextOutlineEffect> {
+    match self {
+      Self::Direct(properties) => properties.text_outline_effect.as_deref(),
+      Self::Style(_) | Self::BaseStyle(_) => None,
+    }
+  }
+
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
       Self::Direct(properties) => properties.highlight.as_ref(),
@@ -5023,6 +5750,7 @@ mod tests {
         ..Default::default()
       },
       &ThemeFonts::default(),
+      &ThemeColors::default(),
     );
 
     let first_row = table_cell_style_for(
@@ -5278,6 +6006,7 @@ mod tests {
         ..Default::default()
       },
       &ThemeFonts::default(),
+      &ThemeColors::default(),
     );
 
     let mut first_row = table_row_style_for(
@@ -5346,6 +6075,7 @@ mod tests {
         ..Default::default()
       },
       &ThemeFonts::default(),
+      &ThemeColors::default(),
     );
 
     assert_eq!(style.alignment, Some(TableAlignment::Center));

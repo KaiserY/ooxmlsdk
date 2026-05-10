@@ -1,6 +1,7 @@
 use super::{
   ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle,
-  ThemeFonts, merge_paragraph_format, parse_hex_color,
+  ThemeColors, ThemeFonts, merge_paragraph_format, resolve_run_color, resolve_text_fill,
+  resolve_text_outline, units,
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
@@ -45,6 +46,7 @@ pub(super) fn run_style(
     &mut style,
     Some(RunProps::Direct(properties)),
     &styles.theme_fonts,
+    &styles.theme_colors,
   );
   style
 }
@@ -53,6 +55,7 @@ pub(super) fn merge_run_style(
   style: &mut TextStyle,
   properties: Option<RunProps<'_>>,
   theme_fonts: &ThemeFonts,
+  theme_colors: &ThemeColors,
 ) {
   let Some(properties) = properties else {
     return;
@@ -85,9 +88,25 @@ pub(super) fn merge_run_style(
     style.font_size_pt = (half_points / 2.0).max(1.0);
   }
   if let Some(color) = properties.color()
-    && let Some(rgb) = parse_hex_color(&color.val)
+    && let Some(rgb) = resolve_run_color(color, theme_colors)
   {
     style.color = rgb;
+  }
+  if let Some(fill) = properties.text_fill()
+    && let Some(resolved) = resolve_text_fill(fill, theme_colors)
+  {
+    style.color = resolved.color;
+    style.opacity = resolved.opacity;
+  }
+  if let Some(outline) = properties.text_outline()
+    && let Some(resolved) = resolve_text_outline(outline, theme_colors)
+  {
+    style.outline_color = Some(resolved.color);
+    style.outline_opacity = resolved.opacity;
+    style.outline_width_pt = outline
+      .line_width
+      .map(|width| units::emu_to_points(width as i64))
+      .unwrap_or(style.outline_width_pt);
   }
   if let Some(spacing) = properties.spacing() {
     style.character_spacing_pt = spacing.val as f32 / 20.0;

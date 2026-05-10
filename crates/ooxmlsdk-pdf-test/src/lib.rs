@@ -13,6 +13,7 @@ use std::sync::{Mutex, OnceLock};
 
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PdfSummary, RawAnnotationSummary, RawPageSummary,
+  RawXObjectSummary,
 };
 pub use render::render_fixture_pdf;
 

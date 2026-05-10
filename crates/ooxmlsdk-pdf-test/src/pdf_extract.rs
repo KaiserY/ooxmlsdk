@@ -3,6 +3,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use flate2::read::ZlibDecoder;
+use image::GenericImageView;
 use lopdf::{Document as LopdfDocument, Object as LopdfObject};
 use pdfium_render::prelude::*;
 
@@ -80,6 +81,7 @@ pub struct RawPageSummary {
   pub page_index: usize,
   pub annotation_count: usize,
   pub annotations: Vec<RawAnnotationSummary>,
+  pub xobjects: Vec<RawXObjectSummary>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,6 +91,21 @@ pub struct RawAnnotationSummary {
   pub subtype_name: Option<String>,
   pub rect: Option<String>,
   pub action_uri: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RawXObjectSummary {
+  pub page_index: usize,
+  pub name: String,
+  pub type_name: Option<String>,
+  pub subtype_name: Option<String>,
+  pub filter_names: Vec<String>,
+  pub width_px: Option<u32>,
+  pub height_px: Option<u32>,
+  pub image_format: Option<String>,
+  pub decoded_width_px: Option<u32>,
+  pub decoded_height_px: Option<u32>,
+  pub bits_per_pixel: Option<u16>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -133,6 +150,7 @@ pub struct TextObjectSummary {
   pub unscaled_font_size: String,
   pub render_mode: String,
   pub fill_color: Option<String>,
+  pub stroke_color: Option<String>,
   pub bounds: Option<String>,
 }
 
@@ -271,6 +289,7 @@ fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
               unscaled_font_size: format_points(text.unscaled_font_size(), 2),
               render_mode: format_text_render_mode(text.render_mode()),
               fill_color: object.fill_color().ok().map(format_color),
+              stroke_color: object.stroke_color().ok().map(format_color),
               bounds: object
                 .bounds()
                 .ok()
@@ -433,10 +452,113 @@ fn raw_page_summary(
     });
   }
 
+  let xobjects = raw_page_xobjects(document, page_index, page)?;
+
   Ok(RawPageSummary {
     page_index,
     annotation_count: annotation_refs.len(),
     annotations,
+    xobjects,
+  })
+}
+
+fn raw_page_xobjects(
+  document: &LopdfDocument,
+  page_index: usize,
+  page: &lopdf::Dictionary,
+) -> Result<Vec<RawXObjectSummary>, String> {
+  let resources = match page.get(b"Resources") {
+    Ok(object) => lopdf_dictionary(document, object, "page Resources")?,
+    Err(lopdf::Error::DictKey(_)) => return Ok(Vec::new()),
+    Err(error) => return Err(format!("lopdf could not read page Resources: {error}")),
+  };
+  let xobjects = match resources.get(b"XObject") {
+    Ok(object) => lopdf_dictionary(document, object, "page Resources/XObject")?,
+    Err(lopdf::Error::DictKey(_)) => return Ok(Vec::new()),
+    Err(error) => {
+      return Err(format!(
+        "lopdf could not read page XObject resources: {error}"
+      ));
+    }
+  };
+
+  let mut summaries = Vec::new();
+  for (name, object) in xobjects.iter() {
+    summaries.push(raw_xobject_summary(
+      document,
+      page_index,
+      &String::from_utf8_lossy(name),
+      object,
+    )?);
+  }
+  summaries.sort_by(|left, right| left.name.cmp(&right.name));
+
+  Ok(summaries)
+}
+
+fn raw_xobject_summary(
+  document: &LopdfDocument,
+  page_index: usize,
+  name: &str,
+  object: &LopdfObject,
+) -> Result<RawXObjectSummary, String> {
+  let stream = lopdf_stream(document, object, "page XObject stream")?;
+  let type_name = stream
+    .dict
+    .get(b"Type")
+    .ok()
+    .and_then(|value| lopdf_name(document, value).ok());
+  let subtype_name = stream
+    .dict
+    .get(b"Subtype")
+    .ok()
+    .and_then(|value| lopdf_name(document, value).ok());
+  let filter_names = stream
+    .filters()
+    .map(|filters| {
+      filters
+        .into_iter()
+        .map(|filter| String::from_utf8_lossy(filter).to_string())
+        .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
+  let width_px = stream
+    .dict
+    .get(b"Width")
+    .ok()
+    .and_then(|value| lopdf_u32(document, value).ok());
+  let height_px = stream
+    .dict
+    .get(b"Height")
+    .ok()
+    .and_then(|value| lopdf_u32(document, value).ok());
+  let image_format = image::guess_format(&stream.content)
+    .ok()
+    .map(|format| format!("{format:?}"));
+  let decoded = image::load_from_memory(&stream.content).ok();
+  let (decoded_width_px, decoded_height_px, bits_per_pixel) = if let Some(image) = decoded {
+    let (width, height) = image.dimensions();
+    (
+      Some(width),
+      Some(height),
+      Some(image.color().bits_per_pixel()),
+    )
+  } else {
+    (None, None, None)
+  };
+
+  Ok(RawXObjectSummary {
+    page_index,
+    name: name.to_string(),
+    type_name,
+    subtype_name,
+    filter_names,
+    width_px,
+    height_px,
+    image_format,
+    decoded_width_px,
+    decoded_height_px,
+    bits_per_pixel,
   })
 }
 
@@ -513,6 +635,33 @@ fn lopdf_rect(document: &LopdfDocument, object: &LopdfObject) -> Result<String, 
     "[{:.6} {:.6} {:.6} {:.6}]",
     numbers[0], numbers[1], numbers[2], numbers[3]
   ))
+}
+
+fn lopdf_stream<'a>(
+  document: &'a LopdfDocument,
+  object: &'a LopdfObject,
+  context: &str,
+) -> Result<&'a lopdf::Stream, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference {context}: {error}"))?;
+  match object {
+    LopdfObject::Stream(stream) => Ok(stream),
+    _ => Err(format!(
+      "lopdf expected stream for {context}, found {}",
+      object.enum_variant()
+    )),
+  }
+}
+
+fn lopdf_u32(document: &LopdfDocument, object: &LopdfObject) -> Result<u32, String> {
+  let (_, object) = document
+    .dereference(object)
+    .map_err(|error| format!("lopdf could not dereference integer: {error}"))?;
+  let value = object
+    .as_i64()
+    .map_err(|error| format!("lopdf expected integer object: {error}"))?;
+  u32::try_from(value).map_err(|_| format!("lopdf integer is out of range for u32: {value}"))
 }
 
 fn bind_pdfium() -> Result<Pdfium, String> {

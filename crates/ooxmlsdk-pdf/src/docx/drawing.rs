@@ -14,8 +14,10 @@ pub(super) fn push_drawing_textboxes(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
   style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
 ) {
-  super::push_drawing_textboxes_impl(drawing, inlines, style);
+  super::push_drawing_textboxes_impl(drawing, inlines, style, styles, images);
 }
 
 pub(super) fn pict_image(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {

@@ -55,12 +55,14 @@ fn assert_rect_eq(actual: &str, expected: [f64; 4]) {
 }
 
 #[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx:testTdf161346
 fn pdfexport_fixture_fdo47811_word2013_has_two_pages() {
   let summary = render_summary("fdo47811-1_Word2013.docx");
   assert_eq!(summary.page_count, 2);
 }
 
 #[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport.cxx:testTdf145274
 fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
   let summary = render_summary("tdf145274.docx");
   assert_eq!(summary.page_count, 1);
@@ -91,6 +93,7 @@ fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
 }
 
 #[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport.cxx:testTdf156685
 fn pdfexport_fixture_tdf156685_matches_upstream_text_object_expectations() {
   let summary = render_summary("tdf156685.docx");
   assert_eq!(summary.page_count, 1);
@@ -121,6 +124,7 @@ fn pdfexport_fixture_tdf156685_matches_upstream_text_object_expectations() {
 }
 
 #[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport.cxx:testTdf142133
 fn pdfexport_fixture_tdf142133_preserves_google_link_annotation() {
   let summary = render_summary("tdf142133.docx");
   assert_eq!(summary.page_count, 1);
@@ -136,6 +140,7 @@ fn pdfexport_fixture_tdf142133_preserves_google_link_annotation() {
 }
 
 #[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx:testTdf152246
 fn pdfexport_fixture_content_control_rtl_matches_upstream_widget_rects() {
   let summary = render_summary("content-control-rtl.docx");
   assert_eq!(summary.page_count, 1);
@@ -166,4 +171,22 @@ fn pdfexport_fixture_content_control_rtl_matches_upstream_widget_rects() {
       .unwrap_or_else(|| panic!("missing widget bounds for {:?}", widget));
     assert_rect_eq(bounds, expected_rect);
   }
+}
+
+#[test]
+// Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx:testTdf129085
+fn pdfexport_fixture_tdf129085_preserves_single_jpeg_xobject() {
+  let summary = render_summary("tdf129085.docx");
+  assert_eq!(summary.page_count, 1);
+
+  let page = raw_page(&summary, 0);
+  assert_eq!(page.xobjects.len(), 1);
+
+  let xobject = &page.xobjects[0];
+  assert_eq!(xobject.type_name.as_deref(), Some("XObject"));
+  assert_eq!(xobject.subtype_name.as_deref(), Some("Image"));
+  assert_eq!(xobject.image_format.as_deref(), Some("Jpeg"));
+  assert_eq!(xobject.decoded_width_px, Some(884));
+  assert_eq!(xobject.decoded_height_px, Some(925));
+  assert_eq!(xobject.bits_per_pixel, Some(24));
 }

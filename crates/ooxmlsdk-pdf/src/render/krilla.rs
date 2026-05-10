@@ -804,7 +804,7 @@ fn draw_text_item(
     if let Some(highlight) = &portion.highlight {
       draw_paint_rect(surface, highlight);
     }
-    surface.set_stroke(None);
+    surface.set_stroke(stroke(&item.style));
     surface.set_fill(Some(fill(&item.style)));
     if let Some(glyphs) = &portion.glyphs {
       let font = fonts.select(&item.style);
@@ -1327,7 +1327,18 @@ fn load_font(style: &TextStyle) -> Result<Font> {
 fn fill(style: &TextStyle) -> Fill {
   Fill {
     paint: rgb::Color::new(style.color.r, style.color.g, style.color.b).into(),
-    opacity: NormalizedF32::ONE,
+    opacity: NormalizedF32::new(style.opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
     rule: Default::default(),
   }
+}
+
+fn stroke(style: &TextStyle) -> Option<Stroke> {
+  let color = style.outline_color?;
+  Some(Stroke {
+    width: style.outline_width_pt.max(0.1),
+    paint: rgb::Color::new(color.r, color.g, color.b).into(),
+    opacity: NormalizedF32::new(style.outline_opacity.clamp(0.0, 1.0))
+      .unwrap_or(NormalizedF32::ZERO),
+    ..Default::default()
+  })
 }

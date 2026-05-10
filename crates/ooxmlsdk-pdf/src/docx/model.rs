@@ -389,6 +389,10 @@ pub(crate) struct TextStyle {
   pub strikethrough: bool,
   pub uppercase: bool,
   pub color: RgbColor,
+  pub opacity: f32,
+  pub outline_color: Option<RgbColor>,
+  pub outline_opacity: f32,
+  pub outline_width_pt: f32,
   pub highlight: Option<RgbColor>,
 }
 
@@ -405,6 +409,10 @@ impl Default for TextStyle {
       strikethrough: false,
       uppercase: false,
       color: RgbColor { r: 0, g: 0, b: 0 },
+      opacity: 1.0,
+      outline_color: None,
+      outline_opacity: 1.0,
+      outline_width_pt: 0.0,
       highlight: None,
     }
   }

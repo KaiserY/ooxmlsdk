@@ -1250,6 +1250,7 @@ version = "0.6.2"
 dependencies = [
  "crc32fast",
  "flate2",
+ "image",
  "lopdf",
  "ooxmlsdk-pdf",
  "pdfium-render",

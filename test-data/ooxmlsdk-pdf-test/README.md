@@ -13,7 +13,7 @@ assertion in `pdfexport.cxx` or `pdfexport2.cxx`. Avoid adding hand-crafted
 fixtures or inferred expectations; copy upstream fixtures and port the upstream
 assertion values directly.
 
-Current fixtures:
+Strict upstream `pdfexport` / `pdfexport2` DOCX fixtures:
 
 - `content-control-rtl.docx`: copied from
   `../core/vcl/qa/cppunit/pdfexport/data/content-control-rtl.docx`.
@@ -25,6 +25,38 @@ Current fixtures:
   `../core/vcl/qa/cppunit/pdfexport/data/tdf145274.docx`.
 - `tdf156685.docx`: copied from
   `../core/vcl/qa/cppunit/pdfexport/data/tdf156685.docx`.
+- `tdf129085.docx`: copied from
+  `../core/vcl/qa/cppunit/pdfexport/data/tdf129085.docx`.
+
+Current upstream scope note:
+
+- `../core/vcl/qa/cppunit/pdfexport/data/` currently contains six DOCX fixtures
+  that are covered by explicit `pdfexport` / `pdfexport2` assertions. This
+  directory mirrors that full strict-upstream DOCX set; adding more DOCX
+  fixtures would require leaving the current `pdfexport` DOCX coverage surface
+  or inventing expectations, both of which this crate avoids.
+
+Core-derived visible-output DOCX fixtures:
+
+- `semi-transparent-text.docx`: copied from
+  `../core/sw/qa/writerfilter/dmapper/data/semi-transparent-text.docx`.
+- `tdf152884_Char_Transparency.docx`: copied from
+  `../core/sw/qa/writerfilter/dmapper/data/tdf152884_Char_Transparency.docx`.
+- `chart-data-label-char-color.docx`: copied from
+  `../core/oox/qa/unit/data/chart-data-label-char-color.docx`.
+- `tdf54095_SmartArtThemeTextColor.docx`: copied from
+  `../core/oox/qa/unit/data/tdf54095_SmartArtThemeTextColor.docx`.
+- `tdf125885_WordArt2.docx`: copied from
+  `../core/oox/qa/unit/data/tdf125885_WordArt2.docx`.
+- `tdf152840_WordArt_non_accent_color.docx`: copied from
+  `../core/oox/qa/unit/data/tdf152840_WordArt_non_accent_color.docx`.
+- `tdf152896_WordArt_color_darken.docx`: copied from
+  `../core/oox/qa/unit/data/tdf152896_WordArt_color_darken.docx`.
+
+These supplemental DOCX fixtures are not native `pdfexport` cases. They come
+from other LibreOffice subsystems, but each one asserts a final visible-output
+property that can be checked directly on the generated PDF without depending on
+Writer's internal document model.
 
 Assertion policy:
 

@@ -1964,7 +1964,7 @@ pub enum DocumentConformance {
   #[sdk(rename = "strict")]
   Strict,
 }
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum StrictCharacterSet {
   #[sdk(rename = "iso-8859-1")]
   #[default]
@@ -1999,6 +1999,8 @@ pub enum StrictCharacterSet {
   ChsThai,
   #[sdk(rename = "windows-1250")]
   ChsEastEurope,
+  #[sdk(other)]
+  OtherVariant(Box<str>),
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ObjectDrawAspect {

@@ -1,9 +1,9 @@
 use crate::Result;
 use crate::sdk_code::codegen_ir::{
   Cardinality, ContentModelDecl, ContentParticleDecl, ContentParticleKind, ElementKind, EnumDecl,
-  EnumValueType, EnumVariantDecl, FieldDecl, FieldWireDecl, MemberDecl, NumberSignKind,
-  SchemaModuleDecl, StringFormatKind, SystemSupportDecl, TypeDecl, TypeKind, TypeRefDecl,
-  ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode,
+  EnumOtherVariantDecl, EnumValueType, EnumVariantDecl, FieldDecl, FieldWireDecl, MemberDecl,
+  NumberSignKind, SchemaModuleDecl, StringFormatKind, SystemSupportDecl, TypeDecl, TypeKind,
+  TypeRefDecl, ValidatorDecl, ValidatorKind, VariantDecl, VariantWireDecl, XmlHeaderMode,
 };
 use crate::sdk_code::helpers::{
   AttrTypeKind, FlatParticleKind, StructuredParticle, StructuredParticleKind, classify_attr_type,
@@ -133,6 +133,13 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
           }
           _ => EnumValueType::StringLike,
         },
+        other_variant: schema_enum
+          .other_variant
+          .as_ref()
+          .map(|other| EnumOtherVariantDecl {
+            rust_name: other.name.clone(),
+            rust_type: other.r#type.clone(),
+          }),
         variants: schema_enum
           .facets
           .iter()
@@ -4100,6 +4107,7 @@ mod tests {
           aliases: vec!["uno".to_string()],
         }],
         version: Some("Office2010".to_string()),
+        other_variant: None,
       }],
       ..Default::default()
     };

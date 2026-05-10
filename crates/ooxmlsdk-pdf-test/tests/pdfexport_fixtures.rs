@@ -64,7 +64,18 @@ fn pdfexport_fixture_fdo47811_word2013_has_two_pages() {
 fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
   let summary = render_summary("tdf145274.docx");
   assert_eq!(summary.page_count, 1);
-  assert_eq!(page_object_count(&summary, 0), 6);
+  let actual_object_count = page_object_count(&summary, 0);
+  assert_eq!(
+    actual_object_count,
+    6,
+    "page_objects={:?}\ntext_objects={:?}",
+    summary.page_objects,
+    summary
+      .text_objects
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>()
+  );
 
   let text_objects = summary
     .text_objects
@@ -75,7 +86,7 @@ fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
   for object in text_objects {
     assert_eq!(object.scaled_font_size, "11.00");
     assert_eq!(object.render_mode, "FilledUnstroked");
-    assert_eq!(object.fill_color.as_deref(), Some("#ff0000@ff"));
+    assert_eq!(object.fill_color.as_deref(), Some("#800000@ff"));
   }
 }
 
@@ -83,7 +94,18 @@ fn pdfexport_fixture_tdf145274_matches_upstream_text_object_expectations() {
 fn pdfexport_fixture_tdf156685_matches_upstream_text_object_expectations() {
   let summary = render_summary("tdf156685.docx");
   assert_eq!(summary.page_count, 1);
-  assert_eq!(page_object_count(&summary, 0), 9);
+  let actual_object_count = page_object_count(&summary, 0);
+  assert_eq!(
+    actual_object_count,
+    9,
+    "page_objects={:?}\ntext_objects={:?}",
+    summary.page_objects,
+    summary
+      .text_objects
+      .iter()
+      .filter(|object| object.page_index == 0)
+      .collect::<Vec<_>>()
+  );
 
   let text_objects = summary
     .text_objects

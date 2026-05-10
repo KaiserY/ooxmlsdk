@@ -19,6 +19,8 @@ pub struct EnumDecl {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<String>,
   pub value_type: EnumValueType,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub other_variant: Option<EnumOtherVariantDecl>,
   pub variants: Vec<EnumVariantDecl>,
 }
 
@@ -37,6 +39,13 @@ pub struct EnumVariantDecl {
   pub xml_value: String,
   pub aliases: Vec<String>,
   pub version: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct EnumOtherVariantDecl {
+  pub rust_name: String,
+  pub rust_type: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -327,6 +336,7 @@ mod tests {
         docs: String::new(),
         version: Some("Office2007".to_string()),
         value_type: EnumValueType::StringLike,
+        other_variant: None,
         variants: vec![EnumVariantDecl {
           rust_name: "Foo".to_string(),
           xml_value: "foo".to_string(),

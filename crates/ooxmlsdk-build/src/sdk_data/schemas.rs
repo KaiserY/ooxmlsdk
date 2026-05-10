@@ -269,6 +269,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
           name: schema_enum.name.clone(),
           r#type: schema_enum.r#type.clone(),
           version: schema_enum.version.clone(),
+          other_variant: None,
           facets: schema_enum
             .facets
             .iter()

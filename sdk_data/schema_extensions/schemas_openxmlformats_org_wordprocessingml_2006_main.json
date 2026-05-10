@@ -1,4 +1,10 @@
 {
+  "Enums": [
+    {
+      "Name": "StrictCharacterSet",
+      "HasOtherVariant": true
+    }
+  ],
   "Types": [
     {
       "ClassName": "RunPropertiesDefault",

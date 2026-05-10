@@ -215,6 +215,8 @@ pub struct SchemaEnum {
   pub facets: Vec<SchemaEnumFacet>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub other_variant: Option<SchemaEnumOtherVariant>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -225,4 +227,11 @@ pub struct SchemaEnumFacet {
   pub version: String,
   #[serde(default)]
   pub aliases: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaEnumOtherVariant {
+  pub name: String,
+  pub r#type: String,
 }

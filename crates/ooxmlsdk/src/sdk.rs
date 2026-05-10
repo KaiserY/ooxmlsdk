@@ -469,7 +469,7 @@ impl PresentationDocumentType {
 }
 
 pub trait SdkEnum: Sized {
-  fn as_xml_str(&self) -> &'static str;
+  fn as_xml_str(&self) -> &str;
 
   fn from_xml_bytes(value: &[u8]) -> Result<Self, crate::common::SdkError>;
 

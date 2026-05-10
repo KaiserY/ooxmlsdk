@@ -19,7 +19,7 @@ icu_segmenter = { workspace = true }
 image = { workspace = true }
 krilla = { workspace = true }
 krilla-svg = { workspace = true }
-ooxmlsdk = { workspace = true, features = ["parts"] }
+ooxmlsdk = { workspace = true, features = ["parts", "mce"] }
 png = { workspace = true }
 quick-xml = { workspace = true }
 rustybuzz = { workspace = true }

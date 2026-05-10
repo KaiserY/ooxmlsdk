@@ -10,7 +10,16 @@ use crate::sdk_data::sdk_data_model::Schema;
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaExtensions {
+  pub enums: Vec<SchemaEnumExtension>,
   pub types: Vec<SchemaTypeExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaEnumExtension {
+  pub name: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub has_other_variant: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -74,6 +83,29 @@ pub fn apply_schema_extensions(
     else {
       return Err(format!("schema extension module {module_name} not found").into());
     };
+
+    for extension in &extensions.enums {
+      let Some(schema_enum) = schema
+        .enums
+        .iter_mut()
+        .find(|schema_enum| schema_enum.name == extension.name)
+      else {
+        return Err(
+          format!(
+            "schema extension enum {}.{} not found",
+            module_name, extension.name
+          )
+          .into(),
+        );
+      };
+
+      if extension.has_other_variant.unwrap_or(false) {
+        schema_enum.other_variant = Some(crate::sdk_data::sdk_data_model::SchemaEnumOtherVariant {
+          name: "OtherVariant".to_string(),
+          r#type: "Box<str>".to_string(),
+        });
+      }
+    }
 
     for extension in &extensions.types {
       let Some(schema_type) = schema
@@ -145,7 +177,40 @@ fn find_child_mut<'a>(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::{SchemaType, SchemaTypeChild};
+  use crate::sdk_data::sdk_data_model::{SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeChild};
+
+  #[test]
+  fn applies_enum_other_variant_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      enums: vec![SchemaEnum {
+        name: "StrictCharacterSet".to_string(),
+        facets: vec![SchemaEnumFacet {
+          name: "Known".to_string(),
+          value: "known".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        enums: vec![SchemaEnumExtension {
+          name: "StrictCharacterSet".to_string(),
+          has_other_variant: Some(true),
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    let other = schemas[0].enums[0].other_variant.as_ref().unwrap();
+    assert_eq!(other.name, "OtherVariant");
+    assert_eq!(other.r#type, "Box<str>");
+  }
 
   #[test]
   fn applies_child_optional_extension_by_property_name() {
@@ -177,6 +242,7 @@ mod tests {
           }],
           ..Default::default()
         }],
+        ..Default::default()
       },
     )];
 

@@ -22,6 +22,10 @@ use ooxmlsdk::parts::{
   presentation_document::PresentationDocument, spreadsheet_document::SpreadsheetDocument,
   wordprocessing_document::WordprocessingDocument,
 };
+use ooxmlsdk::sdk::{
+  FileFormatVersion, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
+  OpenSettings,
+};
 
 pub use error::{PdfError, Result};
 pub use options::{PdfOptions, PdfStandard};
@@ -31,7 +35,14 @@ pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
 where
   R: Read + Seek,
 {
-  let mut document = WordprocessingDocument::new(reader)?;
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
   convert_wordprocessing_document(&mut document, options)
 }
 
@@ -85,6 +96,8 @@ pub fn convert_presentation_document(
 mod tests {
   use std::fs::File;
   use std::path::PathBuf;
+
+  use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
   use super::*;
 
@@ -3349,6 +3362,51 @@ mod tests {
     let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
     let top_cell = text_item(&layout, "Top-aligned cell.");
     assert!(top_cell.x_pt > doc.page.margin_left_pt);
+  }
+
+  #[test]
+  fn pdfexport_fixture_tdf156685_mce_processing_rewrites_run_alternate_content() {
+    let path = fixture_path("test-data/ooxmlsdk-pdf-test/tdf156685.docx");
+    let settings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        target_file_format_version: FileFormatVersion::Microsoft365,
+      },
+      ..Default::default()
+    };
+    let mut package =
+      WordprocessingDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
+    let root = package
+      .main_document_part()
+      .unwrap()
+      .root_element(&mut package)
+      .unwrap();
+
+    let mut drawing_count = 0usize;
+    let mut pict_count = 0usize;
+    let mut xml_any_count = 0usize;
+
+    for choice in &root.body.as_ref().unwrap().body_choice {
+      let w::BodyChoice::WP(paragraph) = choice else {
+        continue;
+      };
+      for choice in &paragraph.paragraph_choice {
+        let w::ParagraphChoice::WR(run) = choice else {
+          continue;
+        };
+        for choice in &run.run_choice {
+          match choice {
+            w::RunChoice::WDrawing(_) => drawing_count += 1,
+            w::RunChoice::WPict(_) => pict_count += 1,
+            w::RunChoice::XmlAny(_) => xml_any_count += 1,
+            _ => {}
+          }
+        }
+      }
+    }
+
+    assert_eq!(xml_any_count, 0);
+    assert!(drawing_count + pict_count > 0);
   }
 
   fn fixture_path(relative: &str) -> PathBuf {

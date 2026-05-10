@@ -2042,10 +2042,8 @@ fn push_run(
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
-      w::RunChoice::WLastRenderedPageBreak => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
-        inlines.push(InlineItem::ColumnBreak);
-      }
+      // This is a cached layout artifact from Word, not an author-authored break.
+      w::RunChoice::WLastRenderedPageBreak => {}
       w::RunChoice::WSym(symbol) => {
         if let Some(symbol) = symbol_text(symbol) {
           text.push(symbol);
@@ -2099,6 +2097,18 @@ fn push_run(
         drawing::push_pict_textboxes(picture, inlines, base_style.clone(), styles, images);
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
+      w::RunChoice::XmlAny(xml) => {
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        push_run_xml_any(
+          xml,
+          inlines,
+          base_style.clone(),
+          style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
       w::RunChoice::WRuby(ruby) => {
         flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
         push_ruby_base(
@@ -2230,6 +2240,31 @@ fn push_sdt_run(
       | w::SdtContentRunChoice::WMoveTo(_) => {}
       _ => {}
     }
+  }
+}
+
+fn push_run_xml_any(
+  xml: &str,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) {
+  if let Ok(drawing) = w::Drawing::from_bytes(xml.as_bytes()) {
+    if let Some(image) = drawing::inline_image(&drawing, images, hyperlinks) {
+      inlines.push(InlineItem::Image(image));
+    }
+    drawing::push_drawing_textboxes(&drawing, inlines, style);
+    return;
+  }
+
+  if let Ok(picture) = w::Picture::from_bytes(xml.as_bytes()) {
+    if let Some(image) = drawing::pict_image(&picture, images) {
+      inlines.push(InlineItem::Image(image));
+    }
+    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images);
   }
 }
 
@@ -3653,7 +3688,6 @@ impl StylesCatalog {
         theme_fonts: ThemeFonts::load(package, main),
         ..Self::default()
       };
-      catalog.doc_default_run.font_size_pt = 10.0;
       if catalog.doc_default_run.font_family.is_none() {
         catalog.doc_default_run.font_family = Some(Arc::<str>::from("Calibri"));
       }
@@ -3665,7 +3699,6 @@ impl StylesCatalog {
       theme_fonts,
       ..Self::default()
     };
-    catalog.doc_default_run.font_size_pt = 10.0;
 
     if let Some(defaults) = styles.doc_defaults.as_deref() {
       merge_paragraph_format(

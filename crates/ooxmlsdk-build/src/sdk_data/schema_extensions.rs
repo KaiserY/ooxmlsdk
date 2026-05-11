@@ -20,6 +20,19 @@ pub struct SchemaEnumExtension {
   pub name: String,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub has_other_variant: Option<bool>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub add_facets: Vec<SchemaEnumFacetExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaEnumFacetExtension {
+  pub name: String,
+  pub value: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub version: String,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub aliases: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -104,6 +117,27 @@ pub fn apply_schema_extensions(
           name: "OtherVariant".to_string(),
           r#type: "Box<str>".to_string(),
         });
+      }
+
+      for facet_extension in &extension.add_facets {
+        let already_exists = schema_enum.facets.iter().any(|facet| {
+          facet.name == facet_extension.name
+            && facet.value == facet_extension.value
+            && facet.version == facet_extension.version
+        });
+
+        if already_exists {
+          continue;
+        }
+
+        schema_enum
+          .facets
+          .push(crate::sdk_data::sdk_data_model::SchemaEnumFacet {
+            name: facet_extension.name.clone(),
+            value: facet_extension.value.clone(),
+            version: facet_extension.version.clone(),
+            aliases: facet_extension.aliases.clone(),
+          });
       }
     }
 
@@ -200,6 +234,7 @@ mod tests {
         enums: vec![SchemaEnumExtension {
           name: "StrictCharacterSet".to_string(),
           has_other_variant: Some(true),
+          add_facets: vec![],
         }],
         ..Default::default()
       },
@@ -251,5 +286,56 @@ mod tests {
     assert!(schemas[0].types[0].children[0].optional);
     assert!(schemas[0].types[0].have_direct_xml_other_children);
     assert!(schemas[0].types[0].parent_have_xml_other_children);
+  }
+
+  #[test]
+  fn applies_enum_add_facets_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      enums: vec![SchemaEnum {
+        name: "LevelJustificationValues".to_string(),
+        facets: vec![SchemaEnumFacet {
+          name: "Left".to_string(),
+          value: "left".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        enums: vec![SchemaEnumExtension {
+          name: "LevelJustificationValues".to_string(),
+          add_facets: vec![
+            SchemaEnumFacetExtension {
+              name: "Start".to_string(),
+              value: "start".to_string(),
+              version: "Office2010".to_string(),
+              aliases: vec![],
+            },
+            SchemaEnumFacetExtension {
+              name: "End".to_string(),
+              value: "end".to_string(),
+              version: "Office2010".to_string(),
+              aliases: vec![],
+            },
+          ],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(schemas[0].enums[0].facets.len(), 3);
+    assert_eq!(schemas[0].enums[0].facets[1].name, "Start");
+    assert_eq!(schemas[0].enums[0].facets[1].value, "start");
+    assert_eq!(schemas[0].enums[0].facets[1].version, "Office2010");
+    assert_eq!(schemas[0].enums[0].facets[2].name, "End");
+    assert_eq!(schemas[0].enums[0].facets[2].value, "end");
+    assert_eq!(schemas[0].enums[0].facets[2].version, "Office2010");
   }
 }

@@ -8,6 +8,8 @@ Buckets:
 - `Open-XML-SDK/`: fixtures copied from `../Open-XML-SDK` assets and tests.
   These are the upstream compatibility fixtures used by validator, package, and
   round-trip coverage.
+- `libreoffice/`: fixtures copied from `../core` and used for package
+  round-trip coverage as supplemental real-world OOXML evidence.
 - `specs/`: project-owned fixtures for spec-focused coverage and the
   `known_failures.toml` file used by the `round_trip_smoke_test` compatibility
   sweep.
@@ -19,7 +21,8 @@ Round-trip policy:
 - The generated `crates/ooxmlsdk-test/tests/doc_samples.rs` coverage now reads
   upstream fixtures from `test-data/ooxmlsdk-test/Open-XML-SDK/`.
 - The broader generated round-trip coverage in
-  `crates/ooxmlsdk-test/tests/doc_samples.rs` also walks `specs/` and `misc/`.
+  `crates/ooxmlsdk-test/tests/doc_samples.rs` also walks `libreoffice/`,
+  `specs/`, and `misc/`.
 - `crates/ooxmlsdk-test/tests/round_trip.rs::round_trip_smoke_test` walks only
   `test-data/ooxmlsdk-test/specs/`, and only that subtree participates in
   `specs/known_failures.toml`.

@@ -3,6 +3,21 @@
     {
       "Name": "StrictCharacterSet",
       "HasOtherVariant": true
+    },
+    {
+      "Name": "LevelJustificationValues",
+      "AddFacets": [
+        {
+          "Name": "Start",
+          "Value": "start",
+          "Version": "Office2010"
+        },
+        {
+          "Name": "End",
+          "Value": "end",
+          "Version": "Office2010"
+        }
+      ]
     }
   ],
   "Types": [

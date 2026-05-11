@@ -355,9 +355,9 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
         let (left, right) = if bounds.paragraph_bidi {
           let mirrored_left = content_left + content_right - bounds.right;
           let mirrored_right = content_left + content_right - bounds.left;
-          (mirrored_left + 18.301, mirrored_right + 1.001)
+          (mirrored_left - 1.001, mirrored_right + 1.001)
         } else {
-          (bounds.left - 1.001, bounds.right - 18.301)
+          (bounds.left - 1.001, bounds.right + 1.001)
         };
         WidgetAnnotationSpec {
           page_index,

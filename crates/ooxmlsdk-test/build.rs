@@ -12,6 +12,7 @@ fn main() {
     .expect("manifest dir should be under crates/ooxmlsdk-test");
   let test_data_dir = workspace_dir.join("test-data/ooxmlsdk-test");
   let upstream_fixtures_dir = test_data_dir.join("Open-XML-SDK");
+  let libreoffice_dir = test_data_dir.join("libreoffice");
   let specs_dir = test_data_dir.join("specs");
   let misc_dir = test_data_dir.join("misc");
   let out_dir = PathBuf::from(env::var("OUT_DIR").expect("missing OUT_DIR"));
@@ -20,11 +21,13 @@ fn main() {
 
   println!("cargo:rerun-if-changed={}", test_data_dir.display());
   println!("cargo:rerun-if-changed={}", upstream_fixtures_dir.display());
+  println!("cargo:rerun-if-changed={}", libreoffice_dir.display());
 
   write_float_rules(workspace_dir, &float_rules_file);
 
   let samples = collect_doc_files(&upstream_fixtures_dir, &upstream_fixtures_dir);
-  let mut test_data_files = collect_doc_files(&specs_dir, &test_data_dir);
+  let mut test_data_files = collect_doc_files(&libreoffice_dir, &test_data_dir);
+  test_data_files.extend(collect_doc_files(&specs_dir, &test_data_dir));
   test_data_files.extend(collect_doc_files(&misc_dir, &test_data_dir));
   test_data_files.sort();
 
@@ -76,6 +79,13 @@ fn main() {
   for file_name in test_data_files {
     let slug = slugify(&file_name);
     let test_name = format!("test_data_{slug}");
+
+    if is_invalid(&file_name) {
+      generated.push_str(&format!(
+        "#[test]\nfn invalid_{test_name}() {{\n  assert_test_data_invalid({file_name:?});\n}}\n\n"
+      ));
+      continue;
+    }
 
     if is_test_data_open_only(&file_name) {
       generated.push_str(&format!(
@@ -148,7 +158,10 @@ fn is_supported_document_path(path: &Path) -> bool {
 }
 
 fn is_invalid(file_name: &str) -> bool {
-  matches!(file_name, "Strict01.docx" | "encrypted_pptx.pptx")
+  matches!(
+    file_name,
+    "Strict01.docx" | "encrypted_pptx.pptx" | "libreoffice/word/strict-lockedcanvas.docx"
+  )
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
@@ -161,8 +174,7 @@ fn is_valid_open_only(file_name: &str) -> bool {
 }
 
 fn is_test_data_open_only(file_name: &str) -> bool {
-  let _ = file_name;
-  false
+  matches!(file_name, "libreoffice/word/comment-annotationref.docx")
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

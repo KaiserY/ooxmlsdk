@@ -11,6 +11,42 @@ be read before diving into crate-specific code or fixture directories.
 - Keep fixture buckets explicit so upstream provenance, project-owned specs, and
   out-of-band regressions do not blur together.
 
+## Current Implementation Strategy
+
+At the current stage, the repository is primarily a Rust reimplementation of
+upstream `Open-XML-SDK` and selected LibreOffice logic.
+
+Reference priority depends on the subsystem:
+
+- `ooxmlsdk`: `Open-XML-SDK` first, LibreOffice second
+- `ooxmlsdk-pdf`: LibreOffice first
+
+This has two consequences:
+
+1. upstream behavior is the default reference model
+2. upstream tests and fixtures are the default evidence for deciding whether the
+   Rust behavior is correct
+
+The near-term goal is not to invent a new document model or expand the feature
+surface beyond upstream-backed behavior. The near-term goal is to faithfully
+port, adapt, and harden upstream logic in Rust.
+
+In practice:
+
+- when implementing `ooxmlsdk` package, schema, validator, or MCE behavior,
+  inspect `Open-XML-SDK` first
+- when implementing `ooxmlsdk-pdf` behavior, inspect LibreOffice first
+- prefer re-expressing upstream control flow and invariants with Rust types,
+  enums, traits, iterators, and ownership boundaries rather than designing a
+  new semantic model
+- when the Rust code disagrees with upstream and there is no deliberate local
+  divergence documented in the repo, assume the Rust side is incomplete until
+  proven otherwise
+- avoid adding novel logic just because upstream behavior is inconvenient,
+  under-specified, or not yet fully understood
+- if exact upstream behavior is still unclear after local inspection, narrow the
+  gap with fixtures and source-backed tests instead of guessing
+
 ## Workspace Layout
 
 The workspace currently has six crates:
@@ -121,6 +157,7 @@ They have different scopes by design.
 Package fixtures live under `test-data/ooxmlsdk-test/`:
 
 - `Open-XML-SDK/`: copied from upstream `../Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles`
+- `libreoffice/`: copied from `../core` and used for package round-trip coverage
 - `specs/`: project-owned fixtures grouped by domain
 - `misc/`: fixtures intentionally outside upstream assets and outside spec buckets
 
@@ -136,6 +173,7 @@ Generated round-trip coverage:
 - emits test cases into `tests/doc_samples.rs`
 - walks:
   - `test-data/ooxmlsdk-test/Open-XML-SDK/`
+  - `test-data/ooxmlsdk-test/libreoffice/`
   - `test-data/ooxmlsdk-test/specs/`
   - `test-data/ooxmlsdk-test/misc/`
 
@@ -148,6 +186,7 @@ Compatibility smoke coverage:
 Known-failure policy is intentionally narrow:
 
 - `specs/known_failures.toml` does not apply to `Open-XML-SDK/`
+- `specs/known_failures.toml` does not apply to `libreoffice/`
 - `specs/known_failures.toml` does not apply to `misc/`
 - `specs/known_failures.toml` does not apply to PDF fixtures
 
@@ -155,68 +194,51 @@ Known-failure policy is intentionally narrow:
 
 Use the repository root for all commands below.
 
-Core lanes:
+- `cargo build --workspace`: build all crates.
+- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
+- `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
+- `cargo test --workspace`: default full test lane.
+- `cargo test --workspace --no-default-features`: no-default-features lane.
+- `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features flat-opc`: Flat OPC lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features mce`: MCE lane without validators or Flat OPC-specific behavior.
+- `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
+- `cargo fmt --all`: format.
+- `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`: Flat OPC clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`: MCE clippy lane.
+- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
+- `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
 
-- `cargo build --workspace`
-- `cargo test -p ooxmlsdk-test`
-- `cargo test --workspace`
-- `cargo fmt --all`
-- `cargo clippy --workspace --all-targets -- -D warnings`
+**Dev Loop**
 
-Generator lane:
+Default dev loop after generator work:
 
-- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
-- `cargo fmt --all`
-- `cargo run -p ooxmlsdk-test --example create_fixtures`
-  Run this only when fixture definitions change; the fixture tree is committed.
+1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+2. `cargo fmt --all`
+3. `cargo test --workspace`
+4. `cargo clippy --workspace --all-targets -- -D warnings`
+5. `cargo fmt --all`
 
-Fixture-driven round-trip lanes:
+Full generator/feature validation:
 
-- `cargo test -p ooxmlsdk-test --test doc_samples -- --nocapture`
-  This runs the generated round-trip coverage for `Open-XML-SDK/`, `specs/`, and `misc/`.
-- `cargo test -p ooxmlsdk-test round_trip_smoke_test -- --nocapture`
-  This runs the specs-only compatibility smoke lane tied to `specs/known_failures.toml`.
+1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+2. `cargo fmt --all`
+3. `cargo test --workspace`
+4. `cargo test --workspace --no-default-features`
+5. `cargo test --workspace --no-default-features --features parts`
+6. `cargo test --workspace --no-default-features --features flat-opc`
+7. `cargo test --workspace --no-default-features --features mce`
+8. `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
+9. `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
+10. `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
+11. `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
+12. `cargo clippy --workspace --all-targets -- -D warnings`
+13. `cargo fmt --all`
 
-Feature-focused lanes:
-
-- `cargo test --workspace --no-default-features`
-- `cargo test --workspace --no-default-features --features parts`
-- `cargo test --workspace --no-default-features --features flat-opc`
-- `cargo test --workspace --no-default-features --features mce`
-- `cargo test -p ooxmlsdk-test --features validators`
-
-Clippy feature lanes:
-
-- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
-- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
-- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`
-
-PDF lanes:
-
-- `cargo test -p ooxmlsdk-pdf-test --no-run`
-- `cargo test -p ooxmlsdk-pdf-test -- --nocapture`
-- `cargo test -p ooxmlsdk-pdf`
-
-Bench lane:
-
-- `cargo bench -p ooxmlsdk-test --bench perf`
-
-Recommended validation sequences:
-
-- Runtime or docs/sample iteration:
-  `cargo test -p ooxmlsdk-test`
-- Fixture structure changes:
-  `cargo test -p ooxmlsdk-test --test doc_samples -- --nocapture`
-  and `cargo test -p ooxmlsdk-test round_trip_smoke_test -- --nocapture`
-- Generator or shared runtime changes:
-  `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`,
-  `cargo fmt --all`,
-  `cargo test --workspace`,
-  `cargo clippy --workspace --all-targets -- -D warnings`
-- Full feature validation:
-  run the generator lane, workspace test lane, no-default-features lanes, feature lanes, and clippy lanes in sequence
+For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run Flat OPC test. If the change touches MCE behavior, also run MCE tests. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
 ### Derive Macro Debugging
 
@@ -260,7 +282,7 @@ Local checkout:
 
 Use it for:
 
-- package API and behavior
+- package API and behavior for `ooxmlsdk`
 - generated metadata shape
 - upstream fixtures
 - upstream tests and coverage intent
@@ -281,9 +303,11 @@ Local checkout:
 
 Use it for:
 
+- primary behavior reference for `ooxmlsdk-pdf`
 - PDF rendering fixtures
 - visible-output expectations
 - PDF export assertions
+- supplemental behavioral evidence for `ooxmlsdk` when Open XML SDK does not cover the case
 - DOCX rendering regressions that are observable in emitted PDFs
 
 Key paths:

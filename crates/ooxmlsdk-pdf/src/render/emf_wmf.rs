@@ -244,6 +244,8 @@ fn read_i32(data: &[u8], offset: usize) -> Result<i32, String> {
 
 #[cfg(test)]
 mod tests {
+  use std::path::PathBuf;
+
   use ooxmlsdk::parts::PartRef;
   use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
 
@@ -251,10 +253,9 @@ mod tests {
 
   #[test]
   fn emf_fixture_decodes_to_jpeg() {
-    let package = WordprocessingDocument::new_from_file(
-      "test-data/ooxmlsdk-pdf-test/libreoffice/tdf129085.docx",
-    )
-    .unwrap();
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf129085.docx");
+    let package = WordprocessingDocument::new_from_file(path).unwrap();
     let image = package
       .get_all_parts()
       .find_map(|part| match part {

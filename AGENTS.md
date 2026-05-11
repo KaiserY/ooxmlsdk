@@ -10,6 +10,27 @@ Read first:
 3. `docs/tests/` for fixture taxonomy and coverage matrices when touching tests
 4. `docs/specs/` for user-facing format notes when touching behavior or docs
 
+## Project Stage
+
+The current phase of this repository is focused on rewriting upstream
+`Open-XML-SDK` and LibreOffice logic in Rust while reusing as much upstream
+test coverage and fixture evidence as possible.
+
+Priority by subsystem:
+
+- `ooxmlsdk`: use `Open-XML-SDK` as the primary reference and LibreOffice as a secondary reference
+- `ooxmlsdk-pdf`: use LibreOffice as the primary reference
+
+Until the implementation reaches a higher maturity level:
+
+- prefer translating upstream behavior into idiomatic Rust over inventing new behavior
+- prefer upstream tests, fixtures, and source code over local guesswork
+- for `ooxmlsdk`, check `Open-XML-SDK` first and use LibreOffice mainly for supplemental evidence
+- for `ooxmlsdk-pdf`, check LibreOffice first
+- when behavior is unclear, inspect upstream first instead of inferring a new rule
+- do not broaden the feature surface or add novel logic unless the task explicitly requires it
+- treat unexplained behavioral differences from upstream as bugs or gaps to investigate, not as opportunities to design a new model
+
 ## Working Style
 
 - Start from local evidence. Use `rg` / `rg --files` first.
@@ -18,24 +39,53 @@ Read first:
 - Do not paste broad search output or large generated snippets unless asked.
 - Run commands from the repository root.
 
-## Command Rules
+## Commands
 
-- Use the default `target/` directory. Do not set `CARGO_TARGET_DIR`.
-- Run Cargo generation, format, test, clippy, and bench commands sequentially.
-- If Cargo reports a target lock, wait for Cargo instead of probing processes.
+- `cargo build --workspace`: build all crates.
+- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
+- `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
+- `cargo test --workspace`: default full test lane.
+- `cargo test --workspace --no-default-features`: no-default-features lane.
+- `cargo test --workspace --no-default-features --features parts`: parts lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features flat-opc`: Flat OPC lane without validators or MCE-specific behavior.
+- `cargo test --workspace --no-default-features --features mce`: MCE lane without validators or Flat OPC-specific behavior.
+- `cargo test -p ooxmlsdk-test --features validators`: validator-focused lane.
+- `cargo fmt --all`: format.
+- `cargo clippy --workspace --all-targets -- -D warnings`: default clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`: no-default-features clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`: Office2007 parts clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`: Flat OPC clippy lane.
+- `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`: MCE clippy lane.
+- `cargo clippy -p ooxmlsdk-test --features validators --all-targets -- -D warnings`: validator clippy lane.
+- `cargo bench -p ooxmlsdk-test --bench perf`: package and XML performance benches.
 
-Common commands:
+### Dev Loop
 
-- `cargo build --workspace`
-- `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
-- `cargo test -p ooxmlsdk-test`
-- `cargo test -p ooxmlsdk-test --test doc_samples -- --nocapture`
-- `cargo test -p ooxmlsdk-test round_trip_smoke_test -- --nocapture`
-- `cargo test --workspace`
-- `cargo test -p ooxmlsdk-test --features validators`
-- `cargo fmt --all`
-- `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo bench -p ooxmlsdk-test --bench perf`
+Default dev loop after generator work:
+
+1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+2. `cargo fmt --all`
+3. `cargo test --workspace`
+4. `cargo clippy --workspace --all-targets -- -D warnings`
+5. `cargo fmt --all`
+
+Full generator/feature validation:
+
+1. `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`
+2. `cargo fmt --all`
+3. `cargo test --workspace`
+4. `cargo test --workspace --no-default-features`
+5. `cargo test --workspace --no-default-features --features parts`
+6. `cargo test --workspace --no-default-features --features flat-opc`
+7. `cargo test --workspace --no-default-features --features mce`
+8. `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
+9. `cargo clippy --workspace --all-targets --no-default-features --features parts -- -D warnings`
+10. `cargo clippy --workspace --all-targets --no-default-features --features flat-opc -- -D warnings`
+11. `cargo clippy --workspace --all-targets --no-default-features --features mce -- -D warnings`
+12. `cargo clippy --workspace --all-targets -- -D warnings`
+13. `cargo fmt --all`
+
+For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run Flat OPC test. If the change touches MCE behavior, also run MCE tests. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
 ## Upstream Sources
 
@@ -76,6 +126,7 @@ Important:
 - Keep hand-written logic in `crates/ooxmlsdk-build`, `crates/ooxmlsdk-derive`, `crates/ooxmlsdk-pdf`, or small runtime helpers.
 - Preserve upstream Open XML SDK concepts in the public package API:
   `new`, `new_with_settings`, `new_from_file`, `save`, relationship helpers, and typed part traversal.
+- In implementation work, rewrite upstream logic with Rust language features and Rust library structure, but do not replace upstream semantics with speculative local designs.
 - Do not expose raw storage or internal caches just to match upstream internals.
 
 ## Testing Guidance

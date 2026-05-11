@@ -1173,6 +1173,10 @@ pub enum LevelJustificationValues {
   Center,
   #[sdk(rename = "right")]
   Right,
+  #[sdk(rename = "start")]
+  Start,
+  #[sdk(rename = "end")]
+  End,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ShadingPatternValues {

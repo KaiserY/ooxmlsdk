@@ -95,12 +95,19 @@ fn assert_package_file_round_trip(path: &Path, file_name: &str) {
 }
 
 fn assert_doc_sample_invalid(file_name: &str) {
+  assert_package_file_invalid(&test_file_path(file_name), file_name);
+}
+
+fn assert_test_data_invalid(file_name: &str) {
+  assert_package_file_invalid(&workspace_file_path(file_name), file_name);
+}
+
+fn assert_package_file_invalid(path: &Path, file_name: &str) {
   let kind = doc_sample_kind(file_name);
-  let path = test_file_path(file_name);
 
   let result = match kind {
     DocSampleKind::Wordprocessing => {
-      WordprocessingDocument::new_from_file(&path).and_then(|mut package| {
+      WordprocessingDocument::new_from_file(path).and_then(|mut package| {
         package
           .main_document_part()?
           .root_element(&mut package)
@@ -108,7 +115,7 @@ fn assert_doc_sample_invalid(file_name: &str) {
       })
     }
     DocSampleKind::Spreadsheet => {
-      SpreadsheetDocument::new_from_file(&path).and_then(|mut package| {
+      SpreadsheetDocument::new_from_file(path).and_then(|mut package| {
         package
           .workbook_part()?
           .root_element(&mut package)
@@ -116,7 +123,7 @@ fn assert_doc_sample_invalid(file_name: &str) {
       })
     }
     DocSampleKind::Presentation => {
-      PresentationDocument::new_from_file(&path).and_then(|mut package| {
+      PresentationDocument::new_from_file(path).and_then(|mut package| {
         package
           .presentation_part()?
           .root_element(&mut package)

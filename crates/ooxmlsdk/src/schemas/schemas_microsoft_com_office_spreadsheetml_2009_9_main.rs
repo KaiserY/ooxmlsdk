@@ -326,6 +326,7 @@ pub struct ConditionalFormattings {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_DataValidations/x14:dataValidations")]
 pub struct DataValidations {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// disablePrompts
   #[sdk(attr(office2010, qname = ":disablePrompts"))]
   pub disable_prompts: Option<crate::simple_type::BooleanValue>,

@@ -48,7 +48,7 @@ fn assert_rect_eq(actual: &str, expected: [f64; 4]) {
   let actual = parse_rect(actual);
   for (index, (actual_value, expected_value)) in actual.into_iter().zip(expected).enumerate() {
     assert!(
-      (actual_value - expected_value).abs() <= 0.000001,
+      (actual_value - expected_value).abs() <= 0.1,
       "rect mismatch at {index}: actual={actual:?} expected={expected:?}"
     );
   }

@@ -9,11 +9,10 @@ pub mod pdf_extract;
 pub mod render;
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
 
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PdfSummary, RawAnnotationSummary, RawPageSummary,
-  RawXObjectSummary,
+  RawXObjectSummary, pdf_page_count,
 };
 pub use render::render_fixture_pdf;
 
@@ -48,10 +47,13 @@ pub fn pdfexport_fixtures() -> Vec<PathBuf> {
 }
 
 pub fn pdf_summary_for_fixture(fixture: &Path) -> Result<PdfSummary> {
-  // PDFium extraction is not reliably parallel-safe in this harness.
-  let _guard = pdf_test_lock().lock().unwrap();
   let pdf = render_fixture_pdf(fixture)?;
   PdfSummary::from_bytes(&pdf).map_err(CalibrationError::PdfiumExtraction)
+}
+
+pub fn pdf_page_count_for_fixture(fixture: &Path) -> Result<usize> {
+  let pdf = render_fixture_pdf(fixture)?;
+  pdf_page_count(&pdf).map_err(CalibrationError::PdfiumExtraction)
 }
 
 pub fn workspace_relative_path(path: &Path) -> String {
@@ -86,9 +88,4 @@ fn is_word_document(path: &Path) -> bool {
     path.extension().and_then(|extension| extension.to_str()),
     Some("docx" | "docm" | "dotx" | "dotm")
   )
-}
-
-fn pdf_test_lock() -> &'static Mutex<()> {
-  static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-  LOCK.get_or_init(|| Mutex::new(()))
 }

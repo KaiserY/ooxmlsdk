@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
 use crate::docx::TextStyle;
 
 #[derive(Clone, Debug)]
@@ -11,17 +14,27 @@ pub(crate) fn load_text_face(style: &TextStyle) -> Option<FontFaceData> {
 }
 
 fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceData> {
-  let mut db = fontdb::Database::new();
-  db.load_system_fonts();
+  let key = FontFaceKey {
+    family: family
+      .filter(|family| !family.trim().is_empty())
+      .map(ToOwned::to_owned),
+    bold,
+    italic,
+  };
+  let mut cache = font_face_cache().lock().ok()?;
+  if let Some(face) = cache.get(&key) {
+    return face.clone();
+  }
 
   let mut families = Vec::new();
   if let Some(family) = family.filter(|family| !family.trim().is_empty()) {
     families.push(fontdb::Family::Name(family));
     push_font_aliases(&mut families, family);
+  } else {
+    families.push(fontdb::Family::SansSerif);
   }
-  families.push(fontdb::Family::SansSerif);
 
-  if let Some(id) = db.query(&fontdb::Query {
+  if let Some(id) = font_db().query(&fontdb::Query {
     families: &families,
     weight: query_weight(family, bold),
     style: if italic {
@@ -30,21 +43,53 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
       fontdb::Style::Normal
     },
     ..fontdb::Query::default()
-  }) && let Some((data, index)) = db.with_face_data(id, |data, index| (data.to_vec(), index))
+  }) && let Some((data, index)) =
+    font_db().with_face_data(id, |data, index| (data.to_vec(), index))
   {
-    return Some(FontFaceData { data, index });
+    let face = Some(FontFaceData { data, index });
+    cache.insert(key, face.clone());
+    return face;
   }
 
-  for path in fallback_font_paths(family, bold, italic) {
+  let fallback_paths = family
+    .filter(|family| !family.trim().is_empty())
+    .map(|family| specific_fallback_font_paths(family, bold, italic))
+    .unwrap_or_else(|| generic_fallback_font_paths(bold, italic));
+
+  for path in fallback_paths {
     let Ok(data) = std::fs::read(path) else {
       continue;
     };
     if ttf_parser::Face::parse(&data, 0).is_ok() {
-      return Some(FontFaceData { data, index: 0 });
+      let face = Some(FontFaceData { data, index: 0 });
+      cache.insert(key, face.clone());
+      return face;
     }
   }
 
+  cache.insert(key, None);
   None
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FontFaceKey {
+  family: Option<String>,
+  bold: bool,
+  italic: bool,
+}
+
+fn font_db() -> &'static fontdb::Database {
+  static DB: OnceLock<fontdb::Database> = OnceLock::new();
+  DB.get_or_init(|| {
+    let mut db = fontdb::Database::new();
+    db.load_system_fonts();
+    db
+  })
+}
+
+fn font_face_cache() -> &'static Mutex<HashMap<FontFaceKey, Option<FontFaceData>>> {
+  static CACHE: OnceLock<Mutex<HashMap<FontFaceKey, Option<FontFaceData>>>> = OnceLock::new();
+  CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn query_weight(family: Option<&str>, bold: bool) -> fontdb::Weight {
@@ -84,8 +129,8 @@ fn push_font_aliases<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str
   }
 }
 
-fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'static [&'static str] {
-  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Calibri")) {
+fn specific_fallback_font_paths(family: &str, bold: bool, italic: bool) -> &'static [&'static str] {
+  if family.eq_ignore_ascii_case("Calibri") {
     return match (bold, italic) {
       (true, true) => &[
         "/usr/share/fonts/truetype/msttcorefonts/calibriz.ttf",
@@ -106,7 +151,7 @@ fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'stat
     };
   }
 
-  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Times New Roman")) {
+  if family.eq_ignore_ascii_case("Times New Roman") {
     return match (bold, italic) {
       (true, true) => &[
         "/usr/share/fonts/truetype/msttcorefonts/timesbi.ttf",
@@ -127,7 +172,7 @@ fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'stat
     };
   }
 
-  if matches!(family, Some(family) if family.eq_ignore_ascii_case("Arial Black")) {
+  if family.eq_ignore_ascii_case("Arial Black") {
     return match italic {
       true => &[
         "/usr/share/fonts/truetype/msttcorefonts/ariblk.ttf",
@@ -141,6 +186,10 @@ fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'stat
     };
   }
 
+  &[]
+}
+
+fn generic_fallback_font_paths(bold: bool, italic: bool) -> &'static [&'static str] {
   match (bold, italic) {
     (true, true) => &[
       "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
@@ -161,5 +210,24 @@ fn fallback_font_paths(family: Option<&str>, bold: bool, italic: bool) -> &'stat
       "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
       "/usr/share/fonts/truetype/ubuntu/Ubuntu[wdth,wght].ttf",
     ],
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::Arc;
+
+  use crate::docx::TextStyle;
+
+  use super::load_text_face;
+
+  #[test]
+  fn missing_named_font_does_not_silently_fall_back_to_generic_sans() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("CodexDefinitelyMissingFont")),
+      ..Default::default()
+    };
+
+    assert!(load_text_face(&style).is_none());
   }
 }

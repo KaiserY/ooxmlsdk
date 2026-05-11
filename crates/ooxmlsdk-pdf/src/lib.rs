@@ -16,6 +16,7 @@ mod render;
 mod text_metrics;
 mod xlsx;
 
+use std::collections::HashSet;
 use std::io::{Read, Seek};
 
 use ooxmlsdk::parts::{
@@ -52,6 +53,7 @@ pub fn convert_wordprocessing_document(
   options: PdfOptions,
 ) -> Result<Vec<u8>> {
   let doc = docx::extract(document, &options)?;
+  validate_docx_fonts(&doc)?;
   let pages = layout::layout(&doc, &options)?;
   render::krilla::render(&pages, &options)
 }
@@ -90,6 +92,114 @@ pub fn convert_presentation_document(
 ) -> Result<Vec<u8>> {
   let pages = pptx::layout(document, &options)?;
   render::krilla::render(&pages, &options)
+}
+
+fn validate_docx_fonts(document: &docx::DocxDocument) -> Result<()> {
+  let mut seen = HashSet::new();
+  for block in &document.footnote_blocks {
+    validate_block_fonts(block, &mut seen)?;
+  }
+  for blocks in document.footnotes.values() {
+    for block in blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+  }
+  for block in &document.endnote_blocks {
+    validate_block_fonts(block, &mut seen)?;
+  }
+  for blocks in document.endnotes.values() {
+    for block in blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+  }
+  for block in &document.comment_blocks {
+    validate_block_fonts(block, &mut seen)?;
+  }
+  for section in &document.sections {
+    for block in &section.blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.header_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.footer_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.first_header_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.first_footer_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.even_header_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+    for block in &section.even_footer_blocks {
+      validate_block_fonts(block, &mut seen)?;
+    }
+  }
+  Ok(())
+}
+
+fn validate_block_fonts(block: &docx::Block, seen: &mut HashSet<FontValidationKey>) -> Result<()> {
+  match block {
+    docx::Block::Paragraph(paragraph) => {
+      for inline in &paragraph.inlines {
+        validate_inline_fonts(inline, seen)?;
+      }
+    }
+    docx::Block::Table(table) => {
+      for row in &table.rows {
+        for cell in &row.cells {
+          for block in &cell.blocks {
+            validate_block_fonts(block, seen)?;
+          }
+        }
+      }
+    }
+  }
+  Ok(())
+}
+
+fn validate_inline_fonts(
+  inline: &docx::InlineItem,
+  seen: &mut HashSet<FontValidationKey>,
+) -> Result<()> {
+  match inline {
+    docx::InlineItem::Text(run) => validate_text_style(&run.style, seen),
+    docx::InlineItem::Image(_)
+    | docx::InlineItem::Shape(_)
+    | docx::InlineItem::FormWidgetStart(_)
+    | docx::InlineItem::FormWidgetEnd(_)
+    | docx::InlineItem::PageBreak
+    | docx::InlineItem::ColumnBreak => Ok(()),
+  }
+}
+
+fn validate_text_style(
+  style: &docx::TextStyle,
+  seen: &mut HashSet<FontValidationKey>,
+) -> Result<()> {
+  let key = FontValidationKey {
+    family: style.font_family.as_deref().map(str::to_owned),
+    bold: style.bold,
+    italic: style.italic,
+  };
+  if !seen.insert(key) {
+    return Ok(());
+  }
+  if fonts::load_text_face(style).is_some() {
+    Ok(())
+  } else {
+    Err(PdfError::font_unavailable(style))
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct FontValidationKey {
+  family: Option<String>,
+  bold: bool,
+  italic: bool,
 }
 
 #[cfg(test)]

@@ -1,4 +1,6 @@
-use ooxmlsdk_pdf_test::{PdfSummary, pdf_summary_for_fixture, pdfexport_fixture_dir};
+use ooxmlsdk_pdf_test::{
+  PdfSummary, pdf_page_count_for_fixture, pdf_summary_for_fixture, pdfexport_fixture_dir,
+};
 
 fn fixture(name: &str) -> std::path::PathBuf {
   pdfexport_fixture_dir().join(name)
@@ -57,8 +59,10 @@ fn assert_rect_eq(actual: &str, expected: [f64; 4]) {
 #[test]
 // Source: ../core/vcl/qa/cppunit/pdfexport/pdfexport2.cxx:testTdf161346
 fn pdfexport_fixture_fdo47811_word2013_has_two_pages() {
-  let summary = render_summary("fdo47811-1_Word2013.docx");
-  assert_eq!(summary.page_count, 2);
+  assert_eq!(
+    pdf_page_count_for_fixture(&fixture("fdo47811-1_Word2013.docx")).unwrap(),
+    2
+  );
 }
 
 #[test]

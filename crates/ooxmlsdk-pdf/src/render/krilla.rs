@@ -1590,7 +1590,7 @@ fn load_font(style: &TextStyle) -> Result<Font> {
     return Ok(font);
   }
 
-  Err(PdfError::FontUnavailable)
+  Err(PdfError::font_unavailable(style))
 }
 
 fn fill(style: &TextStyle) -> Fill {

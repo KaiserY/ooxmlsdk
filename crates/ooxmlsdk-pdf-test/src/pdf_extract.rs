@@ -1,5 +1,6 @@
 use std::io::Read;
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use flate2::read::ZlibDecoder;
@@ -179,6 +180,7 @@ impl PdfSummary {
     let streams = pdf_streams(pdf);
     let pdfium_summary = pdfium_summary(pdf)?;
     let raw_summary = raw_pdf_summary(pdf)?;
+    let pdftotext = pdftotext(pdf);
     Ok(Self {
       page_count: pdfium_summary.page_count,
       image_count: pdfium_summary.images.len(),
@@ -188,8 +190,8 @@ impl PdfSummary {
       media_box_count: pdfium_summary.media_boxes.len(),
       contains_eof: pdf.strip_suffix_ascii_whitespace().ends_with(b"%%EOF"),
       media_boxes: pdfium_summary.media_boxes,
-      text: pdftotext(pdf).ok(),
-      text_error: pdftotext(pdf).err(),
+      text: pdftotext.clone().ok(),
+      text_error: pdftotext.err(),
       text_segments: pdfium_summary.text_segments,
       text_chars: pdfium_summary.text_chars,
       text_objects: pdfium_summary.text_objects,
@@ -203,6 +205,12 @@ impl PdfSummary {
       content: content_summary(&streams),
     })
   }
+}
+
+pub fn pdf_page_count(pdf: &[u8]) -> Result<usize, String> {
+  let document = LopdfDocument::load_mem(pdf)
+    .map_err(|error| format!("lopdf could not load PDF bytes: {error}"))?;
+  Ok(document.get_pages().len())
 }
 
 struct PdfiumSummary {
@@ -224,6 +232,8 @@ struct RawPdfSummary {
 }
 
 fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
+  // PDFium extraction is not reliably parallel-safe in this harness.
+  let _guard = pdfium_lock().lock().unwrap();
   let pdfium = bind_pdfium()?;
   let document = pdfium
     .load_pdf_from_byte_vec(pdf.to_vec(), None)
@@ -770,6 +780,11 @@ fn bind_pdfium() -> Result<Pdfium, String> {
       "could not bind system PDFium library; install libpdfium.so or set PDFIUM_DYNAMIC_LIB_PATH: {error}"
     )),
   }
+}
+
+fn pdfium_lock() -> &'static Mutex<()> {
+  static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+  LOCK.get_or_init(|| Mutex::new(()))
 }
 
 fn pdfium_link_target(link: &PdfLink<'_>) -> (LinkTargetKind, Option<String>) {

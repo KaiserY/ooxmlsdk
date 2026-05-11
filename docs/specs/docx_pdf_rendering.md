@@ -309,9 +309,9 @@ Default fixture policy:
   LibreOffice regression fixture that already captures the behavior
 - record each copied fixture's upstream source path next to the fixture
 
-The initial real fixture is
-`test-data/ooxmlsdk-pdf-test/libreoffice/libreoffice-ooxmlexport-1_page.docx`, copied from
-`../core/sw/qa/extras/ooxmlexport/data/1_page.docx`.
+Each copied fixture should live under
+`test-data/ooxmlsdk-pdf-test/libreoffice/` and record its upstream source path,
+for example a file copied from `../core/sw/qa/extras/ooxmlexport/data/`.
 
 Implementation work should also happen in feature batches. A batch may import
 more properties than layout consumes immediately, provided the model fields are

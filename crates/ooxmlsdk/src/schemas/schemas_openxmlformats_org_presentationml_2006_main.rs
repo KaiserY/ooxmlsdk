@@ -3783,6 +3783,7 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ControlList/p:controls")]
 pub struct ControlList {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Embedded Control.
   #[sdk(child(qname = "p:CT_Control/p:control"))]
   pub p_control: Vec<Control>,
@@ -4618,6 +4619,7 @@ pub struct TextStyles {
 #[sdk(qname = "p:CT_SlideMasterExtensionList/p:extLst")]
 pub struct SlideMasterExtensionList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Defines the SlideMasterExtension Class.
   #[sdk(child(qname = "p:CT_SlideMasterExtension/p:ext"))]
   pub p_ext: Vec<SlideMasterExtension>,

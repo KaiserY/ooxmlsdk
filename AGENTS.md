@@ -38,10 +38,12 @@ Until the implementation reaches a higher maturity level:
 - Keep summaries diff-based rather than conversation-based.
 - Do not paste broad search output or large generated snippets unless asked.
 - Run commands from the repository root.
+- Cargo generation, format, test, clippy, and bench commands must run sequentially in the default `target/` directory; do not set `CARGO_TARGET_DIR`.
+- If Cargo reports a target lock, wait for Cargo rather than probing processes.
+- Do not create ad hoc Cargo projects or temporary manifests for inspection; analyze with existing repository commands and fixtures only.
 
 ## Commands
 
-- `cargo build --workspace`: build all crates.
 - `cargo test -p ooxmlsdk-build test_gen -- --ignored --nocapture`: regenerate `sdk_data/` and runtime generated code from checked-in `data/` and package schemas.
 - `cargo test -p ooxmlsdk-test`: fast integration lane for common runtime and package behavior.
 - `cargo test --workspace`: default full test lane.

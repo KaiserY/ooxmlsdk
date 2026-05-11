@@ -174,7 +174,13 @@ fn is_valid_open_only(file_name: &str) -> bool {
 }
 
 fn is_test_data_open_only(file_name: &str) -> bool {
-  matches!(file_name, "libreoffice/word/comment-annotationref.docx")
+  matches!(
+    file_name,
+    "libreoffice/word/comment-annotationref.docx"
+      | "libreoffice/presentation/chart-theme-override.pptx"
+      | "libreoffice/presentation/import-characters.pptx"
+      | "libreoffice/presentation/tdf147586.pptx"
+  )
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

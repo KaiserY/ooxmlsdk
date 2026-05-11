@@ -1,0 +1,12 @@
+{
+  "Types": [
+    {
+      "ClassName": "ControlList",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "SlideMasterExtensionList",
+      "HaveXmlOtherAttrs": true
+    }
+  ]
+}

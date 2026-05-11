@@ -3379,7 +3379,7 @@ mod tests {
 
   #[test]
   fn pdfexport_fixture_tdf156685_mce_processing_rewrites_run_alternate_content() {
-    let path = fixture_path("test-data/ooxmlsdk-pdf-test/tdf156685.docx");
+    let path = fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice/tdf156685.docx");
     let settings = OpenSettings {
       markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
         process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,

@@ -25,13 +25,14 @@ fn workspace_root() -> PathBuf {
 }
 
 fn load_known_failures(workspace_root: &Path) -> Vec<KnownFailure> {
-  let path = workspace_root.join("test-data/known_failures.toml");
+  let path = workspace_root.join("test-data/ooxmlsdk-test/specs/known_failures.toml");
   if !path.exists() {
     return Vec::new();
   }
-  let content = std::fs::read_to_string(&path).expect("read test-data/known_failures.toml");
+  let content =
+    std::fs::read_to_string(&path).expect("read test-data/ooxmlsdk-test/specs/known_failures.toml");
   let parsed: toml::Value =
-    toml::from_str(&content).expect("parse test-data/known_failures.toml as TOML");
+    toml::from_str(&content).expect("parse test-data/ooxmlsdk-test/specs/known_failures.toml");
 
   let Some(arr) = parsed.get("failure").and_then(|v| v.as_array()) else {
     return Vec::new();
@@ -106,12 +107,11 @@ fn try_round_trip(path: &Path) -> Result<(), String> {
 #[test]
 fn round_trip_smoke_test() {
   let root = workspace_root();
-  let test_data = root.join("test-data");
+  let test_data = root.join("test-data/ooxmlsdk-test/specs");
 
   if !test_data.exists() {
     eprintln!(
-      "warning: test-data/ not found at {}, run \
-             `cargo run -p ooxmlsdk-test --example create_fixtures` first",
+      "warning: test-data/ooxmlsdk-test/specs/ not found at {}, restore the specs fixture tree first",
       test_data.display()
     );
     return;
@@ -161,7 +161,7 @@ fn round_trip_smoke_test() {
         unexpected_successes.push(format!(
           "UNEXPECTED SUCCESS: {rel}\n  \
                      Was expected to fail: {}\n  \
-                     Remove the entry from test-data/known_failures.toml.",
+                     Remove the entry from test-data/ooxmlsdk-test/specs/known_failures.toml.",
           kf.reason
         ));
       }
@@ -181,7 +181,7 @@ fn round_trip_smoke_test() {
       (Err(err), false) => {
         unexpected_failures.push(format!(
           "ROUND-TRIP FAILED: {rel}\n{err}\n\n  \
-                     If this is a known limitation, add it to test-data/known_failures.toml.\n  \
+                     If this is a known limitation, add it to test-data/ooxmlsdk-test/specs/known_failures.toml.\n  \
                      If this is a regression, please file an issue."
         ));
       }

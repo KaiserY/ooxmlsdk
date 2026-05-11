@@ -251,8 +251,10 @@ mod tests {
 
   #[test]
   fn emf_fixture_decodes_to_jpeg() {
-    let package =
-      WordprocessingDocument::new_from_file("test-data/ooxmlsdk-pdf-test/tdf129085.docx").unwrap();
+    let package = WordprocessingDocument::new_from_file(
+      "test-data/ooxmlsdk-pdf-test/libreoffice/tdf129085.docx",
+    )
+    .unwrap();
     let image = package
       .get_all_parts()
       .find_map(|part| match part {

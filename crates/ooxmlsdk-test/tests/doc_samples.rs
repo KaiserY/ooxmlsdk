@@ -342,6 +342,7 @@ fn workspace_file_path(file_name: &str) -> std::path::PathBuf {
     .expect("ooxmlsdk-test should be under a crates dir")
     .parent()
     .expect("crates dir should be under workspace root")
+    .join("test-data/ooxmlsdk-test")
     .join(file_name);
   assert!(path.is_file(), "missing workspace file: {}", path.display());
   path

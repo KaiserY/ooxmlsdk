@@ -171,8 +171,19 @@ pub const SPREADSHEET_CELL_VALUE_DATETIME_XML: &str =
 pub const SPREADSHEET_CELL_VALUE_DATETIME_OFFSET_XML: &str =
   include_str!("../samples/spreadsheet_cell_value_datetime_offset.xml");
 
-pub const DOC_SAMPLES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/doc_samples");
+pub const DOC_SAMPLES_DIR: &str = concat!(
+  env!("CARGO_MANIFEST_DIR"),
+  "/../../test-data/ooxmlsdk-test/Open-XML-SDK"
+);
+pub const MISC_FIXTURES_DIR: &str = concat!(
+  env!("CARGO_MANIFEST_DIR"),
+  "/../../test-data/ooxmlsdk-test/misc"
+);
 
 pub fn doc_sample_path(file_name: &str) -> std::path::PathBuf {
   std::path::Path::new(DOC_SAMPLES_DIR).join(file_name)
+}
+
+pub fn misc_fixture_path(file_name: &str) -> std::path::PathBuf {
+  std::path::Path::new(MISC_FIXTURES_DIR).join(file_name)
 }

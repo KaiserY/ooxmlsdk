@@ -295,7 +295,7 @@ decisions.
 
 The DOCX/PDF lane should optimize for real LibreOffice-aligned coverage rather
 than hand-crafted renderer fixtures. New PDF calibration fixtures live only in
-`test-data/ooxmlsdk-pdf-test/` and should be copied from upstream compatibility
+`test-data/ooxmlsdk-pdf-test/libreoffice/` and should be copied from upstream compatibility
 suites, starting with LibreOffice Writer QA files under `../core/sw/qa/`.
 
 Default fixture policy:
@@ -310,7 +310,7 @@ Default fixture policy:
 - record each copied fixture's upstream source path next to the fixture
 
 The initial real fixture is
-`test-data/ooxmlsdk-pdf-test/libreoffice-ooxmlexport-1_page.docx`, copied from
+`test-data/ooxmlsdk-pdf-test/libreoffice/libreoffice-ooxmlexport-1_page.docx`, copied from
 `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`.
 
 Implementation work should also happen in feature batches. A batch may import
@@ -356,7 +356,7 @@ is:
 1. **Sections/page styles:** section boundaries, break normalization,
    first/default/even header/footer inheritance, body reservation, columns,
    page backgrounds, and page borders match the selected LibreOffice Writer QA
-   fixtures in `test-data/ooxmlsdk-pdf-test/`.
+   fixtures in `test-data/ooxmlsdk-pdf-test/libreoffice/`.
 2. **Paragraph/text:** paragraph/run property overlay, numbering, tabs, fields,
    page/column breaks, keep/widow/orphan behavior, shaped text measurement, and
    paint portions match the selected LibreOffice Writer QA fixtures.
@@ -451,7 +451,7 @@ LibreOffice QA alignment:
 
 Implemented crate responsibilities:
 
-- discover Word fixtures from `test-data/ooxmlsdk-pdf-test/` (`.docx`,
+- discover Word fixtures from `test-data/ooxmlsdk-pdf-test/libreoffice/` (`.docx`,
   `.docm`, `.dotx`, `.dotm`)
 - render each fixture with LibreOffice headless, for example
   `soffice --headless --convert-to pdf --outdir <tmp> <fixture.docx>`
@@ -520,7 +520,7 @@ crates/ooxmlsdk-pdf-test/
     report.rs
   tests/
     libreoffice_fixtures.rs
-test-data/ooxmlsdk-pdf-test/
+test-data/ooxmlsdk-pdf-test/libreoffice/
   README.md
   libreoffice-ooxmlexport-1_page.docx
   libreoffice-ooxmlexport-footnote.docx
@@ -532,7 +532,7 @@ test-data/ooxmlsdk-pdf-test/
 This lane currently has two layers:
 
 - a strict non-ignored parity test that requires LibreOffice and PDFium and
-  strongly gates every fixture in `test-data/ooxmlsdk-pdf-test/`
+  strongly gates every fixture in `test-data/ooxmlsdk-pdf-test/libreoffice/`
 - a non-ignored inventory test that records render failures plus first-pass
   summary differences for that directory; it currently requires running outside
   this sandbox because LibreOffice cannot create its runtime files from the
@@ -542,7 +542,7 @@ Latest inventory run:
 
 - command: `cargo test -p ooxmlsdk-pdf-test -- --nocapture`
 - scope: 5 LibreOffice Writer QA fixtures under
-  `test-data/ooxmlsdk-pdf-test/`
+  `test-data/ooxmlsdk-pdf-test/libreoffice/`
 - sources:
   `../core/sw/qa/extras/ooxmlexport/data/1_page.docx`,
   `footnote.docx`, `multi-column-separator-with-line.docx`,
@@ -981,7 +981,7 @@ Current progress:
   column flow, keep-next pagination, repeated table headers, page background,
   and borders were removed. Future PDF parity coverage for these behaviors
   should come from LibreOffice QA fixtures copied into
-  `test-data/ooxmlsdk-pdf-test/`.
+  `test-data/ooxmlsdk-pdf-test/libreoffice/`.
 - Layout model coverage checks that a table row following into the next section
   column also moves later body blocks into that destination column, matching the
   Writer `SwTabFrame` follow invariant before full row split/follow-flow-line
@@ -1359,7 +1359,7 @@ behavior batches:
 4. Extend floating frame influence from paragraph-local exclusions to
    page/frame-associated fly influence that can affect following paragraphs and
    table cell content.
-5. Expand `test-data/ooxmlsdk-pdf-test/` with focused LibreOffice QA DOCX files
+5. Expand `test-data/ooxmlsdk-pdf-test/libreoffice/` with focused LibreOffice QA DOCX files
    only when the next behavior batch is ready to make those fixtures pass
    without known-issue whitelists.
 

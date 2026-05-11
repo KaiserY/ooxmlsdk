@@ -13,6 +13,12 @@ fn test_file_path(file_name: &str) -> std::path::PathBuf {
   path
 }
 
+fn misc_file_path(file_name: &str) -> std::path::PathBuf {
+  let path = fixtures::misc_fixture_path(file_name);
+  assert!(path.is_file(), "missing misc fixture: {}", path.display());
+  path
+}
+
 fn assert_presentation_document_validates(file_name: &str) {
   let mut package = PresentationDocument::new_from_file(test_file_path(file_name)).unwrap();
   let presentation_part = package.presentation_part().unwrap();
@@ -28,6 +34,16 @@ fn assert_presentation_document_validates(file_name: &str) {
 
 fn assert_spreadsheet_document_validates(file_name: &str) {
   let mut package = SpreadsheetDocument::new_from_file(test_file_path(file_name)).unwrap();
+  let workbook_part = package.workbook_part().unwrap();
+  let errors = workbook_part.root_element(&mut package).unwrap().validate();
+  assert!(
+    errors.is_empty(),
+    "unexpected validation errors: {errors:?}"
+  );
+}
+
+fn assert_misc_spreadsheet_document_validates(file_name: &str) {
+  let mut package = SpreadsheetDocument::new_from_file(misc_file_path(file_name)).unwrap();
   let workbook_part = package.workbook_part().unwrap();
   let errors = workbook_part.root_element(&mut package).unwrap().validate();
   assert!(
@@ -64,9 +80,13 @@ fn basicspreadsheet_xlsx_validation_from_openxml_validator_test() {
 #[test]
 fn additional_spreadsheet_doc_samples_validate() {
   // Source: upstream Open XML SDK test assets under test/DocumentFormat.OpenXml.Tests.Assets/TestFiles
-  for file_name in ["Comments.xlsx", "Products.xlsx"] {
-    assert_spreadsheet_document_validates(file_name);
-  }
+  assert_spreadsheet_document_validates("Comments.xlsx");
+}
+
+#[test]
+fn misc_products_xlsx_validates() {
+  // Source: local fixture outside ../Open-XML-SDK TestFiles; kept under test-data/ooxmlsdk-test/misc
+  assert_misc_spreadsheet_document_validates("Products.xlsx");
 }
 
 #[test]

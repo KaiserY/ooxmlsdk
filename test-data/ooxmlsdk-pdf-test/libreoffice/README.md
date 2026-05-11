@@ -13,6 +13,10 @@ assertion in `pdfexport.cxx` or `pdfexport2.cxx`. Avoid adding hand-crafted
 fixtures or inferred expectations; copy upstream fixtures and port the upstream
 assertion values directly.
 
+Fixtures that are not traceable to `../core` should not live here. Put them in
+a sibling `misc/` bucket once that category exists so the LibreOffice boundary
+stays explicit.
+
 Strict upstream `pdfexport` / `pdfexport2` DOCX fixtures:
 
 - `content-control-rtl.docx`: copied from

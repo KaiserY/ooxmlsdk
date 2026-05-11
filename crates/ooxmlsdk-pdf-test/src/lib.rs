@@ -37,7 +37,7 @@ pub fn workspace_root() -> PathBuf {
 }
 
 pub fn pdfexport_fixture_dir() -> PathBuf {
-  workspace_root().join("test-data/ooxmlsdk-pdf-test")
+  workspace_root().join("test-data/ooxmlsdk-pdf-test/libreoffice")
 }
 
 pub fn pdfexport_fixtures() -> Vec<PathBuf> {

@@ -298,6 +298,7 @@ pub struct BookmarkTarget {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_SectionProperties/p14:sectionPr")]
 pub struct SectionProperties {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SectionOld Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionOld/p14:section"))]
   pub p14_section: Vec<SectionOld>,
@@ -306,6 +307,7 @@ pub struct SectionProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_SectionList/p14:sectionLst")]
 pub struct SectionList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the Section Class.
   #[sdk(child(office2010, qname = "p14:CT_Section/p14:section"))]
   pub p14_section: Vec<Section>,
@@ -322,6 +324,7 @@ pub struct BrowseMode {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_Color/p14:laserClr")]
 pub struct LaserColor {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -357,6 +360,7 @@ pub struct DiscardImageEditData {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_ShowMediaControls/p14:showMediaCtrls")]
 pub struct ShowMediaControls {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// val
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: crate::simple_type::BooleanValue,
@@ -533,6 +537,7 @@ pub struct ExtensionList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_SectionOld/p14:section")]
 pub struct SectionOld {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
@@ -553,6 +558,7 @@ pub struct SectionOld {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_SectionSlideIdListEntry/p14:sldId")]
 pub struct SectionSlideIdListEntry {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
   #[sdk(number_range(range = 256..2147483648))]
@@ -562,6 +568,7 @@ pub struct SectionSlideIdListEntry {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_SectionSlideIdList/p14:sldIdLst")]
 pub struct SectionSlideIdList {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SectionSlideIdListEntry Class.
   #[sdk(child(office2010, qname = "p14:CT_SectionSlideIdListEntry/p14:sldId"))]
   pub p14_sld_id: Vec<SectionSlideIdListEntry>,
@@ -570,6 +577,7 @@ pub struct SectionSlideIdList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "p14:CT_Section/p14:section")]
 pub struct Section {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// name
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,

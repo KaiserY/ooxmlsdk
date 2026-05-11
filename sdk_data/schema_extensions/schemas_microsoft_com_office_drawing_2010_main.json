@@ -1,0 +1,12 @@
+{
+  "Types": [
+    {
+      "ClassName": "HiddenFillProperties",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "HiddenEffectsProperties",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

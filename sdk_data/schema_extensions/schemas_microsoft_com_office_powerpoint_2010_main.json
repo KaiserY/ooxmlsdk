@@ -1,0 +1,36 @@
+{
+  "Types": [
+    {
+      "ClassName": "SectionProperties",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SectionList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "Section",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SectionOld",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SectionSlideIdList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SectionSlideIdListEntry",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "LaserColor",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ShowMediaControls",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

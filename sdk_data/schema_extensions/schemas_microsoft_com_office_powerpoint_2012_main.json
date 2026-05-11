@@ -1,0 +1,20 @@
+{
+  "Types": [
+    {
+      "ClassName": "SlideGuideList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "NotesGuideList",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "PresenceInfo",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "ExtendedGuide",
+      "HaveXmlnsFields": true
+    }
+  ]
+}

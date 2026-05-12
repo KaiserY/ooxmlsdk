@@ -116,7 +116,7 @@ pub struct SortRules {
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
+  pub font: Option<crate::schemas::x::Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,

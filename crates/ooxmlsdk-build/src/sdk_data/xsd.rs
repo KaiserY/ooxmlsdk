@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use crate::Result;
 use crate::simple_type::simple_type_mapping;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct ParsedXsd {
   pub target_namespace: String,
   pub root_elements: BTreeMap<String, ParsedComplexType>,
@@ -14,14 +14,29 @@ pub(crate) struct ParsedXsd {
   pub simple_types: BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ParsedComplexType {
   pub _mixed: bool,
+  pub top_level_particle: Option<ParsedParticle>,
   pub children: Vec<ParsedChildElement>,
   pub attributes: Vec<ParsedAttribute>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ParsedParticleKind {
+  Sequence,
+  Choice,
+  All,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ParsedParticle {
+  pub kind: ParsedParticleKind,
+  pub min_occurs: u64,
+  pub max_occurs: u64,
+}
+
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ParsedChildElement {
   pub q_name: String,
   pub min_occurs: u64,
@@ -29,7 +44,7 @@ pub(crate) struct ParsedChildElement {
   pub complex_type: Option<ParsedComplexType>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ParsedAttribute {
   pub field: String,
   pub q_name: String,
@@ -57,8 +72,12 @@ pub(crate) fn parse_xsd(source: &str) -> Result<ParsedXsd> {
           parsed.complex_types.insert(name, complex_type);
         }
         b"simpleType" => {
-          let (name, values) = parse_simple_type(&mut reader, e)?;
-          parsed.simple_types.insert(name, values);
+          if optional_attr(&reader, &e, b"name")?.is_some() {
+            let (name, values) = parse_simple_type(&mut reader, e)?;
+            parsed.simple_types.insert(name, values);
+          } else {
+            skip_element(&mut reader, e.name().as_ref())?;
+          }
         }
         _ => skip_element(&mut reader, e.name().as_ref())?,
       },
@@ -92,7 +111,12 @@ fn parse_complex_type_body(
   loop {
     match reader.read_event()? {
       Event::Start(e) => match local_name(e.name().as_ref()) {
-        b"sequence" | b"choice" | b"all" | b"simpleContent" | b"extension" => {}
+        b"sequence" | b"choice" | b"all" => {
+          if complex_type.top_level_particle.is_none() {
+            complex_type.top_level_particle = Some(parse_particle(reader, &e)?);
+          }
+        }
+        b"simpleContent" | b"extension" => {}
         b"element" => complex_type
           .children
           .push(parse_child_element(reader, &e, false)?),
@@ -250,6 +274,36 @@ fn parse_child_element(
   })
 }
 
+fn parse_particle(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<ParsedParticle> {
+  let kind = match local_name(element.name().as_ref()) {
+    b"sequence" => ParsedParticleKind::Sequence,
+    b"choice" => ParsedParticleKind::Choice,
+    b"all" => ParsedParticleKind::All,
+    other => {
+      return Err(format!("unsupported particle {}", String::from_utf8_lossy(other)).into());
+    }
+  };
+
+  Ok(ParsedParticle {
+    kind,
+    min_occurs: optional_attr(reader, element, b"minOccurs")?
+      .as_deref()
+      .unwrap_or("1")
+      .parse()
+      .unwrap_or(1),
+    max_occurs: optional_attr(reader, element, b"maxOccurs")?
+      .as_deref()
+      .map(|value| {
+        if value == "unbounded" {
+          u64::MAX
+        } else {
+          value.parse().unwrap_or(1)
+        }
+      })
+      .unwrap_or(1),
+  })
+}
+
 fn parse_attribute(
   reader: &Reader<&[u8]>,
   element: &BytesStart<'_>,
@@ -383,5 +437,34 @@ fn strip_prefix(value: &str) -> &str {
   match value.rsplit_once(':') {
     Some((_, suffix)) => suffix,
     None => value,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{ParsedParticleKind, parse_xsd};
+
+  #[test]
+  fn captures_top_level_choice_particle() {
+    let xsd = parse_xsd(
+      r#"
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+        <xsd:complexType name="CT_Font">
+          <xsd:choice maxOccurs="unbounded">
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="sz" type="xsd:string"/>
+          </xsd:choice>
+        </xsd:complexType>
+      </xsd:schema>
+      "#,
+    )
+    .expect("parse xsd");
+
+    let font = xsd.complex_types.get("CT_Font").expect("CT_Font");
+    let particle = font.top_level_particle.expect("top level particle");
+
+    assert_eq!(particle.kind, ParsedParticleKind::Choice);
+    assert_eq!(particle.min_occurs, 1);
+    assert_eq!(particle.max_occurs, u64::MAX);
   }
 }

@@ -1381,7 +1381,6 @@ pub struct ChartSpace {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Version number of the file, as determined by the features used by this chart
   #[sdk(attr(qname = ":version"))]
   pub version: Option<crate::simple_type::StringValue>,

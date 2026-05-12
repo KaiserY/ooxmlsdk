@@ -941,7 +941,6 @@ pub struct CommentAuthorList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Comment Author.
   #[sdk(child(qname = "p:CT_CommentAuthor/p:cmAuthor"))]
   pub p_cm_author: Vec<CommentAuthor>,
@@ -953,7 +952,6 @@ pub struct CommentList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Comment.
   #[sdk(child(qname = "p:CT_Comment/p:cm"))]
   pub p_cm: Vec<Comment>,
@@ -1002,7 +1000,6 @@ pub struct Presentation {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
   pub server_zoom: Option<crate::simple_type::Int32Value>,
@@ -1116,7 +1113,6 @@ pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1149,7 +1145,6 @@ pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1195,7 +1190,6 @@ pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
@@ -1317,7 +1311,6 @@ pub struct TagList {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Programmable Extensibility Tag.
   #[sdk(child(qname = "p:CT_StringTag/p:tag"))]
   pub p_tag: Vec<Tag>,
@@ -3735,8 +3728,7 @@ pub struct ShapeTree {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
-    qname = "p:CT_ContentPart/p:contentPart",
-    any
+    qname = "p:CT_ContentPart/p:contentPart"
   ))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the ExtensionListWithModification Class.
@@ -3783,7 +3775,6 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ControlList/p:controls")]
 pub struct ControlList {
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Embedded Control.
   #[sdk(child(qname = "p:CT_Control/p:control"))]
   pub p_control: Vec<Control>,
@@ -5303,9 +5294,6 @@ pub enum ShapeTreeChoice {
   PPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {

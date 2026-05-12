@@ -1577,7 +1577,6 @@ pub struct CalculationChain {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Cell.
   #[sdk(child(qname = "x:CT_CalcCell/x:c"))]
   pub x_c: Vec<CalculationCell>,
@@ -1609,7 +1608,6 @@ pub struct MapInfo {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Prefix Mappings for XPath Expressions
   #[sdk(attr(qname = ":SelectionNamespaces"))]
   pub selection_namespaces: crate::simple_type::StringValue,
@@ -1627,7 +1625,6 @@ pub struct Connections {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Connection.
   #[sdk(child(qname = "x:CT_Connection/x:connection"))]
   pub x_connection: Vec<Connection>,
@@ -1737,7 +1734,6 @@ pub struct PivotCacheRecords {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// PivotCache Records Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -2098,7 +2094,6 @@ pub struct SharedStringTable {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// String Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -2119,7 +2114,6 @@ pub struct Headers {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Last Revision GUID
   #[sdk(attr(qname = ":guid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
@@ -2171,7 +2165,6 @@ pub struct Revisions {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   #[sdk(choice(
     qname = "x:CT_RevisionRowColumn/x:rrc",
     qname = "x:CT_RevisionMove/x:rm",
@@ -2195,7 +2188,6 @@ pub struct Users {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Active User Count
   #[sdk(attr(qname = ":count"))]
   pub count: Option<crate::simple_type::UInt32Value>,
@@ -2210,7 +2202,6 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Sheet Properties.
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2333,7 +2324,6 @@ pub struct Chartsheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Chart Sheet Properties
   #[sdk(child(qname = "x:CT_ChartsheetPr/x:sheetPr"))]
   pub chart_sheet_properties: Option<std::boxed::Box<ChartSheetProperties>>,
@@ -2384,7 +2374,6 @@ pub struct DialogSheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Sheet Properties
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2441,7 +2430,6 @@ pub struct Metadata {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Metadata Types Collection
   #[sdk(child(qname = "x:CT_MetadataTypes/x:metadataTypes"))]
   pub metadata_types: Option<MetadataTypes>,
@@ -2471,7 +2459,6 @@ pub struct SingleXmlCells {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Table Properties.
   #[sdk(child(qname = "x:CT_SingleXmlCell/x:singleXmlCell"))]
   pub x_single_xml_cell: Vec<SingleXmlCell>,
@@ -2483,7 +2470,6 @@ pub struct Stylesheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the NumberingFormats Class.
   #[sdk(child(qname = "x:CT_NumFmts/x:numFmts"))]
   pub numbering_formats: Option<NumberingFormats>,
@@ -2631,7 +2617,6 @@ pub struct VolatileTypes {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Volatile Dependency Type.
   #[sdk(child(qname = "x:CT_VolType/x:volType"))]
   pub x_vol_type: Vec<VolatileType>,
@@ -2646,7 +2631,6 @@ pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
@@ -5775,7 +5759,7 @@ pub struct NewCell {
 pub struct OldDifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<Font>>,
+  pub font: Option<Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -5801,7 +5785,7 @@ pub struct OldDifferentialFormat {
 pub struct NewDifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<Font>>,
+  pub font: Option<Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -5827,7 +5811,7 @@ pub struct NewDifferentialFormat {
 pub struct DifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<Font>>,
+  pub font: Option<Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -7470,51 +7454,24 @@ pub struct Protection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Font/x:font")]
 pub struct Font {
-  /// Bold
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
-  pub bold: Option<Bold>,
-  /// Italic
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
-  pub italic: Option<Italic>,
-  /// Strike Through
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
-  pub strike: Option<Strike>,
-  /// Condense
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
-  pub condense: Option<Condense>,
-  /// Extend
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
-  pub extend: Option<Extend>,
-  /// Outline
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
-  pub outline: Option<Outline>,
-  /// Shadow
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
-  pub shadow: Option<Shadow>,
-  /// Underline
-  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
-  pub underline: Option<Underline>,
-  /// Text Vertical Alignment
-  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
-  pub vertical_text_alignment: Option<VerticalTextAlignment>,
-  /// Font Size
-  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
-  pub font_size: Option<FontSize>,
-  /// Text Color
-  #[sdk(child(qname = "x:CT_Color/x:color"))]
-  pub color: Option<Color>,
-  /// Font Name
-  #[sdk(child(qname = "x:CT_FontNameNonEmpty/x:name"))]
-  pub font_name: Option<FontName>,
-  /// Font Family
-  #[sdk(child(qname = "x:CT_FontFamilyNum/x:family"))]
-  pub font_family_numbering: Option<FontFamilyNumbering>,
-  /// Character Set
-  #[sdk(child(qname = "x:CT_ByteProperty/x:charset"))]
-  pub font_char_set: Option<FontCharSet>,
-  /// Scheme
-  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
-  pub font_scheme: Option<FontScheme>,
+  #[sdk(choice(
+    qname = "x:CT_BooleanProperty/x:b",
+    qname = "x:CT_BooleanProperty/x:i",
+    qname = "x:CT_BooleanProperty/x:strike",
+    qname = "x:CT_BooleanProperty/x:condense",
+    qname = "x:CT_BooleanProperty/x:extend",
+    qname = "x:CT_BooleanProperty/x:outline",
+    qname = "x:CT_BooleanProperty/x:shadow",
+    qname = "x:CT_UnderlineProperty/x:u",
+    qname = "x:CT_VerticalAlignFontProperty/x:vertAlign",
+    qname = "x:CT_FontSize/x:sz",
+    qname = "x:CT_Color/x:color",
+    qname = "x:CT_FontNameNonEmpty/x:name",
+    qname = "x:CT_FontFamilyNum/x:family",
+    qname = "x:CT_ByteProperty/x:charset",
+    qname = "x:CT_FontScheme/x:scheme"
+  ))]
+  pub font_choice: Vec<FontChoice>,
 }
 /// Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11274,6 +11231,39 @@ pub enum MdxChoice {
   /// KPI MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxKPI/x:k"))]
   XK(std::boxed::Box<MdxKpi>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum FontChoice {
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
+  XB(std::boxed::Box<Bold>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
+  XI(std::boxed::Box<Italic>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
+  XStrike(std::boxed::Box<Strike>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
+  XCondense(std::boxed::Box<Condense>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
+  XExtend(std::boxed::Box<Extend>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
+  XOutline(std::boxed::Box<Outline>),
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
+  XShadow(std::boxed::Box<Shadow>),
+  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
+  XU(std::boxed::Box<Underline>),
+  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
+  XVertAlign(std::boxed::Box<VerticalTextAlignment>),
+  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
+  XSz(std::boxed::Box<FontSize>),
+  #[sdk(child(qname = "x:CT_Color/x:color"))]
+  XColor(std::boxed::Box<Color>),
+  #[sdk(child(qname = "x:CT_FontNameNonEmpty/x:name"))]
+  XName(std::boxed::Box<FontName>),
+  #[sdk(child(qname = "x:CT_FontFamilyNum/x:family"))]
+  XFamily(std::boxed::Box<FontFamilyNumbering>),
+  #[sdk(child(qname = "x:CT_ByteProperty/x:charset"))]
+  XCharset(std::boxed::Box<FontCharSet>),
+  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
+  XScheme(std::boxed::Box<FontScheme>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {

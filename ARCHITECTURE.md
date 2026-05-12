@@ -116,6 +116,50 @@ Because generated code is checked in, reviews should usually focus on:
 - whether the generated diff matches the intended model shift
 - whether format/test/clippy lanes stay green
 
+### Schema Extension Semantics
+
+Schema extension files under `sdk_data/schema_extensions/` patch gaps in the
+upstream-derived `data/` model before Rust code is generated. Keep these patches
+small and source-backed. Prefer fixture or upstream evidence for every new
+extension entry.
+
+`HaveDirectXmlOtherChildren` is scoped to the current type only. It means the
+current element may contain direct unknown XML children that should be preserved
+as raw XML on the current struct. In generated Rust this adds:
+
+```rust
+pub xml_other_children: Vec<(usize, Box<str>)>
+```
+
+Use `HaveDirectXmlOtherChildren` only when the unknown child really belongs to
+the current element's own direct-child storage. Do not use it for
+`mc:AlternateContent` that wraps an otherwise known child inside a repeated
+choice stream.
+
+`ParentChoiceHasAny` is scoped through references to the current type. It means
+that when the current type appears as a member of a parent repeated choice or
+single repeated child stream, the parent stream must accept raw XML as another
+ordered item. In generated Rust this either adds `XmlAny` to the parent's
+existing `Vec<ChoiceEnum>` field or promotes a single `Vec<Child>` field into a
+`Vec<ParentChoice>` field with both the child variant and `XmlAny`.
+
+For example, if `w:CT_Font/w:font` has `ParentChoiceHasAny`, then
+`w:CT_FontsList/w:fonts` can be generated as:
+
+```rust
+#[sdk(choice(qname = "w:CT_Font/w:font", any))]
+pub xml_children: Vec<FontsChoice>,
+```
+
+Use `ParentChoiceHasAny` when an MCE wrapper, such as `mc:AlternateContent`, is
+observed in a parent where the wrapped payload is the marked child type. The
+mark belongs on the wrapped child type, not on the parent. This preserves order
+inside the parent child stream without adding a separate `xml_other_children`
+field to the parent.
+
+Do not add alternate parent-level raw-child fields for this path. MCE wrappers
+inside parent child streams should use `ParentChoiceHasAny`.
+
 ## Feature Model
 
 The runtime feature surface is intentionally small:

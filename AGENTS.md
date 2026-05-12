@@ -39,6 +39,10 @@ Until the implementation reaches a higher maturity level:
 - Do not paste broad search output or large generated snippets unless asked.
 - Run commands from the repository root.
 - Cargo generation, format, test, clippy, and bench commands must run sequentially in the default `target/` directory; do not set `CARGO_TARGET_DIR`.
+- This repository has long Cargo build/test times. After starting any Cargo command, let it run to completion and wait for the final result.
+- Never start a second Cargo command while another Cargo command is still running, even for a quick verification, retry, status check, or no-op probe.
+- While a Cargo command is running, do not launch other repository commands just to inspect progress. Do not poll with extra Cargo invocations. If output is quiet for a while, keep waiting.
+- If Cargo reports a target lock or another Cargo process is already running, do not probe processes or start competing commands; just wait for the active Cargo command to finish and then continue.
 - If Cargo reports a target lock, wait for Cargo rather than probing processes.
 - Do not create ad hoc Cargo projects or temporary manifests for inspection; analyze with existing repository commands and fixtures only.
 

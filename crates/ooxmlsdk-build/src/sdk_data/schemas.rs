@@ -5,6 +5,7 @@ use crate::sdk_data::{
     SchemaTypeAttribute, SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind,
     SchemaTypeKind, SchemaTypeXmlHeader,
   },
+  xsd::{ParsedParticleKind, ParsedXsd},
 };
 
 use crate::sdk_code::versioning::effective_version;
@@ -62,7 +63,11 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
         .types
         .iter()
         .map(|ty| {
-          let composite_kind = resolve_composite_kind(ty);
+          let composite_kind = resolve_composite_kind(
+            ty,
+            schema.target_namespace.as_str(),
+            &gen_context.xsd_schemas,
+          );
           let kind = resolve_kind(ty, &type_map);
           let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> = ty
             .children
@@ -176,18 +181,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 have_xml_other_attrs,
                 &children,
               );
-          let parent_have_xml_other_children = parent_have_xml_other_children_for_common_content(
-            ty,
-            kind,
-            schema.module_name.as_str(),
-          );
           let have_direct_xml_other_children =
-            have_direct_xml_other_children_for_common_part_root_content(
-              ty,
-              kind,
-              schema.module_name.as_str(),
-              have_xml_other_children,
-            ) || have_direct_xml_other_children_for_targeted_mce_content(
+            have_direct_xml_other_children_for_targeted_mce_content(
               ty,
               kind,
               schema.module_name.as_str(),
@@ -215,7 +210,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             have_xml_other_attrs,
             have_xml_other_children,
             have_direct_xml_other_children,
-            parent_have_xml_other_children,
+            parent_choice_has_any: false,
             text_value_type: String::new(),
             api_kind: resolve_api_kind(ty, &type_map),
             attributes: ty
@@ -929,37 +924,6 @@ fn have_xml_other_children_for_text_list_style_extension_siblings(
       .any(|child| is_extension_list_name(child.name.as_str()))
 }
 
-fn parent_have_xml_other_children_for_common_content(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-) -> bool {
-  matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
-    && is_office2007_or_default(schema_type.version.as_deref())
-    && !is_extension_schema_type(schema_type)
-    && ((module_name.contains("wordprocessingml_2006_main")
-      && matches!(
-        schema_type.name.as_str(),
-        "w:CT_Body/w:body" | "w:CT_FontsList/w:fonts" | "w:CT_P/w:p" | "w:CT_R/w:r"
-      ))
-      || (module_name.contains("presentationml_2006_main")
-        && schema_type.name == "p:CT_GroupShape/p:spTree"))
-}
-
-fn have_direct_xml_other_children_for_common_part_root_content(
-  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
-  kind: SchemaTypeKind,
-  module_name: &str,
-  have_xml_other_children: bool,
-) -> bool {
-  have_xml_other_children
-    && matches!(kind, SchemaTypeKind::Composite | SchemaTypeKind::Derived)
-    && is_office2007_or_default(schema_type.version.as_deref())
-    && is_common_ooxml_content_module(module_name)
-    && !is_extension_schema_type(schema_type)
-    && is_part_root_schema_type(schema_type)
-}
-
 fn have_direct_xml_other_children_for_targeted_mce_content(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
   kind: SchemaTypeKind,
@@ -998,9 +962,6 @@ fn have_direct_xml_other_children_for_targeted_mce_content(
     || (is_common_office2007_content
       && module_name.contains("drawingml_2006_main")
       && name == "a:CT_RegularTextRun/a:r")
-    || (is_common_office2007_content
-      && module_name.contains("drawingml_2006_spreadsheet_drawing")
-      && name == "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor")
     || (module_name.contains("microsoft_com_office_drawing_2014_chartex")
       && name == "cx:CT_ChartSpace/cx:chartSpace")
 }
@@ -1794,8 +1755,14 @@ fn is_drawing_payload_module(module_name: &str) -> bool {
 
 fn resolve_composite_kind(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
 ) -> SchemaTypeCompositeKind {
-  if schema_type.composite_type == "OneSequence" {
+  if schema_type.composite_type == "OneSequence"
+    && matches_xsd_repeatable_choice_rule(schema_type, target_namespace, xsd_schemas)
+  {
+    SchemaTypeCompositeKind::XsdRepeatableChoice
+  } else if schema_type.composite_type == "OneSequence" {
     SchemaTypeCompositeKind::OneSequence
   } else if schema_type.composite_type == "OneChoice" {
     SchemaTypeCompositeKind::OneChoice
@@ -1806,6 +1773,34 @@ fn resolve_composite_kind(
   } else {
     SchemaTypeCompositeKind::None
   }
+}
+
+fn matches_xsd_repeatable_choice_rule(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+) -> bool {
+  if schema_type.composite_type != "OneSequence" {
+    return false;
+  }
+
+  let Some(type_name) = schema_type_name(schema_type.name.as_str()) else {
+    return false;
+  };
+
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return false;
+  };
+
+  let Some(complex_type) = xsd.complex_types.get(type_name) else {
+    return false;
+  };
+
+  let Some(particle) = complex_type.top_level_particle else {
+    return false;
+  };
+
+  particle.kind == ParsedParticleKind::Choice && particle.max_occurs == u64::MAX
 }
 
 fn resolve_derived_base_type<'a>(
@@ -1822,4 +1817,181 @@ fn resolve_derived_base_type<'a>(
   }
 
   type_map.get(base_class_type_name).copied()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{gen_schemas, matches_xsd_repeatable_choice_rule, resolve_composite_kind};
+  use crate::sdk_data::{
+    context::Context,
+    open_xml::{OpenXmlSchemaType, OpenXmlSchemaTypeParticle},
+    sdk_data_model::{SchemaTypeCompositeKind, SchemaTypeKind},
+    xsd::parse_xsd,
+  };
+  use std::collections::{HashMap, HashSet};
+  use std::path::PathBuf;
+
+  #[test]
+  fn upgrades_one_sequence_to_xsd_repeatable_choice() {
+    let mut xsd_schemas = HashMap::new();
+    xsd_schemas.insert(
+      "urn:test".to_string(),
+      parse_xsd(
+        r#"
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+          <xsd:complexType name="CT_Font">
+            <xsd:choice maxOccurs="unbounded">
+              <xsd:element name="name" type="xsd:string"/>
+              <xsd:element name="sz" type="xsd:string"/>
+            </xsd:choice>
+          </xsd:complexType>
+        </xsd:schema>
+        "#,
+      )
+      .expect("parse xsd"),
+    );
+
+    let schema_type = OpenXmlSchemaType {
+      name: "x:CT_Font/x:font".to_string(),
+      composite_type: "OneSequence".to_string(),
+      particle: OpenXmlSchemaTypeParticle {
+        kind: "Sequence".to_string(),
+        ..OpenXmlSchemaTypeParticle::default()
+      },
+      ..OpenXmlSchemaType::default()
+    };
+
+    assert!(matches_xsd_repeatable_choice_rule(
+      &schema_type,
+      "urn:test",
+      &xsd_schemas,
+    ));
+    assert_eq!(
+      resolve_composite_kind(&schema_type, "urn:test", &xsd_schemas),
+      SchemaTypeCompositeKind::XsdRepeatableChoice,
+    );
+  }
+
+  #[test]
+  fn keeps_other_one_sequence_types_unchanged() {
+    let mut xsd_schemas = HashMap::new();
+    xsd_schemas.insert(
+      "urn:test".to_string(),
+      parse_xsd(
+        r#"
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+          <xsd:complexType name="CT_Example">
+            <xsd:sequence>
+              <xsd:element name="name" type="xsd:string"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:schema>
+        "#,
+      )
+      .expect("parse xsd"),
+    );
+
+    let schema_type = OpenXmlSchemaType {
+      name: "x:CT_Example/x:example".to_string(),
+      composite_type: "OneSequence".to_string(),
+      ..OpenXmlSchemaType::default()
+    };
+
+    assert_eq!(
+      resolve_composite_kind(&schema_type, "urn:test", &xsd_schemas),
+      SchemaTypeCompositeKind::OneSequence,
+    );
+  }
+
+  #[test]
+  fn actual_repo_rule_matches_only_font() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+
+    let matched: Vec<(String, String)> = schemas
+      .iter()
+      .flat_map(|schema| {
+        schema
+          .types
+          .iter()
+          .filter(|schema_type| {
+            schema_type.composite_kind == SchemaTypeCompositeKind::XsdRepeatableChoice
+          })
+          .map(|schema_type| (schema.module_name.clone(), schema_type.name.clone()))
+      })
+      .collect();
+
+    assert_eq!(
+      matched,
+      vec![(
+        "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
+        "x:CT_Font/x:font".to_string(),
+      )],
+    );
+
+    let font = schemas
+      .iter()
+      .flat_map(|schema| schema.types.iter())
+      .find(|schema_type| schema_type.name == "x:CT_Font/x:font")
+      .expect("font");
+
+    assert_eq!(font.kind, SchemaTypeKind::Composite);
+  }
+
+  #[test]
+  fn actual_repo_does_not_auto_generate_direct_xml_other_children_for_parent_choice_cases() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+
+    let direct_other_children: Vec<String> = schemas
+      .iter()
+      .flat_map(|schema| schema.types.iter())
+      .filter(|schema_type| schema_type.have_direct_xml_other_children)
+      .map(|schema_type| schema_type.name.clone())
+      .collect();
+
+    assert!(!direct_other_children.iter().any(|name| {
+      matches!(
+        name.as_str(),
+        "w:CT_FontsList/w:fonts"
+          | "w:CT_Body/w:body"
+          | "w:CT_P/w:p"
+          | "w:CT_R/w:r"
+          | "xdr:CT_Drawing/xdr:wsDr"
+          | "x:CT_Controls/x:controls"
+          | "p:CT_ControlList/p:controls"
+      )
+    }));
+  }
+
+  #[test]
+  fn actual_repo_keeps_targeted_direct_xml_other_children_cases() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+
+    let direct_other_children: HashSet<String> = schemas
+      .iter()
+      .flat_map(|schema| schema.types.iter())
+      .filter(|schema_type| schema_type.have_direct_xml_other_children)
+      .map(|schema_type| schema_type.name.clone())
+      .collect();
+
+    for expected in [
+      "w:CT_Settings/w:settings",
+      "w:CT_RPr/w:rPr",
+      "w:CT_RPrBaseStyleable/w:rPr",
+      "w:CT_PPr/w:pPr",
+      "x:CT_Rst/x:si",
+      "a:CT_RegularTextRun/a:r",
+      "cx:CT_ChartSpace/cx:chartSpace",
+    ] {
+      assert!(
+        direct_other_children.contains(expected),
+        "missing {expected}"
+      );
+    }
+  }
 }

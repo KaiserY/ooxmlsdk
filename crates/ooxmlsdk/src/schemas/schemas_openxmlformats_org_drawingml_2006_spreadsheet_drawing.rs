@@ -20,7 +20,6 @@ pub enum EditAsValues {
 pub struct TwoCellAnchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Positioning and Resizing Behaviors
   #[sdk(attr(qname = ":editAs"))]
   #[sdk(string_format(kind = "token"))]

@@ -160,7 +160,10 @@ fn is_supported_document_path(path: &Path) -> bool {
 fn is_invalid(file_name: &str) -> bool {
   matches!(
     file_name,
-    "Strict01.docx" | "encrypted_pptx.pptx" | "libreoffice/word/strict-lockedcanvas.docx"
+    "Strict01.docx"
+      | "encrypted_pptx.pptx"
+      | "libreoffice/presentation/strict_ooxml.pptx"
+      | "libreoffice/word/strict-lockedcanvas.docx"
   )
 }
 
@@ -236,11 +239,12 @@ impl GeneratedFloatKind {
 }
 
 fn write_float_rules(workspace_dir: &Path, out_file: &Path) {
-  let namespace_file = workspace_dir.join("sdk_data/namespaces.json");
+  let data_dir = workspace_dir.join("data");
+  let namespace_file = data_dir.join("namespaces.json");
   println!("cargo:rerun-if-changed={}", namespace_file.display());
   let namespaces = read_namespaces(&namespace_file);
 
-  let schemas_dir = workspace_dir.join("sdk_data/schemas");
+  let schemas_dir = data_dir.join("schemas");
   println!("cargo:rerun-if-changed={}", schemas_dir.display());
 
   let mut attr_kinds = BTreeMap::new();
@@ -306,20 +310,24 @@ fn collect_schema_float_rules_from_data(
   attr_kinds: &mut BTreeMap<(String, String), GeneratedFloatKind>,
   text_kinds: &mut BTreeMap<String, GeneratedFloatKind>,
 ) {
-  let raw = fs::read_to_string(path).expect("read sdk_data schema");
-  let schema: serde_json::Value = serde_json::from_str(&raw).expect("parse sdk_data schema");
+  let raw = fs::read_to_string(path).expect("read data schema");
+  let schema: serde_json::Value = serde_json::from_str(&raw).expect("parse data schema");
   let Some(types) = schema.get("Types").and_then(serde_json::Value::as_array) else {
     return;
   };
   let type_by_name = types
     .iter()
-    .filter_map(|ty| Some((ty.get("RustName")?.as_str()?, ty)))
+    .filter_map(|ty| Some((ty.get("ClassName")?.as_str()?, ty)))
     .collect::<BTreeMap<_, _>>();
 
   for ty in types {
-    let Some(element_qname) = ty.get("XmlQName").and_then(serde_json::Value::as_str) else {
+    let Some(element_qname) = ty.get("Name").and_then(serde_json::Value::as_str) else {
       continue;
     };
+    let element_qname = element_qname.rsplit('/').next().unwrap_or(element_qname);
+    if element_qname.is_empty() {
+      continue;
+    }
     let element_name = expand_generated_qname(element_qname, namespaces, false);
     collect_type_float_attrs(ty, &type_by_name, namespaces, &element_name, attr_kinds);
     collect_type_float_text(ty, &type_by_name, &element_name, text_kinds);
@@ -333,35 +341,23 @@ fn collect_type_float_attrs(
   element_name: &str,
   attr_kinds: &mut BTreeMap<(String, String), GeneratedFloatKind>,
 ) {
-  if let Some(base_name) = ty.get("BaseRustName").and_then(serde_json::Value::as_str)
+  if let Some(base_name) = ty.get("BaseClass").and_then(serde_json::Value::as_str)
     && let Some(base_ty) = type_by_name.get(base_name)
   {
     collect_type_float_attrs(base_ty, type_by_name, namespaces, element_name, attr_kinds);
   }
 
-  let Some(members) = ty.get("Members").and_then(serde_json::Value::as_array) else {
+  let Some(attrs) = ty.get("Attributes").and_then(serde_json::Value::as_array) else {
     return;
   };
-  for member in members {
-    let Some(field) = member.get("Field") else {
-      continue;
-    };
-    let Some(type_ref) = field
-      .get("TypeRef")
-      .and_then(|type_ref| type_ref.get("RustType"))
-      .and_then(serde_json::Value::as_str)
-    else {
+  for attr in attrs {
+    let Some(type_ref) = attr.get("Type").and_then(serde_json::Value::as_str) else {
       continue;
     };
     let Some(kind) = float_kind(type_ref) else {
       continue;
     };
-    let Some(attr_qname) = field
-      .get("Wire")
-      .and_then(|wire| wire.get("Attribute"))
-      .and_then(|attr| attr.get("QName"))
-      .and_then(serde_json::Value::as_str)
-    else {
+    let Some(attr_qname) = attr.get("QName").and_then(serde_json::Value::as_str) else {
       continue;
     };
     attr_kinds.insert(
@@ -380,16 +376,30 @@ fn collect_type_float_text(
   element_name: &str,
   text_kinds: &mut BTreeMap<String, GeneratedFloatKind>,
 ) {
-  if let Some(base_name) = ty.get("BaseRustName").and_then(serde_json::Value::as_str)
+  if let Some(base_name) = ty.get("BaseClass").and_then(serde_json::Value::as_str)
     && let Some(base_ty) = type_by_name.get(base_name)
   {
     collect_type_float_text(base_ty, type_by_name, element_name, text_kinds);
   }
 
+  if !ty
+    .get("IsLeafText")
+    .and_then(serde_json::Value::as_bool)
+    .unwrap_or(false)
+  {
+    return;
+  }
   let Some(type_name) = ty
-    .get("XmlContent")
-    .and_then(|content| content.get("RustType"))
-    .and_then(serde_json::Value::as_str)
+    .get("Validators")
+    .and_then(serde_json::Value::as_array)
+    .and_then(|validators| {
+      validators.iter().find_map(|validator| {
+        if validator.get("Name").and_then(serde_json::Value::as_str) != Some("NumberValidator") {
+          return None;
+        }
+        validator.get("Type").and_then(serde_json::Value::as_str)
+      })
+    })
   else {
     return;
   };
@@ -401,8 +411,8 @@ fn collect_type_float_text(
 
 fn float_kind(type_name: &str) -> Option<GeneratedFloatKind> {
   Some(match type_name {
-    "SingleValue" => GeneratedFloatKind::Single,
-    "DoubleValue" => GeneratedFloatKind::Double,
+    "SingleValue" | "xsd:float" => GeneratedFloatKind::Single,
+    "DoubleValue" | "xsd:double" => GeneratedFloatKind::Double,
     _ => return None,
   })
 }

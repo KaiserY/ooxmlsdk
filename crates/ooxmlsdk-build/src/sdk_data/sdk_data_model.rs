@@ -101,7 +101,7 @@ pub struct SchemaType {
   pub have_xml_other_attrs: bool,
   pub have_xml_other_children: bool,
   pub have_direct_xml_other_children: bool,
-  pub parent_have_xml_other_children: bool,
+  pub parent_choice_has_any: bool,
   pub text_value_type: String,
   pub api_kind: SchemaTypeApiKind,
   pub attributes: Vec<SchemaTypeAttribute>,
@@ -137,6 +137,7 @@ pub enum SchemaTypeCompositeKind {
   OneChoice,
   OneAll,
   SdkSequence,
+  XsdRepeatableChoice,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

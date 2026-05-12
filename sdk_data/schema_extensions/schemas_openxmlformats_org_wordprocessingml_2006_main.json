@@ -27,6 +27,18 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "Font",
+      "ParentChoiceHasAny": true
+    },
+    {
+      "ClassName": "Paragraph",
+      "ParentChoiceHasAny": true
+    },
+    {
+      "ClassName": "Run",
+      "ParentChoiceHasAny": true
+    },
+    {
       "ClassName": "SpacingBetweenLines",
       "HaveXmlOtherAttrs": true
     }

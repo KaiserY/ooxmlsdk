@@ -11,6 +11,7 @@ use crate::sdk_data::{
   open_xml::{
     OpenXmlNamespace, OpenXmlPart, OpenXmlSchema, OpenXmlSchemaType, TypedNamespace, TypedSchema,
   },
+  xsd::{ParsedXsd, parse_xsd},
 };
 
 #[derive(Debug, Default)]
@@ -22,6 +23,7 @@ pub struct Context {
   pub type_name_module_name_map: HashMap<String, String>,
   pub namespace_uri_prefix_map: HashMap<String, String>,
   pub prefix_typed_namespace_map: HashMap<String, String>,
+  pub(crate) xsd_schemas: HashMap<String, ParsedXsd>,
 }
 
 impl Context {
@@ -29,6 +31,14 @@ impl Context {
     let data_parts_dir_path = data_dir.join("parts");
     let data_schemas_dir_path = data_dir.join("schemas");
     let data_typed_dir_path = data_dir.join("typed");
+    let xsd_dir_path = data_dir
+      .parent()
+      .map(|root| {
+        root
+          .join("schemas")
+          .join("OfficeOpenXML-XMLSchema-Transitional")
+      })
+      .unwrap_or_default();
 
     let mut parts: Vec<OpenXmlPart> = vec![];
     let mut schemas: Vec<OpenXmlSchema> = vec![];
@@ -82,6 +92,24 @@ impl Context {
           })
           .collect(),
       );
+    }
+
+    let mut xsd_schemas = HashMap::new();
+    if xsd_dir_path.exists() {
+      for entry in fs::read_dir(&xsd_dir_path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("xsd") {
+          continue;
+        }
+
+        let source = fs::read_to_string(&path)?;
+        let xsd =
+          parse_xsd(&source).map_err(|err| format!("parse XSD {}: {err}", path.display()))?;
+        if !xsd.target_namespace.is_empty() {
+          xsd_schemas.insert(xsd.target_namespace.clone(), xsd);
+        }
+      }
     }
 
     let namespaces: Vec<OpenXmlNamespace> =
@@ -179,6 +207,7 @@ impl Context {
       type_name_module_name_map,
       namespace_uri_prefix_map,
       prefix_typed_namespace_map,
+      xsd_schemas,
     })
   }
 }

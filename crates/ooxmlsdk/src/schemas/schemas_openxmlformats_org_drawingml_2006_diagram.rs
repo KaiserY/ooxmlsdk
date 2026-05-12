@@ -891,7 +891,6 @@ pub struct ColorsDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Unique ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -978,7 +977,6 @@ pub struct LayoutDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// uniqueId
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,
@@ -1074,7 +1072,6 @@ pub struct StyleDefinition {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Unique Style ID
   #[sdk(attr(qname = ":uniqueId"))]
   pub unique_id: Option<crate::simple_type::StringValue>,

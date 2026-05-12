@@ -50,6 +50,58 @@ fn deserialize_type_inner_ident(mode: DeserializeMode) -> Ident {
   mode.deserialize_inner_ident()
 }
 
+fn is_local_name_dispatch_namespace(prefix: &str) -> bool {
+  matches!(prefix, "x14" | "xne")
+}
+
+fn should_match_text_child_end_by_local_name(qname: &str, use_local_name_dispatch: bool) -> bool {
+  let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
+  use_local_name_dispatch && is_local_name_dispatch_namespace(&tag_prefix)
+}
+
+fn dispatch_field_qname_local_name(qname: &str) -> Option<String> {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  if tag_prefix.is_empty() || !is_local_name_dispatch_namespace(&tag_prefix) {
+    return None;
+  }
+  Some(local_name)
+}
+
+fn has_unique_local_name_dispatch<I>(qnames: I) -> bool
+where
+  I: IntoIterator,
+  I::Item: AsRef<str>,
+{
+  let mut seen = std::collections::HashSet::new();
+  for qname in qnames {
+    let Some(local_name) = dispatch_field_qname_local_name(qname.as_ref()) else {
+      return false;
+    };
+    if !seen.insert(local_name) {
+      return false;
+    }
+  }
+  true
+}
+
+fn should_use_local_name_child_dispatch(
+  schema_qname: &str,
+  child_qnames: impl IntoIterator<Item = String>,
+  has_choice_dispatch: bool,
+  has_any_dispatch: bool,
+) -> bool {
+  let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
+  if !is_local_name_dispatch_namespace(&tag_prefix) || has_choice_dispatch || has_any_dispatch {
+    return false;
+  }
+
+  let child_qnames = child_qnames.into_iter().collect::<Vec<_>>();
+  !child_qnames.is_empty() && has_unique_local_name_dispatch(child_qnames)
+}
+
 fn qname_match_targets(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
   let mut seen = std::collections::HashSet::new();
   let mut targets = Vec::new();
@@ -632,12 +684,19 @@ fn number_range_f64_literal(value: &str) -> proc_macro2::TokenStream {
 }
 
 fn text_child_match_target(qname: &str) -> proc_macro2::TokenStream {
+  text_child_match_target_with_local_name_dispatch(qname, false)
+}
+
+fn text_child_match_target_with_local_name_dispatch(
+  qname: &str,
+  use_local_name_dispatch: bool,
+) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-  if tag_prefix.is_empty() {
+  if use_local_name_dispatch || tag_prefix.is_empty() {
     quote! { #local_name_lit }
   } else {
     let tag_qname_lit = LitByteStr::new(
@@ -648,25 +707,37 @@ fn text_child_match_target(qname: &str) -> proc_macro2::TokenStream {
   }
 }
 
+struct TextChildParseArmOptions {
+  repeated: bool,
+  as_result: bool,
+  use_local_name_dispatch: bool,
+}
+
 fn build_text_child_parse_arm(
   owner_ident: &Ident,
   field_ident: &Ident,
   qname: &str,
   field_ty: &Type,
-  repeated: bool,
-  as_result: bool,
   xml_child_slot_assign: proc_macro2::TokenStream,
+  options: TextChildParseArmOptions,
 ) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
-  let target = text_child_match_target(qname);
+  let target =
+    text_child_match_target_with_local_name_dispatch(qname, options.use_local_name_dispatch);
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   let tag_qname_lit = LitByteStr::new(
     format!("{tag_prefix}:{local_name}").as_bytes(),
     Span::call_site(),
   );
+  let end_match_tokens =
+    if should_match_text_child_end_by_local_name(qname, options.use_local_name_dispatch) {
+      quote! { end.local_name().as_ref() == #local_name_lit }
+    } else {
+      quote! { end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit }
+    };
   let value_ty = unwrap_option_vec_type(field_ty);
   let parse_from_text_tokens = if is_string_like_type(&value_ty) {
     quote! { text.unwrap_or_default() }
@@ -691,12 +762,12 @@ fn build_text_child_parse_arm(
       )?
     }
   };
-  let assign_tokens = if repeated {
+  let assign_tokens = if options.repeated {
     quote! { #field_ident.push(parsed_child); }
   } else {
     quote! { #field_ident = Some(parsed_child); }
   };
-  let finish_tokens = if as_result {
+  let finish_tokens = if options.as_result {
     quote! { Ok(true) }
   } else {
     quote! { true }
@@ -722,7 +793,7 @@ fn build_text_child_parse_arm(
               )?;
             }
             quick_xml::events::Event::End(end) => {
-              if end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit {
+              if #end_match_tokens {
                 break;
               }
             }
@@ -1375,9 +1446,12 @@ fn expand_sequence_helper_struct(
           field_ident,
           &qname,
           &field.ty,
-          contains_vec_type(&field.ty),
-          false,
           quote! {},
+          TextChildParseArmOptions {
+            repeated: contains_vec_type(&field.ty),
+            as_result: false,
+            use_local_name_dispatch: false,
+          },
         );
         let text_child_dispatch = quote! {
           if matches!(event_name, #match_target) {
@@ -2537,9 +2611,12 @@ fn expand_helper_struct(
       field_ident,
       &field.qname,
       &field.ty,
-      field.repeated,
-      false,
       quote! {},
+      TextChildParseArmOptions {
+        repeated: field.repeated,
+        as_result: false,
+        use_local_name_dispatch: false,
+      },
     );
     child_parse_tokens_borrowed.push(parse_arm.clone());
     child_parse_tokens_io.push(parse_arm);
@@ -2548,9 +2625,12 @@ fn expand_helper_struct(
       field_ident,
       &field.qname,
       &field.ty,
-      field.repeated,
-      true,
       quote! {},
+      TextChildParseArmOptions {
+        repeated: field.repeated,
+        as_result: true,
+        use_local_name_dispatch: false,
+      },
     );
     child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
     child_visit_parse_tokens_io.push(visit_parse_arm);
@@ -3165,6 +3245,21 @@ fn expand_named_struct(
   let has_xml_header_field = xml_header_field.is_some();
   let has_xml_other_attrs_field = xml_other_attrs_field.is_some();
   let has_xml_other_children_field = xml_other_children_field.is_some();
+  let use_canonical_xmlns_prefix = has_xmlns_fields && {
+    let QNameInfo { tag_prefix, .. } = parse_qname_info(schema_qname);
+    is_local_name_dispatch_namespace(&tag_prefix)
+  };
+  let use_local_name_child_dispatch = should_use_local_name_child_dispatch(
+    schema_qname,
+    child_fields
+      .iter()
+      .map(|field| field.qname.clone())
+      .chain(empty_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(text_child_fields.iter().map(|field| field.qname.clone()))
+      .chain(any_child_fields.iter().map(|field| field.qname.clone())),
+    !choice_fields.is_empty(),
+    !any_fields.is_empty(),
+  );
 
   let mut xml_child_slot_by_field = std::collections::HashMap::<String, usize>::new();
   let mut xml_child_slot_count = 0usize;
@@ -3543,7 +3638,7 @@ fn expand_named_struct(
     let is_generic_child = field.qname.is_empty();
     let target = if is_generic_child {
       quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
-    } else if tag_prefix.is_empty() {
+    } else if use_local_name_child_dispatch || tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
       let tag_qname_lit = LitByteStr::new(
@@ -3847,7 +3942,7 @@ fn expand_named_struct(
       local_name,
     } = parse_qname_info(&field.qname);
     let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
-    let target = if tag_prefix.is_empty() {
+    let target = if use_local_name_child_dispatch || tag_prefix.is_empty() {
       quote! { #local_name_lit }
     } else {
       let tag_qname_lit = LitByteStr::new(
@@ -4008,9 +4103,12 @@ fn expand_named_struct(
       field_ident,
       &field.qname,
       &field.ty,
-      field.repeated,
-      false,
       xml_child_slot_assign.clone(),
+      TextChildParseArmOptions {
+        repeated: field.repeated,
+        as_result: false,
+        use_local_name_dispatch: use_local_name_child_dispatch,
+      },
     );
     child_parse_tokens_borrowed.push(parse_arm.clone());
     child_parse_tokens_io.push(parse_arm);
@@ -4019,9 +4117,12 @@ fn expand_named_struct(
       field_ident,
       &field.qname,
       &field.ty,
-      field.repeated,
-      true,
       xml_child_slot_assign,
+      TextChildParseArmOptions {
+        repeated: field.repeated,
+        as_result: true,
+        use_local_name_dispatch: use_local_name_child_dispatch,
+      },
     );
     child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
     child_visit_parse_tokens_io.push(visit_parse_arm);
@@ -5745,6 +5846,17 @@ fn expand_named_struct(
       crate::common::IoTagEvent::Decl(_) => None,
     }
   };
+  let child_event_name_tokens = if use_local_name_child_dispatch {
+    quote! {
+      let event_name = e.local_name();
+      let event_name = event_name.as_ref();
+    }
+  } else {
+    quote! {
+      let event_name = e.name();
+      let event_name = event_name.as_ref();
+    }
+  };
   let borrowed_children_text_loop_tokens = quote! {
     if !empty_tag {
       loop {
@@ -5752,15 +5864,13 @@ fn expand_named_struct(
           #borrowed_decl_event_tokens
           quick_xml::events::Event::Start(e) => {
             let next_empty = false;
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
           quick_xml::events::Event::Empty(e) => {
             let next_empty = true;
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
@@ -5784,8 +5894,7 @@ fn expand_named_struct(
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_borrowed
           crate::common::SliceTagEvent::Start(e, next_empty) => {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_borrowed
             #unmatched_child_tokens_borrowed
           }
@@ -5825,16 +5934,14 @@ fn expand_named_struct(
           quick_xml::events::Event::Start(e) => {
             let e = e.into_owned();
             let next_empty = false;
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
           quick_xml::events::Event::Empty(e) => {
             let e = e.into_owned();
             let next_empty = true;
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -5858,8 +5965,7 @@ fn expand_named_struct(
         match xml_reader.next_tag_event()? {
           #tag_decl_tokens_io
           crate::common::IoTagEvent::Start(e, next_empty) => {
-            let event_name = e.name();
-            let event_name = event_name.as_ref();
+            #child_event_name_tokens
             #child_choice_dispatch_tokens_io
             #unmatched_child_tokens_io
           }
@@ -5892,7 +5998,22 @@ fn expand_named_struct(
     }
   };
 
-  let special_namespace_write_tokens = if has_xmlns_fields {
+  let special_namespace_write_tokens = if use_canonical_xmlns_prefix {
+    quote! {
+      for declaration in &self.xmlns {
+        let prefix = crate::common::canonical_xmlns_prefix(
+          declaration.prefix.as_ref(),
+          declaration.uri.as_ref(),
+        );
+        let prefix = if declaration.is_default() {
+          None
+        } else {
+          Some(prefix)
+        };
+        crate::common::write_xmlns_attr(writer, prefix, declaration.uri.as_ref())?;
+      }
+    }
+  } else if has_xmlns_fields {
     quote! {
       for declaration in &self.xmlns {
         let prefix = if declaration.is_default() {

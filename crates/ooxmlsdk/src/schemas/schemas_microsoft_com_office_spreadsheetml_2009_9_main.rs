@@ -876,6 +876,7 @@ pub struct SlicerCacheDefinition {
   qname = "x14:CT_ConditionalFormatting/x14:conditionalFormatting"
 )]
 pub struct ConditionalFormatting {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// pivot
   #[sdk(attr(office2010, qname = ":pivot"))]
   pub pivot: Option<crate::simple_type::BooleanValue>,

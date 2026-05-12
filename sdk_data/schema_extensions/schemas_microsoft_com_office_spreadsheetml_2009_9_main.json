@@ -1,6 +1,10 @@
 {
   "Types": [
     {
+      "ClassName": "ConditionalFormatting",
+      "HaveXmlnsFields": true
+    },
+    {
       "ClassName": "DataValidations",
       "HaveXmlnsFields": true
     }

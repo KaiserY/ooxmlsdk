@@ -163,4 +163,5 @@ When updating docs, start with checked-in repository docs before browsing:
 - Keep commit subjects short, imperative, and scoped.
 - Base commit messages on repository state, not the latest chat turn.
 - Inspect `git status --short`, `git diff --stat`, and relevant diffs before writing a message.
-- Do not create a commit unless explicitly asked.
+- Do not run `git add`, `git commit`, `git commit --amend`, or other git index/history update commands. The user creates commits.
+- When the user asks whether changes can be committed, report the verification status and provide a suggested commit message instead of staging or committing.

@@ -77,6 +77,14 @@ pub fn find_xmlns_uri<'a>(declarations: &'a [XmlNamespaceDecl], prefix: &str) ->
     .map(|declaration| declaration.uri.as_ref())
 }
 
+#[inline]
+pub(crate) fn canonical_xmlns_prefix<'a>(prefix: &'a str, uri: &str) -> &'a str {
+  match uri {
+    "http://schemas.microsoft.com/office/excel/2006/main" => "xne",
+    _ => prefix,
+  }
+}
+
 #[inline(always)]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,

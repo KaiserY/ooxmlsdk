@@ -1,0 +1,8 @@
+{
+  "Types": [
+    {
+      "ClassName": "Style",
+      "ParentChoiceHasAnyIn": ["ChartSpace"]
+    }
+  ]
+}

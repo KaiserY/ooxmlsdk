@@ -199,7 +199,8 @@ pub struct Run {
     qname = "w:CT_Drawing/w:drawing",
     qname = "w:CT_PTab/w:ptab",
     qname = "w:CT_Empty/w:lastRenderedPageBreak",
-    qname = "m:CT_Text/m:t"
+    qname = "m:CT_Text/m:t",
+    any
   ))]
   pub run_choice: Vec<RunChoice>,
 }
@@ -493,7 +494,8 @@ pub struct Paragraph {
     qname = "w:CT_ContentPart/w:contentPart",
     qname = "w:CT_RunTrackChange/w14:conflictIns",
     qname = "w:CT_RunTrackChange/w14:conflictDel",
-    qname = "w:CT_R/w:r"
+    qname = "w:CT_R/w:r",
+    any
   ))]
   pub paragraph_choice: Vec<ParagraphChoice>,
 }
@@ -2213,6 +2215,9 @@ pub enum RunChoice {
   /// Text.
   #[sdk(child(qname = "m:CT_Text/m:t"))]
   MT(std::boxed::Box<Text>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice2 {
@@ -2339,6 +2344,9 @@ pub enum ParagraphChoice {
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::w::Run>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice2 {

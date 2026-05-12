@@ -43,7 +43,7 @@ pub struct SchemaTypeExtension {
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
-  pub parent_choice_has_any: Option<bool>,
+  pub parent_choice_has_any_in: Option<Vec<String>>,
   pub children: Vec<SchemaTypeChildExtension>,
 }
 
@@ -168,8 +168,8 @@ pub fn apply_schema_extensions(
       if let Some(have_direct_xml_other_children) = extension.have_direct_xml_other_children {
         schema_type.have_direct_xml_other_children = have_direct_xml_other_children;
       }
-      if let Some(parent_choice_has_any) = extension.parent_choice_has_any {
-        schema_type.parent_choice_has_any = parent_choice_has_any;
+      if let Some(parent_choice_has_any_in) = &extension.parent_choice_has_any_in {
+        schema_type.parent_choice_has_any_in = parent_choice_has_any_in.clone();
       }
 
       for child_extension in &extension.children {
@@ -269,7 +269,7 @@ mod tests {
         types: vec![SchemaTypeExtension {
           class_name: "Parent".to_string(),
           have_direct_xml_other_children: Some(true),
-          parent_choice_has_any: Some(true),
+          parent_choice_has_any_in: Some(vec!["ParentContainer".to_string()]),
           children: vec![SchemaTypeChildExtension {
             property_name: "Child".to_string(),
             optional: Some(true),
@@ -285,7 +285,10 @@ mod tests {
 
     assert!(schemas[0].types[0].children[0].optional);
     assert!(schemas[0].types[0].have_direct_xml_other_children);
-    assert!(schemas[0].types[0].parent_choice_has_any);
+    assert_eq!(
+      schemas[0].types[0].parent_choice_has_any_in,
+      vec!["ParentContainer".to_string()]
+    );
   }
 
   #[test]

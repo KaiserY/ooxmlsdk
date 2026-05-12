@@ -110,7 +110,7 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
     types.extend(extra_types);
   }
 
-  apply_parent_choice_has_any_rewrites(&mut types, schema);
+  apply_parent_choice_has_any_rewrites(&mut types, schema, context);
   dedupe_helper_struct_types(&mut types)?;
   inline_safe_pure_child_choice_payloads(&mut types);
   populate_content_structures(&mut types, schema, context)?;
@@ -887,34 +887,40 @@ fn build_type_decl(
   ))
 }
 
-fn apply_parent_choice_has_any_rewrites(types: &mut Vec<TypeDecl>, schema: &Schema) {
-  for child_schema_type in &schema.types {
-    if !child_schema_type.parent_choice_has_any {
+fn apply_parent_choice_has_any_rewrites(
+  types: &mut Vec<TypeDecl>,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) {
+  for parent_schema_type in &schema.types {
+    let child_schema_types =
+      context.types_with_parent_choice_has_any_in(parent_schema_type.class_name.as_str());
+    if child_schema_types.is_empty() {
       continue;
     }
 
-    for parent_schema_type in &schema.types {
-      if !parent_choice_target_contains_child(parent_schema_type, child_schema_type.name.as_str()) {
-        continue;
-      }
+    if !child_schema_types.iter().any(|child_schema_type| {
+      parent_choice_target_contains_child(parent_schema_type, child_schema_type.name.as_str())
+    }) {
+      continue;
+    }
 
-      let Some(parent_index) = types
-        .iter()
-        .position(|type_decl| type_decl.rust_name == parent_schema_type.class_name)
-      else {
-        continue;
-      };
+    let Some(parent_index) = types
+      .iter()
+      .position(|type_decl| type_decl.rust_name == parent_schema_type.class_name)
+    else {
+      continue;
+    };
 
-      let mut members = std::mem::take(&mut types[parent_index].members);
-      let rewrote_parent = route_parent_choice_has_any(parent_schema_type, &mut members, types);
-      types[parent_index].members = members;
-      if rewrote_parent {
-        types[parent_index].content_model = refresh_type_content_model_after_parent_choice_rewrite(
-          parent_schema_type,
-          &types[parent_index].members,
-          types[parent_index].xml_content.as_ref(),
-        );
-      }
+    let mut members = std::mem::take(&mut types[parent_index].members);
+    let rewrote_parent = route_parent_choice_has_any(parent_schema_type, &mut members, types);
+    types[parent_index].members = members;
+    if rewrote_parent {
+      types[parent_index].content_model = refresh_type_content_model_after_parent_choice_rewrite(
+        parent_schema_type,
+        &types[parent_index].members,
+        types[parent_index].xml_content.as_ref(),
+      );
     }
   }
 }
@@ -929,12 +935,14 @@ fn refresh_type_content_model_after_parent_choice_rewrite(
 
 fn parent_choice_target_contains_child(schema_type: &SchemaType, child_name: &str) -> bool {
   let content_children = top_level_content_children(schema_type);
-  let repeated_choice_targets = content_children
+  let choice_targets = content_children
     .iter()
-    .filter(|child| child.kind == SchemaTypeChildKind::Choice && child.repeated)
+    .filter(|child| {
+      child.kind == SchemaTypeChildKind::Choice && schema_child_contains_name(child, child_name)
+    })
     .collect::<Vec<_>>();
-  if repeated_choice_targets.len() == 1 {
-    return schema_child_contains_name(repeated_choice_targets[0], child_name);
+  if choice_targets.len() == 1 {
+    return true;
   }
 
   content_children.len() == 1
@@ -959,23 +967,18 @@ fn route_parent_choice_has_any(
   members: &mut Vec<MemberDecl>,
   all_types: &mut Vec<TypeDecl>,
 ) -> bool {
-  add_xml_other_variant_to_single_repeated_choice(members, all_types.as_mut_slice())
+  add_xml_other_variant_to_single_choice(members, all_types.as_mut_slice())
     || promote_single_repeated_child_to_xml_other_choice(schema_type, members, all_types)
 }
 
-fn add_xml_other_variant_to_single_repeated_choice(
+fn add_xml_other_variant_to_single_choice(
   members: &[MemberDecl],
   extra_types: &mut [TypeDecl],
 ) -> bool {
   let choice_fields = members
     .iter()
     .filter_map(|member| match member {
-      MemberDecl::Field(field)
-        if matches!(field.wire, FieldWireDecl::Choice)
-          && field.cardinality == Cardinality::Many =>
-      {
-        Some(field)
-      }
+      MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
       _ => None,
     })
     .collect::<Vec<_>>();
@@ -4667,7 +4670,19 @@ mod tests {
           name: "t:CT_Leaf/t:leaf".to_string(),
           class_name: "Leaf".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          parent_choice_has_any: true,
+          parent_choice_has_any_in: vec!["Parent".to_string()],
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+          class_name: "OtherLeaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+          class_name: "OtherLeaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
           ..Default::default()
         },
         SchemaType {
@@ -4678,12 +4693,20 @@ mod tests {
             particle_id: String::new(),
             kind: SchemaTypeChildKind::Choice,
             repeated: true,
-            children: vec![SchemaTypeChild {
-              particle_id: String::new(),
-              name: "t:CT_Leaf/t:leaf".to_string(),
-              kind: SchemaTypeChildKind::Child,
-              ..Default::default()
-            }],
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_Leaf/t:leaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+            ],
             ..Default::default()
           }],
           ..Default::default()
@@ -4694,6 +4717,249 @@ mod tests {
     let context = CodegenContext::new(std::slice::from_ref(&schema));
 
     let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParentChoice")
+      .unwrap();
+    assert!(choice.members.iter().any(|member| {
+      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
+    }));
+  }
+
+  #[test]
+  fn parent_choice_has_any_in_ignores_unlisted_parent_choice_enum() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Leaf/t:leaf".to_string(),
+          class_name: "Leaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          parent_choice_has_any_in: vec!["Parent".to_string()],
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+          class_name: "OtherLeaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Parent/t:parent".to_string(),
+          class_name: "Parent".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            kind: SchemaTypeChildKind::Choice,
+            repeated: true,
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_Leaf/t:leaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_OtherParent/t:otherParent".to_string(),
+          class_name: "OtherParent".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            kind: SchemaTypeChildKind::Choice,
+            repeated: true,
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_Leaf/t:leaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let parent_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "ParentChoice")
+      .unwrap();
+    assert!(parent_choice.members.iter().any(|member| {
+      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
+    }));
+
+    let other_parent = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "OtherParent")
+      .unwrap();
+    let other_parent_choice_name = other_parent
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => {
+          Some(field.type_ref.rust_type.as_str())
+        }
+        _ => None,
+      })
+      .unwrap();
+    let other_parent_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == other_parent_choice_name)
+      .unwrap();
+    assert!(!other_parent_choice.members.iter().any(|member| {
+      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
+    }));
+  }
+
+  #[test]
+  fn parent_choice_has_any_in_adds_xml_any_to_single_parent_choice_enum() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Leaf/t:leaf".to_string(),
+          class_name: "Leaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          parent_choice_has_any_in: vec!["Parent".to_string()],
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+          class_name: "OtherLeaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Parent/t:parent".to_string(),
+          class_name: "Parent".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            kind: SchemaTypeChildKind::Choice,
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_Leaf/t:leaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
+    let field = parent
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(field.cardinality, Cardinality::Optional);
+
+    let choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == field.type_ref.rust_type)
+      .unwrap();
+    assert!(choice.members.iter().any(|member| {
+      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
+    }));
+  }
+
+  #[test]
+  fn parent_choice_has_any_in_matches_child_from_another_schema() {
+    let child_schema = Schema {
+      module_name: "child_module".to_string(),
+      target_namespace: "urn:child".to_string(),
+      prefix: "c".to_string(),
+      typed_namespace: "Child.Namespace".to_string(),
+      types: vec![SchemaType {
+        name: "c:CT_Leaf/c:leaf".to_string(),
+        class_name: "Leaf".to_string(),
+        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+        parent_choice_has_any_in: vec!["Parent".to_string()],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let parent_schema = Schema {
+      module_name: "parent_module".to_string(),
+      target_namespace: "urn:parent".to_string(),
+      prefix: "p".to_string(),
+      typed_namespace: "Parent.Namespace".to_string(),
+      types: vec![SchemaType {
+        name: "p:CT_Parent/p:parent".to_string(),
+        class_name: "Parent".to_string(),
+        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+        children: vec![SchemaTypeChild {
+          particle_id: String::new(),
+          kind: SchemaTypeChildKind::Choice,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            name: "c:CT_Leaf/c:leaf".to_string(),
+            kind: SchemaTypeChildKind::Child,
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let schemas = vec![parent_schema, child_schema];
+    let context = CodegenContext::new(&schemas);
+
+    let ir = build_codegen_ir(&schemas[0], &context).unwrap();
 
     let choice = ir
       .types
@@ -4717,7 +4983,7 @@ mod tests {
           name: "t:CT_Leaf/t:leaf".to_string(),
           class_name: "Leaf".to_string(),
           kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          parent_choice_has_any: true,
+          parent_choice_has_any_in: vec!["Parent".to_string()],
           ..Default::default()
         },
         SchemaType {

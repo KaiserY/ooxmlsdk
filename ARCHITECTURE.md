@@ -136,29 +136,31 @@ the current element's own direct-child storage. Do not use it for
 `mc:AlternateContent` that wraps an otherwise known child inside a repeated
 choice stream.
 
-`ParentChoiceHasAny` is scoped through references to the current type. It means
-that when the current type appears as a member of a parent repeated choice or
-single repeated child stream, the parent stream must accept raw XML as another
-ordered item. In generated Rust this either adds `XmlAny` to the parent's
-existing `Vec<ChoiceEnum>` field or promotes a single `Vec<Child>` field into a
+`ParentChoiceHasAnyIn` is scoped through references to the current type and a
+small explicit parent-class allowlist. It means that when the current type
+appears as a member of one of those parent repeated choice or single repeated
+child streams, the parent stream must accept raw XML as another ordered item. In
+generated Rust this either adds `XmlAny` to the parent's existing
+`Vec<ChoiceEnum>` field or promotes a single `Vec<Child>` field into a
 `Vec<ParentChoice>` field with both the child variant and `XmlAny`.
 
-For example, if `w:CT_Font/w:font` has `ParentChoiceHasAny`, then
-`w:CT_FontsList/w:fonts` can be generated as:
+For example, if `w:CT_Font/w:font` has
+`"ParentChoiceHasAnyIn": ["Fonts"]`, then `w:CT_FontsList/w:fonts` can be
+generated as:
 
 ```rust
 #[sdk(choice(qname = "w:CT_Font/w:font", any))]
 pub xml_children: Vec<FontsChoice>,
 ```
 
-Use `ParentChoiceHasAny` when an MCE wrapper, such as `mc:AlternateContent`, is
-observed in a parent where the wrapped payload is the marked child type. The
-mark belongs on the wrapped child type, not on the parent. This preserves order
-inside the parent child stream without adding a separate `xml_other_children`
-field to the parent.
+Use `ParentChoiceHasAnyIn` when an MCE wrapper, such as `mc:AlternateContent`,
+is observed in a specific parent where the wrapped payload is the marked child
+type. The mark belongs on the wrapped child type and must list the parent class
+that needs the raw XML choice item. This preserves order inside the parent child
+stream without adding a separate `xml_other_children` field to the parent.
 
 Do not add alternate parent-level raw-child fields for this path. MCE wrappers
-inside parent child streams should use `ParentChoiceHasAny`.
+inside parent child streams should use `ParentChoiceHasAnyIn`.
 
 ## Feature Model
 

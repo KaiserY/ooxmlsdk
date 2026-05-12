@@ -210,7 +210,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
             have_xml_other_attrs,
             have_xml_other_children,
             have_direct_xml_other_children,
-            parent_choice_has_any: false,
+            parent_choice_has_any_in: Vec::new(),
             text_value_type: String::new(),
             api_kind: resolve_api_kind(ty, &type_map),
             attributes: ty

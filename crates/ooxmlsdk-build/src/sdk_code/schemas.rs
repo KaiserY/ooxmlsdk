@@ -373,6 +373,26 @@ impl<'a> CodegenContext<'a> {
     self.type_class_name_map.get(class_name).copied()
   }
 
+  pub fn types_with_parent_choice_has_any_in(
+    &self,
+    parent_class_name: &str,
+  ) -> Vec<&'a SchemaType> {
+    let mut seen = HashSet::new();
+    self
+      .type_map
+      .values()
+      .copied()
+      .filter(|schema_type| {
+        !schema_type.parent_choice_has_any_in.is_empty()
+          && schema_type
+            .parent_choice_has_any_in
+            .iter()
+            .any(|class_name| class_name == parent_class_name)
+          && seen.insert(schema_type.name.as_str())
+      })
+      .collect()
+  }
+
   pub fn derived_base_type(&self, schema_type: &SchemaType) -> Option<&'a SchemaType> {
     let base_type_name = schema_type
       .name

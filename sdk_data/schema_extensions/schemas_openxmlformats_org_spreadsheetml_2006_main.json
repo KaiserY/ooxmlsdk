@@ -1,0 +1,16 @@
+{
+  "Types": [
+    {
+      "ClassName": "Control",
+      "ParentChoiceHasAnyIn": ["Controls"]
+    },
+    {
+      "ClassName": "Workbook",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "Worksheet",
+      "HaveDirectXmlOtherChildren": true
+    }
+  ]
+}

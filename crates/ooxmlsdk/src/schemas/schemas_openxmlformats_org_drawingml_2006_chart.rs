@@ -1399,7 +1399,7 @@ pub struct ChartSpace {
   /// Defines the RoundedCorners Class.
   #[sdk(child(qname = "c:CT_Boolean/c:roundedCorners"))]
   pub rounded_corners: Option<RoundedCorners>,
-  #[sdk(choice(qname = "c14:CT_Style/c14:style", qname = "c:CT_Style/c:style"))]
+  #[sdk(choice(qname = "c14:CT_Style/c14:style", qname = "c:CT_Style/c:style", any))]
   pub chart_space_choice: Option<ChartSpaceChoice>,
   /// Defines the ColorMapOverride Class.
   #[sdk(child(qname = "a:CT_ColorMapping/c:clrMapOvr"))]
@@ -4770,6 +4770,9 @@ pub enum ChartSpaceChoice {
   C14Style(std::boxed::Box<crate::schemas::c14::Style>),
   #[sdk(child(qname = "c:CT_Style/c:style"))]
   CStyle(std::boxed::Box<Style>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UserShapesChoice {

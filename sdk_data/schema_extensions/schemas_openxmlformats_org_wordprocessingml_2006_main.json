@@ -28,15 +28,19 @@
     },
     {
       "ClassName": "Font",
-      "ParentChoiceHasAny": true
+      "ParentChoiceHasAnyIn": ["Fonts"]
     },
     {
       "ClassName": "Paragraph",
-      "ParentChoiceHasAny": true
+      "ParentChoiceHasAnyIn": ["Body"]
     },
     {
       "ClassName": "Run",
-      "ParentChoiceHasAny": true
+      "ParentChoiceHasAnyIn": ["Paragraph"]
+    },
+    {
+      "ClassName": "Drawing",
+      "ParentChoiceHasAnyIn": ["Run"]
     },
     {
       "ClassName": "SpacingBetweenLines",

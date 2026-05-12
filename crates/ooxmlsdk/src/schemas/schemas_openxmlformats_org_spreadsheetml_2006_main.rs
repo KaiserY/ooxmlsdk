@@ -2202,6 +2202,7 @@ pub struct Worksheet {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Sheet Properties.
   #[sdk(child(qname = "x:CT_SheetPr/x:sheetPr"))]
   pub sheet_properties: Option<std::boxed::Box<SheetProperties>>,
@@ -2631,6 +2632,7 @@ pub struct Workbook {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// conformance
   #[sdk(attr(qname = ":conformance"))]
   pub conformance: Option<ConformanceClass>,
@@ -9020,9 +9022,8 @@ pub struct OleObjects {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Controls/x:controls")]
 pub struct Controls {
-  /// Embedded Control.
-  #[sdk(child(qname = "x:CT_Control/x:control"))]
-  pub x_control: Vec<Control>,
+  #[sdk(choice(qname = "x:CT_Control/x:control", any))]
+  pub xml_children: Vec<ControlsChoice>,
 }
 /// Macro Sheet Dimensions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11656,6 +11657,15 @@ pub enum WorkbookExtensionChoice {
   Xlecs2ExternalCodeServiceImageAsInput(
     std::boxed::Box<crate::schemas::xlecs2::ExternalCodeServiceImageAsInput>,
   ),
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum ControlsChoice {
+  /// Embedded Control.
+  #[sdk(child(qname = "x:CT_Control/x:control"))]
+  XControl(std::boxed::Box<Control>),
+  /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
 }

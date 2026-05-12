@@ -1113,6 +1113,7 @@ pub struct Slide {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1145,6 +1146,7 @@ pub struct SlideLayout {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Show Master Shapes
   #[sdk(attr(qname = ":showMasterSp"))]
   pub show_master_shapes: Option<crate::simple_type::BooleanValue>,
@@ -1190,6 +1192,7 @@ pub struct SlideMaster {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_header: crate::common::XmlHeaderType,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// preserve
   #[sdk(attr(qname = ":preserve"))]
   pub preserve: Option<crate::simple_type::BooleanValue>,
@@ -3728,7 +3731,8 @@ pub struct ShapeTree {
     qname = "p:CT_GraphicalObjectFrame/p:graphicFrame",
     qname = "p:CT_Connector/p:cxnSp",
     qname = "p:CT_Picture/p:pic",
-    qname = "p:CT_ContentPart/p:contentPart"
+    qname = "p:CT_ContentPart/p:contentPart",
+    any
   ))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the ExtensionListWithModification Class.
@@ -3775,9 +3779,8 @@ pub struct CustomerDataList {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_ControlList/p:controls")]
 pub struct ControlList {
-  /// Embedded Control.
-  #[sdk(child(qname = "p:CT_Control/p:control"))]
-  pub p_control: Vec<Control>,
+  #[sdk(choice(qname = "p:CT_Control/p:control", any))]
+  pub xml_children: Vec<ControlListChoice>,
 }
 /// Defines the CommonSlideDataExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5294,6 +5297,9 @@ pub enum ShapeTreeChoice {
   PPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
@@ -5631,4 +5637,13 @@ pub enum SoundActionChoice {
   /// Stop Sound Action.
   #[sdk(empty_child(qname = "p:CT_Empty/p:endSnd"))]
   PEndSnd,
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum ControlListChoice {
+  /// Embedded Control.
+  #[sdk(child(qname = "p:CT_Control/p:control"))]
+  PControl(std::boxed::Box<Control>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }

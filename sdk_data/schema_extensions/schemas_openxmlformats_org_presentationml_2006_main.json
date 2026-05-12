@@ -1,6 +1,26 @@
 {
   "Types": [
     {
+      "ClassName": "Shape",
+      "ParentChoiceHasAnyIn": ["ShapeTree"]
+    },
+    {
+      "ClassName": "Control",
+      "ParentChoiceHasAnyIn": ["ControlList"]
+    },
+    {
+      "ClassName": "Slide",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "SlideMaster",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "SlideLayout",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "SlideMasterExtensionList",
       "HaveXmlOtherAttrs": true
     }

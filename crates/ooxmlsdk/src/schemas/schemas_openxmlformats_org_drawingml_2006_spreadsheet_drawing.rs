@@ -36,7 +36,8 @@ pub struct TwoCellAnchor {
     qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame",
     qname = "xdr:CT_Connector/xdr:cxnSp",
     qname = "xdr:CT_Picture/xdr:pic",
-    qname = "xdr14:CT_ContentPart/xdr:contentPart"
+    qname = "xdr14:CT_ContentPart/xdr:contentPart",
+    any
   ))]
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// Client Data.
@@ -250,7 +251,8 @@ pub struct WorksheetDrawing {
   #[sdk(choice(
     qname = "xdr:CT_TwoCellAnchor/xdr:twoCellAnchor",
     qname = "xdr:CT_OneCellAnchor/xdr:oneCellAnchor",
-    qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor"
+    qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor",
+    any
   ))]
   pub worksheet_drawing_choice: Vec<WorksheetDrawingChoice>,
 }
@@ -657,6 +659,9 @@ pub enum TwoCellAnchorChoice {
   XdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneCellAnchorChoice {
@@ -714,6 +719,9 @@ pub enum WorksheetDrawingChoice {
   /// Absolute Anchor Shape Size.
   #[sdk(child(qname = "xdr:CT_AbsoluteAnchor/xdr:absoluteAnchor"))]
   XdrAbsoluteAnchor(std::boxed::Box<AbsoluteAnchor>),
+  /// Unknown XML child.
+  #[sdk(any)]
+  XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {

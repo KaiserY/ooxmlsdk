@@ -205,8 +205,10 @@ pub struct GraphicFrame {
 pub enum WordprocessingGroupChoice {
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
   WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
   WpgGrpSp(std::boxed::Box<GroupShape>),
+  /// Defines the GraphicFrame Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
   WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
@@ -218,8 +220,10 @@ pub enum WordprocessingGroupChoice {
 pub enum GroupShapeChoice {
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
   WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
   WpgGrpSp(std::boxed::Box<GroupShape>),
+  /// Defines the GraphicFrame Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
   WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]

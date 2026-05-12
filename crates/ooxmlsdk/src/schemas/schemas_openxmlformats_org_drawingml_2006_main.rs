@@ -9621,15 +9621,19 @@ pub enum SolidFillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientFillChoice {
+  /// Linear Gradient Fill.
   #[sdk(child(qname = "a:CT_LinearShadeProperties/a:lin"))]
   ALin(std::boxed::Box<LinearGradientFill>),
+  /// Path Gradient.
   #[sdk(child(qname = "a:CT_PathShadeProperties/a:path"))]
   APath(std::boxed::Box<PathGradientFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
+  /// Tile.
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
   ATile(std::boxed::Box<Tile>),
+  /// Stretch.
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
   AStretch(std::boxed::Box<Stretch>),
 }
@@ -10601,6 +10605,7 @@ pub enum UnderlineFillChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
+  /// Defines the AlphaBiLevel Class.
   #[sdk(child(qname = "a:CT_AlphaBiLevelEffect/a:alphaBiLevel"))]
   AAlphaBiLevel(std::boxed::Box<AlphaBiLevel>),
   /// Alpha Ceiling Effect.
@@ -10609,33 +10614,46 @@ pub enum BlipChoice {
   /// Alpha Floor Effect.
   #[sdk(empty_child(qname = "a:CT_AlphaFloorEffect/a:alphaFloor"))]
   AAlphaFloor,
+  /// Alpha Inverse Effect.
   #[sdk(child(qname = "a:CT_AlphaInverseEffect/a:alphaInv"))]
   AAlphaInv(std::boxed::Box<AlphaInverse>),
+  /// Alpha Modulate Effect.
   #[sdk(child(qname = "a:CT_AlphaModulateEffect/a:alphaMod"))]
   AAlphaMod(std::boxed::Box<AlphaModulationEffect>),
+  /// Defines the AlphaModulationFixed Class.
   #[sdk(child(qname = "a:CT_AlphaModulateFixedEffect/a:alphaModFix"))]
   AAlphaModFix(std::boxed::Box<AlphaModulationFixed>),
+  /// Alpha Replace Effect.
   #[sdk(child(qname = "a:CT_AlphaReplaceEffect/a:alphaRepl"))]
   AAlphaRepl(std::boxed::Box<AlphaReplace>),
+  /// Defines the BiLevel Class.
   #[sdk(child(qname = "a:CT_BiLevelEffect/a:biLevel"))]
   ABiLevel(std::boxed::Box<BiLevel>),
+  /// Defines the Blur Class.
   #[sdk(child(qname = "a:CT_BlurEffect/a:blur"))]
   ABlur(std::boxed::Box<Blur>),
+  /// Color Change Effect.
   #[sdk(child(qname = "a:CT_ColorChangeEffect/a:clrChange"))]
   AClrChange(std::boxed::Box<ColorChange>),
+  /// Defines the ColorReplacement Class.
   #[sdk(child(qname = "a:CT_ColorReplaceEffect/a:clrRepl"))]
   AClrRepl(std::boxed::Box<ColorReplacement>),
+  /// Duotone Effect.
   #[sdk(child(qname = "a:CT_DuotoneEffect/a:duotone"))]
   ADuotone(std::boxed::Box<Duotone>),
+  /// Fill Overlay Effect.
   #[sdk(child(qname = "a:CT_FillOverlayEffect/a:fillOverlay"))]
   AFillOverlay(std::boxed::Box<FillOverlay>),
   /// Gray Scale Effect.
   #[sdk(empty_child(qname = "a:CT_GrayscaleEffect/a:grayscl"))]
   AGrayscl,
+  /// Hue Saturation Luminance Effect.
   #[sdk(child(qname = "a:CT_HSLEffect/a:hsl"))]
   AHsl(std::boxed::Box<Hsl>),
+  /// Luminance.
   #[sdk(child(qname = "a:CT_LuminanceEffect/a:lum"))]
   ALum(std::boxed::Box<LuminanceEffect>),
+  /// Defines the TintEffect Class.
   #[sdk(child(qname = "a:CT_TintEffect/a:tint"))]
   ATint(std::boxed::Box<TintEffect>),
 }
@@ -10662,8 +10680,10 @@ pub enum CustomColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum EffectStyleChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
   AEffectLst(std::boxed::Box<EffectList>),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
   AEffectDag(std::boxed::Box<EffectDag>),
 }
@@ -10969,6 +10989,7 @@ pub enum TextShapeChoice {
   /// Use Shape Text Rectangle.
   #[sdk(empty_child(qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect"))]
   AUseSpRect,
+  /// Defines the Transform2D Class.
   #[sdk(child(qname = "a:CT_Transform2D/a:xfrm"))]
   AXfrm(std::boxed::Box<Transform2D>),
 }
@@ -11046,14 +11067,19 @@ pub enum BodyPropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellPropertiesChoice {
+  /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
   ANoFill(std::boxed::Box<NoFill>),
+  /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
   ASolidFill(std::boxed::Box<SolidFill>),
+  /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
   AGradFill(std::boxed::Box<GradientFill>),
+  /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
   ABlipFill(std::boxed::Box<BlipFill>),
+  /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
   APattFill(std::boxed::Box<PatternFill>),
   /// Group Fill.
@@ -11203,8 +11229,10 @@ pub enum TableCellTextStyleChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellStyleChoice {
+  /// Fill.
   #[sdk(child(qname = "a:CT_FillProperties/a:fill"))]
   AFill(std::boxed::Box<FillProperties>),
+  /// Fill Reference.
   #[sdk(child(qname = "a:CT_StyleMatrixReference/a:fillRef"))]
   AFillRef(std::boxed::Box<FillReference>),
 }
@@ -11867,10 +11895,13 @@ pub enum DefaultRunPropertiesChoice4 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ParagraphChoice {
+  /// Text Run.
   #[sdk(child(qname = "a:CT_RegularTextRun/a:r"))]
   AR(std::boxed::Box<Run>),
+  /// Text Line Break.
   #[sdk(child(qname = "a:CT_TextLineBreak/a:br"))]
   ABr(std::boxed::Box<Break>),
+  /// Text Field.
   #[sdk(child(qname = "a:CT_TextField/a:fld"))]
   AFld(std::boxed::Box<Field>),
   /// Defines the TextMath Class.
@@ -11967,18 +11998,24 @@ pub enum VisualGroupShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  /// Text Shape.
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
   ATxSp(std::boxed::Box<TextShape>),
+  /// Shape.
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
   ASp(std::boxed::Box<Shape>),
+  /// Connection Shape.
   #[sdk(child(qname = "a:CT_GvmlConnector/a:cxnSp"))]
   ACxnSp(std::boxed::Box<ConnectionShape>),
+  /// Picture.
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
   APic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
   A14ContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
+  /// Graphic Frame.
   #[sdk(child(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame"))]
   AGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Group shape.
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
   AGrpSp(std::boxed::Box<GroupShape>),
 }

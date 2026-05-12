@@ -4937,23 +4937,39 @@ mod tests {
       target_namespace: "urn:parent".to_string(),
       prefix: "p".to_string(),
       typed_namespace: "Parent.Namespace".to_string(),
-      types: vec![SchemaType {
-        name: "p:CT_Parent/p:parent".to_string(),
-        class_name: "Parent".to_string(),
-        kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-        children: vec![SchemaTypeChild {
-          particle_id: String::new(),
-          kind: SchemaTypeChildKind::Choice,
+      types: vec![
+        SchemaType {
+          name: "p:CT_OtherLeaf/p:otherLeaf".to_string(),
+          class_name: "OtherLeaf".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "p:CT_Parent/p:parent".to_string(),
+          class_name: "Parent".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
           children: vec![SchemaTypeChild {
             particle_id: String::new(),
-            name: "c:CT_Leaf/c:leaf".to_string(),
-            kind: SchemaTypeChildKind::Child,
+            kind: SchemaTypeChildKind::Choice,
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "c:CT_Leaf/c:leaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "p:CT_OtherLeaf/p:otherLeaf".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                ..Default::default()
+              },
+            ],
             ..Default::default()
           }],
           ..Default::default()
-        }],
-        ..Default::default()
-      }],
+        },
+      ],
       ..Default::default()
     };
     let schemas = vec![parent_schema, child_schema];

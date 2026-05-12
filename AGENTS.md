@@ -44,7 +44,16 @@ Until the implementation reaches a higher maturity level:
 - While a Cargo command is running, do not launch other repository commands just to inspect progress. Do not poll with extra Cargo invocations. If output is quiet for a while, keep waiting.
 - If Cargo reports a target lock or another Cargo process is already running, do not probe processes or start competing commands; just wait for the active Cargo command to finish and then continue.
 - If Cargo reports a target lock, wait for Cargo rather than probing processes.
-- Do not create ad hoc Cargo projects or temporary manifests for inspection; analyze with existing repository commands and fixtures only.
+- Never create ad hoc Cargo projects, temporary manifests, or throwaway crates
+  for inspection, reproduction, debugging, or code execution. This ban applies
+  everywhere: `/tmp`, other workspace directories, sibling checkouts, nested
+  repository subdirectories, and any other path.
+- Do not work around the ban by generating temporary Cargo files, helper
+  projects, or one-off crates outside the repository. Analyze with existing
+  repository commands, checked-in fixtures, and existing tests only.
+- If inspecting runtime output requires instrumentation, prefer an existing
+  test or existing repository binary. Ask the user before adding temporary
+  debugging code.
 
 ## Commands
 

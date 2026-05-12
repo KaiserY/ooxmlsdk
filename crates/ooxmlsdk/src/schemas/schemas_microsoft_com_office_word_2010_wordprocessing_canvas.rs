@@ -99,6 +99,7 @@ pub enum WordprocessingCanvasChoice {
   W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:wgp"))]
   WpgWgp(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
+  /// Defines the GraphicFrameType Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"))]
   WpcGraphicFrame(std::boxed::Box<GraphicFrameType>),
 }

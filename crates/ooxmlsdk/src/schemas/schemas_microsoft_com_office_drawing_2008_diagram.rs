@@ -390,15 +390,19 @@ pub enum GroupShapePropertiesChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  /// Defines the Shape Class.
   #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
+  /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
+  /// Defines the Shape Class.
   #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
   DspSp(std::boxed::Box<Shape>),
+  /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   DspGrpSp(std::boxed::Box<GroupShape>),
 }

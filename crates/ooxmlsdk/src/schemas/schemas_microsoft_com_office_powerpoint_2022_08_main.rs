@@ -150,20 +150,25 @@ pub struct TaskHistory {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TaskHistoryEventChoice {
+  /// Defines the AsgnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskAssignUnassignUser/p228:asgn"))]
   P228Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   /// Defines the AddEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p228:add"))]
   P228Add,
+  /// Defines the TaskTitleEventInfo Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskTitleEventInfo/p228:title"))]
   P228Title(std::boxed::Box<TaskTitleEventInfo>),
+  /// Defines the TaskScheduleEventInfo Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskScheduleEventInfo/p228:date"))]
   P228Date(std::boxed::Box<TaskScheduleEventInfo>),
+  /// Defines the TaskProgressEventInfo Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskProgressEventInfo/p228:pcntCmplt"))]
   P228PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the UnasgnAllEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p228:unasgnAll"))]
   P228UnasgnAll,
+  /// Defines the TaskUndo Class.
   #[sdk(child(microsoft365, qname = "p228:CT_TaskUndo/p228:undo"))]
   P228Undo(std::boxed::Box<TaskUndo>),
   /// Defines the TaskUnknownRecord Class.

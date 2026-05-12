@@ -2611,8 +2611,10 @@ pub enum OfficeMathChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MathPropertiesChoice {
+  /// Wrap Indent.
   #[sdk(child(qname = "m:CT_TwipsMeasure/m:wrapIndent"))]
   MWrapIndent(std::boxed::Box<WrapIndent>),
+  /// Wrap Right.
   #[sdk(child(qname = "m:CT_OnOff/m:wrapRight"))]
   MWrapRight(std::boxed::Box<WrapRight>),
 }
@@ -2627,6 +2629,7 @@ pub struct RunPropertiesChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RunPropertiesChoice {
+  /// Normal Text.
   #[sdk(child(qname = "m:CT_OnOff/m:nor"))]
   MNor(std::boxed::Box<NormalText>),
   /// Sequence of m:scr, m:sty

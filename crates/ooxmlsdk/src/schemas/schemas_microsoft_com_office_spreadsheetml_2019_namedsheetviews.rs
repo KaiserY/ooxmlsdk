@@ -273,8 +273,10 @@ pub enum FilterColumnChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SortRuleChoice {
+  /// Defines the SortCondition Class.
   #[sdk(child(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
   XnsvSortCondition(std::boxed::Box<SortCondition>),
+  /// Defines the RichSortCondition Class.
   #[sdk(child(
     office2021,
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"

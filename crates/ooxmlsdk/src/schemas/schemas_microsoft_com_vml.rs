@@ -2739,22 +2739,31 @@ pub enum TextBoxChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
@@ -2794,22 +2803,31 @@ pub enum ShapeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapetypeChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
@@ -3186,22 +3204,31 @@ pub enum LineChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OvalChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
@@ -3236,22 +3263,31 @@ pub enum OvalChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PolyLineChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
@@ -3288,22 +3324,31 @@ pub enum PolyLineChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RectangleChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]
@@ -3338,22 +3383,31 @@ pub enum RectangleChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RoundRectangleChoice {
+  /// Defines the Path Class.
   #[sdk(child(qname = "v:CT_Path/v:path"))]
   VPath(std::boxed::Box<Path>),
+  /// Defines the Formulas Class.
   #[sdk(child(qname = "v:CT_Formulas/v:formulas"))]
   VFormulas(std::boxed::Box<Formulas>),
+  /// Defines the ShapeHandles Class.
   #[sdk(child(qname = "v:CT_Handles/v:handles"))]
   VHandles(std::boxed::Box<ShapeHandles>),
+  /// Defines the Fill Class.
   #[sdk(child(qname = "v:CT_Fill/v:fill"))]
   VFill(std::boxed::Box<Fill>),
+  /// Defines the Stroke Class.
   #[sdk(child(qname = "v:CT_Stroke/v:stroke"))]
   VStroke(std::boxed::Box<Stroke>),
+  /// Defines the Shadow Class.
   #[sdk(child(qname = "v:CT_Shadow/v:shadow"))]
   VShadow(std::boxed::Box<Shadow>),
+  /// Defines the TextBox Class.
   #[sdk(child(qname = "v:CT_Textbox/v:textbox"))]
   VTextbox(std::boxed::Box<TextBox>),
+  /// Defines the TextPath Class.
   #[sdk(child(qname = "v:CT_TextPath/v:textpath"))]
   VTextpath(std::boxed::Box<TextPath>),
+  /// Defines the ImageData Class.
   #[sdk(child(qname = "v:CT_ImageData/v:imagedata"))]
   VImagedata(std::boxed::Box<ImageData>),
   #[sdk(child(qname = "o:CT_Skew/o:skew"))]

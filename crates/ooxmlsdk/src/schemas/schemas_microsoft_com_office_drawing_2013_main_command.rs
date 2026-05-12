@@ -1294,16 +1294,22 @@ pub struct TextCharRangeContext {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupCommandChoice {
+  /// Defines the ShapeMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_ShapeMoniker/oac:spMk"))]
   OacSpMk(std::boxed::Box<ShapeMoniker>),
+  /// Defines the GroupShapeMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk"))]
   OacGrpSpMk(std::boxed::Box<GroupShapeMoniker>),
+  /// Defines the GraphicFrameMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_GraphicFrameMoniker/oac:graphicFrameMk"))]
   OacGraphicFrameMk(std::boxed::Box<GraphicFrameMoniker>),
+  /// Defines the ConnectorMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_ConnectorMoniker/oac:cxnSpMk"))]
   OacCxnSpMk(std::boxed::Box<ConnectorMoniker>),
+  /// Defines the PictureMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_PictureMoniker/oac:picMk"))]
   OacPicMk(std::boxed::Box<PictureMoniker>),
+  /// Defines the InkMoniker Class.
   #[sdk(child(office2016, qname = "oac:CT_InkMoniker/oac:inkMk"))]
   OacInkMk(std::boxed::Box<InkMoniker>),
 }

@@ -1915,16 +1915,18 @@ fn choice_variant_doc_attrs(
   type_graph: &TypeContainmentGraph,
   prefer_payload_docs: bool,
 ) -> TokenStream {
-  let doc_text = if prefer_payload_docs {
+  let payload_doc_text = || {
     empty_leaf_marker_doc_for_ref(module, &variant.payload, type_graph)
       .and_then(meaningful_doc_text)
       .or_else(|| {
         type_decl_for_ref(module, &variant.payload)
           .and_then(|type_decl| meaningful_doc_text(&type_decl.docs))
       })
-      .or_else(|| meaningful_doc_text(&variant.docs))
+  };
+  let doc_text = if prefer_payload_docs {
+    payload_doc_text().or_else(|| meaningful_doc_text(&variant.docs))
   } else {
-    meaningful_doc_text(&variant.docs)
+    meaningful_doc_text(&variant.docs).or_else(payload_doc_text)
   };
 
   if let Some(doc_text) = doc_text {
@@ -5857,6 +5859,7 @@ mod tests {
         TypeDecl {
           rust_name: "AttributedMarker".to_string(),
           xml_qname: Some("t:CT_AttributedMarker/t:attributedMarker".to_string()),
+          docs: "Defines the AttributedMarker Class.".to_string(),
           kind: TypeKind::ElementStruct,
           element_kind: Some(ElementKind::Leaf),
           base_rust_name: Some("OpenXmlLeafElement".to_string()),
@@ -5918,6 +5921,7 @@ mod tests {
     assert!(
       generated.contains("# [sdk (child (qname = \"t:CT_AttributedMarker/t:attributedMarker\"))]")
     );
+    assert!(generated.contains("# [doc = \" Defines the AttributedMarker Class.\"]"));
     assert!(generated.contains("TAttributedMarker (std :: boxed :: Box < AttributedMarker >)"));
   }
 

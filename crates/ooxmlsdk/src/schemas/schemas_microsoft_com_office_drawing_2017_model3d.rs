@@ -721,8 +721,10 @@ pub enum ShapePropertiesChoice3 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DCameraChoice {
+  /// Defines the OrthographicProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_OrthographicProjection/am3d:orthographic"))]
   Am3dOrthographic(std::boxed::Box<OrthographicProjection>),
+  /// Defines the PerspectiveProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_PerspectiveProjection/am3d:perspective"))]
   Am3dPerspective(std::boxed::Box<PerspectiveProjection>),
 }

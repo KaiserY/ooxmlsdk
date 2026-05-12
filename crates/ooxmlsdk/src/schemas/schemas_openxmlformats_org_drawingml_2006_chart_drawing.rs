@@ -517,14 +517,19 @@ pub struct GroupShapeProperties {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RelativeAnchorSizeChoice {
+  /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
   CdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
   CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
@@ -532,14 +537,19 @@ pub enum RelativeAnchorSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AbsoluteAnchorSizeChoice {
+  /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
   CdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
   CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
@@ -547,14 +557,19 @@ pub enum AbsoluteAnchorSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
   CdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
   CdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
   CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
   CdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
   CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]

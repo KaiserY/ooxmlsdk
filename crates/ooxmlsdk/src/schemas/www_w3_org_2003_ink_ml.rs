@@ -1330,8 +1330,10 @@ pub enum InkChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MappingChoice {
+  /// Defines the Table Class.
   #[sdk(child(qname = "inkml:CT_Table/inkml:table"))]
   InkmlTable(std::boxed::Box<Table>),
+  /// Defines the Matrix Class.
   #[sdk(child(qname = "inkml:CT_Matrix/inkml:matrix"))]
   InkmlMatrix(std::boxed::Box<Matrix>),
 }

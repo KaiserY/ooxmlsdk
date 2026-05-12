@@ -67,7 +67,10 @@ struct NamedSequenceVariantField {
   boxed: bool,
 }
 
-fn choice_qname_patterns(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
+fn choice_qname_patterns(
+  qnames: &[String],
+  local_name_fallback_qnames: &std::collections::HashSet<String>,
+) -> Vec<proc_macro2::TokenStream> {
   let mut patterns = Vec::with_capacity(qnames.len());
   for qname in qnames {
     let QNameInfo {
@@ -75,8 +78,15 @@ fn choice_qname_patterns(qnames: &[String]) -> Vec<proc_macro2::TokenStream> {
       local_name,
     } = parse_qname_info(qname);
     let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+    let allows_local_name = local_name_fallback_qnames.contains(qname);
     if tag_prefix.is_empty() {
       patterns.push(quote! { #local_name_lit });
+    } else if !allows_local_name {
+      let tag_qname_lit = LitByteStr::new(
+        format!("{tag_prefix}:{local_name}").as_bytes(),
+        Span::call_site(),
+      );
+      patterns.push(quote! { #tag_qname_lit });
     } else {
       let tag_qname_lit = LitByteStr::new(
         format!("{tag_prefix}:{local_name}").as_bytes(),
@@ -92,8 +102,9 @@ fn empty_child_skip_tokens(
   ident: &Ident,
   mode: DeserializeMode,
   qnames: &[String],
+  local_name_fallback_qnames: &std::collections::HashSet<String>,
 ) -> proc_macro2::TokenStream {
-  let qname_patterns = choice_qname_patterns(qnames);
+  let qname_patterns = choice_qname_patterns(qnames, local_name_fallback_qnames);
   let first_qname = qnames.first().map(String::as_str).unwrap_or("");
   let QNameInfo { tag_prefix, .. } = parse_qname_info(first_qname);
   let skip_foreign_children = mode.skip_foreign_element_children_tokens();
@@ -130,6 +141,57 @@ fn empty_child_skip_tokens(
       }
     }
   }
+}
+
+fn choice_child_local_name_fallback_qnames(
+  variants: &syn::punctuated::Punctuated<syn::Variant, syn::token::Comma>,
+) -> syn::Result<std::collections::HashSet<String>> {
+  let mut local_name_qnames = std::collections::HashMap::<String, Vec<String>>::new();
+  for variant in variants {
+    match parse_sdk_choice_variant_kind(&variant.attrs)? {
+      Some(SdkChoiceVariantKind::Child { qnames })
+      | Some(SdkChoiceVariantKind::EmptyChild { qnames })
+      | Some(SdkChoiceVariantKind::AnyChild { qnames })
+      | Some(SdkChoiceVariantKind::TextChild { qnames }) => {
+        for qname in qnames {
+          let QNameInfo { local_name, .. } = parse_qname_info(&qname);
+          local_name_qnames.entry(local_name).or_default().push(qname);
+        }
+      }
+      Some(
+        SdkChoiceVariantKind::Choice
+        | SdkChoiceVariantKind::Sequence
+        | SdkChoiceVariantKind::Any
+        | SdkChoiceVariantKind::Text,
+      )
+      | None => {}
+    }
+  }
+
+  Ok(
+    local_name_qnames
+      .into_values()
+      .filter_map(|qnames| {
+        if qnames.len() == 1 {
+          return qnames.into_iter().next();
+        }
+
+        let base_qnames = qnames
+          .into_iter()
+          .filter(|qname| {
+            let QNameInfo { tag_prefix, .. } = parse_qname_info(qname);
+            !tag_prefix.as_bytes().last().is_some_and(u8::is_ascii_digit)
+          })
+          .collect::<Vec<_>>();
+
+        if base_qnames.len() == 1 {
+          base_qnames.into_iter().next()
+        } else {
+          None
+        }
+      })
+      .collect(),
+  )
 }
 
 fn any_child_dispatch_tokens(
@@ -368,6 +430,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       "SdkChoice can only be derived for enums",
     ));
   };
+  let local_name_fallback_qnames = choice_child_local_name_fallback_qnames(variants)?;
 
   let mut write_arms = Vec::with_capacity(variants.len());
   let mut direct_matcher_arms = Vec::with_capacity(variants.len());
@@ -403,7 +466,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let payload_ty = choice_variant_payload_type(variant)?;
         let inner_payload_ty = box_inner_type(&payload_ty).unwrap_or_else(|| payload_ty.clone());
         if is_vec_string_type(&inner_payload_ty) {
-          let qname_patterns = choice_qname_patterns(&qnames);
+          let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
           let QNameInfo {
             tag_prefix,
             local_name,
@@ -514,7 +577,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         } else {
           quote! { Self::#variant_ident(parsed_child) }
         };
-        let qname_patterns = choice_qname_patterns(&qnames);
+        let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
         direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
@@ -620,7 +683,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         });
       }
       (Fields::Unit, SdkChoiceVariantKind::EmptyChild { qnames }) => {
-        let qname_patterns = choice_qname_patterns(&qnames);
+        let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
         let write_qname = qnames.first().ok_or_else(|| {
           syn::Error::new_spanned(variant, "empty_child requires at least one qname")
         })?;
@@ -628,9 +691,18 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           tag_prefix,
           local_name,
         } = parse_qname_info(write_qname);
-        let skip_tokens_borrowed =
-          empty_child_skip_tokens(ident, DeserializeMode::Borrowed, &qnames);
-        let skip_tokens_io = empty_child_skip_tokens(ident, DeserializeMode::Io, &qnames);
+        let skip_tokens_borrowed = empty_child_skip_tokens(
+          ident,
+          DeserializeMode::Borrowed,
+          &qnames,
+          &local_name_fallback_qnames,
+        );
+        let skip_tokens_io = empty_child_skip_tokens(
+          ident,
+          DeserializeMode::Io,
+          &qnames,
+          &local_name_fallback_qnames,
+        );
         direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
@@ -769,7 +841,10 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           | NamedSequenceVariantFieldKind::EmptyChild { qname }
           | NamedSequenceVariantFieldKind::TextChild { qname } => qname,
         };
-        let start_qname_patterns = choice_qname_patterns(std::slice::from_ref(start_qname));
+        let start_qname_patterns = choice_qname_patterns(
+          std::slice::from_ref(start_qname),
+          &local_name_fallback_qnames,
+        );
         direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => true,
@@ -834,7 +909,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         if fields.unnamed.len() == 1 =>
       {
         let payload_ty = choice_variant_payload_type(variant)?;
-        let qname_patterns = choice_qname_patterns(&qnames);
+        let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
         let QNameInfo {
           tag_prefix,
           local_name,
@@ -976,7 +1051,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
       (Fields::Unnamed(fields), SdkChoiceVariantKind::AnyChild { qnames })
         if fields.unnamed.len() == 1 =>
       {
-        let qname_patterns = choice_qname_patterns(&qnames);
+        let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
         let QNameInfo {
           tag_prefix,
           local_name,

@@ -4758,6 +4758,7 @@ pub struct DataLabelsChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelsChoice {
+  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   /// Sequence of c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator, c:showLeaderLines, c:leaderLines
@@ -4768,6 +4769,7 @@ pub enum DataLabelsChoice {
 pub enum ChartSpaceChoice {
   #[sdk(child(office2010, qname = "c14:CT_Style/c14:style"))]
   C14Style(std::boxed::Box<crate::schemas::c14::Style>),
+  /// Defines the Style Class.
   #[sdk(child(qname = "c:CT_Style/c:style"))]
   CStyle(std::boxed::Box<Style>),
   /// Unknown XML child.
@@ -4830,6 +4832,7 @@ pub enum BubbleSizeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LegendEntryChoice {
+  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
@@ -4918,6 +4921,7 @@ pub struct DataLabelChoiceSequence {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelChoice {
+  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   CDelete(std::boxed::Box<Delete>),
   /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
@@ -4926,29 +4930,37 @@ pub enum DataLabelChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ValueAxisChoice {
+  /// Crosses.
   #[sdk(child(qname = "c:CT_Crosses/c:crosses"))]
   CCrosses(std::boxed::Box<Crosses>),
+  /// Crossing Value.
   #[sdk(child(qname = "c:CT_Double/c:crossesAt"))]
   CCrossesAt(std::boxed::Box<CrossesAt>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CategoryAxisChoice {
+  /// Crosses.
   #[sdk(child(qname = "c:CT_Crosses/c:crosses"))]
   CCrosses(std::boxed::Box<Crosses>),
+  /// Crossing Value.
   #[sdk(child(qname = "c:CT_Double/c:crossesAt"))]
   CCrossesAt(std::boxed::Box<CrossesAt>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DateAxisChoice {
+  /// Crosses.
   #[sdk(child(qname = "c:CT_Crosses/c:crosses"))]
   CCrosses(std::boxed::Box<Crosses>),
+  /// Crossing Value.
   #[sdk(child(qname = "c:CT_Double/c:crossesAt"))]
   CCrossesAt(std::boxed::Box<CrossesAt>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SeriesAxisChoice {
+  /// Crosses.
   #[sdk(child(qname = "c:CT_Crosses/c:crosses"))]
   CCrosses(std::boxed::Box<Crosses>),
+  /// Crossing Value.
   #[sdk(child(qname = "c:CT_Double/c:crossesAt"))]
   CCrossesAt(std::boxed::Box<CrossesAt>),
 }
@@ -5186,8 +5198,10 @@ pub enum ValAxExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DisplayUnitsChoice {
+  /// Custom Display Unit.
   #[sdk(child(qname = "c:CT_Double/c:custUnit"))]
   CCustUnit(std::boxed::Box<CustomDisplayUnit>),
+  /// Built in Display Unit Value.
   #[sdk(child(qname = "c:CT_BuiltInUnit/c:builtInUnit"))]
   CBuiltInUnit(std::boxed::Box<BuiltInUnit>),
 }

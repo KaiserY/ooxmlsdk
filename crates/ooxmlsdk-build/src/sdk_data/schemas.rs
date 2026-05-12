@@ -1758,9 +1758,7 @@ fn resolve_composite_kind(
   target_namespace: &str,
   xsd_schemas: &HashMap<String, ParsedXsd>,
 ) -> SchemaTypeCompositeKind {
-  if schema_type.composite_type == "OneSequence"
-    && matches_xsd_repeatable_choice_rule(schema_type, target_namespace, xsd_schemas)
-  {
+  if matches_xsd_repeatable_choice_rule(schema_type, target_namespace, xsd_schemas) {
     SchemaTypeCompositeKind::XsdRepeatableChoice
   } else if schema_type.composite_type == "OneSequence" {
     SchemaTypeCompositeKind::OneSequence
@@ -1780,7 +1778,7 @@ fn matches_xsd_repeatable_choice_rule(
   target_namespace: &str,
   xsd_schemas: &HashMap<String, ParsedXsd>,
 ) -> bool {
-  if schema_type.composite_type != "OneSequence" {
+  if !is_xsd_repeatable_choice_candidate(schema_type) {
     return false;
   }
 
@@ -1801,6 +1799,13 @@ fn matches_xsd_repeatable_choice_rule(
   };
 
   particle.kind == ParsedParticleKind::Choice && particle.max_occurs == u64::MAX
+}
+
+fn is_xsd_repeatable_choice_candidate(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+) -> bool {
+  schema_type.composite_type == "OneSequence"
+    || (schema_type.composite_type.is_empty() && schema_type.particle.kind == "Sequence")
 }
 
 fn resolve_derived_base_type<'a>(
@@ -1904,7 +1909,47 @@ mod tests {
   }
 
   #[test]
-  fn actual_repo_rule_matches_only_font() {
+  fn upgrades_sdk_sequence_to_xsd_repeatable_choice() {
+    let mut xsd_schemas = HashMap::new();
+    xsd_schemas.insert(
+      "urn:test".to_string(),
+      parse_xsd(
+        r#"
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+          <xsd:complexType name="CT_RunProperties">
+            <xsd:choice maxOccurs="unbounded">
+              <xsd:element name="font" type="xsd:string"/>
+              <xsd:element name="size" type="xsd:string"/>
+            </xsd:choice>
+          </xsd:complexType>
+        </xsd:schema>
+        "#,
+      )
+      .expect("parse xsd"),
+    );
+
+    let schema_type = OpenXmlSchemaType {
+      name: "x:CT_RunProperties/x:rPr".to_string(),
+      particle: OpenXmlSchemaTypeParticle {
+        kind: "Sequence".to_string(),
+        ..OpenXmlSchemaTypeParticle::default()
+      },
+      ..OpenXmlSchemaType::default()
+    };
+
+    assert!(matches_xsd_repeatable_choice_rule(
+      &schema_type,
+      "urn:test",
+      &xsd_schemas,
+    ));
+    assert_eq!(
+      resolve_composite_kind(&schema_type, "urn:test", &xsd_schemas),
+      SchemaTypeCompositeKind::XsdRepeatableChoice,
+    );
+  }
+
+  #[test]
+  fn actual_repo_rule_matches_repeatable_choice_types() {
     let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let context = Context::new(&data_dir).expect("context");
     let schemas = gen_schemas(&context);
@@ -1924,10 +1969,16 @@ mod tests {
 
     assert_eq!(
       matched,
-      vec![(
-        "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
-        "x:CT_Font/x:font".to_string(),
-      )],
+      vec![
+        (
+          "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
+          "x:CT_RPrElt/x:rPr".to_string(),
+        ),
+        (
+          "schemas_openxmlformats_org_spreadsheetml_2006_main".to_string(),
+          "x:CT_Font/x:font".to_string(),
+        ),
+      ],
     );
 
     let font = schemas

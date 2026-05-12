@@ -647,16 +647,22 @@ pub struct GroupShapeProperties {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TwoCellAnchorChoice {
+  /// Shape.
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]
   XdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame"))]
   XdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "xdr:CT_Connector/xdr:cxnSp"))]
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
@@ -665,44 +671,61 @@ pub enum TwoCellAnchorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OneCellAnchorChoice {
+  /// Shape.
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]
   XdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame"))]
   XdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "xdr:CT_Connector/xdr:cxnSp"))]
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AbsoluteAnchorChoice {
+  /// Shape.
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]
   XdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame"))]
   XdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "xdr:CT_Connector/xdr:cxnSp"))]
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr:contentPart"))]
   XdrContentPart(std::boxed::Box<ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  /// Shape.
   #[sdk(child(qname = "xdr:CT_Shape/xdr:sp"))]
   XdrSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "xdr:CT_GroupShape/xdr:grpSp"))]
   XdrGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "xdr:CT_GraphicalObjectFrame/xdr:graphicFrame"))]
   XdrGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "xdr:CT_Connector/xdr:cxnSp"))]
   XdrCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "xdr:CT_Picture/xdr:pic"))]
   XdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "xdr14:CT_ContentPart/xdr14:contentPart"))]

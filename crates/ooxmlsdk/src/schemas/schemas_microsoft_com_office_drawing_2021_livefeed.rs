@@ -79,12 +79,16 @@ pub struct LiveFeedBackgroundProperties {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LiveFeedBackgroundPropertiesChoice {
+  /// Defines the BackgroundNormalProperties Class.
   #[sdk(child(office2021, qname = "alf:CT_BackgroundNormalProperties/alf:Normal"))]
   AlfNormal(std::boxed::Box<BackgroundNormalProperties>),
+  /// Defines the BackgroundRemovedProperties Class.
   #[sdk(child(office2021, qname = "alf:CT_BackgroundRemovedProperties/alf:Removed"))]
   AlfRemoved(std::boxed::Box<BackgroundRemovedProperties>),
+  /// Defines the BackgroundBlurProperties Class.
   #[sdk(child(office2021, qname = "alf:CT_BackgroundBlurProperties/alf:Blur"))]
   AlfBlur(std::boxed::Box<BackgroundBlurProperties>),
+  /// Defines the BackgroundCustomProperties Class.
   #[sdk(child(office2021, qname = "alf:CT_BackgroundCustomProperties/alf:Custom"))]
   AlfCustom(std::boxed::Box<BackgroundCustomProperties>),
 }

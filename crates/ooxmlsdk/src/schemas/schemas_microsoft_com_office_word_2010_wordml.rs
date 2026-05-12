@@ -2279,8 +2279,10 @@ pub enum SolidColorFillPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GradientFillPropertiesChoice {
+  /// Defines the LinearShadeProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin"))]
   W14Lin(std::boxed::Box<LinearShadeProperties>),
+  /// Defines the PathShadeProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_PathShadeProperties/w14:path"))]
   W14Path(std::boxed::Box<PathShadeProperties>),
 }

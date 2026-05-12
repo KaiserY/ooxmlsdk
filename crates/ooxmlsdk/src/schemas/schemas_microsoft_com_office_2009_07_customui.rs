@@ -6473,8 +6473,10 @@ pub struct ContextMenus {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonRegularChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
@@ -6510,8 +6512,10 @@ pub enum MenuRegularChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonWithTitleChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
@@ -6577,8 +6581,10 @@ pub enum MenuChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleButton/mso14:button"))]
   Mso14Button(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_VisibleToggleButton/mso14:toggleButton"))]
   Mso14ToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
@@ -6734,6 +6740,7 @@ pub enum LayoutContainerChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackstageGroupChoice {
+  /// Defines the PrimaryItem Class.
   #[sdk(child(office2010, qname = "mso14:CT_PrimaryItem/mso14:primaryItem"))]
   Mso14PrimaryItem(std::boxed::Box<PrimaryItem>),
 }
@@ -6901,73 +6908,100 @@ pub enum PrimaryItemChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TopItemsGroupControlsChoice {
+  /// Defines the BackstageGroupButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
+  /// Defines the BackstageCheckBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageCheckBox/mso14:checkBox"))]
   Mso14CheckBox(std::boxed::Box<BackstageCheckBox>),
+  /// Defines the BackstageEditBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageEditBox/mso14:editBox"))]
   Mso14EditBox(std::boxed::Box<BackstageEditBox>),
+  /// Defines the BackstageDropDown Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageDropDown/mso14:dropDown"))]
   Mso14DropDown(std::boxed::Box<BackstageDropDown>),
+  /// Defines the RadioGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_RadioGroup/mso14:radioGroup"))]
   Mso14RadioGroup(std::boxed::Box<RadioGroup>),
+  /// Defines the BackstageComboBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageComboBox/mso14:comboBox"))]
   Mso14ComboBox(std::boxed::Box<BackstageComboBox>),
+  /// Defines the Hyperlink Class.
   #[sdk(child(office2010, qname = "mso14:CT_Hyperlink/mso14:hyperlink"))]
   Mso14Hyperlink(std::boxed::Box<Hyperlink>),
+  /// Defines the BackstageLabelControl Class.
   #[sdk(child(
     office2010,
     qname = "mso14:CT_BackstageLabelControl/mso14:labelControl"
   ))]
   Mso14LabelControl(std::boxed::Box<BackstageLabelControl>),
+  /// Defines the GroupBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupBox/mso14:groupBox"))]
   Mso14GroupBox(std::boxed::Box<GroupBox>),
+  /// Defines the LayoutContainer Class.
   #[sdk(child(office2010, qname = "mso14:CT_LayoutContainer/mso14:layoutContainer"))]
   Mso14LayoutContainer(std::boxed::Box<LayoutContainer>),
+  /// Defines the ImageControl Class.
   #[sdk(child(office2010, qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BottomItemsGroupControlsChoice {
+  /// Defines the BackstageGroupButton Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroupButton/mso14:button"))]
   Mso14Button(std::boxed::Box<BackstageGroupButton>),
+  /// Defines the BackstageCheckBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageCheckBox/mso14:checkBox"))]
   Mso14CheckBox(std::boxed::Box<BackstageCheckBox>),
+  /// Defines the BackstageEditBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageEditBox/mso14:editBox"))]
   Mso14EditBox(std::boxed::Box<BackstageEditBox>),
+  /// Defines the BackstageDropDown Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageDropDown/mso14:dropDown"))]
   Mso14DropDown(std::boxed::Box<BackstageDropDown>),
+  /// Defines the RadioGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_RadioGroup/mso14:radioGroup"))]
   Mso14RadioGroup(std::boxed::Box<RadioGroup>),
+  /// Defines the BackstageComboBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageComboBox/mso14:comboBox"))]
   Mso14ComboBox(std::boxed::Box<BackstageComboBox>),
+  /// Defines the Hyperlink Class.
   #[sdk(child(office2010, qname = "mso14:CT_Hyperlink/mso14:hyperlink"))]
   Mso14Hyperlink(std::boxed::Box<Hyperlink>),
+  /// Defines the BackstageLabelControl Class.
   #[sdk(child(
     office2010,
     qname = "mso14:CT_BackstageLabelControl/mso14:labelControl"
   ))]
   Mso14LabelControl(std::boxed::Box<BackstageLabelControl>),
+  /// Defines the GroupBox Class.
   #[sdk(child(office2010, qname = "mso14:CT_GroupBox/mso14:groupBox"))]
   Mso14GroupBox(std::boxed::Box<GroupBox>),
+  /// Defines the LayoutContainer Class.
   #[sdk(child(office2010, qname = "mso14:CT_LayoutContainer/mso14:layoutContainer"))]
   Mso14LayoutContainer(std::boxed::Box<LayoutContainer>),
+  /// Defines the ImageControl Class.
   #[sdk(child(office2010, qname = "mso14:CT_ImageControl/mso14:imageControl"))]
   Mso14ImageControl(std::boxed::Box<ImageControl>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackstageGroupsChoice {
+  /// Defines the TaskFormGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskFormGroup/mso14:taskFormGroup"))]
   Mso14TaskFormGroup(std::boxed::Box<TaskFormGroup>),
+  /// Defines the BackstageGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroup/mso14:group"))]
   Mso14Group(std::boxed::Box<BackstageGroup>),
+  /// Defines the TaskGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskGroup/mso14:taskGroup"))]
   Mso14TaskGroup(std::boxed::Box<TaskGroup>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SimpleGroupsChoice {
+  /// Defines the BackstageGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_BackstageGroup/mso14:group"))]
   Mso14Group(std::boxed::Box<BackstageGroup>),
+  /// Defines the TaskGroup Class.
   #[sdk(child(office2010, qname = "mso14:CT_TaskGroup/mso14:taskGroup"))]
   Mso14TaskGroup(std::boxed::Box<TaskGroup>),
 }

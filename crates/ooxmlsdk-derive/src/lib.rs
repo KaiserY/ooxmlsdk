@@ -1919,6 +1919,30 @@ mod tests {
     ));
   }
 
+  #[test]
+  fn sdk_choice_omits_local_name_fallback_for_ambiguous_child_local_names() {
+    let input: DeriveInput = syn::parse_quote! {
+      #[derive(SdkChoice)]
+      enum FilterColumnChoice {
+        #[sdk(child(qname = "x14:CT_CustomFilters/x14:customFilters"))]
+        X14CustomFilters(std::boxed::Box<X14CustomFilters>),
+        #[sdk(child(qname = "x:CT_CustomFilters/x:customFilters"))]
+        XCustomFilters(std::boxed::Box<CustomFilters>),
+        #[sdk(child(qname = "x:CT_Top10/x:top10"))]
+        XTop10(std::boxed::Box<Top10>),
+      }
+    };
+
+    let generated = sdk_choice::expand_sdk_choice(&input)
+      .expect("SdkChoice expansion")
+      .to_string();
+
+    assert!(generated.contains("b\"x14:customFilters\" => true"));
+    assert!(!generated.contains("b\"x14:customFilters\" | b\"customFilters\" => true"));
+    assert!(generated.contains("b\"x:customFilters\" | b\"customFilters\" => true"));
+    assert!(generated.contains("b\"x:top10\" | b\"top10\" => true"));
+  }
+
   fn dump_macro_expansion(kind: &str, input: &DeriveInput, tokens: &proc_macro2::TokenStream) {
     let lock = SNAPSHOT_LOCK.get_or_init(|| Mutex::new(()));
     let _guard = lock.lock().expect("snapshot lock");

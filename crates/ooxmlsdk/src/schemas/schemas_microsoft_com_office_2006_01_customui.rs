@@ -4022,8 +4022,10 @@ pub struct Ribbon {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum UnsizedSplitButtonChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleButton/mso:button"))]
   MsoButton(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleToggleButton/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
@@ -4059,8 +4061,10 @@ pub enum UnsizedMenuChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonWithTitleChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleButton/mso:button"))]
   MsoButton(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleToggleButton/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<VisibleToggleButton>),
 }
@@ -4126,8 +4130,10 @@ pub enum MenuChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SplitButtonChoice {
+  /// Defines the VisibleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleButton/mso:button"))]
   MsoButton(std::boxed::Box<VisibleButton>),
+  /// Defines the VisibleToggleButton Class.
   #[sdk(child(qname = "mso:CT_VisibleToggleButton/mso:toggleButton"))]
   MsoToggleButton(std::boxed::Box<VisibleToggleButton>),
 }

@@ -4876,8 +4876,10 @@ pub enum BackgroundStyleReferenceChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OleObjectChoice {
+  /// Defines the OleObjectEmbed Class.
   #[sdk(child(qname = "p:CT_OleObjectEmbed/p:embed"))]
   PEmbed(std::boxed::Box<OleObjectEmbed>),
+  /// Defines the OleObjectLink Class.
   #[sdk(child(qname = "p:CT_OleObjectLink/p:link"))]
   PLink(std::boxed::Box<OleObjectLink>),
 }
@@ -5182,8 +5184,10 @@ pub enum ShowPropertiesExtensionChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TransitionChoice {
+  /// Defines the BlindsTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:blinds"))]
   PBlinds(std::boxed::Box<BlindsTransition>),
+  /// Defines the CheckerTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:checker"))]
   PChecker(std::boxed::Box<CheckerTransition>),
   /// Defines the CircleTransition Class.
@@ -5192,15 +5196,19 @@ pub enum TransitionChoice {
   /// Defines the DissolveTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:dissolve"))]
   PDissolve,
+  /// Defines the CombTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:comb"))]
   PComb(std::boxed::Box<CombTransition>),
+  /// Defines the CoverTransition Class.
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:cover"))]
   PCover(std::boxed::Box<CoverTransition>),
+  /// Defines the CutTransition Class.
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:cut"))]
   PCut(std::boxed::Box<CutTransition>),
   /// Defines the DiamondTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:diamond"))]
   PDiamond,
+  /// Defines the FadeTransition Class.
   #[sdk(child(qname = "p:CT_OptionalBlackTransition/p:fade"))]
   PFade(std::boxed::Box<FadeTransition>),
   /// Defines the NewsflashTransition Class.
@@ -5209,26 +5217,34 @@ pub enum TransitionChoice {
   /// Defines the PlusTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:plus"))]
   PPlus,
+  /// Defines the PullTransition Class.
   #[sdk(child(qname = "p:CT_EightDirectionTransition/p:pull"))]
   PPull(std::boxed::Box<PullTransition>),
+  /// Defines the PushTransition Class.
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:push"))]
   PPush(std::boxed::Box<PushTransition>),
   /// Defines the RandomTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:random"))]
   PRandom,
+  /// Defines the RandomBarTransition Class.
   #[sdk(child(qname = "p:CT_OrientationTransition/p:randomBar"))]
   PRandomBar(std::boxed::Box<RandomBarTransition>),
+  /// Defines the SplitTransition Class.
   #[sdk(child(qname = "p:CT_SplitTransition/p:split"))]
   PSplit(std::boxed::Box<SplitTransition>),
+  /// Defines the StripsTransition Class.
   #[sdk(child(qname = "p:CT_CornerDirectionTransition/p:strips"))]
   PStrips(std::boxed::Box<StripsTransition>),
   /// Defines the WedgeTransition Class.
   #[sdk(empty_child(qname = "p:CT_Empty/p:wedge"))]
   PWedge,
+  /// Defines the WheelTransition Class.
   #[sdk(child(qname = "p:CT_WheelTransition/p:wheel"))]
   PWheel(std::boxed::Box<WheelTransition>),
+  /// Defines the WipeTransition Class.
   #[sdk(child(qname = "p:CT_SideDirectionTransition/p:wipe"))]
   PWipe(std::boxed::Box<WipeTransition>),
+  /// Defines the ZoomTransition Class.
   #[sdk(child(qname = "p:CT_InOutTransition/p:zoom"))]
   PZoom(std::boxed::Box<ZoomTransition>),
   /// Defines the FlashTransition Class.
@@ -5285,16 +5301,22 @@ pub enum BackgroundChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
+  /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
   PGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
   PGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
   PCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   PPic(std::boxed::Box<Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
@@ -5303,16 +5325,22 @@ pub enum ShapeTreeChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
+  /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
   PSp(std::boxed::Box<Shape>),
+  /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
   PGrpSp(std::boxed::Box<GroupShape>),
+  /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
   PGraphicFrame(std::boxed::Box<GraphicFrame>),
+  /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
   PCxnSp(std::boxed::Box<ConnectionShape>),
+  /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
   PPic(std::boxed::Box<Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
   PContentPart(std::boxed::Box<ContentPart>),
 }
@@ -5538,8 +5566,10 @@ pub enum HtmlPublishPropertiesChoice {
   /// All Slides.
   #[sdk(empty_child(qname = "p:CT_Empty/p:sldAll"))]
   PSldAll,
+  /// Slide Range.
   #[sdk(child(qname = "p:CT_IndexRange/p:sldRg"))]
   PSldRg(std::boxed::Box<SlideRange>),
+  /// Custom Show.
   #[sdk(child(qname = "p:CT_CustomShowId/p:custShow"))]
   PCustShow(std::boxed::Box<CustomShowReference>),
 }

@@ -2039,6 +2039,7 @@ pub enum NumericDimensionChoice {
   /// Sequence of cx:f, cx:nf, cx:lvl
   #[sdk(sequence)]
   Sequence(std::boxed::Box<NumericDimensionChoiceSequence>),
+  /// Defines the NumericLevel Class.
   #[sdk(child(office2016, qname = "cx:CT_NumericLevel/cx:lvl"))]
   CxLvl(std::boxed::Box<NumericLevel>),
 }
@@ -2059,13 +2060,16 @@ pub enum StringDimensionChoice {
   /// Sequence of cx:f, cx:nf, cx:lvl
   #[sdk(sequence)]
   Sequence(std::boxed::Box<StringDimensionChoiceSequence>),
+  /// Defines the StringLevel Class.
   #[sdk(child(office2016, qname = "cx:CT_StringLevel/cx:lvl"))]
   CxLvl(std::boxed::Box<StringLevel>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataChoice {
+  /// Defines the NumericDimension Class.
   #[sdk(child(office2016, qname = "cx:CT_NumericDimension/cx:numDim"))]
   CxNumDim(std::boxed::Box<NumericDimension>),
+  /// Defines the StringDimension Class.
   #[sdk(child(office2016, qname = "cx:CT_StringDimension/cx:strDim"))]
   CxStrDim(std::boxed::Box<StringDimension>),
 }
@@ -2188,13 +2192,16 @@ pub enum SeriesLayoutPropertiesChoice {
   /// Defines the Aggregation Class.
   #[sdk(empty_child(office2016, qname = "cx:CT_Aggregation/cx:aggregation"))]
   CxAggregation,
+  /// Defines the Binning Class.
   #[sdk(child(office2016, qname = "cx:CT_Binning/cx:binning"))]
   CxBinning(std::boxed::Box<Binning>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AxisChoice {
+  /// Defines the CategoryAxisScaling Class.
   #[sdk(child(office2016, qname = "cx:CT_CategoryAxisScaling/cx:catScaling"))]
   CxCatScaling(std::boxed::Box<CategoryAxisScaling>),
+  /// Defines the ValueAxisScaling Class.
   #[sdk(child(office2016, qname = "cx:CT_ValueAxisScaling/cx:valScaling"))]
   CxValScaling(std::boxed::Box<ValueAxisScaling>),
 }

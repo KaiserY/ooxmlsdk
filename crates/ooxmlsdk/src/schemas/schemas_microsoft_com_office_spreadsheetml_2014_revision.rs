@@ -1696,8 +1696,10 @@ pub enum StateBasedObjectChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevExChgObjChoice {
+  /// Defines the RevisionStateLink Class.
   #[sdk(child(office2016, qname = "xr:CT_RevisionStateLink/xr:link"))]
   XrLink(std::boxed::Box<RevisionStateLink>),
+  /// Defines the RevisionState Class.
   #[sdk(child(office2016, qname = "xr:CT_RevisionState/xr:body"))]
   XrBody(std::boxed::Box<RevisionState>),
 }

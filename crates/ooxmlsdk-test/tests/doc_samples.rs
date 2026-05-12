@@ -579,7 +579,9 @@ fn summarize_xml_parent_path(path: &str) -> &str {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct XmlElement {
   name: String,
+  raw_name: String,
   attrs: Vec<(String, String)>,
+  raw_attrs: Vec<(String, String)>,
   children: Vec<XmlNode>,
 }
 
@@ -599,8 +601,18 @@ enum XmlDeclaration {
 #[derive(Debug)]
 struct XmlFrame {
   name: String,
+  raw_name: String,
   attrs: Vec<(String, String)>,
+  raw_attrs: Vec<(String, String)>,
   children: Vec<XmlNode>,
+  ns: BTreeMap<String, String>,
+}
+
+struct ParsedXmlNode {
+  name: String,
+  raw_name: String,
+  attrs: Vec<(String, String)>,
+  raw_attrs: Vec<(String, String)>,
   ns: BTreeMap<String, String>,
 }
 
@@ -666,7 +678,7 @@ fn canonicalize_xml(
     }) {
       Event::Start(event) => {
         let inherited_ns = stack.last().map(|frame| &frame.ns);
-        let (name, attrs, ns) = parse_xml_node(
+        let parsed = parse_xml_node(
           &reader,
           &event,
           inherited_ns,
@@ -675,16 +687,18 @@ fn canonicalize_xml(
           entry_name,
         );
         let frame = XmlFrame {
-          name,
-          attrs,
+          name: parsed.name,
+          raw_name: parsed.raw_name,
+          attrs: parsed.attrs,
+          raw_attrs: parsed.raw_attrs,
           children: Vec::new(),
-          ns,
+          ns: parsed.ns,
         };
         stack.push(frame);
       }
       Event::Empty(event) => {
         let inherited_ns = stack.last().map(|frame| &frame.ns);
-        let (name, attrs, _) = parse_xml_node(
+        let parsed = parse_xml_node(
           &reader,
           &event,
           inherited_ns,
@@ -693,8 +707,10 @@ fn canonicalize_xml(
           entry_name,
         );
         let node = XmlNode::Element(XmlElement {
-          name,
-          attrs,
+          name: parsed.name,
+          raw_name: parsed.raw_name,
+          attrs: parsed.attrs,
+          raw_attrs: parsed.raw_attrs,
           children: Vec::new(),
         });
         push_xml_node(&mut roots, &mut stack, node);
@@ -705,7 +721,9 @@ fn canonicalize_xml(
           .unwrap_or_else(|| panic!("unexpected xml end event for {file_name}:{entry_name}"));
         let node = XmlNode::Element(XmlElement {
           name: frame.name,
+          raw_name: frame.raw_name,
           attrs: frame.attrs,
+          raw_attrs: frame.raw_attrs,
           children: frame.children,
         });
         push_xml_node(&mut roots, &mut stack, node);
@@ -944,6 +962,14 @@ fn compare_xml_element(
 ) {
   if original.name != roundtripped.name {
     push_xml_name_error(path, "element", &original.name, &roundtripped.name, errors);
+    errors.push(format!(
+      "{path}: original XML snippet: {}",
+      xml_element_snippet(original)
+    ));
+    errors.push(format!(
+      "{path}: roundtripped XML snippet: {}",
+      xml_element_snippet(roundtripped)
+    ));
   }
 
   compare_xml_attrs(path, &original.attrs, &roundtripped.attrs, errors);
@@ -1067,6 +1093,45 @@ fn xml_node_summary(node: &XmlNode) -> String {
   }
 }
 
+fn xml_element_snippet(element: &XmlElement) -> String {
+  truncate_for_error(&render_xml_element_snippet(element, 3))
+}
+
+fn render_xml_element_snippet(element: &XmlElement, depth: usize) -> String {
+  let mut out = String::new();
+  out.push('<');
+  out.push_str(&element.raw_name);
+  for (name, value) in &element.raw_attrs {
+    out.push(' ');
+    out.push_str(name);
+    out.push_str("=\"");
+    out.push_str(&escape_xml_attr(value));
+    out.push('"');
+  }
+
+  if element.children.is_empty() {
+    out.push_str("/>");
+    return out;
+  }
+
+  out.push('>');
+  if depth == 0 {
+    out.push_str("...");
+  } else {
+    for child in &element.children {
+      match child {
+        XmlNode::Declaration(_) => {}
+        XmlNode::Element(child) => out.push_str(&render_xml_element_snippet(child, depth - 1)),
+        XmlNode::Text(text) => out.push_str(text),
+      }
+    }
+  }
+  out.push_str("</");
+  out.push_str(&element.raw_name);
+  out.push('>');
+  out
+}
+
 fn xml_node_structural_sort_key(node: &XmlNode) -> String {
   match node {
     XmlNode::Declaration(decl) => format!("0:{}", xml_declaration_summary(*decl)),
@@ -1129,7 +1194,7 @@ fn parse_xml_node(
   options: CanonicalOptions,
   file_name: &str,
   entry_name: &str,
-) -> (String, Vec<(String, String)>, BTreeMap<String, String>) {
+) -> ParsedXmlNode {
   let mut raw_attrs = Vec::new();
   let mut ns = inherited_ns.cloned().unwrap_or_default();
   for attr in event.attributes().with_checks(false) {
@@ -1151,21 +1216,22 @@ fn parse_xml_node(
     raw_attrs.push((key, value));
   }
 
-  let name = expand_xml_name(&String::from_utf8_lossy(event.name().as_ref()), &ns, false);
+  let raw_name = String::from_utf8_lossy(event.name().as_ref()).into_owned();
+  let name = expand_xml_name(&raw_name, &ns, false);
 
   let mut attrs = Vec::new();
-  for (key, value) in raw_attrs {
+  for (key, value) in &raw_attrs {
     if key == "xmlns" || key.starts_with("xmlns:") {
       continue;
     }
 
-    let expanded_key = expand_xml_name(&key, &ns, true);
+    let expanded_key = expand_xml_name(key, &ns, true);
     let value = if is_mc_ignorable_attr(&expanded_key) {
-      normalize_ignorable_prefix_list(&value, &ns)
+      normalize_ignorable_prefix_list(value, &ns)
     } else if entry_name.ends_with(".rels") && key == "Type" {
-      normalize_relationship_type_uri(&value)
+      normalize_relationship_type_uri(value)
     } else {
-      value
+      value.clone()
     };
     let value = if options.normalize_float_lexemes {
       schema_float_kind_for_attr(&name, &expanded_key)
@@ -1179,7 +1245,13 @@ fn parse_xml_node(
   }
 
   attrs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-  (name, attrs, ns)
+  ParsedXmlNode {
+    name,
+    raw_name,
+    attrs,
+    raw_attrs,
+    ns,
+  }
 }
 
 fn expand_xml_name(name: &str, namespaces: &BTreeMap<String, String>, is_attr: bool) -> String {
@@ -1307,6 +1379,20 @@ fn escape_xml_text(value: &str) -> String {
       '&' => out.push_str("&amp;"),
       '<' => out.push_str("&lt;"),
       '>' => out.push_str("&gt;"),
+      _ => out.push(ch),
+    }
+  }
+  out
+}
+
+fn escape_xml_attr(value: &str) -> String {
+  let mut out = String::with_capacity(value.len());
+  for ch in value.chars() {
+    match ch {
+      '&' => out.push_str("&amp;"),
+      '<' => out.push_str("&lt;"),
+      '>' => out.push_str("&gt;"),
+      '"' => out.push_str("&quot;"),
       _ => out.push(ch),
     }
   }

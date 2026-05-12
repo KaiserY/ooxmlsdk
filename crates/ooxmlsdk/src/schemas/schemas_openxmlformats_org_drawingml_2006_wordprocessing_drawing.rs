@@ -460,12 +460,16 @@ pub enum AnchorChoice {
   /// No Text Wrapping.
   #[sdk(empty_child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
   WpWrapNone,
+  /// Square Wrapping.
   #[sdk(child(qname = "wp:CT_WrapSquare/wp:wrapSquare"))]
   WpWrapSquare(std::boxed::Box<WrapSquare>),
+  /// Tight Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTight/wp:wrapTight"))]
   WpWrapTight(std::boxed::Box<WrapTight>),
+  /// Through Wrapping.
   #[sdk(child(qname = "wp:CT_WrapThrough/wp:wrapThrough"))]
   WpWrapThrough(std::boxed::Box<WrapThrough>),
+  /// Top and Bottom Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"))]
   WpWrapTopAndBottom(std::boxed::Box<WrapTopBottom>),
 }

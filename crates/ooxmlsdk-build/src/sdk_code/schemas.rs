@@ -79,6 +79,8 @@ pub struct ResolvedOneSequenceChild<'a> {
   pub property_comments: Cow<'a, str>,
   pub version: &'a str,
   pub kind: SchemaTypeChildKind,
+  pub optional: bool,
+  pub repeated: bool,
 }
 
 #[derive(Debug)]
@@ -452,6 +454,8 @@ impl<'a> CodegenContext<'a> {
           property_comments,
           version: child.initial_version.as_str(),
           kind: child.kind,
+          optional: child.optional,
+          repeated: child.repeated,
         });
       }
 
@@ -474,6 +478,8 @@ impl<'a> CodegenContext<'a> {
         property_comments,
         version: schema_item_version(child_type),
         kind: child.kind,
+        optional: child.optional,
+        repeated: child.repeated,
       });
     }
 
@@ -494,6 +500,8 @@ impl<'a> CodegenContext<'a> {
       },
       version: schema_item_version(child_type),
       kind: child_kind_for_schema_type(child_type),
+      optional: false,
+      repeated: false,
     })
   }
 
@@ -514,6 +522,8 @@ impl<'a> CodegenContext<'a> {
           property_comments: Cow::Borrowed(" _"),
           version: child.initial_version.as_str(),
           kind: child.kind,
+          optional: child.optional,
+          repeated: child.repeated,
         });
       } else if child.kind == SchemaTypeChildKind::Any {
         variants.push(ResolvedOneSequenceChild {
@@ -530,6 +540,8 @@ impl<'a> CodegenContext<'a> {
           },
           version: child.initial_version.as_str(),
           kind: child.kind,
+          optional: child.optional,
+          repeated: child.repeated,
         });
       } else {
         let child_type = self.type_by_name(child.name.as_str()).ok_or_else(|| {
@@ -548,6 +560,8 @@ impl<'a> CodegenContext<'a> {
           },
           version: schema_item_version(child_type),
           kind: child.kind,
+          optional: child.optional,
+          repeated: child.repeated,
         });
       }
     }
@@ -685,7 +699,10 @@ impl<'a> CodegenContext<'a> {
         return Err(format!("{:?}", schema_type.name).into());
       }
 
-      variants.push(self.resolve_one_sequence_child(schema_type, child.name.as_str())?);
+      let mut variant = self.resolve_one_sequence_child(schema_type, child.name.as_str())?;
+      variant.optional = child.optional;
+      variant.repeated = child.repeated;
+      variants.push(variant);
     }
 
     Ok(ResolvedOneChoice {

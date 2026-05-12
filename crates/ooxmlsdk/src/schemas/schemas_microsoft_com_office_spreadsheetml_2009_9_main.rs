@@ -347,6 +347,7 @@ pub struct DataValidations {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_SparklineGroups/x14:sparklineGroups")]
 pub struct SparklineGroups {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Defines the SparklineGroup Class.
   #[sdk(child(office2010, qname = "x14:CT_SparklineGroup/x14:sparklineGroup"))]
   pub x14_sparkline_group: Vec<SparklineGroup>,
@@ -1690,6 +1691,7 @@ pub struct DifferentialType {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "x14:CT_Cfvo/x14:cfvo")]
 pub struct ConditionalFormattingValueObject {
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// type
   #[sdk(attr(office2010, qname = ":type"))]
   pub r#type: ConditionalFormattingValueObjectTypeValues,

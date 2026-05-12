@@ -5,6 +5,19 @@
       "HasOtherVariant": true
     },
     {
+      "Name": "OnOffOnlyValues",
+      "AddFacets": [
+        {
+          "Name": "True",
+          "Value": "true"
+        },
+        {
+          "Name": "False",
+          "Value": "false"
+        }
+      ]
+    },
+    {
       "Name": "LevelJustificationValues",
       "AddFacets": [
         {
@@ -45,6 +58,14 @@
     {
       "ClassName": "SpacingBetweenLines",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ParagraphBorders",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "StyleRunProperties",
+      "HaveDirectXmlOtherChildren": true
     }
   ]
 }

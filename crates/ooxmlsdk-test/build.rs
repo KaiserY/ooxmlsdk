@@ -179,7 +179,11 @@ fn is_valid_open_only(file_name: &str) -> bool {
 fn is_test_data_open_only(file_name: &str) -> bool {
   matches!(
     file_name,
-    "libreoffice/word/comment-annotationref.docx"
+    "libreoffice/spreadsheet/formats.xlsx"
+      | "libreoffice/spreadsheet/tdf130959.xlsx"
+      | "libreoffice/spreadsheet/tdf134553.xlsx"
+      | "libreoffice/word/comment-annotationref.docx"
+      | "libreoffice/word/fdo63164-1.docx"
       | "libreoffice/presentation/chart-theme-override.pptx"
       | "libreoffice/presentation/import-characters.pptx"
       | "libreoffice/presentation/tdf147586.pptx"

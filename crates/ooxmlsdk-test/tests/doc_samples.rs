@@ -363,13 +363,13 @@ fn assert_doc_sample_zip_equivalent(original: &[u8], roundtripped: &[u8], file_n
   let mut errors = Vec::new();
 
   for name in original.keys() {
-    if !roundtripped.contains_key(name) {
+    if !roundtripped.contains_key(name) && !is_empty_relationships_entry(name, &original[name]) {
       errors.push(format!("missing zip entry: {name}"));
     }
   }
 
   for name in roundtripped.keys() {
-    if !original.contains_key(name) {
+    if !original.contains_key(name) && !is_empty_relationships_entry(name, &roundtripped[name]) {
       errors.push(format!("extra zip entry: {name}"));
     }
   }
@@ -434,6 +434,38 @@ fn read_zip_entries(bytes: &[u8], file_name: &str) -> BTreeMap<String, Vec<u8>> 
 
 fn is_xml_entry(name: &str) -> bool {
   name == "[Content_Types].xml" || name.ends_with(".xml") || name.ends_with(".rels")
+}
+
+fn is_empty_relationships_entry(name: &str, bytes: &[u8]) -> bool {
+  const RELATIONSHIPS_NAME: &str =
+    "{http://schemas.openxmlformats.org/package/2006/relationships}Relationships";
+  const RELATIONSHIP_NAME: &str =
+    "{http://schemas.openxmlformats.org/package/2006/relationships}Relationship";
+
+  if !name.ends_with(".rels") {
+    return false;
+  }
+
+  let nodes = canonicalize_xml(bytes, CanonicalOptions::strict(), name, name);
+  let element_roots: Vec<_> = nodes
+    .iter()
+    .filter_map(|node| match node {
+      XmlNode::Element(element) => Some(element),
+      XmlNode::Declaration(_) => None,
+      XmlNode::Text(text) if text.trim().is_empty() => None,
+      XmlNode::Text(_) => None,
+    })
+    .collect();
+
+  let [root] = element_roots.as_slice() else {
+    return false;
+  };
+
+  root.name == RELATIONSHIPS_NAME
+    && !root.children.iter().any(|child| match child {
+      XmlNode::Element(element) => element.name == RELATIONSHIP_NAME,
+      XmlNode::Declaration(_) | XmlNode::Text(_) => false,
+    })
 }
 
 fn format_doc_sample_errors(errors: &[String]) -> String {
@@ -639,7 +671,7 @@ impl CanonicalOptions {
   fn relaxed_for_entry(entry_name: &str) -> Self {
     Self {
       normalize_float_lexemes: true,
-      sort_package_properties: matches!(entry_name, "docProps/app.xml" | "docProps/core.xml"),
+      sort_package_properties: is_package_properties_entry(entry_name),
     }
   }
 
@@ -811,10 +843,7 @@ fn normalize_xml_node_for_entry(
       element.children = collapse_adjacent_xml_text_nodes(element.children);
 
       if options.sort_package_properties
-        && (entry_name == "docProps/core.xml"
-          || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name))
-          || (entry_name == "docProps/app.xml"
-            && split_expanded_name(&element.name).1 == "Properties"))
+        && is_package_properties_sort_root(entry_name, &element.name)
       {
         element.children.sort_by_key(xml_node_structural_sort_key);
       }
@@ -1340,8 +1369,7 @@ fn render_xml_node_to_string(
       } else {
         out.push('>');
         if options.sort_package_properties
-          && (entry_name == "docProps/core.xml"
-            || (entry_name == "docProps/app.xml" && is_extended_properties_root(&element.name)))
+          && is_package_properties_sort_root(entry_name, &element.name)
         {
           let mut children = element
             .children
@@ -1370,6 +1398,20 @@ fn render_xml_node_to_string(
 fn is_extended_properties_root(name: &str) -> bool {
   name == "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Properties"
     || name == "{http://purl.oclc.org/ooxml/officeDocument/extendedProperties}Properties"
+}
+
+fn is_core_properties_root(name: &str) -> bool {
+  name == "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}coreProperties"
+}
+
+fn is_package_properties_entry(entry_name: &str) -> bool {
+  entry_name.starts_with("docProps/") && entry_name.ends_with(".xml")
+}
+
+fn is_package_properties_sort_root(entry_name: &str, name: &str) -> bool {
+  is_core_properties_root(name)
+    || is_extended_properties_root(name)
+    || (entry_name == "docProps/app.xml" && split_expanded_name(name).1 == "Properties")
 }
 
 fn escape_xml_text(value: &str) -> String {

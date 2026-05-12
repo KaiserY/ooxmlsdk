@@ -863,6 +863,8 @@ pub enum ConditionalFormattingOperatorValues {
   BeginsWith,
   #[sdk(rename = "endsWith")]
   EndsWith,
+  #[sdk(rename = "expression")]
+  Expression,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ConditionalFormatValueObjectValues {
@@ -7521,6 +7523,7 @@ pub struct MruColors {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableStyle/x:tableStyle")]
 pub struct TableStyle {
+  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Table Style Name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -9311,7 +9314,7 @@ pub struct Filters {
     qname = "x:CT_Filter/x:filter",
     qname = "x:CT_DateGroupItem/x:dateGroupItem"
   ))]
-  pub filters_choice: Option<FiltersChoice>,
+  pub filters_choice: Vec<FiltersChoice>,
 }
 /// Top 10.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

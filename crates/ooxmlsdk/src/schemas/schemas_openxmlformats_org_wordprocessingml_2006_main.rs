@@ -11,6 +11,10 @@ pub enum OnOffOnlyValues {
   On,
   #[sdk(rename = "off")]
   Off,
+  #[sdk(rename = "true")]
+  True,
+  #[sdk(rename = "false")]
+  False,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HighlightColorValues {
@@ -4559,6 +4563,7 @@ pub struct NumberingProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_PBdr/w:pBdr")]
 pub struct ParagraphBorders {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Paragraph Border Above Identical Paragraphs
   #[sdk(child(qname = "w:CT_Border/w:top"))]
   pub top_border: Option<TopBorder>,
@@ -9943,7 +9948,7 @@ pub struct GlossaryDocument {
   pub document_background: Option<std::boxed::Box<DocumentBackground>>,
   /// List of Glossary Document Entries
   #[sdk(child(qname = "w:CT_DocParts/w:docParts"))]
-  pub doc_parts: Option<std::boxed::Box<DocParts>>,
+  pub doc_parts: Option<DocParts>,
 }
 /// Previous Table-Level Property Exceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13298,6 +13303,7 @@ pub struct UiPriority {
 pub struct StyleRunProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,
@@ -14070,7 +14076,7 @@ pub struct DocumentBackground {
 pub struct DocParts {
   /// Glossary Document Entry.
   #[sdk(child(qname = "w:CT_DocPart/w:docPart"))]
-  pub doc_part: std::boxed::Box<DocPart>,
+  pub doc_part: Vec<DocPart>,
 }
 /// Entry Name.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14103,7 +14109,7 @@ pub struct DocPartTypes {
   pub all: Option<crate::simple_type::OnOffValue>,
   /// Entry Type.
   #[sdk(child(qname = "w:CT_DocPartType/w:type"))]
-  pub doc_part_type: std::boxed::Box<DocPartType>,
+  pub doc_part_type: Vec<DocPartType>,
 }
 /// Entry Insertion Behaviors.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14111,7 +14117,7 @@ pub struct DocPartTypes {
 pub struct Behaviors {
   /// Entry Insertion Behavior.
   #[sdk(child(qname = "w:CT_DocPartBehavior/w:behavior"))]
-  pub behavior: std::boxed::Box<Behavior>,
+  pub behavior: Vec<Behavior>,
 }
 /// Entry ID.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14138,10 +14144,10 @@ pub struct DocPartProperties {
   pub category: Option<std::boxed::Box<Category>>,
   /// Entry Types
   #[sdk(child(qname = "w:CT_DocPartTypes/w:types"))]
-  pub doc_part_types: Option<std::boxed::Box<DocPartTypes>>,
+  pub doc_part_types: Option<DocPartTypes>,
   /// Entry Insertion Behaviors
   #[sdk(child(qname = "w:CT_DocPartBehaviors/w:behaviors"))]
-  pub behaviors: Option<std::boxed::Box<Behaviors>>,
+  pub behaviors: Option<Behaviors>,
   /// Description for Entry
   #[sdk(child(qname = "w:CT_String/w:description"))]
   pub description: Option<Description>,

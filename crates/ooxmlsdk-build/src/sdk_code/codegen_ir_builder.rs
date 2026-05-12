@@ -1232,6 +1232,8 @@ fn build_recursive_one_sequence_choice_members(
             }),
             version: child.initial_version.as_str(),
             kind: child.kind,
+            optional: child.optional,
+            repeated: child.repeated,
           }
         } else {
           context.resolve_one_sequence_child(schema_type, child.name.as_str())?
@@ -1490,6 +1492,8 @@ fn build_recursive_choice_leaf_variant_decl(
       }),
       version: child.initial_version.as_str(),
       kind: child.kind,
+      optional: child.optional,
+      repeated: child.repeated,
     }
   } else {
     context.resolve_one_sequence_child(schema_type, child.name.as_str())?
@@ -2200,6 +2204,23 @@ fn cardinality_from_flags(optional: bool, repeated: bool) -> Cardinality {
   }
 }
 
+fn choice_field_cardinality(
+  choice_cardinality: Cardinality,
+  variants: &[ResolvedOneSequenceChild<'_>],
+) -> Cardinality {
+  if matches!(choice_cardinality, Cardinality::Many)
+    || variants.iter().any(|variant| variant.repeated)
+  {
+    Cardinality::Many
+  } else if matches!(choice_cardinality, Cardinality::Optional)
+    || variants.iter().any(|variant| variant.optional)
+  {
+    Cardinality::Optional
+  } else {
+    Cardinality::One
+  }
+}
+
 fn resolve_single_nested_schema_child(
   children: &[crate::sdk_data::sdk_data_model::SchemaTypeChild],
   optional: bool,
@@ -2373,6 +2394,8 @@ fn build_simple_one_choice_members(
 
   let choice_version = choice_child.initial_version.clone();
   let choice_cardinality = cardinality_from_flags(choice_child.optional, choice_child.repeated);
+  let effective_choice_cardinality =
+    choice_field_cardinality(choice_cardinality, &resolved_variants);
 
   if resolved_variants.len() == 1 {
     let variant = &resolved_variants[0];
@@ -2428,7 +2451,7 @@ fn build_simple_one_choice_members(
             qname: variant.name.to_string(),
           },
         },
-        cardinality: choice_cardinality,
+        cardinality: effective_choice_cardinality,
         type_ref,
         validators: Vec::new(),
       }));
@@ -2442,7 +2465,7 @@ fn build_simple_one_choice_members(
     docs: " Choice of child elements.".to_string(),
     version: choice_version.clone(),
     wire: FieldWireDecl::Choice,
-    cardinality: if matches!(choice_cardinality, Cardinality::Many) {
+    cardinality: if matches!(effective_choice_cardinality, Cardinality::Many) {
       Cardinality::Many
     } else {
       Cardinality::Optional
@@ -2636,7 +2659,9 @@ fn build_flatten_one_sequence_members(
           docs: choice.property_comments.clone(),
           version: choice_version,
           wire: FieldWireDecl::Choice,
-          cardinality: if flat_particle.repeated {
+          cardinality: if flat_particle.repeated
+            || choice.variants.iter().any(|variant| variant.repeated)
+          {
             Cardinality::Many
           } else {
             Cardinality::Optional
@@ -3543,6 +3568,8 @@ fn build_mixed_choice_leaf_variant_decl(
     property_comments: std::borrow::Cow::Borrowed(" _"),
     version: child.version,
     kind: child.kind,
+    optional: child.optional,
+    repeated: child.repeated,
   };
   build_one_sequence_choice_variant_decl(&synthetic_child, schema, context)
 }
@@ -4490,6 +4517,78 @@ mod tests {
         .iter()
         .all(|ty| ty.rust_name != "ChoiceHolderChoice")
     );
+  }
+
+  #[test]
+  fn carries_repeated_choice_variants_as_many_choice_field() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_Filter/t:filter".to_string(),
+          class_name: "Filter".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_DateGroupItem/t:dateGroupItem".to_string(),
+          class_name: "DateGroupItem".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Filters/t:filters".to_string(),
+          class_name: "Filters".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: crate::sdk_data::sdk_data_model::SchemaTypeCompositeKind::OneChoice,
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            kind: SchemaTypeChildKind::Choice,
+            children: vec![
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_Filter/t:filter".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                repeated: true,
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                particle_id: String::new(),
+                name: "t:CT_DateGroupItem/t:dateGroupItem".to_string(),
+                kind: SchemaTypeChildKind::Child,
+                repeated: true,
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let filters = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "Filters")
+      .unwrap();
+    let field = filters
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+    assert_eq!(field.rust_name, "filters_choice");
+    assert_eq!(field.cardinality, Cardinality::Many);
   }
 
   #[test]

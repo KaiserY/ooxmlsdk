@@ -296,7 +296,7 @@ pub struct RevExFuture {
   pub sti: Option<crate::simple_type::BooleanValue>,
   /// Defines the RevExTest Class.
   #[sdk(empty_child(office2016, qname = "xr:CT_RevExTest/xr:xrrtest"))]
-  pub rev_ex_test: Option<()>,
+  pub rev_ex_test: Vec<()>,
 }
 /// Defines the RevExUnsupported Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

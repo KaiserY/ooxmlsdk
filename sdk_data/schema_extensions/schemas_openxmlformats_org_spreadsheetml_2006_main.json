@@ -1,4 +1,15 @@
 {
+  "Enums": [
+    {
+      "Name": "ConditionalFormattingOperatorValues",
+      "AddFacets": [
+        {
+          "Name": "Expression",
+          "Value": "expression"
+        }
+      ]
+    }
+  ],
   "Types": [
     {
       "ClassName": "Control",
@@ -11,6 +22,10 @@
     {
       "ClassName": "Worksheet",
       "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "TableStyle",
+      "HaveXmlOtherAttrs": true
     }
   ]
 }

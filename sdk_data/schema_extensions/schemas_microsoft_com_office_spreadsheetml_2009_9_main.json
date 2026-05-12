@@ -5,7 +5,15 @@
       "HaveXmlnsFields": true
     },
     {
+      "ClassName": "ConditionalFormattingValueObject",
+      "HaveXmlOtherAttrs": true
+    },
+    {
       "ClassName": "DataValidations",
+      "HaveXmlnsFields": true
+    },
+    {
+      "ClassName": "SparklineGroups",
       "HaveXmlnsFields": true
     }
   ]

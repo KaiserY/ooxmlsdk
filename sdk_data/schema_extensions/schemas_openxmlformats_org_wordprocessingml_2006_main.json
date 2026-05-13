@@ -5,19 +5,6 @@
       "HasOtherVariant": true
     },
     {
-      "Name": "OnOffOnlyValues",
-      "AddFacets": [
-        {
-          "Name": "True",
-          "Value": "true"
-        },
-        {
-          "Name": "False",
-          "Value": "false"
-        }
-      ]
-    },
-    {
       "Name": "LevelJustificationValues",
       "AddFacets": [
         {
@@ -29,6 +16,19 @@
           "Name": "End",
           "Value": "end",
           "Version": "Office2010"
+        }
+      ]
+    },
+    {
+      "Name": "TableRowAlignmentValues",
+      "AddFacets": [
+        {
+          "Name": "Start",
+          "Value": "start"
+        },
+        {
+          "Name": "End",
+          "Value": "end"
         }
       ]
     }
@@ -58,6 +58,15 @@
     {
       "ClassName": "SpacingBetweenLines",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "DocGrid",
+      "Attributes": [
+        {
+          "PropertyName": "CharacterSpace",
+          "OverrideType": "Int32ZeroOnOverflowValue"
+        }
+      ]
     },
     {
       "ClassName": "SectionProperties",

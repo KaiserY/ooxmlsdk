@@ -121,6 +121,7 @@ define_attr_parser_forwarders! {
   parse_i16_attr -> i16,
   parse_u32_attr -> u32,
   parse_i32_attr -> i32,
+  parse_i32_zero_on_overflow_attr -> i32,
   parse_u64_attr -> u64,
   parse_i64_attr -> i64,
 }
@@ -457,6 +458,26 @@ mod tests {
     })
     .expect("parse u8");
     assert_eq!(byte, u8::MAX);
+  }
+
+  #[test]
+  fn i32_zero_on_overflow_attr_parser_zeroes_only_overflow() {
+    let normal = with_first_attr(r#"<x val="-42"/>"#, |attr, decoder| {
+      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse normal i32");
+    assert_eq!(normal, -42);
+
+    let overflow = with_first_attr(r#"<x val="4294961151"/>"#, |attr, decoder| {
+      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
+    })
+    .expect("parse overflow as zero");
+    assert_eq!(overflow, 0);
+
+    let invalid = with_first_attr(r#"<x val="abc"/>"#, |attr, decoder| {
+      parse_i32_zero_on_overflow_attr(&attr, decoder, "X", "val")
+    });
+    assert!(invalid.is_err());
   }
 
   #[cfg(feature = "parts")]

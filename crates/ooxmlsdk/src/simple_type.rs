@@ -46,6 +46,7 @@ pub type DoubleValue = f64;
 pub type HexBinaryValue = String;
 pub type Int16Value = i16;
 pub type Int32Value = i32;
+pub type Int32ZeroOnOverflowValue = i32;
 pub type Int64Value = i64;
 pub type IntegerValue = i64;
 pub type SByteValue = i8;

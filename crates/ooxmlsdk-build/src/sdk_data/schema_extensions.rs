@@ -39,12 +39,26 @@ pub struct SchemaEnumFacetExtension {
 #[serde(default, rename_all = "PascalCase")]
 pub struct SchemaTypeExtension {
   pub class_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub override_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub override_base_class: String,
   pub have_xmlns_fields: Option<bool>,
   pub have_xml_other_attrs: Option<bool>,
   pub have_xml_other_children: Option<bool>,
   pub have_direct_xml_other_children: Option<bool>,
   pub parent_choice_has_any_in: Option<Vec<String>>,
+  pub attributes: Vec<SchemaTypeAttributeExtension>,
   pub children: Vec<SchemaTypeChildExtension>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct SchemaTypeAttributeExtension {
+  pub q_name: String,
+  pub property_name: String,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub override_type: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -53,6 +67,8 @@ pub struct SchemaTypeChildExtension {
   pub name: String,
   pub property_name: String,
   pub optional: Option<bool>,
+  #[serde(skip_serializing_if = "String::is_empty")]
+  pub override_name: String,
 }
 
 pub fn read_schema_extensions(dir: &Path) -> Result<Vec<(String, SchemaExtensions)>> {
@@ -159,6 +175,12 @@ pub fn apply_schema_extensions(
       if let Some(have_xmlns_fields) = extension.have_xmlns_fields {
         schema_type.have_xmlns_fields = have_xmlns_fields;
       }
+      if !extension.override_name.is_empty() {
+        schema_type.name = extension.override_name.clone();
+      }
+      if !extension.override_base_class.is_empty() {
+        schema_type.base_class = extension.override_base_class.clone();
+      }
       if let Some(have_xml_other_attrs) = extension.have_xml_other_attrs {
         schema_type.have_xml_other_attrs = have_xml_other_attrs;
       }
@@ -170,6 +192,26 @@ pub fn apply_schema_extensions(
       }
       if let Some(parent_choice_has_any_in) = &extension.parent_choice_has_any_in {
         schema_type.parent_choice_has_any_in = parent_choice_has_any_in.clone();
+      }
+
+      for attr_extension in &extension.attributes {
+        let Some(attr) = schema_type.attributes.iter_mut().find(|attr| {
+          (!attr_extension.q_name.is_empty() && attr.q_name == attr_extension.q_name)
+            || (!attr_extension.property_name.is_empty()
+              && attr.property_name == attr_extension.property_name)
+        }) else {
+          return Err(
+            format!(
+              "schema extension attribute {}.{} not found",
+              module_name, extension.class_name
+            )
+            .into(),
+          );
+        };
+
+        if !attr_extension.override_type.is_empty() {
+          attr.r#type = attr_extension.override_type.clone();
+        }
       }
 
       for child_extension in &extension.children {
@@ -185,6 +227,9 @@ pub fn apply_schema_extensions(
 
         if let Some(optional) = child_extension.optional {
           child.optional = optional;
+        }
+        if !child_extension.override_name.is_empty() {
+          child.name = child_extension.override_name.clone();
         }
       }
     }
@@ -211,7 +256,9 @@ fn find_child_mut<'a>(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::sdk_data::sdk_data_model::{SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeChild};
+  use crate::sdk_data::sdk_data_model::{
+    SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeAttribute, SchemaTypeChild,
+  };
 
   #[test]
   fn applies_enum_other_variant_extension() {
@@ -288,6 +335,114 @@ mod tests {
     assert_eq!(
       schemas[0].types[0].parent_choice_has_any_in,
       vec!["ParentContainer".to_string()]
+    );
+  }
+
+  #[test]
+  fn applies_child_override_name_extension_by_property_name() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "Parent".to_string(),
+        children: vec![SchemaTypeChild {
+          name: "t:CT_Old/t:child".to_string(),
+          property_name: "Child".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            property_name: "Child".to_string(),
+            override_name: "t:CT_New/t:child".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(schemas[0].types[0].children[0].name, "t:CT_New/t:child");
+    assert_eq!(schemas[0].types[0].children[0].property_name, "Child");
+  }
+
+  #[test]
+  fn applies_type_override_name_and_base_class_extension() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        name: "t:CT_Old/t:item".to_string(),
+        class_name: "Item".to_string(),
+        base_class: "OldBase".to_string(),
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Item".to_string(),
+          override_name: "t:CT_New/t:item".to_string(),
+          override_base_class: "NewBase".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(schemas[0].types[0].name, "t:CT_New/t:item");
+    assert_eq!(schemas[0].types[0].base_class, "NewBase");
+  }
+
+  #[test]
+  fn applies_attribute_override_type_extension_by_property_name() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "DocGrid".to_string(),
+        attributes: vec![SchemaTypeAttribute {
+          q_name: "w:charSpace".to_string(),
+          property_name: "CharacterSpace".to_string(),
+          r#type: "Int32Value".to_string(),
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "DocGrid".to_string(),
+          attributes: vec![SchemaTypeAttributeExtension {
+            property_name: "CharacterSpace".to_string(),
+            override_type: "Int32ZeroOnOverflowValue".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert_eq!(
+      schemas[0].types[0].attributes[0].r#type,
+      "Int32ZeroOnOverflowValue"
     );
   }
 

@@ -456,10 +456,18 @@ pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {
     "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => {
       Some(SimpleValueKind::BoolLike)
     }
-    "ByteValue" | "SByteValue" | "Int16Value" | "Int32Value" | "Int64Value" | "IntegerValue"
-    | "UInt16Value" | "UInt32Value" | "UInt64Value" | "DoubleValue" | "SingleValue" => {
-      Some(SimpleValueKind::NumericLike)
-    }
+    "ByteValue"
+    | "SByteValue"
+    | "Int16Value"
+    | "Int32Value"
+    | "Int32ZeroOnOverflowValue"
+    | "Int64Value"
+    | "IntegerValue"
+    | "UInt16Value"
+    | "UInt32Value"
+    | "UInt64Value"
+    | "DoubleValue"
+    | "SingleValue" => Some(SimpleValueKind::NumericLike),
     _ => None,
   }
 }

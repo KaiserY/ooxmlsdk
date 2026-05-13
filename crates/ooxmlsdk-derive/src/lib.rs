@@ -1735,6 +1735,7 @@ enum IntegerTypeKind {
   I16,
   U32,
   I32,
+  I32ZeroOnOverflow,
   U64,
   I64,
 }
@@ -1751,6 +1752,7 @@ fn integer_type_kind(ty: &Type) -> Option<IntegerTypeKind> {
     "Int16Value" | "i16" => IntegerTypeKind::I16,
     "UInt32Value" | "u32" => IntegerTypeKind::U32,
     "Int32Value" | "i32" => IntegerTypeKind::I32,
+    "Int32ZeroOnOverflowValue" => IntegerTypeKind::I32ZeroOnOverflow,
     "UInt64Value" | "u64" => IntegerTypeKind::U64,
     "Int64Value" | "IntegerValue" | "i64" => IntegerTypeKind::I64,
     _ => return None,
@@ -1815,6 +1817,9 @@ fn parse_integer_attr_tokens(
     },
     Some(IntegerTypeKind::I32) => quote! {
       crate::common::parse_i32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
+    },
+    Some(IntegerTypeKind::I32ZeroOnOverflow) => quote! {
+      crate::common::parse_i32_zero_on_overflow_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
     Some(IntegerTypeKind::U64) => quote! {
       crate::common::parse_u64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?

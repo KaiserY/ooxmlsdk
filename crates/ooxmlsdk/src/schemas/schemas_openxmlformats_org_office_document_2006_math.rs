@@ -1819,7 +1819,7 @@ pub struct ColumnSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Left Margin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1828,7 +1828,7 @@ pub struct LeftMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Right Margin.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1837,7 +1837,7 @@ pub struct RightMargin {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Pre-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1846,7 +1846,7 @@ pub struct PreSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Post-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1855,7 +1855,7 @@ pub struct PostSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Inter-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1864,7 +1864,7 @@ pub struct InterSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Intra-Equation Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1873,7 +1873,7 @@ pub struct IntraSpacing {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Wrap Indent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1882,7 +1882,7 @@ pub struct WrapIndent {
   /// Value
   #[sdk(attr(qname = "m:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
 }
 /// Matrix Columns.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

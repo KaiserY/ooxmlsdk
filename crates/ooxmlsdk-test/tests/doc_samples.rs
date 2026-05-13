@@ -657,6 +657,7 @@ enum SchemaFloatKind {
 #[derive(Clone, Copy)]
 struct CanonicalOptions {
   normalize_float_lexemes: bool,
+  normalize_doc_grid_char_space_overflow: bool,
   sort_package_properties: bool,
   sort_all_particle_children: bool,
 }
@@ -665,6 +666,7 @@ impl CanonicalOptions {
   fn strict() -> Self {
     Self {
       normalize_float_lexemes: false,
+      normalize_doc_grid_char_space_overflow: false,
       sort_package_properties: false,
       sort_all_particle_children: false,
     }
@@ -673,6 +675,7 @@ impl CanonicalOptions {
   fn relaxed_for_entry(entry_name: &str) -> Self {
     Self {
       normalize_float_lexemes: true,
+      normalize_doc_grid_char_space_overflow: true,
       sort_package_properties: is_package_properties_entry(entry_name),
       sort_all_particle_children: true,
     }
@@ -682,6 +685,9 @@ impl CanonicalOptions {
     let mut enabled = Vec::new();
     if self.normalize_float_lexemes {
       enabled.push("schema float lexemes");
+    }
+    if self.normalize_doc_grid_char_space_overflow {
+      enabled.push("docGrid charSpace overflow");
     }
     if self.sort_package_properties {
       enabled.push("package property order");
@@ -1278,6 +1284,11 @@ fn parse_xml_node(
     } else {
       value
     };
+    let value = if options.normalize_doc_grid_char_space_overflow {
+      normalize_doc_grid_char_space_overflow(&name, &expanded_key, &value).unwrap_or(value)
+    } else {
+      value
+    };
 
     attrs.push((expanded_key, value));
   }
@@ -1487,6 +1498,40 @@ fn normalize_schema_float_lexeme(value: &str, kind: SchemaFloatKind) -> String {
       .map(render_schema_float_f64)
       .unwrap_or_else(|_| value.to_string()),
   }
+}
+
+fn normalize_doc_grid_char_space_overflow(
+  element_name: &str,
+  attr_name: &str,
+  value: &str,
+) -> Option<String> {
+  const WORDPROCESSINGML_NS: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  let (element_ns, element_local) = split_expanded_name(element_name);
+  let (attr_ns, attr_local) = split_expanded_name(attr_name);
+  if element_ns != WORDPROCESSINGML_NS
+    || element_local != "docGrid"
+    || attr_ns != WORDPROCESSINGML_NS
+    || attr_local != "charSpace"
+  {
+    return None;
+  }
+
+  if value.parse::<i32>().is_ok() {
+    return None;
+  }
+
+  let mut chars = value.chars();
+  let digits = match chars.next() {
+    Some('-' | '+') => chars.as_str(),
+    Some(_) => value,
+    None => return None,
+  };
+  if digits.is_empty() || !digits.chars().all(|ch| ch.is_ascii_digit()) {
+    return None;
+  }
+
+  Some("0".to_string())
 }
 
 fn render_schema_float_f32(value: f32) -> String {

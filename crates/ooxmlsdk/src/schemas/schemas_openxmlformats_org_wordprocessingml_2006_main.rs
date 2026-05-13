@@ -11,10 +11,6 @@ pub enum OnOffOnlyValues {
   On,
   #[sdk(rename = "off")]
   Off,
-  #[sdk(rename = "true")]
-  True,
-  #[sdk(rename = "false")]
-  False,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum HighlightColorValues {
@@ -277,6 +273,10 @@ pub enum TableRowAlignmentValues {
   Center,
   #[sdk(rename = "right")]
   Right,
+  #[sdk(rename = "start")]
+  Start,
+  #[sdk(rename = "end")]
+  End,
 }
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum ViewValues {
@@ -4477,7 +4477,7 @@ pub struct FrameProperties {
   /// Frame Height
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub height: Option<crate::simple_type::UInt32Value>,
+  pub height: Option<crate::simple_type::StringValue>,
   /// Vertical Frame Padding
   #[sdk(attr(qname = "w:vSpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -6163,7 +6163,7 @@ pub struct FitText {
   /// Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::UInt32Value,
+  pub val: crate::simple_type::StringValue,
   /// Fit Text Run ID
   #[sdk(attr(qname = "w:id"))]
   pub id: Option<crate::simple_type::Int32Value>,
@@ -8678,91 +8678,91 @@ pub struct TableCellBorders {
 }
 /// Defines the NoWrap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:noWrap")]
+#[sdk(qname = "w:CT_OnOff/w:noWrap")]
 pub struct NoWrap {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableCellFitText Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:tcFitText")]
+#[sdk(qname = "w:CT_OnOff/w:tcFitText")]
 pub struct TableCellFitText {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the HideMark Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:hideMark")]
+#[sdk(qname = "w:CT_OnOff/w:hideMark")]
 pub struct HideMark {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the CantSplit Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:cantSplit")]
+#[sdk(qname = "w:CT_OnOff/w:cantSplit")]
 pub struct CantSplit {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableHeader Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:tblHeader")]
+#[sdk(qname = "w:CT_OnOff/w:tblHeader")]
 pub struct TableHeader {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the BiDiVisual Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:bidiVisual")]
+#[sdk(qname = "w:CT_OnOff/w:bidiVisual")]
 pub struct BiDiVisual {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Frame Cannot Be Resized.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:noResizeAllowed")]
+#[sdk(qname = "w:CT_OnOff/w:noResizeAllowed")]
 pub struct NoResizeAllowed {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Maintain Link to Existing File.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:linkedToFile")]
+#[sdk(qname = "w:CT_OnOff/w:linkedToFile")]
 pub struct LinkedToFile {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Do Not Display Frameset Splitters.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:noBorder")]
+#[sdk(qname = "w:CT_OnOff/w:noBorder")]
 pub struct NoBorder {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Frameset Splitter Border Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:flatBorders")]
+#[sdk(qname = "w:CT_OnOff/w:flatBorders")]
 pub struct FlatBorders {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Automatically Merge User Formatting Into Style Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:autoRedefine")]
+#[sdk(qname = "w:CT_OnOff/w:autoRedefine")]
 pub struct AutoRedefine {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Hide Style From User Interface.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8774,59 +8774,59 @@ pub struct StyleHidden {
 }
 /// Hide Style From Main User Interface.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:semiHidden")]
+#[sdk(qname = "w:CT_OnOff/w:semiHidden")]
 pub struct SemiHidden {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Remove Semi-Hidden Property When Style Is Used.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:unhideWhenUsed")]
+#[sdk(qname = "w:CT_OnOff/w:unhideWhenUsed")]
 pub struct UnhideWhenUsed {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Primary Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:qFormat")]
+#[sdk(qname = "w:CT_OnOff/w:qFormat")]
 pub struct PrimaryStyle {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Style Cannot Be Applied.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:locked")]
+#[sdk(qname = "w:CT_OnOff/w:locked")]
 pub struct Locked {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// E-Mail Message Text Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:personal")]
+#[sdk(qname = "w:CT_OnOff/w:personal")]
 pub struct Personal {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// E-Mail Message Composition Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:personalCompose")]
+#[sdk(qname = "w:CT_OnOff/w:personalCompose")]
 pub struct PersonalCompose {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// E-Mail Message Reply Style.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_OnOffOnly/w:personalReply")]
+#[sdk(qname = "w:CT_OnOff/w:personalReply")]
 pub struct PersonalReply {
-  /// val
+  /// On/Off Value
   #[sdk(attr(qname = "w:val"))]
-  pub val: Option<OnOffOnlyValues>,
+  pub val: Option<crate::simple_type::OnOffValue>,
 }
 /// Defines the TableCellMargin Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8839,7 +8839,7 @@ pub struct TableCellMargin {
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
-  pub left_margin: Option<LeftMargin>,
+  pub left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
   #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
   pub start_margin: Option<StartMargin>,
@@ -8848,7 +8848,7 @@ pub struct TableCellMargin {
   pub bottom_margin: Option<BottomMargin>,
   /// Table Cell Right Margin Exception
   #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
-  pub right_margin: Option<RightMargin>,
+  pub right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
   #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
   pub end_margin: Option<EndMargin>,
@@ -8890,7 +8890,7 @@ pub struct TableRowHeight {
   /// Table Row Height
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: Option<crate::simple_type::UInt32Value>,
+  pub val: Option<crate::simple_type::StringValue>,
   /// Table Row Height Type
   #[sdk(attr(qname = "w:hRule"))]
   pub height_type: Option<HeightRuleValues>,
@@ -8910,19 +8910,19 @@ pub struct TablePositionProperties {
   /// Distance From Left of Table to Text
   #[sdk(attr(qname = "w:leftFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub left_from_text: Option<crate::simple_type::Int16Value>,
+  pub left_from_text: Option<crate::simple_type::StringValue>,
   /// (Distance From Right of Table to Text
   #[sdk(attr(qname = "w:rightFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub right_from_text: Option<crate::simple_type::Int16Value>,
+  pub right_from_text: Option<crate::simple_type::StringValue>,
   /// Distance From Top of Table to Text
   #[sdk(attr(qname = "w:topFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub top_from_text: Option<crate::simple_type::Int16Value>,
+  pub top_from_text: Option<crate::simple_type::StringValue>,
   /// Distance From Bottom of Table to Text
   #[sdk(attr(qname = "w:bottomFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub bottom_from_text: Option<crate::simple_type::Int16Value>,
+  pub bottom_from_text: Option<crate::simple_type::StringValue>,
   /// Table Vertical Anchor
   #[sdk(attr(qname = "w:vertAnchor"))]
   pub vertical_anchor: Option<VerticalAnchorValues>,
@@ -8935,14 +8935,14 @@ pub struct TablePositionProperties {
   /// Absolute Horizontal Distance From Anchor
   #[sdk(attr(qname = "w:tblpX"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub table_position_x: Option<crate::simple_type::Int32Value>,
+  pub table_position_x: Option<crate::simple_type::StringValue>,
   /// Relative Vertical Alignment from Anchor
   #[sdk(attr(qname = "w:tblpYSpec"))]
   pub table_position_y_alignment: Option<VerticalAlignmentValues>,
   /// Absolute Vertical Distance From Anchor
   #[sdk(attr(qname = "w:tblpY"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub table_position_y: Option<crate::simple_type::Int32Value>,
+  pub table_position_y: Option<crate::simple_type::StringValue>,
 }
 /// Defines the TableOverlap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8972,12 +8972,17 @@ pub struct TableStyleColumnBandSize {
 }
 /// Defines the TableIndentation Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidthShort/w:tblInd")]
+#[sdk(qname = "w:CT_TblWidth/w:tblInd")]
 pub struct TableIndentation {
-  /// w
+  /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
-  pub width: Option<crate::simple_type::Int32Value>,
-  /// type
+  #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
+  pub width: Option<crate::simple_type::StringValue>,
+  /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
 }
@@ -9030,7 +9035,7 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:CT_TblWidth/w:top"))]
   pub top_margin: Option<TopMargin>,
   /// Table Cell Left Margin Default
-  #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:left"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:left"))]
   pub table_cell_left_margin: Option<TableCellLeftMargin>,
   /// Defines the StartMargin Class.
   #[sdk(child(office2010, qname = "w:CT_TblWidth/w:start"))]
@@ -9039,7 +9044,7 @@ pub struct TableCellMarginDefault {
   #[sdk(child(qname = "w:CT_TblWidth/w:bottom"))]
   pub bottom_margin: Option<BottomMargin>,
   /// Table Cell Right Margin Default
-  #[sdk(child(qname = "w:CT_TblWidthDxaNil/w:right"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:right"))]
   pub table_cell_right_margin: Option<TableCellRightMargin>,
   /// Defines the EndMargin Class.
   #[sdk(child(office2010, qname = "w:CT_TblWidth/w:end"))]
@@ -9153,11 +9158,11 @@ pub struct PageSize {
   /// Page Width
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub width: Option<crate::simple_type::UInt32Value>,
+  pub width: Option<crate::simple_type::StringValue>,
   /// Page Height
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub height: Option<crate::simple_type::UInt32Value>,
+  pub height: Option<crate::simple_type::StringValue>,
   /// Page Orientation
   #[sdk(attr(qname = "w:orient"))]
   pub orient: Option<PageOrientationValues>,
@@ -9172,31 +9177,31 @@ pub struct PageMargin {
   /// Top Margin Spacing
   #[sdk(attr(qname = "w:top"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub top: Option<crate::simple_type::Int32Value>,
+  pub top: Option<crate::simple_type::StringValue>,
   /// Right Margin Spacing
   #[sdk(attr(qname = "w:right"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub right: Option<crate::simple_type::UInt32Value>,
+  pub right: Option<crate::simple_type::StringValue>,
   /// Page Bottom Spacing
   #[sdk(attr(qname = "w:bottom"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
+  pub bottom: Option<crate::simple_type::StringValue>,
   /// Left Margin Spacing
   #[sdk(attr(qname = "w:left"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub left: Option<crate::simple_type::UInt32Value>,
+  pub left: Option<crate::simple_type::StringValue>,
   /// Spacing to Top of Header
   #[sdk(attr(qname = "w:header"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub header: Option<crate::simple_type::UInt32Value>,
+  pub header: Option<crate::simple_type::StringValue>,
   /// Spacing to Bottom of Footer
   #[sdk(attr(qname = "w:footer"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub footer: Option<crate::simple_type::UInt32Value>,
+  pub footer: Option<crate::simple_type::StringValue>,
   /// Page Gutter Spacing
   #[sdk(attr(qname = "w:gutter"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub gutter: Option<crate::simple_type::UInt32Value>,
+  pub gutter: Option<crate::simple_type::StringValue>,
 }
 /// Defines the PaperSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9327,7 +9332,7 @@ pub struct DocGrid {
   pub line_pitch: Option<crate::simple_type::Int32Value>,
   /// Document Grid Character Pitch
   #[sdk(attr(qname = "w:charSpace"))]
-  pub character_space: Option<crate::simple_type::Int32Value>,
+  pub character_space: Option<crate::simple_type::Int32ZeroOnOverflowValue>,
 }
 /// Inclusion/Exclusion Data for Data Source.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9633,7 +9638,7 @@ pub struct Settings {
   #[sdk(child(qname = "w:CT_OnOff/w:styleLockQFSet"))]
   pub w_style_lock_qf_set: Option<StyleLockStylesPart>,
   /// Distance Between Automatic Tab Stops.
-  #[sdk(child(qname = "w:CT_NonNegativeShort/w:defaultTabStop"))]
+  #[sdk(child(qname = "w:CT_TwipsMeasure/w:defaultTabStop"))]
   pub w_default_tab_stop: Option<DefaultTabStop>,
   /// Automatically Hyphenate Document Contents When Displayed.
   #[sdk(child(qname = "w:CT_OnOff/w:autoHyphenation"))]
@@ -9966,7 +9971,7 @@ pub struct PreviousTablePropertyExceptions {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Table Indent from Leading Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Table Borders Exceptions
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -10012,7 +10017,7 @@ pub struct PreviousTableCellProperties {
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noWrap"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
   #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
@@ -10021,13 +10026,13 @@ pub struct PreviousTableCellProperties {
   #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TableCellFitText Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:tcFitText"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:tcFitText"))]
   pub table_cell_fit_text: Option<TableCellFitText>,
   /// Defines the TableCellVerticalAlignment Class.
   #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
   /// Defines the HideMark Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:hideMark"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
   #[sdk(choice(
     qname = "w:CT_TrackChange/w:cellIns",
@@ -10051,8 +10056,8 @@ pub struct PreviousTableRowProperties {
     qname = "w:CT_TblWidth/w:wAfter",
     qname = "w:CT_Height/w:trHeight",
     qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOffOnly/w:cantSplit",
-    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_OnOff/w:cantSplit",
+    qname = "w:CT_OnOff/w:tblHeader",
     qname = "w:CT_TblWidth/w:tblCellSpacing",
     qname = "w:CT_TblJc/w:jc"
   ))]
@@ -10074,7 +10079,7 @@ pub struct PreviousTableProperties {
   #[sdk(child(qname = "w:CT_TblOverlap/w:tblOverlap"))]
   pub table_overlap: Option<TableOverlap>,
   /// Defines the BiDiVisual Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:bidiVisual"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
   /// Defines the TableWidth Class.
   #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
@@ -10086,7 +10091,7 @@ pub struct PreviousTableProperties {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -10719,7 +10724,7 @@ pub struct TabStop {
   /// Tab Stop Position
   #[sdk(attr(qname = "w:pos"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub position: crate::simple_type::Int32Value,
+  pub position: crate::simple_type::StringValue,
 }
 /// Run Properties for the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11932,7 +11937,7 @@ pub struct TableCellProperties {
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noWrap"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
   #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
@@ -11941,13 +11946,13 @@ pub struct TableCellProperties {
   #[sdk(child(qname = "w:CT_TextDirection/w:textDirection"))]
   pub text_direction: Option<TextDirection>,
   /// Defines the TableCellFitText Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:tcFitText"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:tcFitText"))]
   pub table_cell_fit_text: Option<TableCellFitText>,
   /// Defines the TableCellVerticalAlignment Class.
   #[sdk(child(qname = "w:CT_VerticalTblJc/w:vAlign"))]
   pub table_cell_vertical_alignment: Option<TableCellVerticalAlignment>,
   /// Defines the HideMark Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:hideMark"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:hideMark"))]
   pub hide_mark: Option<HideMark>,
   #[sdk(choice(
     qname = "w:CT_TrackChange/w:cellIns",
@@ -12047,7 +12052,7 @@ pub struct TableProperties {
   #[sdk(child(qname = "w:CT_TblOverlap/w:tblOverlap"))]
   pub table_overlap: Option<TableOverlap>,
   /// Defines the BiDiVisual Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:bidiVisual"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:bidiVisual"))]
   pub bi_di_visual: Option<BiDiVisual>,
   /// Defines the TableWidth Class.
   #[sdk(child(qname = "w:CT_TblWidth/w:tblW"))]
@@ -12059,7 +12064,7 @@ pub struct TableProperties {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -12671,10 +12676,10 @@ pub struct FramesetSplitbar {
   #[sdk(child(qname = "w:CT_Color/w:color"))]
   pub color: Option<Color>,
   /// Do Not Display Frameset Splitters
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noBorder"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noBorder"))]
   pub no_border: Option<NoBorder>,
   /// Frameset Splitter Border Style
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:flatBorders"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:flatBorders"))]
   pub flat_borders: Option<FlatBorders>,
 }
 /// Frameset Layout.
@@ -12724,10 +12729,10 @@ pub struct Frame {
   #[sdk(child(qname = "w:CT_FrameScrollbar/w:scrollbar"))]
   pub scrollbar_visibility: Option<ScrollbarVisibility>,
   /// Frame Cannot Be Resized
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noResizeAllowed"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noResizeAllowed"))]
   pub no_resize_allowed: Option<NoResizeAllowed>,
   /// Maintain Link to Existing File
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:linkedToFile"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:linkedToFile"))]
   pub linked_to_file: Option<LinkedToFile>,
 }
 /// Content Between Numbering Symbol and Paragraph Text.
@@ -13236,7 +13241,7 @@ pub struct TableStyleConditionalFormattingTableProperties {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -13254,8 +13259,8 @@ pub struct TableStyleConditionalFormattingTableProperties {
 pub struct TableStyleConditionalFormattingTableRowProperties {
   #[sdk(choice(
     qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOffOnly/w:cantSplit",
-    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_OnOff/w:cantSplit",
+    qname = "w:CT_OnOff/w:tblHeader",
     qname = "w:CT_TblWidth/w:tblCellSpacing",
     qname = "w:CT_TblJc/w:jc"
   ))]
@@ -13273,7 +13278,7 @@ pub struct TableStyleConditionalFormattingTableCellProperties {
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noWrap"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
   #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
@@ -13430,7 +13435,7 @@ pub struct StyleTableProperties {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Defines the TableIndentation Class.
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Defines the TableBorders Class.
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -13450,7 +13455,7 @@ pub struct StyleTableCellProperties {
   #[sdk(child(qname = "w:CT_Shd/w:shd"))]
   pub shading: Option<Shading>,
   /// Defines the NoWrap Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:noWrap"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:noWrap"))]
   pub no_wrap: Option<NoWrap>,
   /// Defines the TableCellMargin Class.
   #[sdk(child(qname = "w:CT_TcMar/w:tcMar"))]
@@ -13580,7 +13585,7 @@ pub struct Style {
   #[sdk(child(qname = "w:CT_String253/w:link"))]
   pub linked_style: Option<LinkedStyle>,
   /// Automatically Merge User Formatting Into Style Definition
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:autoRedefine"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:autoRedefine"))]
   pub auto_redefine: Option<AutoRedefine>,
   /// Hide Style From User Interface
   #[sdk(child(qname = "w:CT_OnOffOnly/w:hidden"))]
@@ -13589,25 +13594,25 @@ pub struct Style {
   #[sdk(child(qname = "w:CT_UiPriority/w:uiPriority"))]
   pub ui_priority: Option<UiPriority>,
   /// Hide Style From Main User Interface
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:semiHidden"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:semiHidden"))]
   pub semi_hidden: Option<SemiHidden>,
   /// Remove Semi-Hidden Property When Style Is Used
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:unhideWhenUsed"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:unhideWhenUsed"))]
   pub unhide_when_used: Option<UnhideWhenUsed>,
   /// Primary Style
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:qFormat"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:qFormat"))]
   pub primary_style: Option<PrimaryStyle>,
   /// Style Cannot Be Applied
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:locked"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:locked"))]
   pub locked: Option<Locked>,
   /// E-Mail Message Text Style
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:personal"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:personal"))]
   pub personal: Option<Personal>,
   /// E-Mail Message Composition Style
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:personalCompose"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:personalCompose"))]
   pub personal_compose: Option<PersonalCompose>,
   /// E-Mail Message Reply Style
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:personalReply"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:personalReply"))]
   pub personal_reply: Option<PersonalReply>,
   /// Revision Identifier for Style Definition
   #[sdk(child(qname = "w:CT_LongHexNumber/w:rsid"))]
@@ -14282,27 +14287,35 @@ pub struct CompatibilitySetting {
 }
 /// Table Cell Left Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidthDxaNil/w:left")]
+#[sdk(qname = "w:CT_TblWidth/w:left")]
 pub struct TableCellLeftMargin {
-  /// w
+  /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
-  #[sdk(number_range(range = 0..))]
-  pub width: crate::simple_type::Int16Value,
-  /// type
+  #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
+  pub width: Option<crate::simple_type::StringValue>,
+  /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
-  pub r#type: TableWidthValues,
+  pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table Cell Right Margin Default.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_TblWidthDxaNil/w:right")]
+#[sdk(qname = "w:CT_TblWidth/w:right")]
 pub struct TableCellRightMargin {
-  /// w
+  /// Table Width Value
   #[sdk(attr(qname = "w:w"))]
-  #[sdk(number_range(range = 0..))]
-  pub width: crate::simple_type::Int16Value,
-  /// type
+  #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 1u32, union = 0u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
+  #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
+  #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
+  pub width: Option<crate::simple_type::StringValue>,
+  /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
-  pub r#type: TableWidthValues,
+  pub r#type: Option<TableWidthUnitValues>,
 }
 /// Table-Level Property Exceptions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14320,7 +14333,7 @@ pub struct TablePropertyExceptions {
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
   pub table_cell_spacing: Option<TableCellSpacing>,
   /// Table Indent from Leading Margin Exception
-  #[sdk(child(qname = "w:CT_TblWidthShort/w:tblInd"))]
+  #[sdk(child(qname = "w:CT_TblWidth/w:tblInd"))]
   pub table_indentation: Option<TableIndentation>,
   /// Table Borders Exceptions
   #[sdk(child(qname = "w:CT_TblBorders/w:tblBorders"))]
@@ -14356,8 +14369,8 @@ pub struct TableRowProperties {
     qname = "w:CT_TblWidth/w:wAfter",
     qname = "w:CT_Height/w:trHeight",
     qname = "w:CT_OnOff/w:hidden",
-    qname = "w:CT_OnOffOnly/w:cantSplit",
-    qname = "w:CT_OnOffOnly/w:tblHeader",
+    qname = "w:CT_OnOff/w:cantSplit",
+    qname = "w:CT_OnOff/w:tblHeader",
     qname = "w:CT_TblWidth/w:tblCellSpacing",
     qname = "w:CT_TblJc/w:jc"
   ))]
@@ -15063,12 +15076,18 @@ pub struct DocumentProtection {
 }
 /// Distance Between Automatic Tab Stops.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-#[sdk(qname = "w:CT_NonNegativeShort/w:defaultTabStop")]
+#[sdk(qname = "w:CT_TwipsMeasure/w:defaultTabStop")]
 pub struct DefaultTabStop {
-  /// val
+  /// Measurement in Twentieths of a Point
   #[sdk(attr(qname = "w:val"))]
-  #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::Int16Value,
+  #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
+  #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_UnsignedDecimalNumber"))]
+  #[sdk(pattern(
+    source = 3u32,
+    union = 0u64,
+    regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
+  ))]
+  pub val: crate::simple_type::StringValue,
 }
 /// Number of Pages Per Booklet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -20049,10 +20068,10 @@ pub enum PreviousTableRowPropertiesChoice {
   #[sdk(child(qname = "w:CT_OnOff/w:hidden"))]
   WHidden(std::boxed::Box<Hidden>),
   /// Defines the CantSplit Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:cantSplit"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:cantSplit"))]
   WCantSplit(std::boxed::Box<CantSplit>),
   /// Defines the TableHeader Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:tblHeader"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:tblHeader"))]
   WTblHeader(std::boxed::Box<TableHeader>),
   /// Defines the TableCellSpacing Class.
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
@@ -21272,10 +21291,10 @@ pub enum TableStyleConditionalFormattingTableRowPropertiesChoice {
   #[sdk(child(qname = "w:CT_OnOff/w:hidden"))]
   WHidden(std::boxed::Box<Hidden>),
   /// Defines the CantSplit Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:cantSplit"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:cantSplit"))]
   WCantSplit(std::boxed::Box<CantSplit>),
   /// Defines the TableHeader Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:tblHeader"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:tblHeader"))]
   WTblHeader(std::boxed::Box<TableHeader>),
   /// Defines the TableCellSpacing Class.
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]
@@ -21881,10 +21900,10 @@ pub enum TableRowPropertiesChoice {
   #[sdk(child(qname = "w:CT_OnOff/w:hidden"))]
   WHidden(std::boxed::Box<Hidden>),
   /// Defines the CantSplit Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:cantSplit"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:cantSplit"))]
   WCantSplit(std::boxed::Box<CantSplit>),
   /// Defines the TableHeader Class.
-  #[sdk(child(qname = "w:CT_OnOffOnly/w:tblHeader"))]
+  #[sdk(child(qname = "w:CT_OnOff/w:tblHeader"))]
   WTblHeader(std::boxed::Box<TableHeader>),
   /// Defines the TableCellSpacing Class.
   #[sdk(child(qname = "w:CT_TblWidth/w:tblCellSpacing"))]

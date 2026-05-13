@@ -45,82 +45,63 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
   let schemas: Vec<Schema> = gen_context
     .schemas
     .iter()
-    .map(|schema| Schema {
-      target_namespace: schema.target_namespace.clone(),
-      prefix: gen_context
+    .map(|schema| {
+      let prefix = gen_context
         .namespace_uri_prefix_map
         .get(&schema.target_namespace)
         .cloned()
-        .unwrap_or_default(),
-      typed_namespace: gen_context
-        .namespace_uri_prefix_map
-        .get(&schema.target_namespace)
-        .and_then(|prefix| gen_context.prefix_typed_namespace_map.get(prefix))
-        .cloned()
-        .unwrap_or_default(),
-      module_name: schema.module_name.clone(),
-      types: schema
-        .types
-        .iter()
-        .map(|ty| {
-          let composite_kind = resolve_composite_kind(
-            ty,
-            schema.target_namespace.as_str(),
-            &gen_context.xsd_schemas,
-          );
-          let kind = resolve_kind(ty, &type_map);
-          let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> = ty
-            .children
-            .iter()
-            .map(|child| (child.name.as_str(), child))
-            .collect();
-          let mut children = Vec::new();
-          if composite_kind == SchemaTypeCompositeKind::OneChoice {
-            children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
-          } else if ty.particle.kind == "All" {
-            children.extend(ty.children.iter().map(|child| SchemaTypeChild {
-              particle_id: String::new(),
-              name: child.name.clone(),
-              property_name: child.property_name.clone(),
-              property_comments: child.property_comments.clone(),
-              kind: resolve_child_kind(child.name.as_str(), &type_map),
-              optional: false,
-              repeated: false,
-              initial_version: String::new(),
-              children: Vec::new(),
-            }));
-          } else if ty.particle.kind.is_empty() {
-            if !ty.additional_elements.is_empty() {
-              let variants: Vec<SchemaTypeChild> = ty
-                .children
-                .iter()
-                .map(|child| SchemaTypeChild {
-                  particle_id: String::new(),
-                  name: child.name.clone(),
-                  property_name: child.property_name.clone(),
-                  property_comments: child.property_comments.clone(),
-                  kind: resolve_child_kind(child.name.as_str(), &type_map),
-                  optional: false,
-                  repeated: false,
-                  initial_version: String::new(),
-                  children: Vec::new(),
-                })
-                .collect();
+        .unwrap_or_default();
+      let on_off_qname_overrides = xsd_on_off_only_to_on_off_qname_overrides(
+        prefix.as_str(),
+        schema.target_namespace.as_str(),
+        &gen_context.xsd_schemas,
+      );
+      let twips_measure_attr_overrides = xsd_twips_measure_attr_type_overrides(
+        schema.target_namespace.as_str(),
+        &gen_context.xsd_schemas,
+      );
+      let twips_measure_element_qname_overrides = xsd_twips_measure_element_qname_overrides(
+        prefix.as_str(),
+        schema.target_namespace.as_str(),
+        &gen_context.xsd_schemas,
+        &schema.types,
+      );
+      let table_width_element_qname_overrides = xsd_table_width_element_qname_overrides(
+        prefix.as_str(),
+        schema.target_namespace.as_str(),
+        &gen_context.xsd_schemas,
+        &schema.types,
+      );
 
-              if !variants.is_empty() {
-                children.push(SchemaTypeChild {
-                  particle_id: String::new(),
-                  name: String::new(),
-                  property_name: "children".to_string(),
-                  property_comments: String::new(),
-                  kind: SchemaTypeChildKind::Choice,
-                  optional: false,
-                  repeated: true,
-                  initial_version: String::new(),
-                  children: variants,
-                });
-              }
-            } else {
+      Schema {
+        target_namespace: schema.target_namespace.clone(),
+        prefix,
+        typed_namespace: gen_context
+          .namespace_uri_prefix_map
+          .get(&schema.target_namespace)
+          .and_then(|prefix| gen_context.prefix_typed_namespace_map.get(prefix))
+          .cloned()
+          .unwrap_or_default(),
+        module_name: schema.module_name.clone(),
+        types: schema
+          .types
+          .iter()
+          .map(|ty| {
+            let composite_kind = resolve_composite_kind(
+              ty,
+              schema.target_namespace.as_str(),
+              &gen_context.xsd_schemas,
+            );
+            let kind = resolve_kind(ty, &type_map);
+            let raw_child_map: HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaTypeChild> =
+              ty.children
+                .iter()
+                .map(|child| (child.name.as_str(), child))
+                .collect();
+            let mut children = Vec::new();
+            if composite_kind == SchemaTypeCompositeKind::OneChoice {
+              children.extend(gen_one_choice_children(ty, &raw_child_map, &type_map));
+            } else if ty.particle.kind == "All" {
               children.extend(ty.children.iter().map(|child| SchemaTypeChild {
                 particle_id: String::new(),
                 name: child.name.clone(),
@@ -132,155 +113,580 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 initial_version: String::new(),
                 children: Vec::new(),
               }));
+            } else if ty.particle.kind.is_empty() {
+              if !ty.additional_elements.is_empty() {
+                let variants: Vec<SchemaTypeChild> = ty
+                  .children
+                  .iter()
+                  .map(|child| SchemaTypeChild {
+                    particle_id: String::new(),
+                    name: child.name.clone(),
+                    property_name: child.property_name.clone(),
+                    property_comments: child.property_comments.clone(),
+                    kind: resolve_child_kind(child.name.as_str(), &type_map),
+                    optional: false,
+                    repeated: false,
+                    initial_version: String::new(),
+                    children: Vec::new(),
+                  })
+                  .collect();
+
+                if !variants.is_empty() {
+                  children.push(SchemaTypeChild {
+                    particle_id: String::new(),
+                    name: String::new(),
+                    property_name: "children".to_string(),
+                    property_comments: String::new(),
+                    kind: SchemaTypeChildKind::Choice,
+                    optional: false,
+                    repeated: true,
+                    initial_version: String::new(),
+                    children: variants,
+                  });
+                }
+              } else {
+                children.extend(ty.children.iter().map(|child| SchemaTypeChild {
+                  particle_id: String::new(),
+                  name: child.name.clone(),
+                  property_name: child.property_name.clone(),
+                  property_comments: child.property_comments.clone(),
+                  kind: resolve_child_kind(child.name.as_str(), &type_map),
+                  optional: false,
+                  repeated: false,
+                  initial_version: String::new(),
+                  children: Vec::new(),
+                }));
+              }
+            } else {
+              collect_choice_children(
+                &ty.particle,
+                &raw_child_map,
+                &type_map,
+                &mut children,
+                false,
+                false,
+                false,
+              );
             }
-          } else {
-            collect_choice_children(
-              &ty.particle,
-              &raw_child_map,
-              &type_map,
-              &mut children,
-              false,
-              false,
-              false,
-            );
-          }
-          mark_sequence_collection_children_repeated(ty, &mut children);
-          mark_mixed_sequence_direct_children_optional(&mut children);
-          let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
-            ty,
-            kind,
-            schema.module_name.as_str(),
-            &type_map,
-            &children,
-          );
-          let have_xmlns_fields = ty.has_xmlns_fields
-            || !ty.part.is_empty()
-            || ty.base_class == "OpenXmlPartRootElement"
-            || has_extension_xmlns_fields(ty, kind)
-            || has_drawing_payload_xmlns_fields(ty, kind, &type_map)
-            || has_spreadsheet_repeated_part_root_content_xmlns_fields(
+            mark_sequence_collection_children_repeated(ty, &mut children);
+            mark_mixed_sequence_direct_children_optional(&mut children);
+            let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
               ty,
               kind,
               schema.module_name.as_str(),
               &type_map,
-            )
-            || has_mce_context_xmlns_fields(ty, kind, have_xml_other_attrs, &type_map, &children);
-          let have_xml_other_children =
-            have_xml_other_children_for_mixed_version_content(ty, &type_map, &children)
-              || have_xml_other_children_for_spreadsheet_repeated_part_root_content_child(
+              &children,
+            );
+            let have_xmlns_fields = ty.has_xmlns_fields
+              || !ty.part.is_empty()
+              || ty.base_class == "OpenXmlPartRootElement"
+              || has_extension_xmlns_fields(ty, kind)
+              || has_drawing_payload_xmlns_fields(ty, kind, &type_map)
+              || has_spreadsheet_repeated_part_root_content_xmlns_fields(
                 ty,
                 kind,
                 schema.module_name.as_str(),
                 &type_map,
               )
-              || have_xml_other_children_for_text_list_style_extension_siblings(ty, kind)
-              || have_xml_other_children_for_common_repeated_content(
+              || has_mce_context_xmlns_fields(ty, kind, have_xml_other_attrs, &type_map, &children);
+            let have_xml_other_children =
+              have_xml_other_children_for_mixed_version_content(ty, &type_map, &children)
+                || have_xml_other_children_for_spreadsheet_repeated_part_root_content_child(
+                  ty,
+                  kind,
+                  schema.module_name.as_str(),
+                  &type_map,
+                )
+                || have_xml_other_children_for_text_list_style_extension_siblings(ty, kind)
+                || have_xml_other_children_for_common_repeated_content(
+                  ty,
+                  kind,
+                  have_xmlns_fields,
+                  have_xml_other_attrs,
+                  &children,
+                );
+            let have_direct_xml_other_children =
+              have_direct_xml_other_children_for_targeted_mce_content(
                 ty,
                 kind,
-                have_xmlns_fields,
-                have_xml_other_attrs,
-                &children,
+                schema.module_name.as_str(),
               );
-          let have_direct_xml_other_children =
-            have_direct_xml_other_children_for_targeted_mce_content(
-              ty,
+            assign_particle_ids(&mut children);
+
+            let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
+              SchemaTypeXmlHeader::Standalone
+            } else {
+              SchemaTypeXmlHeader::None
+            };
+
+            let mut schema_type = SchemaType {
+              name: ty.name.clone(),
+              class_name: ty.class_name.clone(),
+              summary: ty.summary.clone(),
+              version: ty.version.clone(),
+              part: ty.part.clone(),
+              base_class: ty.base_class.clone(),
               kind,
-              schema.module_name.as_str(),
+              composite_kind,
+              xml_header,
+              is_abstract: ty.is_abstract,
+              have_xmlns_fields,
+              have_xml_other_attrs,
+              have_xml_other_children,
+              have_direct_xml_other_children,
+              parent_choice_has_any_in: Vec::new(),
+              text_value_type: String::new(),
+              api_kind: resolve_api_kind(ty, &type_map),
+              attributes: ty
+                .attributes
+                .iter()
+                .map(|attr| SchemaTypeAttribute {
+                  q_name: attr.q_name.clone(),
+                  property_name: attr.property_name.clone(),
+                  r#type: attr.r#type.clone(),
+                  property_comments: attr.property_comments.clone(),
+                  version: attr.version.clone(),
+                  required: attr
+                    .validators
+                    .iter()
+                    .any(|validator| validator.name == "RequiredValidator"),
+                  validators: attr
+                    .validators
+                    .iter()
+                    .map(|validator| {
+                      crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidator {
+                        name: validator.name.clone(),
+                        is_list: validator.is_list,
+                        r#type: validator.r#type.clone(),
+                        union_id: validator.union_id,
+                        is_initial_version: validator.is_initial_version,
+                        arguments: validator
+                          .arguments
+                          .iter()
+                          .map(|argument| {
+                            crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidatorArgument {
+                              name: argument.name.clone(),
+                              r#type: argument.r#type.clone(),
+                              value: argument.value.clone(),
+                            }
+                          })
+                          .collect(),
+                      }
+                    })
+                    .collect(),
+                  ..Default::default()
+                })
+                .collect(),
+              children,
+            };
+            apply_xsd_twips_measure_element_qname_overrides(
+              &mut schema_type,
+              &twips_measure_element_qname_overrides,
             );
-          assign_particle_ids(&mut children);
-
-          let xml_header = if !ty.part.is_empty() || ty.base_class == "OpenXmlPartRootElement" {
-            SchemaTypeXmlHeader::Standalone
-          } else {
-            SchemaTypeXmlHeader::None
-          };
-
-          SchemaType {
-            name: ty.name.clone(),
-            class_name: ty.class_name.clone(),
-            summary: ty.summary.clone(),
-            version: ty.version.clone(),
-            part: ty.part.clone(),
-            base_class: ty.base_class.clone(),
-            kind,
-            composite_kind,
-            xml_header,
-            is_abstract: ty.is_abstract,
-            have_xmlns_fields,
-            have_xml_other_attrs,
-            have_xml_other_children,
-            have_direct_xml_other_children,
-            parent_choice_has_any_in: Vec::new(),
-            text_value_type: String::new(),
-            api_kind: resolve_api_kind(ty, &type_map),
-            attributes: ty
-              .attributes
+            apply_xsd_table_width_element_qname_overrides(
+              &mut schema_type,
+              &table_width_element_qname_overrides,
+            );
+            apply_xsd_twips_measure_attr_type_overrides(
+              &mut schema_type,
+              &twips_measure_attr_overrides,
+            );
+            apply_on_off_qname_overrides(&mut schema_type, &on_off_qname_overrides);
+            schema_type
+          })
+          .collect(),
+        enums: schema
+          .enums
+          .iter()
+          .map(|schema_enum| SchemaEnum {
+            name: schema_enum.name.clone(),
+            r#type: schema_enum.r#type.clone(),
+            version: schema_enum.version.clone(),
+            other_variant: None,
+            facets: schema_enum
+              .facets
               .iter()
-              .map(|attr| SchemaTypeAttribute {
-                q_name: attr.q_name.clone(),
-                property_name: attr.property_name.clone(),
-                r#type: attr.r#type.clone(),
-                property_comments: attr.property_comments.clone(),
-                version: attr.version.clone(),
-                required: attr
-                  .validators
-                  .iter()
-                  .any(|validator| validator.name == "RequiredValidator"),
-                validators: attr
-                  .validators
-                  .iter()
-                  .map(
-                    |validator| crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidator {
-                      name: validator.name.clone(),
-                      is_list: validator.is_list,
-                      r#type: validator.r#type.clone(),
-                      union_id: validator.union_id,
-                      is_initial_version: validator.is_initial_version,
-                      arguments: validator
-                        .arguments
-                        .iter()
-                        .map(|argument| {
-                          crate::sdk_data::sdk_data_model::SchemaTypeAttributeValidatorArgument {
-                            name: argument.name.clone(),
-                            r#type: argument.r#type.clone(),
-                            value: argument.value.clone(),
-                          }
-                        })
-                        .collect(),
-                    },
-                  )
-                  .collect(),
+              .map(|facet| SchemaEnumFacet {
+                name: facet.name.clone(),
+                value: facet.value.clone(),
+                version: facet.version.clone(),
                 ..Default::default()
               })
               .collect(),
-            children,
-          }
-        })
-        .collect(),
-      enums: schema
-        .enums
-        .iter()
-        .map(|schema_enum| SchemaEnum {
-          name: schema_enum.name.clone(),
-          r#type: schema_enum.r#type.clone(),
-          version: schema_enum.version.clone(),
-          other_variant: None,
-          facets: schema_enum
-            .facets
-            .iter()
-            .map(|facet| SchemaEnumFacet {
-              name: facet.name.clone(),
-              value: facet.value.clone(),
-              version: facet.version.clone(),
-              ..Default::default()
-            })
-            .collect(),
-        })
-        .collect(),
+          })
+          .collect(),
+      }
     })
     .collect();
 
   schemas
+}
+
+fn xsd_on_off_only_to_on_off_qname_overrides(
+  prefix: &str,
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+) -> HashMap<String, String> {
+  if prefix.is_empty() {
+    return HashMap::new();
+  }
+
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return HashMap::new();
+  };
+
+  let mut xsd_element_types: HashMap<String, HashSet<String>> = HashMap::new();
+  for complex_type in xsd.complex_types.values().chain(xsd.root_elements.values()) {
+    for child in &complex_type.children {
+      let local_name = xsd_child_local_name(child.q_name.as_str());
+      let type_name = xsd_type_local_name(child.r#type.as_str());
+      if !local_name.is_empty() && !type_name.is_empty() {
+        xsd_element_types
+          .entry(local_name.to_string())
+          .or_default()
+          .insert(type_name.to_string());
+      }
+    }
+  }
+
+  xsd_element_types
+    .into_iter()
+    .filter_map(|(local_name, types)| {
+      if local_name == "hidden" || types.len() != 1 || !types.contains("CT_OnOff") {
+        return None;
+      }
+      Some((
+        format!("{prefix}:CT_OnOffOnly/{prefix}:{local_name}"),
+        format!("{prefix}:CT_OnOff/{prefix}:{local_name}"),
+      ))
+    })
+    .collect()
+}
+
+fn xsd_child_local_name(q_name: &str) -> &str {
+  q_name.rsplit(':').next().unwrap_or(q_name)
+}
+
+fn xsd_type_local_name(type_name: &str) -> &str {
+  type_name.rsplit(':').next().unwrap_or(type_name)
+}
+
+fn xsd_twips_measure_attr_type_overrides(
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+) -> HashSet<(String, String)> {
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return HashSet::new();
+  };
+
+  xsd
+    .complex_types
+    .iter()
+    .flat_map(|(complex_type_name, complex_type)| {
+      complex_type.attributes.iter().filter_map(|attr| {
+        if is_xsd_twips_measure_type(attr.xsd_type.as_str()) {
+          Some((
+            complex_type_name.clone(),
+            xsd_child_local_name(attr.q_name.as_str()).to_string(),
+          ))
+        } else {
+          None
+        }
+      })
+    })
+    .collect()
+}
+
+fn xsd_twips_measure_element_qname_overrides(
+  prefix: &str,
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+  schema_types: &[crate::sdk_data::open_xml::OpenXmlSchemaType],
+) -> HashMap<String, (String, String)> {
+  if prefix.is_empty() {
+    return HashMap::new();
+  }
+
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return HashMap::new();
+  };
+
+  let mut xsd_element_types: HashMap<String, HashSet<String>> = HashMap::new();
+  for complex_type in xsd.complex_types.values().chain(xsd.root_elements.values()) {
+    for child in &complex_type.children {
+      let type_name = xsd_type_local_name(child.r#type.as_str());
+      if is_xsd_twips_measure_complex_type(type_name) {
+        xsd_element_types
+          .entry(xsd_child_local_name(child.q_name.as_str()).to_string())
+          .or_default()
+          .insert(type_name.to_string());
+      }
+    }
+  }
+
+  let mut data_element_counts: HashMap<String, usize> = HashMap::new();
+  for schema_type in schema_types {
+    if let Some(local_name) = schema_type_element_local_name(schema_type.name.as_str())
+      && !local_name.is_empty()
+    {
+      *data_element_counts
+        .entry(local_name.to_string())
+        .or_default() += 1;
+    }
+  }
+
+  schema_types
+    .iter()
+    .filter_map(|schema_type| {
+      let local_name = schema_type_element_local_name(schema_type.name.as_str())?;
+      if data_element_counts.get(local_name).copied() != Some(1) {
+        return None;
+      }
+
+      let xsd_types = xsd_element_types.get(local_name)?;
+      if xsd_types.len() != 1 {
+        return None;
+      }
+
+      let xsd_type = xsd_types.iter().next()?;
+      if schema_type_complex_type_name(schema_type.name.as_str()) == Some(xsd_type.as_str()) {
+        return None;
+      }
+
+      let base_class = match xsd_type.as_str() {
+        "CT_TwipsMeasure" => "TwipsMeasureType",
+        "CT_SignedTwipsMeasure" => "SignedTwipsMeasureType",
+        _ => return None,
+      };
+
+      Some((
+        schema_type.name.clone(),
+        (
+          format!("{prefix}:{xsd_type}/{prefix}:{local_name}"),
+          base_class.to_string(),
+        ),
+      ))
+    })
+    .collect()
+}
+
+fn xsd_table_width_element_qname_overrides(
+  prefix: &str,
+  target_namespace: &str,
+  xsd_schemas: &HashMap<String, ParsedXsd>,
+  schema_types: &[crate::sdk_data::open_xml::OpenXmlSchemaType],
+) -> HashMap<String, (String, String)> {
+  if prefix.is_empty() {
+    return HashMap::new();
+  }
+
+  let Some(xsd) = xsd_schemas.get(target_namespace) else {
+    return HashMap::new();
+  };
+
+  let xsd_table_width_children: HashSet<(String, String)> = xsd
+    .complex_types
+    .iter()
+    .flat_map(|(complex_type_name, complex_type)| {
+      complex_type.children.iter().filter_map(|child| {
+        if xsd_type_local_name(child.r#type.as_str()) == "CT_TblWidth" {
+          Some((
+            complex_type_name.clone(),
+            xsd_child_local_name(child.q_name.as_str()).to_string(),
+          ))
+        } else {
+          None
+        }
+      })
+    })
+    .collect();
+
+  let mut qnames_to_override = HashSet::new();
+  for schema_type in schema_types {
+    let Some(parent_complex_type_name) = schema_type_complex_type_name(schema_type.name.as_str())
+    else {
+      continue;
+    };
+
+    for child in &schema_type.children {
+      let Some(child_complex_type_name) = schema_type_complex_type_name(child.name.as_str()) else {
+        continue;
+      };
+      let Some(child_local_name) = schema_type_element_local_name(child.name.as_str()) else {
+        continue;
+      };
+
+      if xsd_table_width_children.contains(&(
+        parent_complex_type_name.to_string(),
+        child_local_name.to_string(),
+      )) && child_complex_type_name != "CT_TblWidth"
+      {
+        qnames_to_override.insert(child.name.clone());
+      }
+    }
+  }
+
+  qnames_to_override
+    .into_iter()
+    .filter_map(|qname| {
+      let local_name = schema_type_element_local_name(qname.as_str())?.to_string();
+      Some((
+        qname,
+        (
+          format!("{prefix}:CT_TblWidth/{prefix}:{}", local_name),
+          "TableWidthType".to_string(),
+        ),
+      ))
+    })
+    .collect()
+}
+
+fn is_xsd_twips_measure_type(type_name: &str) -> bool {
+  matches!(
+    xsd_type_local_name(type_name),
+    "ST_TwipsMeasure" | "ST_SignedTwipsMeasure"
+  )
+}
+
+fn is_xsd_twips_measure_complex_type(type_name: &str) -> bool {
+  matches!(type_name, "CT_TwipsMeasure" | "CT_SignedTwipsMeasure")
+}
+
+fn apply_xsd_twips_measure_attr_type_overrides(
+  schema_type: &mut SchemaType,
+  attr_overrides: &HashSet<(String, String)>,
+) {
+  let Some(complex_type_name) = schema_type_complex_type_name(schema_type.name.as_str()) else {
+    return;
+  };
+
+  for attr in &mut schema_type.attributes {
+    if attr_overrides.contains(&(
+      complex_type_name.to_string(),
+      xsd_child_local_name(attr.q_name.as_str()).to_string(),
+    )) && is_integer_value_type(attr.r#type.as_str())
+    {
+      attr.r#type = "StringValue".to_string();
+    }
+  }
+}
+
+fn apply_xsd_twips_measure_element_qname_overrides(
+  schema_type: &mut SchemaType,
+  qname_overrides: &HashMap<String, (String, String)>,
+) {
+  if let Some((override_name, override_base_class)) = qname_overrides.get(schema_type.name.as_str())
+  {
+    schema_type.name = override_name.clone();
+    schema_type.base_class = override_base_class.clone();
+    schema_type.kind = SchemaTypeKind::Derived;
+    schema_type.attributes.clear();
+  }
+
+  apply_xsd_twips_measure_element_qname_overrides_to_children(
+    &mut schema_type.children,
+    qname_overrides,
+  );
+}
+
+fn apply_xsd_table_width_element_qname_overrides(
+  schema_type: &mut SchemaType,
+  qname_overrides: &HashMap<String, (String, String)>,
+) {
+  if let Some((override_name, override_base_class)) = qname_overrides.get(schema_type.name.as_str())
+  {
+    schema_type.name = override_name.clone();
+    schema_type.base_class = override_base_class.clone();
+    schema_type.kind = SchemaTypeKind::Derived;
+    schema_type.attributes.clear();
+  }
+
+  apply_xsd_table_width_element_qname_overrides_to_children(
+    &mut schema_type.children,
+    qname_overrides,
+  );
+}
+
+fn apply_xsd_table_width_element_qname_overrides_to_children(
+  children: &mut [SchemaTypeChild],
+  qname_overrides: &HashMap<String, (String, String)>,
+) {
+  for child in children {
+    if let Some((override_name, _)) = qname_overrides.get(child.name.as_str()) {
+      child.name = override_name.clone();
+    }
+    apply_xsd_table_width_element_qname_overrides_to_children(&mut child.children, qname_overrides);
+  }
+}
+
+fn apply_xsd_twips_measure_element_qname_overrides_to_children(
+  children: &mut [SchemaTypeChild],
+  qname_overrides: &HashMap<String, (String, String)>,
+) {
+  for child in children {
+    if let Some((override_name, _)) = qname_overrides.get(child.name.as_str()) {
+      child.name = override_name.clone();
+    }
+    apply_xsd_twips_measure_element_qname_overrides_to_children(
+      &mut child.children,
+      qname_overrides,
+    );
+  }
+}
+
+fn schema_type_complex_type_name(name: &str) -> Option<&str> {
+  let before_element_name = name.split_once('/')?.0;
+  Some(xsd_type_local_name(before_element_name))
+}
+
+fn schema_type_element_local_name(name: &str) -> Option<&str> {
+  let (_, element_name) = name.split_once('/')?;
+  if element_name.is_empty() {
+    None
+  } else {
+    Some(xsd_child_local_name(element_name))
+  }
+}
+
+fn is_integer_value_type(type_name: &str) -> bool {
+  matches!(
+    type_name,
+    "SByteValue"
+      | "ByteValue"
+      | "Int16Value"
+      | "UInt16Value"
+      | "Int32Value"
+      | "UInt32Value"
+      | "Int64Value"
+      | "UInt64Value"
+      | "IntegerValue"
+  )
+}
+
+fn apply_on_off_qname_overrides(
+  schema_type: &mut SchemaType,
+  qname_overrides: &HashMap<String, String>,
+) {
+  if let Some(override_name) = qname_overrides.get(schema_type.name.as_str()) {
+    schema_type.name = override_name.clone();
+    if schema_type.base_class == "OnOffOnlyType" {
+      schema_type.base_class = "OnOffType".to_string();
+    }
+  }
+
+  apply_on_off_qname_overrides_to_children(&mut schema_type.children, qname_overrides);
+}
+
+fn apply_on_off_qname_overrides_to_children(
+  children: &mut [SchemaTypeChild],
+  qname_overrides: &HashMap<String, String>,
+) {
+  for child in children {
+    if let Some(override_name) = qname_overrides.get(child.name.as_str()) {
+      child.name = override_name.clone();
+    }
+    apply_on_off_qname_overrides_to_children(&mut child.children, qname_overrides);
+  }
 }
 
 pub(crate) fn assign_schema_particle_ids(schemas: &mut [Schema]) {
@@ -1826,7 +2232,12 @@ fn resolve_derived_base_type<'a>(
 
 #[cfg(test)]
 mod tests {
-  use super::{gen_schemas, matches_xsd_repeatable_choice_rule, resolve_composite_kind};
+  use super::{
+    gen_schemas, is_integer_value_type, matches_xsd_repeatable_choice_rule, resolve_composite_kind,
+    schema_type_complex_type_name, xsd_child_local_name, xsd_on_off_only_to_on_off_qname_overrides,
+    xsd_table_width_element_qname_overrides, xsd_twips_measure_attr_type_overrides,
+    xsd_twips_measure_element_qname_overrides,
+  };
   use crate::sdk_data::{
     context::Context,
     open_xml::{OpenXmlSchemaType, OpenXmlSchemaTypeParticle},
@@ -1988,6 +2399,307 @@ mod tests {
       .expect("font");
 
     assert_eq!(font.kind, SchemaTypeKind::Composite);
+  }
+
+  #[test]
+  fn actual_repo_upgrades_on_off_only_elements_from_xsd_except_style_hidden() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+
+    let word_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("word schema");
+
+    let upgraded: HashSet<String> = word_schema
+      .types
+      .iter()
+      .filter(|schema_type| schema_type.name.starts_with("w:CT_OnOff/"))
+      .filter(|schema_type| schema_type.base_class == "OnOffType")
+      .map(|schema_type| schema_type.class_name.clone())
+      .collect();
+
+    for expected in [
+      "AutoRedefine",
+      "BiDiVisual",
+      "CantSplit",
+      "FlatBorders",
+      "HideMark",
+      "LinkedToFile",
+      "Locked",
+      "NoBorder",
+      "NoResizeAllowed",
+      "NoWrap",
+      "Personal",
+      "PersonalCompose",
+      "PersonalReply",
+      "PrimaryStyle",
+      "SemiHidden",
+      "TableCellFitText",
+      "TableHeader",
+      "UnhideWhenUsed",
+    ] {
+      assert!(upgraded.contains(expected), "missing {expected}");
+    }
+
+    let style_hidden = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "StyleHidden")
+      .expect("StyleHidden");
+    assert_eq!(style_hidden.name, "w:CT_OnOffOnly/w:hidden");
+    assert_eq!(style_hidden.base_class, "OnOffOnlyType");
+  }
+
+  #[test]
+  fn actual_repo_upgrades_integer_twips_measure_attrs_from_xsd_to_string() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+
+    let word_raw_schema = context
+      .schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("raw word schema");
+    let attr_overrides = xsd_twips_measure_attr_type_overrides(
+      word_raw_schema.target_namespace.as_str(),
+      &context.xsd_schemas,
+    );
+
+    let raw_integer_candidates: Vec<(&str, &str, &str)> = word_raw_schema
+      .types
+      .iter()
+      .flat_map(|schema_type| {
+        schema_type.attributes.iter().filter_map(|attr| {
+          let complex_type_name = schema_type_complex_type_name(schema_type.name.as_str())?;
+          if attr_overrides.contains(&(
+            complex_type_name.to_string(),
+            xsd_child_local_name(attr.q_name.as_str()).to_string(),
+          )) && is_integer_value_type(attr.r#type.as_str())
+          {
+            Some((
+              schema_type.class_name.as_str(),
+              attr.property_name.as_str(),
+              attr.r#type.as_str(),
+            ))
+          } else {
+            None
+          }
+        })
+      })
+      .collect();
+
+    assert_eq!(raw_integer_candidates.len(), 19);
+
+    let schemas = gen_schemas(&context);
+    let word_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("word schema");
+
+    for (class_name, property_name, raw_type) in raw_integer_candidates {
+      let schema_type = word_schema
+        .types
+        .iter()
+        .find(|schema_type| schema_type.class_name == class_name)
+        .unwrap_or_else(|| panic!("missing generated type {class_name}"));
+      let attr = schema_type
+        .attributes
+        .iter()
+        .find(|attr| attr.property_name == property_name)
+        .unwrap_or_else(|| panic!("missing generated attr {class_name}.{property_name}"));
+      assert_eq!(
+        attr.r#type, "StringValue",
+        "{class_name}.{property_name} raw type was {raw_type}"
+      );
+    }
+
+    let page_size = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "PageSize")
+      .expect("PageSize");
+    assert_eq!(
+      page_size
+        .attributes
+        .iter()
+        .find(|attr| attr.property_name == "Code")
+        .expect("PageSize.Code")
+        .r#type,
+      "UInt16Value"
+    );
+
+    let columns = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "Columns")
+      .expect("Columns");
+    assert_eq!(
+      columns
+        .attributes
+        .iter()
+        .find(|attr| attr.property_name == "Space")
+        .expect("Columns.Space")
+        .r#type,
+      "StringValue"
+    );
+  }
+
+  #[test]
+  fn actual_repo_upgrades_uniquely_identified_twips_measure_elements_from_xsd() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+
+    let word_raw_schema = context
+      .schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("raw word schema");
+    let prefix = context
+      .namespace_uri_prefix_map
+      .get(&word_raw_schema.target_namespace)
+      .expect("word prefix");
+    let qname_overrides = xsd_twips_measure_element_qname_overrides(
+      prefix,
+      word_raw_schema.target_namespace.as_str(),
+      &context.xsd_schemas,
+      &word_raw_schema.types,
+    );
+
+    assert_eq!(qname_overrides.len(), 1);
+    assert_eq!(
+      qname_overrides
+        .get("w:CT_NonNegativeShort/w:defaultTabStop")
+        .map(|(qname, base_class)| (qname.as_str(), base_class.as_str())),
+      Some(("w:CT_TwipsMeasure/w:defaultTabStop", "TwipsMeasureType"))
+    );
+    assert!(!qname_overrides.contains_key("w:CT_TextScale/w:w"));
+
+    let schemas = gen_schemas(&context);
+    let word_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("word schema");
+
+    let default_tab_stop = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "DefaultTabStop")
+      .expect("DefaultTabStop");
+    assert_eq!(default_tab_stop.name, "w:CT_TwipsMeasure/w:defaultTabStop");
+    assert_eq!(default_tab_stop.base_class, "TwipsMeasureType");
+
+    let character_scale = word_schema
+      .types
+      .iter()
+      .find(|schema_type| schema_type.class_name == "CharacterScale")
+      .expect("CharacterScale");
+    assert_eq!(character_scale.name, "w:CT_TextScale/w:w");
+  }
+
+  #[test]
+  fn actual_repo_upgrades_table_width_elements_from_xsd_parent_child_rules() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+
+    let word_raw_schema = context
+      .schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("raw word schema");
+    let prefix = context
+      .namespace_uri_prefix_map
+      .get(&word_raw_schema.target_namespace)
+      .expect("word prefix");
+    let qname_overrides = xsd_table_width_element_qname_overrides(
+      prefix,
+      word_raw_schema.target_namespace.as_str(),
+      &context.xsd_schemas,
+      &word_raw_schema.types,
+    );
+
+    assert_eq!(qname_overrides.len(), 3);
+    for (from, to, base_class) in [
+      (
+        "w:CT_TblWidthDxaNil/w:left",
+        "w:CT_TblWidth/w:left",
+        "TableWidthType",
+      ),
+      (
+        "w:CT_TblWidthDxaNil/w:right",
+        "w:CT_TblWidth/w:right",
+        "TableWidthType",
+      ),
+      (
+        "w:CT_TblWidthShort/w:tblInd",
+        "w:CT_TblWidth/w:tblInd",
+        "TableWidthType",
+      ),
+    ] {
+      assert_eq!(
+        qname_overrides
+          .get(from)
+          .map(|(qname, base_class)| (qname.as_str(), base_class.as_str())),
+        Some((to, base_class))
+      );
+    }
+    assert!(!qname_overrides.contains_key("w:CT_Border/w:left"));
+    assert!(!qname_overrides.contains_key("w:CT_Border/w:right"));
+    assert!(!qname_overrides.contains_key("w:CT_Border/w:top"));
+    assert!(!qname_overrides.contains_key("w:CT_Border/w:bottom"));
+
+    let schemas = gen_schemas(&context);
+    let word_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
+      .expect("word schema");
+
+    for (class_name, expected_qname) in [
+      ("TableCellLeftMargin", "w:CT_TblWidth/w:left"),
+      ("TableCellRightMargin", "w:CT_TblWidth/w:right"),
+      ("TableIndentation", "w:CT_TblWidth/w:tblInd"),
+    ] {
+      let schema_type = word_schema
+        .types
+        .iter()
+        .find(|schema_type| schema_type.class_name == class_name)
+        .unwrap_or_else(|| panic!("missing {class_name}"));
+      assert_eq!(schema_type.name, expected_qname);
+      assert_eq!(schema_type.base_class, "TableWidthType");
+      assert_eq!(schema_type.kind, SchemaTypeKind::Derived);
+      assert!(schema_type.attributes.is_empty());
+    }
+  }
+
+  #[test]
+  fn on_off_xsd_upgrade_map_excludes_ambiguous_style_hidden() {
+    let mut xsd_schemas = HashMap::new();
+    xsd_schemas.insert(
+      "urn:test".to_string(),
+      parse_xsd(
+        r#"
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+          <xsd:complexType name="CT_Style">
+            <xsd:sequence>
+              <xsd:element name="hidden" type="CT_OnOff" minOccurs="0"/>
+              <xsd:element name="qFormat" type="CT_OnOff" minOccurs="0"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:schema>
+        "#,
+      )
+      .expect("parse xsd"),
+    );
+
+    let overrides = xsd_on_off_only_to_on_off_qname_overrides("w", "urn:test", &xsd_schemas);
+    assert_eq!(
+      overrides
+        .get("w:CT_OnOffOnly/w:qFormat")
+        .map(String::as_str),
+      Some("w:CT_OnOff/w:qFormat")
+    );
+    assert!(!overrides.contains_key("w:CT_OnOffOnly/w:hidden"));
   }
 
   #[test]

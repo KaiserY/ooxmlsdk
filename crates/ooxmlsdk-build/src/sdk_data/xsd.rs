@@ -39,6 +39,7 @@ pub(crate) struct ParsedParticle {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ParsedChildElement {
   pub q_name: String,
+  pub r#type: String,
   pub min_occurs: u64,
   pub max_occurs: u64,
   pub complex_type: Option<ParsedComplexType>,
@@ -49,6 +50,7 @@ pub(crate) struct ParsedAttribute {
   pub field: String,
   pub q_name: String,
   pub r#type: String,
+  pub xsd_type: String,
   pub required: bool,
 }
 
@@ -255,6 +257,7 @@ fn parse_child_element(
 
   Ok(ParsedChildElement {
     q_name,
+    r#type: optional_attr(reader, element, b"type")?.unwrap_or_default(),
     min_occurs: optional_attr(reader, element, b"minOccurs")?
       .as_deref()
       .unwrap_or("1")
@@ -314,6 +317,7 @@ fn parse_attribute(
       field: attribute_field_name(&q_name),
       q_name,
       r#type: "StringValue".to_string(),
+      xsd_type: String::new(),
       required: optional_attr(reader, element, b"use")?.as_deref() == Some("required"),
     }));
   }
@@ -322,14 +326,14 @@ fn parse_attribute(
     return Ok(None);
   };
 
+  let xsd_type =
+    optional_attr(reader, element, b"type")?.unwrap_or_else(|| "xsd:string".to_string());
+
   Ok(Some(ParsedAttribute {
     field: attribute_field_name(&name),
     q_name: name,
-    r#type: map_xsd_type_to_schema_type(
-      optional_attr(reader, element, b"type")?
-        .unwrap_or_else(|| "xsd:string".to_string())
-        .as_str(),
-    ),
+    r#type: map_xsd_type_to_schema_type(xsd_type.as_str()),
+    xsd_type,
     required: optional_attr(reader, element, b"use")?.as_deref() == Some("required"),
   }))
 }

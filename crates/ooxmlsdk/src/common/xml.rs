@@ -357,6 +357,67 @@ define_unsigned_decimal_attr_parser!(parse_u64_attr, parse_u64_bytes, u64);
 define_signed_decimal_attr_parser!(parse_i64_attr, parse_i64_bytes, i64);
 
 #[inline]
+pub(crate) fn parse_i32_zero_on_overflow_attr(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i32, SdkError> {
+  if let Some(value) = attr_raw_value(attr) {
+    parse_i32_zero_on_overflow_bytes(value, ty, field)
+  } else {
+    let value = decode_attr_value(attr, decoder)?;
+    parse_i32_zero_on_overflow_bytes(value.as_bytes(), ty, field)
+  }
+}
+
+#[inline]
+fn parse_i32_zero_on_overflow_bytes(
+  value: &[u8],
+  ty: &'static str,
+  field: &'static str,
+) -> Result<i32, SdkError> {
+  let (negative, digits) = match value {
+    [b'-', rest @ ..] => (true, rest),
+    [b'+', rest @ ..] => (false, rest),
+    _ => (false, value),
+  };
+  if digits.is_empty() {
+    return Err(invalid_field_value_bytes(ty, field, value));
+  }
+
+  let limit = if negative {
+    i32::MAX as u32 + 1
+  } else {
+    i32::MAX as u32
+  };
+  let mut parsed: u32 = 0;
+  for &digit in digits {
+    if !digit.is_ascii_digit() {
+      return Err(invalid_field_value_bytes(ty, field, value));
+    }
+
+    parsed = match parsed
+      .checked_mul(10)
+      .and_then(|current| current.checked_add((digit - b'0') as u32))
+    {
+      Some(parsed) if parsed <= limit => parsed,
+      _ => return Ok(0),
+    };
+  }
+
+  if negative {
+    if parsed == i32::MAX as u32 + 1 {
+      Ok(i32::MIN)
+    } else {
+      Ok(-(parsed as i32))
+    }
+  } else {
+    Ok(parsed as i32)
+  }
+}
+
+#[inline]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,

@@ -1,5 +1,6 @@
 use ooxmlsdk_pdf_test::{
-  PdfSummary, pdf_page_count_for_fixture, pdf_summary_for_fixture, pdfexport_fixture_dir,
+  PdfBounds, PdfSummary, assert_pdf_rect_close, pdf_page_count_for_fixture,
+  pdf_summary_for_fixture, pdfexport_fixture_dir,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -30,30 +31,6 @@ fn page_object_count(summary: &PdfSummary, page_index: usize) -> usize {
     + page.shading_objects
     + page.form_objects
     + page.unsupported_objects
-}
-
-fn parse_rect(rect: &str) -> [f64; 4] {
-  let trimmed = rect
-    .trim()
-    .strip_prefix('[')
-    .and_then(|value| value.strip_suffix(']'))
-    .unwrap_or_else(|| panic!("invalid rect format: {rect}"));
-  let values = trimmed
-    .split_ascii_whitespace()
-    .map(|value| value.parse::<f64>().unwrap())
-    .collect::<Vec<_>>();
-  assert_eq!(values.len(), 4, "expected four rect coordinates in {rect}");
-  [values[0], values[1], values[2], values[3]]
-}
-
-fn assert_rect_eq(actual: &str, expected: [f64; 4]) {
-  let actual = parse_rect(actual);
-  for (index, (actual_value, expected_value)) in actual.into_iter().zip(expected).enumerate() {
-    assert!(
-      (actual_value - expected_value).abs() <= 0.1,
-      "rect mismatch at {index}: actual={actual:?} expected={expected:?}"
-    );
-  }
 }
 
 #[test]
@@ -181,11 +158,36 @@ fn pdfexport_fixture_content_control_rtl_matches_upstream_widget_rects() {
   assert_eq!(widgets.len(), 5);
 
   let expected = [
-    [55.699, 706.701, 132.401, 722.499],
-    [197.499, 706.701, 274.201, 722.499],
-    [302.349, 679.101, 379.051, 694.899],
-    [479.599, 679.101, 556.301, 694.899],
-    [55.699, 651.501, 132.401, 667.299],
+    PdfBounds {
+      left: 55.699,
+      bottom: 706.701,
+      right: 132.401,
+      top: 722.499,
+    },
+    PdfBounds {
+      left: 197.499,
+      bottom: 706.701,
+      right: 274.201,
+      top: 722.499,
+    },
+    PdfBounds {
+      left: 302.349,
+      bottom: 679.101,
+      right: 379.051,
+      top: 694.899,
+    },
+    PdfBounds {
+      left: 479.599,
+      bottom: 679.101,
+      right: 556.301,
+      top: 694.899,
+    },
+    PdfBounds {
+      left: 55.699,
+      bottom: 651.501,
+      right: 132.401,
+      top: 667.299,
+    },
   ];
 
   for (widget, expected_rect) in widgets.iter().zip(expected) {
@@ -193,7 +195,7 @@ fn pdfexport_fixture_content_control_rtl_matches_upstream_widget_rects() {
       .rect
       .as_deref()
       .unwrap_or_else(|| panic!("missing widget bounds for {:?}", widget));
-    assert_rect_eq(bounds, expected_rect);
+    assert_pdf_rect_close(bounds, expected_rect, 0.001);
   }
 }
 

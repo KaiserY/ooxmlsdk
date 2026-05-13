@@ -177,6 +177,124 @@ pub struct RenderedPageSummary {
   pub rgba_crc32: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PdfBounds {
+  pub left: f32,
+  pub bottom: f32,
+  pub right: f32,
+  pub top: f32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PixelRect {
+  pub left: u32,
+  pub top: u32,
+  pub width: u32,
+  pub height: u32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RenderedPageImage {
+  pub page_index: usize,
+  pub width_px: u32,
+  pub height_px: u32,
+  pub page_width_pt: f32,
+  pub page_height_pt: f32,
+  pub rgba_crc32: String,
+  pub rgba: Vec<u8>,
+}
+
+impl PdfBounds {
+  pub fn width(self) -> f32 {
+    self.right - self.left
+  }
+
+  pub fn height(self) -> f32 {
+    self.top - self.bottom
+  }
+
+  pub fn center(self) -> (f32, f32) {
+    (
+      self.left + self.width() / 2.0,
+      self.bottom + self.height() / 2.0,
+    )
+  }
+}
+
+impl RenderedPageImage {
+  pub fn pixel_rgba(&self, x: u32, y: u32) -> Option<[u8; 4]> {
+    if x >= self.width_px || y >= self.height_px {
+      return None;
+    }
+    let offset = ((y * self.width_px + x) * 4) as usize;
+    Some([
+      self.rgba[offset],
+      self.rgba[offset + 1],
+      self.rgba[offset + 2],
+      self.rgba[offset + 3],
+    ])
+  }
+
+  pub fn sample_pdf_point_rgba(&self, x_pt: f32, y_pt: f32) -> Option<[u8; 4]> {
+    let (x, y) = self.pdf_point_to_pixel(x_pt, y_pt)?;
+    self.pixel_rgba(x, y)
+  }
+
+  pub fn sample_pdf_rect_center_rgba(&self, rect: PdfBounds) -> Option<[u8; 4]> {
+    let (x, y) = rect.center();
+    self.sample_pdf_point_rgba(x, y)
+  }
+
+  pub fn pixel_region_crc32(&self, rect: PixelRect) -> Option<String> {
+    if rect.width == 0
+      || rect.height == 0
+      || rect.left >= self.width_px
+      || rect.top >= self.height_px
+      || rect.left + rect.width > self.width_px
+      || rect.top + rect.height > self.height_px
+    {
+      return None;
+    }
+
+    let mut crc = crc32fast::Hasher::new();
+    for y in rect.top..rect.top + rect.height {
+      let start = ((y * self.width_px + rect.left) * 4) as usize;
+      let end = start + (rect.width * 4) as usize;
+      crc.update(&self.rgba[start..end]);
+    }
+    Some(format!("{:08x}", crc.finalize()))
+  }
+
+  pub fn pdf_rect_crc32(&self, rect: PdfBounds) -> Option<String> {
+    self.pixel_region_crc32(self.pdf_rect_to_pixel_rect(rect)?)
+  }
+
+  pub fn pdf_point_to_pixel(&self, x_pt: f32, y_pt: f32) -> Option<(u32, u32)> {
+    if !(0.0..=self.page_width_pt).contains(&x_pt) || !(0.0..=self.page_height_pt).contains(&y_pt) {
+      return None;
+    }
+
+    let x = (x_pt / self.page_width_pt * self.width_px as f32).floor() as u32;
+    let y =
+      ((self.page_height_pt - y_pt) / self.page_height_pt * self.height_px as f32).floor() as u32;
+    Some((x.min(self.width_px - 1), y.min(self.height_px - 1)))
+  }
+
+  pub fn pdf_rect_to_pixel_rect(&self, rect: PdfBounds) -> Option<PixelRect> {
+    if rect.width() <= 0.0 || rect.height() <= 0.0 {
+      return None;
+    }
+    let (left, top) = self.pdf_point_to_pixel(rect.left, rect.top)?;
+    let (right, bottom) = self.pdf_point_to_pixel(rect.right, rect.bottom)?;
+    Some(PixelRect {
+      left,
+      top,
+      width: right.saturating_sub(left).max(1),
+      height: bottom.saturating_sub(top).max(1),
+    })
+  }
+}
+
 impl PdfSummary {
   pub fn from_bytes(pdf: &[u8]) -> Result<Self, String> {
     let text = String::from_utf8_lossy(pdf);
@@ -215,6 +333,72 @@ pub fn pdf_page_count(pdf: &[u8]) -> Result<usize, String> {
   let document = LopdfDocument::load_mem(pdf)
     .map_err(|error| format!("lopdf could not load PDF bytes: {error}"))?;
   Ok(document.get_pages().len())
+}
+
+pub fn parse_pdf_rect(rect: &str) -> Result<PdfBounds, String> {
+  let trimmed = rect
+    .trim()
+    .strip_prefix('[')
+    .and_then(|value| value.strip_suffix(']'))
+    .ok_or_else(|| format!("invalid PDF rect format: {rect}"))?;
+  let values = trimmed
+    .split_ascii_whitespace()
+    .map(|value| {
+      value
+        .parse::<f32>()
+        .map_err(|error| format!("invalid PDF rect coordinate {value:?}: {error}"))
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+  if values.len() != 4 {
+    return Err(format!(
+      "expected four PDF rect coordinates, got {} in {rect}",
+      values.len()
+    ));
+  }
+  Ok(PdfBounds {
+    left: values[0],
+    bottom: values[1],
+    right: values[2],
+    top: values[3],
+  })
+}
+
+pub fn assert_pdf_rect_close(actual: &str, expected: PdfBounds, tolerance: f32) {
+  let actual = parse_pdf_rect(actual).unwrap();
+  for (name, actual_value, expected_value) in [
+    ("left", actual.left, expected.left),
+    ("bottom", actual.bottom, expected.bottom),
+    ("right", actual.right, expected.right),
+    ("top", actual.top, expected.top),
+  ] {
+    assert!(
+      (actual_value - expected_value).abs() <= tolerance,
+      "PDF rect {name} mismatch: actual={actual:?} expected={expected:?} tolerance={tolerance}"
+    );
+  }
+}
+
+pub fn rendered_page_image_from_pdf(
+  pdf: &[u8],
+  page_index: usize,
+  target_width: i32,
+) -> Result<RenderedPageImage, String> {
+  let _guard = pdfium_lock().lock().unwrap();
+  let pdfium = bind_pdfium()?;
+  let document = pdfium
+    .load_pdf_from_byte_vec(pdf.to_vec(), None)
+    .map_err(|error| format!("PDFium could not load PDF bytes: {error}"))?;
+
+  for (current_page_index, page) in document.pages().iter().enumerate() {
+    if current_page_index == page_index {
+      return rendered_page_image(page_index, &page, target_width);
+    }
+  }
+
+  Err(format!(
+    "PDF page index {page_index} is out of range; page count is {}",
+    document.pages().len()
+  ))
 }
 
 struct PdfiumSummary {
@@ -906,8 +1090,22 @@ fn rendered_page_summary(
   page_index: usize,
   page: &PdfPage<'_>,
 ) -> Result<RenderedPageSummary, String> {
+  let image = rendered_page_image(page_index, page, 1200)?;
+  Ok(RenderedPageSummary {
+    page_index,
+    width_px: image.width_px,
+    height_px: image.height_px,
+    rgba_crc32: image.rgba_crc32,
+  })
+}
+
+fn rendered_page_image(
+  page_index: usize,
+  page: &PdfPage<'_>,
+  target_width: i32,
+) -> Result<RenderedPageImage, String> {
   let bitmap = page
-    .render_with_config(&PdfRenderConfig::new().set_target_width(1200))
+    .render_with_config(&PdfRenderConfig::new().set_target_width(target_width))
     .map_err(|error| format!("PDFium could not render page {page_index}: {error}"))?;
   let width_px = bitmap.width() as u32;
   let height_px = bitmap.height() as u32;
@@ -917,11 +1115,14 @@ fn rendered_page_summary(
   let rgba = image.to_rgba8();
   let mut crc = crc32fast::Hasher::new();
   crc.update(rgba.as_raw());
-  Ok(RenderedPageSummary {
+  Ok(RenderedPageImage {
     page_index,
     width_px,
     height_px,
+    page_width_pt: page.width().value,
+    page_height_pt: page.height().value,
     rgba_crc32: format!("{:08x}", crc.finalize()),
+    rgba: rgba.into_raw(),
   })
 }
 
@@ -943,11 +1144,11 @@ fn format_text_render_mode(mode: PdfPageTextRenderMode) -> String {
   format!("{mode:?}")
 }
 
-fn format_rect(rect: PdfRect, precision: usize) -> String {
+fn format_rect(rect: pdfium_render::prelude::PdfRect, precision: usize) -> String {
   format_rect_with_precision(rect, precision)
 }
 
-fn format_rect_with_precision(rect: PdfRect, precision: usize) -> String {
+fn format_rect_with_precision(rect: pdfium_render::prelude::PdfRect, precision: usize) -> String {
   format!(
     "[{left:.precision$} {bottom:.precision$} {right:.precision$} {top:.precision$}]",
     left = rect.left().value,
@@ -955,6 +1156,105 @@ fn format_rect_with_precision(rect: PdfRect, precision: usize) -> String {
     right = rect.right().value,
     top = rect.top().value,
   )
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn parse_pdf_rect_reads_four_point_coordinates() {
+    let rect = parse_pdf_rect("[1.5 2.0 30.25 40.75]").unwrap();
+    assert_eq!(
+      rect,
+      PdfBounds {
+        left: 1.5,
+        bottom: 2.0,
+        right: 30.25,
+        top: 40.75,
+      }
+    );
+    assert_eq!(rect.width(), 28.75);
+    assert_eq!(rect.height(), 38.75);
+    assert_eq!(rect.center(), (15.875, 21.375));
+  }
+
+  #[test]
+  #[should_panic(expected = "PDF rect right mismatch")]
+  fn assert_pdf_rect_close_reports_coordinate_mismatch() {
+    assert_pdf_rect_close(
+      "[0.0 0.0 12.0 10.0]",
+      PdfBounds {
+        left: 0.0,
+        bottom: 0.0,
+        right: 10.0,
+        top: 10.0,
+      },
+      0.1,
+    );
+  }
+
+  #[test]
+  fn rendered_page_image_maps_pdf_coordinates_to_pixels() {
+    let image = RenderedPageImage {
+      page_index: 0,
+      width_px: 200,
+      height_px: 100,
+      page_width_pt: 400.0,
+      page_height_pt: 200.0,
+      rgba_crc32: String::new(),
+      rgba: vec![0; 200 * 100 * 4],
+    };
+
+    assert_eq!(image.pdf_point_to_pixel(0.0, 200.0), Some((0, 0)));
+    assert_eq!(image.pdf_point_to_pixel(400.0, 0.0), Some((199, 99)));
+    assert_eq!(image.pdf_point_to_pixel(200.0, 100.0), Some((100, 50)));
+    assert_eq!(
+      image.pdf_rect_to_pixel_rect(PdfBounds {
+        left: 100.0,
+        bottom: 50.0,
+        right: 300.0,
+        top: 150.0,
+      }),
+      Some(PixelRect {
+        left: 50,
+        top: 25,
+        width: 100,
+        height: 50,
+      })
+    );
+  }
+
+  #[test]
+  fn rendered_page_image_samples_pixels_and_hashes_regions() {
+    let mut rgba = vec![0; 4 * 4 * 4];
+    rgba[(2 * 4 + 1) * 4..(2 * 4 + 2) * 4].copy_from_slice(&[10, 20, 30, 255]);
+    let image = RenderedPageImage {
+      page_index: 0,
+      width_px: 4,
+      height_px: 4,
+      page_width_pt: 4.0,
+      page_height_pt: 4.0,
+      rgba_crc32: String::new(),
+      rgba,
+    };
+
+    assert_eq!(image.pixel_rgba(1, 2), Some([10, 20, 30, 255]));
+    assert_eq!(
+      image.sample_pdf_point_rgba(1.0, 2.0),
+      Some([10, 20, 30, 255])
+    );
+    assert!(
+      image
+        .pixel_region_crc32(PixelRect {
+          left: 1,
+          top: 2,
+          width: 1,
+          height: 1,
+        })
+        .is_some()
+    );
+  }
 }
 
 struct PdfStream {

@@ -11,8 +11,9 @@ pub mod render;
 use std::path::{Path, PathBuf};
 
 pub use pdf_extract::{
-  AnnotationSummary, LinkTargetKind, PdfSummary, RawAnnotationSummary, RawPageSummary,
-  RawXObjectSummary, pdf_page_count,
+  AnnotationSummary, LinkTargetKind, PdfBounds, PdfSummary, PixelRect, RawAnnotationSummary,
+  RawPageSummary, RawXObjectSummary, RenderedPageImage, assert_pdf_rect_close, parse_pdf_rect,
+  pdf_page_count, rendered_page_image_from_pdf,
 };
 pub use render::render_fixture_pdf;
 
@@ -54,6 +55,16 @@ pub fn pdf_summary_for_fixture(fixture: &Path) -> Result<PdfSummary> {
 pub fn pdf_page_count_for_fixture(fixture: &Path) -> Result<usize> {
   let pdf = render_fixture_pdf(fixture)?;
   pdf_page_count(&pdf).map_err(CalibrationError::PdfiumExtraction)
+}
+
+pub fn rendered_page_image_for_fixture(
+  fixture: &Path,
+  page_index: usize,
+  target_width: i32,
+) -> Result<RenderedPageImage> {
+  let pdf = render_fixture_pdf(fixture)?;
+  rendered_page_image_from_pdf(&pdf, page_index, target_width)
+    .map_err(CalibrationError::PdfiumExtraction)
 }
 
 pub fn workspace_relative_path(path: &Path) -> String {

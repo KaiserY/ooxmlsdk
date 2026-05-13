@@ -66,6 +66,51 @@ from other LibreOffice subsystems, but each one asserts a final visible-output
 property that can be checked directly on the generated PDF without depending on
 Writer's internal document model.
 
+Mapped visible-output fixtures:
+
+- `fdo66145.docx`: copied from
+  `../core/sw/qa/core/header_footer/data/fdo66145.docx`.
+- `first-header-footer.docx`: copied from
+  `../core/sw/qa/core/header_footer/data/first-header-footer.docx`.
+- `cont-sect-break-header-footer.docx`: copied from
+  `../core/sw/qa/core/header_footer/data/cont-sect-break-header-footer.docx`.
+- `tdf166205_first_page_header_footer_visible.docx`: copied from
+  `../core/sw/qa/core/header_footer/data/tdf166205_first_page_header_footer_visible.docx`.
+- `testTitlePage.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/testTitlePage.docx`.
+- `inheritFirstHeader.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/inheritFirstHeader.docx`.
+- `n750255.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/n750255.docx`.
+- `n780843.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/n780843.docx`.
+- `tdf155736_PageNumbers_footer.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf155736_PageNumbers_footer.docx`.
+- `num-override-lvltext.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/num-override-lvltext.docx`.
+- `tdf147646_mergedCellNumbering.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf147646_mergedCellNumbering.docx`.
+- `tdf153613_anchoredAfterPgBreak.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_anchoredAfterPgBreak.docx`.
+- `tdf153613_anchoredAfterPgBreak2.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_anchoredAfterPgBreak2.docx`.
+- `tdf153613_anchoredAfterPgBreak3.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_anchoredAfterPgBreak3.docx`.
+- `tdf153613_anchoredAfterPgBreak6.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_anchoredAfterPgBreak6.docx`.
+- `tdf153613_inlineAfterPgBreak.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_inlineAfterPgBreak.docx`.
+- `tdf153613_inlineAfterPgBreak2.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_inlineAfterPgBreak2.docx`.
+- `tdf153613_textboxAfterPgBreak3.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153613_textboxAfterPgBreak3.docx`.
+- `tdf147724.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf147724.docx`.
+- `n751077.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/n751077.docx`.
+- `tdf136952_pgBreak3.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf136952_pgBreak3.docx`.
+
 Assertion policy:
 
 - Render the fixture only through `ooxmlsdk-pdf`; do not shell out to

@@ -110,6 +110,88 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/ooxmlimport/data/n751077.docx`.
 - `tdf136952_pgBreak3.docx`: copied from
   `../core/sw/qa/extras/ooxmlimport/data/tdf136952_pgBreak3.docx`.
+- `tdf123636_newlinePageBreak3.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf123636_newlinePageBreak3.docx`.
+- `tdf123636_newlinePageBreak4.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf123636_newlinePageBreak4.docx`.
+- `tdf169802_hidden_shape.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf169802_hidden_shape.docx`.
+- `tdf124594.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf124594.docx`.
+- `128197_compat14.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/128197_compat14.docx`.
+- `128197_compat15.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/128197_compat15.docx`.
+- `tdf149313.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf149313.docx`.
+- `tdf154369.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf154369.docx`.
+- `tdf75573_page1frame.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf75573_page1frame.docx`.
+- `tdf120548.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf120548.docx`.
+- `tdf95495.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf95495.docx`.
+- `fdo81031.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/fdo81031.docx`.
+- `n705956-1.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/n705956-1.docx`.
+- `textbox_picturefill.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/textbox_picturefill.docx`.
+- `tdf117923.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf117923.docx`.
+- `tdf104492.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf104492.docx`.
+- `floattable-multi-nested.docx`: copied from
+  `../core/sw/qa/writerfilter/ooxml/data/floattable-multi-nested.docx`.
+- `tdf124600.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf124600.docx`.
+- `tdf113946.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf113946.docx`.
+- `picture-with-schemecolor.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/picture-with-schemecolor.docx`.
+- `n777345.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/n777345.docx`.
+- `msobrightnesscontrast.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/msobrightnesscontrast.docx`.
+- `tdf136841.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf136841.docx`.
+- `tdf156078_rightTabOutsideParaRightIndent.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf156078_rightTabOutsideParaRightIndent.docx`.
+- `tdf132976_testRelativeAnchorWidthFromLeftMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf132976_testRelativeAnchorWidthFromLeftMargin.docx`.
+- `tdf133861_RelativeAnchorWidthFromInsideOutsideMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133861_RelativeAnchorWidthFromInsideOutsideMargin.docx`.
+- `tdf133045_TestShapeAlignmentRelativeFromTopMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133045_TestShapeAlignmentRelativeFromTopMargin.docx`.
+- `tdf113183.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf113183.docx`.
+- `tdf120511_eatenSection.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf120511_eatenSection.docx`.
+- `tdf119760_positionCellBorder.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf119760_positionCellBorder.docx`.
+- `tdf116985.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf116985.docx`.
+- `090716_Studentische_Arbeit_VWS.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/090716_Studentische_Arbeit_VWS.docx`.
+- `tdf102466.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf102466.docx`.
+- `tdf95367_inheritFollowStyle.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf95367_inheritFollowStyle.docx`.
+- `tdf84678.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf84678.docx`.
+- `tdf103544.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf103544.docx`.
+- `StyleRef-DE.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/StyleRef-DE.docx`.
+- `n758883.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/n758883.docx`.
+- `tdf95377.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf95377.docx`.
+- `negative-cell-margin-twips.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/negative-cell-margin-twips.docx`.
+- `tdf153042_largeTab.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153042_largeTab.docx`.
 
 Assertion policy:
 

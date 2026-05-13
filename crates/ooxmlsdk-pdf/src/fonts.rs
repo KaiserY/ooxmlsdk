@@ -96,6 +96,9 @@ fn query_weight(family: Option<&str>, bold: bool) -> fontdb::Weight {
   if family.is_some_and(|family| family.eq_ignore_ascii_case("Arial Black")) {
     return fontdb::Weight::BLACK;
   }
+  if family.is_some_and(|family| family.eq_ignore_ascii_case("Calibri Light")) && !bold {
+    return fontdb::Weight::LIGHT;
+  }
   if bold {
     fontdb::Weight::BOLD
   } else {
@@ -105,6 +108,13 @@ fn query_weight(family: Option<&str>, bold: bool) -> fontdb::Weight {
 
 fn push_font_aliases<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str) {
   match family.trim().to_ascii_lowercase().as_str() {
+    "courier" => families.push(fontdb::Family::Name("Courier New")),
+    "timesnewromanpsmt" => families.push(fontdb::Family::Name("Times New Roman")),
+    "dinpro-medium" => families.push(fontdb::Family::Name("DINPro")),
+    "univers 45 light" => families.extend([
+      fontdb::Family::Name("Univers Light"),
+      fontdb::Family::Name("Univers"),
+    ]),
     "calibri" => families.extend([
       fontdb::Family::Name("Carlito"),
       fontdb::Family::Name("Liberation Sans"),
@@ -151,6 +161,24 @@ fn specific_fallback_font_paths(family: &str, bold: bool, italic: bool) -> &'sta
     };
   }
 
+  if family.eq_ignore_ascii_case("Calibri Light") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/Fonts/calibriz.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/Fonts/calibrib.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/Fonts/calibrili.ttf",
+        "/usr/share/fonts/truetype/Fonts/calibril.ttf",
+      ],
+      (false, false) => &["/usr/share/fonts/truetype/Fonts/calibril.ttf"],
+    };
+  }
+
   if family.eq_ignore_ascii_case("Times New Roman") {
     return match (bold, italic) {
       (true, true) => &[
@@ -168,6 +196,40 @@ fn specific_fallback_font_paths(family: &str, bold: bool, italic: bool) -> &'sta
       (false, false) => &[
         "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
         "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+      ],
+    };
+  }
+
+  if family.eq_ignore_ascii_case("TimesNewRomanPSMT") {
+    return match italic {
+      true => &[
+        "/usr/share/fonts/truetype/msttcorefonts/timesi.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Italic.ttf",
+      ],
+      false => &[
+        "/usr/share/fonts/truetype/msttcorefonts/times.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf",
+      ],
+    };
+  }
+
+  if family.eq_ignore_ascii_case("Courier") {
+    return match (bold, italic) {
+      (true, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/courbi.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold_Italic.ttf",
+      ],
+      (true, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/courbd.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Bold.ttf",
+      ],
+      (false, true) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/couri.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New_Italic.ttf",
+      ],
+      (false, false) => &[
+        "/usr/share/fonts/truetype/msttcorefonts/cour.ttf",
+        "/usr/share/fonts/truetype/msttcorefonts/Courier_New.ttf",
       ],
     };
   }

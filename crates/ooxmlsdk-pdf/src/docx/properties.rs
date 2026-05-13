@@ -62,18 +62,21 @@ pub(super) fn merge_run_style(
   };
 
   if let Some(fonts) = properties.run_fonts() {
-    style.font_family = fonts
+    if let Some(font_family) = fonts
       .ascii
       .as_deref()
       .or(fonts.high_ansi.as_deref())
       .or(fonts.east_asia.as_deref())
       .or(fonts.complex_script.as_deref())
-      .filter(|value| !value.trim().is_empty())
+      .filter(|value| is_explicit_font_family(value))
       .map(std::sync::Arc::<str>::from)
       .or_else(|| theme_fonts.resolve(fonts.ascii_theme))
       .or_else(|| theme_fonts.resolve(fonts.high_ansi_theme))
       .or_else(|| theme_fonts.resolve(fonts.east_asia_theme))
-      .or_else(|| theme_fonts.resolve(fonts.complex_script_theme));
+      .or_else(|| theme_fonts.resolve(fonts.complex_script_theme))
+    {
+      style.font_family = Some(font_family);
+    }
   }
 
   if let Some(bold) = properties.bold() {
@@ -147,6 +150,13 @@ pub(super) fn merge_run_style(
   if let Some(highlight) = properties.highlight() {
     style.highlight = highlight_color(highlight.val);
   }
+}
+
+fn is_explicit_font_family(value: &str) -> bool {
+  let value = value.trim();
+  !value.is_empty()
+    && !value.eq_ignore_ascii_case("default")
+    && !value.eq_ignore_ascii_case("inherit")
 }
 
 fn highlight_color(value: w::HighlightColorValues) -> Option<super::RgbColor> {

@@ -7,11 +7,12 @@ upstream-aligned PDF export assertions.
 package/schema/relationship round-trip behavior is covered by
 `crates/ooxmlsdk-test`; this directory is only for `docx -> pdf` behavior.
 
-Fixtures in this directory should come from LibreOffice's PDF export coverage
-under `../core/vcl/qa/cppunit/pdfexport/data/`, paired with an existing
-assertion in `pdfexport.cxx` or `pdfexport2.cxx`. Avoid adding hand-crafted
-fixtures or inferred expectations; copy upstream fixtures and port the upstream
-assertion values directly.
+Fixtures in this directory should come from LibreOffice DOCX -> visible PDF
+coverage, paired with an existing upstream assertion. Prefer strict
+`../core/vcl/qa/cppunit/pdfexport/data/` fixtures when available, then scattered
+Writer/SVX/OoXML tests that export or assert visible page output. Avoid adding
+hand-crafted fixtures or inferred expectations; copy upstream fixtures and port
+the upstream assertion values directly.
 
 Fixtures that are not traceable to `../core` should not live here. Put them in
 a sibling `misc/` bucket once that category exists so the LibreOffice boundary
@@ -32,13 +33,16 @@ Strict upstream `pdfexport` / `pdfexport2` DOCX fixtures:
 - `tdf129085.docx`: copied from
   `../core/vcl/qa/cppunit/pdfexport/data/tdf129085.docx`.
 
-Current upstream scope note:
+Additional direct PDF/object fixtures:
 
-- `../core/vcl/qa/cppunit/pdfexport/data/` currently contains six DOCX fixtures
-  that are covered by explicit `pdfexport` / `pdfexport2` assertions. This
-  directory mirrors that full strict-upstream DOCX set; adding more DOCX
-  fixtures would require leaving the current `pdfexport` DOCX coverage surface
-  or inventing expectations, both of which this crate avoids.
+- `page-view-draw-layer-clip.docx`: copied from
+  `../core/svx/qa/unit/data/page-view-draw-layer-clip.docx`.
+- `content-control-header.docx`: copied from
+  `../core/sw/qa/core/text/data/content-control-header.docx`.
+- `tdf153040.docx`: copied from
+  `../core/sw/qa/core/text/data/tdf153040.docx`.
+- `tdf131728.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf131728.docx`.
 
 Core-derived visible-output DOCX fixtures:
 

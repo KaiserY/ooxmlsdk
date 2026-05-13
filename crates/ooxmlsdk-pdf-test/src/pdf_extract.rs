@@ -27,6 +27,7 @@ pub struct PdfSummary {
   pub paths: Vec<PathObjectSummary>,
   pub links: Vec<LinkSummary>,
   pub annotations: Vec<AnnotationSummary>,
+  pub outlines: Vec<String>,
   pub raw_pages: Vec<RawPageSummary>,
   pub page_objects: Vec<PageObjectSummary>,
   pub rendered_pages: Vec<RenderedPageSummary>,
@@ -92,6 +93,8 @@ pub struct RawAnnotationSummary {
   pub subtype_name: Option<String>,
   pub rect: Option<String>,
   pub action_uri: Option<String>,
+  pub field_type_name: Option<String>,
+  pub field_value: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -199,6 +202,7 @@ impl PdfSummary {
       paths: pdfium_summary.paths,
       links: pdfium_summary.links,
       annotations: pdfium_summary.annotations,
+      outlines: raw_summary.outlines,
       raw_pages: raw_summary.pages,
       page_objects: pdfium_summary.page_objects,
       rendered_pages: pdfium_summary.rendered_pages,
@@ -229,6 +233,7 @@ struct PdfiumSummary {
 
 struct RawPdfSummary {
   pages: Vec<RawPageSummary>,
+  outlines: Vec<String>,
 }
 
 fn pdfium_summary(pdf: &[u8]) -> Result<PdfiumSummary, String> {
@@ -412,7 +417,9 @@ fn raw_pdf_summary(pdf: &[u8]) -> Result<RawPdfSummary, String> {
   }
   pages.sort_by_key(|page| page.page_index);
 
-  Ok(RawPdfSummary { pages })
+  let outlines = raw_outline_titles(&document)?;
+
+  Ok(RawPdfSummary { pages, outlines })
 }
 
 fn raw_page_summary(
@@ -437,12 +444,34 @@ fn raw_page_summary(
   let mut annotations = Vec::new();
   for annotation in &annotation_refs {
     let dictionary = lopdf_dictionary(document, annotation, "annotation dictionary")?;
+    let parent = dictionary
+      .get(b"Parent")
+      .ok()
+      .and_then(|parent| lopdf_dictionary(document, parent, "annotation parent dictionary").ok());
     let action_uri = dictionary
       .get(b"A")
       .ok()
       .and_then(|action| lopdf_dictionary(document, action, "annotation action").ok())
       .and_then(|action| action.get(b"URI").ok())
       .and_then(|uri| lopdf_text(document, uri).ok());
+    let field_type_name = dictionary
+      .get(b"FT")
+      .ok()
+      .and_then(|value| lopdf_name(document, value).ok())
+      .or_else(|| {
+        parent
+          .and_then(|parent| parent.get(b"FT").ok())
+          .and_then(|value| lopdf_name(document, value).ok())
+      });
+    let field_value = dictionary
+      .get(b"V")
+      .ok()
+      .and_then(|value| lopdf_text(document, value).ok())
+      .or_else(|| {
+        parent
+          .and_then(|parent| parent.get(b"V").ok())
+          .and_then(|value| lopdf_text(document, value).ok())
+      });
 
     annotations.push(RawAnnotationSummary {
       page_index,
@@ -459,6 +488,8 @@ fn raw_page_summary(
         .ok()
         .and_then(|value| lopdf_rect(document, value).ok()),
       action_uri,
+      field_type_name,
+      field_value,
     });
   }
 
@@ -470,6 +501,48 @@ fn raw_page_summary(
     annotations,
     xobjects,
   })
+}
+
+fn raw_outline_titles(document: &LopdfDocument) -> Result<Vec<String>, String> {
+  let trailer_root = document
+    .trailer
+    .get(b"Root")
+    .map_err(|error| format!("lopdf could not read trailer Root: {error}"))?;
+  let catalog = lopdf_dictionary(document, trailer_root, "catalog dictionary")?;
+  let Ok(outlines_object) = catalog.get(b"Outlines") else {
+    return Ok(Vec::new());
+  };
+  let outlines = lopdf_dictionary(document, outlines_object, "Outlines dictionary")?;
+  let Ok(first) = outlines.get(b"First") else {
+    return Ok(Vec::new());
+  };
+
+  let mut titles = Vec::new();
+  collect_outline_siblings(document, first, &mut titles)?;
+  Ok(titles)
+}
+
+fn collect_outline_siblings(
+  document: &LopdfDocument,
+  first: &LopdfObject,
+  titles: &mut Vec<String>,
+) -> Result<(), String> {
+  let mut current = Some(first.clone());
+  while let Some(object) = current {
+    let item = lopdf_dictionary(document, &object, "outline item dictionary")?;
+    if let Ok(title) = item
+      .get(b"Title")
+      .map_err(|error| error.to_string())
+      .and_then(|value| lopdf_text(document, value))
+    {
+      titles.push(title);
+    }
+    if let Ok(child) = item.get(b"First") {
+      collect_outline_siblings(document, child, titles)?;
+    }
+    current = item.get(b"Next").ok().cloned();
+  }
+  Ok(())
 }
 
 fn raw_page_xobjects(

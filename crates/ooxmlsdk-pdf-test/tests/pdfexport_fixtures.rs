@@ -214,3 +214,60 @@ fn pdfexport_fixture_tdf129085_preserves_single_jpeg_xobject() {
   assert_eq!(xobject.decoded_height_px, Some(925));
   assert_eq!(xobject.bits_per_pixel, Some(24));
 }
+
+#[test]
+// Source: ../core/svx/qa/unit/svdraw.cxx:testPageViewDrawLayerClip
+fn pdfexport_fixture_page_view_draw_layer_clip_matches_page_object_counts() {
+  let summary = render_summary("page-view-draw-layer-clip.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_eq!(page_object_count(&summary, 0), 3);
+  assert_eq!(page_object_count(&summary, 1), 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/itrform2.cxx:testContentControlHeaderPDFExport
+fn pdfexport_fixture_content_control_header_preserves_page_two_text_objects() {
+  let summary = render_summary("content-control-header.docx");
+  assert!(summary.page_count >= 2);
+
+  let page_two_text_objects = summary
+    .text_objects
+    .iter()
+    .filter(|object| object.page_index == 1)
+    .count();
+  assert_eq!(page_two_text_objects, 3);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/text.cxx:testDropdownContentControlPDF2
+fn pdfexport_fixture_dropdown_content_control_preserves_combo_widget_value() {
+  let summary = render_summary("tdf153040.docx");
+  assert_eq!(summary.page_count, 1);
+  let page = raw_page(&summary, 0);
+  assert_eq!(page.annotation_count, 4);
+
+  let first = page.annotations.first().expect("missing first annotation");
+  assert_eq!(first.subtype_name.as_deref(), Some("Widget"));
+  assert_eq!(first.field_type_name.as_deref(), Some("Ch"));
+  assert_eq!(first.field_value.as_deref(), Some("Apfel"));
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/uiwriter/uiwriter8.cxx:testTdf131728
+fn pdfexport_fixture_tdf131728_preserves_bookmark_order() {
+  let summary = render_summary("tdf131728.docx");
+  assert_eq!(summary.page_count, 1);
+  assert_eq!(
+    summary.outlines,
+    [
+      "Article 1. Definitions",
+      " Apple",
+      " Bread",
+      " Cable",
+      " Cable",
+      "Article 2. Three style separators in one line!",
+      " Heading 2",
+      " Heading 2 Again",
+    ]
+  );
+}

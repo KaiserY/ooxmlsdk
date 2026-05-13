@@ -60,7 +60,7 @@ Do not migrate these as active PDF tests:
 
 The comparison with `../typst` is only methodological: Typst accepts output
 tests through deterministic PDF/SVG/render references and dedicated PDF-tag
-outputs. For this matrix, `covered` and `planned` rows are the direct analogue;
+outputs. For this matrix, `covered` direct-PDF rows are the direct analogue;
 `mapped` rows are active TDD targets that need a faithful projection path, and
 `review` rows are not active migration targets yet.
 
@@ -68,7 +68,7 @@ outputs. For this matrix, `covered` and `planned` rows are the direct analogue;
 
 | Tier | Matrix rows | Count | Rust migration meaning |
 |---|---:|---:|---|
-| Direct PDF/object | `Direct PDF Tests` covered/planned rows | 10 | Can be expressed with current or near-current PDF extraction assertions. |
+| Direct PDF/object | `Direct PDF Tests` covered rows | 10 | Expressed with current PDF extraction assertions. |
 | Covered supplemental | `Covered Supplemental Tests` rows | 7 | Already represented locally with source-backed visible PDF color/alpha/text assertions. |
 | Projection required | `mapped` rows | 299 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
 | Review only | `review` rows | 0 | Broad-scan rows have been item-reviewed in this pass. |
@@ -103,9 +103,9 @@ test harness convenience, not a capability blocker.
 
 ## Scan Summary
 
-- Local covered PDF-rendering fixtures: 13.
-- Direct upstream DOCX -> PDF/object assertions: 10 rows, including 6 covered
-  and 4 planned.
+- Local covered PDF-rendering fixtures: 17.
+- Direct upstream DOCX -> PDF/object assertions: 10 rows, all covered.
+- Planned direct PDF rows remaining: 0.
 - Supplemental source-backed PDF-visible assertions already covered locally: 7
   rows.
 - Additional visible-output candidates listed individually below: 299 mapped
@@ -139,10 +139,10 @@ test harness convenience, not a capability blocker.
 | `pdfexport.cxx::testTdf142133` | `tdf142133.docx` | `../core/vcl/qa/cppunit/pdfexport/data/tdf142133.docx` | `covered` | 1 link annotation with URI `https://google.com/`. |
 | `pdfexport2.cxx::testTdf129085` | `tdf129085.docx` | `../core/vcl/qa/cppunit/pdfexport/data/tdf129085.docx` | `covered` | 1 JPEG XObject, 884x925, 24 bpp. |
 | `pdfexport2.cxx::testTdf152246` | `content-control-rtl.docx` | `../core/vcl/qa/cppunit/pdfexport/data/content-control-rtl.docx` | `covered` | 5 widget annotations with upstream rectangle coordinates. |
-| `svdraw.cxx::testPageViewDrawLayerClip` | `page-view-draw-layer-clip.docx` | `../core/svx/qa/unit/data/page-view-draw-layer-clip.docx` | `planned` | Page 1 has 3 objects, page 2 has 2 objects. |
-| `itrform2.cxx::testContentControlHeaderPDFExport` | `content-control-header.docx` | `../core/sw/qa/core/text/data/content-control-header.docx` | `planned` | Page 2 has 3 text objects. |
-| `text.cxx::testDropdownContentControlPDF2` | `tdf153040.docx` | `../core/sw/qa/core/text/data/tdf153040.docx` | `planned` | 4 annotations; first widget is a combo box with value `Apfel`. |
-| `uiwriter8.cxx::testTdf131728` | `tdf131728.docx` | `../core/sw/qa/extras/uiwriter/data/tdf131728.docx` | `planned` | PDF bookmark order matches upstream expected outline strings. |
+| `svdraw.cxx::testPageViewDrawLayerClip` | `page-view-draw-layer-clip.docx` | `../core/svx/qa/unit/data/page-view-draw-layer-clip.docx` | `covered` | Page 1 has 3 objects, page 2 has 2 objects. |
+| `itrform2.cxx::testContentControlHeaderPDFExport` | `content-control-header.docx` | `../core/sw/qa/core/text/data/content-control-header.docx` | `covered` | Page 2 has 3 text objects. |
+| `text.cxx::testDropdownContentControlPDF2` | `tdf153040.docx` | `../core/sw/qa/core/text/data/tdf153040.docx` | `covered` | 4 annotations; first widget is a combo box with value `Apfel`. |
+| `uiwriter8.cxx::testTdf131728` | `tdf131728.docx` | `../core/sw/qa/extras/uiwriter/data/tdf131728.docx` | `covered` | PDF bookmark order matches upstream expected outline strings. |
 
 ## Covered Supplemental Tests
 

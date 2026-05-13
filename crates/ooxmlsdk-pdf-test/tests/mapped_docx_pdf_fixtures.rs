@@ -45,8 +45,37 @@ fn assert_page_starts_with(summary: &PdfSummary, page_index: usize, expected: &s
   );
 }
 
+fn assert_page_contains_in_order(summary: &PdfSummary, page_index: usize, expected: &[&str]) {
+  let text = page_text(summary, page_index);
+  let normalized_text = normalize_space(&text);
+  let mut cursor = 0;
+  for item in expected {
+    let normalized_item = normalize_space(item);
+    let Some(offset) = normalized_text[cursor..].find(&normalized_item) else {
+      panic!("missing page {page_index} text {item:?} after offset {cursor}; page text:\n{text}");
+    };
+    cursor += offset + normalized_item.len();
+  }
+}
+
 fn normalized_occurrences(text: &str, expected: &str) -> usize {
   text.match_indices(&normalize_space(expected)).count()
+}
+
+fn assert_page_text_occurrences(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  expected_count: usize,
+) {
+  let text = normalized_page_text(summary, page_index);
+  let count = normalized_occurrences(&text, expected);
+  assert_eq!(
+    count,
+    expected_count,
+    "page {page_index} text {expected:?} occurrence mismatch; page text:\n{}",
+    page_text(summary, page_index)
+  );
 }
 
 fn page_image_count(summary: &PdfSummary, page_index: usize) -> usize {
@@ -232,6 +261,20 @@ fn path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds
     .collect()
 }
 
+fn horizontal_path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  path_bounds_on_page(summary, page_index)
+    .into_iter()
+    .filter(|bounds| bounds.width() > 5.0 && bounds.width() >= bounds.height() * 3.0)
+    .collect()
+}
+
+fn vertical_path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  path_bounds_on_page(summary, page_index)
+    .into_iter()
+    .filter(|bounds| bounds.height() > 5.0 && bounds.height() >= bounds.width() * 3.0)
+    .collect()
+}
+
 fn image_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
   summary
     .images
@@ -251,6 +294,163 @@ fn text_segment_bounds(summary: &PdfSummary, text: &str) -> PdfBounds {
   parse_pdf_rect(&segment.bounds).unwrap()
 }
 
+fn text_segment_bounds_on_page(summary: &PdfSummary, page_index: usize, text: &str) -> PdfBounds {
+  let segment = summary
+    .text_segments
+    .iter()
+    .find(|segment| {
+      segment.page_index == page_index && normalize_space(&segment.text).contains(text)
+    })
+    .unwrap_or_else(|| panic!("missing page {page_index} text segment containing {text:?}"));
+  parse_pdf_rect(&segment.bounds).unwrap()
+}
+
+fn assert_text_top_from_page_top_at_most(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  expected_top: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let top_from_page_top = media_box.top - bounds.top;
+  assert!(
+    top_from_page_top <= expected_top,
+    "page {page_index} text {text:?} top {top_from_page_top}pt exceeds {expected_top}pt; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn first_text_bounds_on_page(summary: &PdfSummary, page_index: usize) -> PdfBounds {
+  let segment = summary
+    .text_segments
+    .iter()
+    .find(|segment| segment.page_index == page_index)
+    .unwrap_or_else(|| panic!("missing text segment on page {page_index}"));
+  parse_pdf_rect(&segment.bounds).unwrap()
+}
+
+fn assert_first_text_top_from_page_top_at_most(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_top: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = first_text_bounds_on_page(summary, page_index);
+  let top_from_page_top = media_box.top - bounds.top;
+  assert!(
+    top_from_page_top <= expected_top,
+    "page {page_index} first text top {top_from_page_top}pt exceeds {expected_top}pt; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_first_text_top_from_page_top_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_top: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = first_text_bounds_on_page(summary, page_index);
+  let top_from_page_top = media_box.top - bounds.top;
+  assert!(
+    top_from_page_top >= expected_top,
+    "page {page_index} first text top {top_from_page_top}pt is less than {expected_top}pt; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_text_top_from_page_top_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  expected_top: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let top_from_page_top = media_box.top - bounds.top;
+  assert!(
+    top_from_page_top >= expected_top,
+    "page {page_index} text {text:?} top {top_from_page_top}pt is less than {expected_top}pt; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_page_text_below_text(
+  summary: &PdfSummary,
+  page_index: usize,
+  lower_text: &str,
+  upper_text: &str,
+  minimum_gap: f32,
+) {
+  let lower = text_segment_bounds_on_page(summary, page_index, lower_text);
+  let upper = text_segment_bounds_on_page(summary, page_index, upper_text);
+  let gap = upper.top - lower.top;
+  assert!(
+    gap >= minimum_gap,
+    "page {page_index} text {lower_text:?} should be below {upper_text:?} by at least {minimum_gap}pt; gap={gap}; lower={lower:?}; upper={upper:?}"
+  );
+}
+
+fn assert_text_inside_any_path(summary: &PdfSummary, page_index: usize, text: &str) {
+  let text_bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    path_bounds.iter().any(|path| {
+      text_bounds.left >= path.left
+        && text_bounds.right <= path.right
+        && text_bounds.bottom >= path.bottom
+        && text_bounds.top <= path.top
+    }),
+    "page {page_index} text {text:?} should be inside a path; text={text_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
+fn assert_matching_text_segments_inside_paths(summary: &PdfSummary, page_index: usize, text: &str) {
+  let text_bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| {
+      segment.page_index == page_index && normalize_space(&segment.text).contains(text)
+    })
+    .map(|segment| parse_pdf_rect(&segment.bounds).unwrap())
+    .collect::<Vec<_>>();
+  assert!(
+    !text_bounds.is_empty(),
+    "missing page {page_index} text segment containing {text:?}"
+  );
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  for text_bound in &text_bounds {
+    assert!(
+      path_bounds.iter().any(|path| {
+        text_bound.left >= path.left
+          && text_bound.right <= path.right
+          && text_bound.bottom >= path.bottom
+          && text_bound.top <= path.top
+      }),
+      "page {page_index} text {text:?} segment should be inside a path; text={text_bound:?}; paths={path_bounds:?}"
+    );
+  }
+}
+
+fn assert_text_below_any_path_by_at_least(summary: &PdfSummary, text: &str, minimum_gap: f32) {
+  let text_bounds = text_segment_bounds(summary, text);
+  let path_bounds = path_bounds_on_page(summary, 0);
+  assert!(
+    path_bounds
+      .iter()
+      .any(|path| path.bottom - text_bounds.top >= minimum_gap),
+    "text {text:?} should be below a path by at least {minimum_gap}pt; text={text_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
+fn assert_text_top_above_any_image_bottom(summary: &PdfSummary, text: &str) {
+  let text_bounds = text_segment_bounds(summary, text);
+  let image_bounds = image_bounds_on_page(summary, 0);
+  assert!(
+    image_bounds
+      .iter()
+      .any(|image| text_bounds.top > image.bottom),
+    "text {text:?} should start above an image bottom; text={text_bounds:?}; images={image_bounds:?}"
+  );
+}
+
 fn assert_path_width_close(summary: &PdfSummary, page_index: usize, expected_width: f32) {
   let bounds = path_bounds_on_page(summary, page_index);
   assert!(
@@ -258,6 +458,93 @@ fn assert_path_width_close(summary: &PdfSummary, page_index: usize, expected_wid
       .iter()
       .any(|bounds| (bounds.width() - expected_width).abs() <= 0.5),
     "missing page {page_index} path width {expected_width}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_path_width_between(
+  summary: &PdfSummary,
+  page_index: usize,
+  minimum_width: f32,
+  maximum_width: f32,
+) {
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| bounds.width() >= minimum_width && bounds.width() <= maximum_width),
+    "missing page {page_index} path width between {minimum_width}pt and {maximum_width}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_path_width_at_least_page_fraction(
+  summary: &PdfSummary,
+  page_index: usize,
+  minimum_fraction: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let minimum_width = media_box.width() * minimum_fraction;
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.iter().any(|bounds| bounds.width() >= minimum_width),
+    "missing page {page_index} path width at least {minimum_fraction} of page width ({minimum_width}pt); bounds={bounds:?}"
+  );
+}
+
+fn assert_horizontal_path_width_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_width: f32,
+) {
+  let bounds = horizontal_path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| (bounds.width() - expected_width).abs() <= 0.75),
+    "missing page {page_index} horizontal path width {expected_width}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_horizontal_path_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_count: usize,
+) {
+  let bounds = horizontal_path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.len() >= expected_count,
+    "expected at least {expected_count} horizontal paths on page {page_index}, got {}; bounds={bounds:?}",
+    bounds.len()
+  );
+}
+
+fn assert_vertical_path_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_count: usize,
+) {
+  let bounds = vertical_path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.len() >= expected_count,
+    "expected at least {expected_count} vertical paths on page {page_index}, got {}; bounds={bounds:?}",
+    bounds.len()
+  );
+}
+
+fn assert_middle_horizontal_border_is_inset(summary: &PdfSummary, page_index: usize) {
+  let bounds = horizontal_path_bounds_on_page(summary, page_index);
+  let left = bounds
+    .iter()
+    .map(|bounds| bounds.left)
+    .fold(f32::INFINITY, f32::min);
+  let right = bounds
+    .iter()
+    .map(|bounds| bounds.right)
+    .fold(f32::NEG_INFINITY, f32::max);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| bounds.left > left + 0.5 && bounds.right < right - 0.5),
+    "missing inset middle horizontal border on page {page_index}; bounds={bounds:?}"
   );
 }
 
@@ -450,6 +737,21 @@ fn assert_rightmost_path_within_page_right(
   );
 }
 
+fn assert_all_paths_within_page(summary: &PdfSummary, page_index: usize, tolerance: f32) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(!bounds.is_empty(), "missing page {page_index} paths");
+  for path in &bounds {
+    assert!(
+      path.left >= media_box.left - tolerance
+        && path.right <= media_box.right + tolerance
+        && path.bottom >= media_box.bottom - tolerance
+        && path.top <= media_box.top + tolerance,
+      "page {page_index} path should stay within media box {media_box:?} +/- {tolerance}; path={path:?}; all={bounds:?}"
+    );
+  }
+}
+
 fn assert_rightmost_text_within_rightmost_path(
   summary: &PdfSummary,
   page_index: usize,
@@ -484,6 +786,14 @@ fn assert_any_text_segment_width_positive(summary: &PdfSummary, page_index: usiz
   assert!(
     widths.iter().any(|width| *width > 0.0),
     "missing positive text width on page {page_index}; widths={widths:?}"
+  );
+}
+
+fn assert_text_segment_taller_than_wide(summary: &PdfSummary, page_index: usize, text: &str) {
+  let bounds = text_segment_bounds_on_page(summary, page_index, text);
+  assert!(
+    bounds.height() > bounds.width(),
+    "page {page_index} text {text:?} should be vertically oriented; bounds={bounds:?}"
   );
 }
 
@@ -1628,4 +1938,422 @@ fn mapped_fixture_tdf169986_bottom_spacing_keeps_continuous_break_on_one_page() 
 fn mapped_fixture_tdf167657_continuous_section_keeps_bottom_spacing_visible() {
   let summary = render_summary("tdf167657_sectPr_bottomSpacing.docx");
   assert_eq!(summary.page_count, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/text.cxx:testNumberPortionNoformat
+fn mapped_fixture_number_portion_noformat_keeps_numbering_portion_auto_colored() {
+  let summary = render_summary("number-portion-noformat.docx");
+  assert_text_object_fill_color(&summary, "1.", "#000000@ff");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/calcmove.cxx:testIgnoreTopMargin
+fn mapped_fixture_ignore_top_margin_ignores_first_paragraph_top_margin_on_page_two() {
+  let summary = render_summary("ignore-top-margin.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "Page 2");
+  assert_first_text_top_from_page_top_at_most(&summary, 1, 90.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/calcmove.cxx:testIgnoreTopMarginTable
+fn mapped_fixture_ignore_top_margin_table_keeps_cell_first_paragraph_top_margin() {
+  let summary = render_summary("ignore-top-margin-table.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 1, "A1");
+  assert_page_contains(&summary, 1, "B1");
+  assert_page_text_below_text(&summary, 1, "B1", "A1", 80.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/calcmove.cxx:testIgnoreTopMarginPageStyleChange
+fn mapped_fixture_ignore_top_margin_page_style_change_keeps_section_top_margin() {
+  let summary = render_summary("ignore-top-margin-page-style-change.docx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 1, "after page break");
+  assert_page_contains(&summary, 2, "after section break");
+  assert_first_text_top_from_page_top_at_least(&summary, 2, 80.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/ftnfrm.cxx:testInlineEndnotePosition
+fn mapped_fixture_inline_endnote_position_keeps_endnote_separator_spacing() {
+  let summary = render_summary("inline-endnote-position.docx");
+  assert_page_contains(&summary, 0, "Endnote");
+  assert_text_below_any_path_by_at_least(&summary, "Endnote", 13.45);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testTableFlyOverlap
+fn mapped_fixture_table_fly_overlap_keeps_table_below_header_image() {
+  let summary = render_summary("table-fly-overlap.docx");
+  assert_text_below_any_image(&summary, "Table1:B1");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testTdf128195
+fn mapped_fixture_tdf128195_keeps_header_spacing_above_body_text() {
+  let summary = render_summary("tdf128195.docx");
+  assert_page_contains(&summary, 0, "Body");
+  assert_text_top_from_page_top_at_least(&summary, 0, "Body", 176.45);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testBorderCollapseCompat
+fn mapped_fixture_border_collapse_compat_prefers_solid_cell_border() {
+  let summary = render_summary("border-collapse-compat.docx");
+  assert!(
+    summary.paths.iter().any(|path| path.stroked == Some(true)),
+    "expected rendered solid table border path; paths={:?}",
+    summary.paths
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testTableFlyOverlapSpacing
+fn mapped_fixture_table_fly_overlap_spacing_keeps_table_next_to_image() {
+  let summary = render_summary("table-fly-overlap-spacing.docx");
+  assert_page_contains(&summary, 0, "Before table");
+  assert_page_contains(&summary, 0, "After table.");
+  assert_text_top_above_any_image_bottom(&summary, "These");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testTextBoxAutoGrowVertical
+fn mapped_fixture_textbox_autogrow_vertical_keeps_text_inside_shape() {
+  let summary = render_summary("textbox-autogrow-vertical.docx");
+  assert_text_inside_any_path(&summary, 0, "Shape");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testTextBoxInHeaderIsPositioned
+fn mapped_fixture_header_textbox_keeps_header_textbox_right_positioned() {
+  let summary = render_summary("header-textbox.docx");
+  assert_text_top_from_page_top_at_most(&summary, 0, "XXXXXXX", 120.0);
+  assert!(
+    text_segment_left(&summary, "XXXXXXX") >= 350.0,
+    "header textbox text should be positioned on the right side"
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testVerticallyMergedCellBorder
+fn mapped_fixture_vmerge_cell_border_omits_merged_cell_lower_borders() {
+  let summary = render_summary("vmerge-cell-border.docx");
+  assert_page_contains(&summary, 0, "B1");
+  assert_horizontal_path_count_at_least(&summary, 0, 4);
+  assert_vertical_path_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testInnerCellBorderIntersect
+fn mapped_fixture_inner_border_keeps_middle_border_inset_from_outer_border() {
+  let summary = render_summary("inner-border.docx");
+  assert_horizontal_path_count_at_least(&summary, 0, 3);
+  assert_middle_horizontal_border_is_inset(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testDoubleBorderVertical
+fn mapped_fixture_double_border_vertical_draws_all_four_vertical_border_lines() {
+  let summary = render_summary("double-border-vertical.docx");
+  assert_vertical_path_count_at_least(&summary, 0, 4);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testDoubleBorderHorizontal
+fn mapped_fixture_double_border_horizontal_draws_all_four_horizontal_border_lines() {
+  let summary = render_summary("double-border-horizontal.docx");
+  assert_horizontal_path_count_at_least(&summary, 0, 4);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testParaBorderInCellClip
+fn mapped_fixture_para_border_in_cell_clip_keeps_paragraph_borders_clipped_to_cell() {
+  let summary = render_summary("para-border-in-cell-clip.docx");
+  assert_page_contains(&summary, 0, "A");
+  assert_page_contains(&summary, 0, "1");
+  assert_text_inside_any_path(&summary, 0, "A");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/layout.cxx:testDoublePageBorder
+fn mapped_fixture_double_page_border_draws_top_and_bottom_double_borders() {
+  let summary = render_summary("double-page-border.docx");
+  assert_horizontal_path_count_at_least(&summary, 0, 4);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/paintfrm.cxx:testRTLBorderMerge
+fn mapped_fixture_rtl_table_keeps_all_six_vertical_column_borders() {
+  let summary = render_summary("rtl-table.docx");
+  assert_vertical_path_count_at_least(&summary, 0, 6);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/paintfrm.cxx:testInlineEndnoteSeparatorPosition
+fn mapped_fixture_inline_endnote_separator_keeps_word_separator_length() {
+  let summary = render_summary("inline-endnote-position.docx");
+  assert_horizontal_path_width_close(&summary, 0, 144.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/paintfrm.cxx:testEndnoteContSeparator
+fn mapped_fixture_endnote_cont_separator_spans_page_print_area() {
+  let summary = render_summary("endnote-cont-separator.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_horizontal_path_width_close(&summary, 1, 468.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/tabfrm.cxx:testTablePrintAreaLeft
+fn mapped_fixture_table_print_area_left_keeps_table_visible_at_left_margin() {
+  let summary = render_summary("table-print-area-left.docx");
+  assert_page_contains(&summary, 0, "Date & venue");
+  assert!(
+    text_segment_left(&summary, "Date") < 100.0,
+    "table should remain visible near the left page margin"
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:TestTdf136588
+fn mapped_fixture_tdf136588_keeps_expected_second_line_break() {
+  let summary = render_summary("tdf136588.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "effectively by modern-day small to medium enterprises?",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf88496
+fn mapped_fixture_tdf88496_keeps_repeating_header_fallback_to_three_pages() {
+  let summary = render_summary("tdf88496.docx");
+  assert_eq!(summary.page_count, 3);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:TestTdf137025
+fn mapped_fixture_tdf137025_preserves_textbox_padding_visible_in_pdf() {
+  let summary = render_summary("tdf137025.docx");
+  assert_page_contains(&summary, 0, "xxxx");
+  assert_text_inside_any_path(&summary, 0, "xxxx");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:TestTdf134277
+fn mapped_fixture_tdf134277_keeps_text_visible_without_extra_layout_mode() {
+  let summary = render_summary("tdf134277.docx");
+  assert_any_text_segment_width_positive(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf116486
+fn mapped_fixture_tdf116486_preserves_fly_portion_height() {
+  let summary = render_summary("tdf116486.docx");
+  assert_page_contains(&summary, 0, "Flying Box");
+  assert_path_height_close(&summary, 0, 200.30);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:TestTdf142080
+fn mapped_fixture_fdo43573_2_min_keeps_page_nine_column_text_and_image() {
+  let summary = render_summary("fdo43573-2-min.docx");
+  assert!(summary.page_count >= 9);
+  assert_page_contains(&summary, 8, "De kleur u (rood) in het rechtervlak");
+  assert_page_image_count(&summary, 8, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf128198
+fn mapped_fixture_tdf128198_keeps_wrapped_text_after_fly_untruncated() {
+  let summary = render_summary("tdf128198-1.docx");
+  assert_page_contains(&summary, 0, "From this perspective");
+  assert_page_contains(&summary, 0, "satellite boasts some significant advantages.");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf106153
+fn mapped_fixture_tdf106153_keeps_all_textboxes_inside_page() {
+  let summary = render_summary("tdf106153.docx");
+  assert_all_paths_within_page(&summary, 0, 0.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf109137
+fn mapped_fixture_tdf109137_keeps_blue_rectangle_on_first_page() {
+  let summary = render_summary("tdf109137.docx");
+  assert_page_contains(&summary, 0, "Gráfico");
+  assert_page_path_count(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout.cxx:testTdf157628
+fn mapped_fixture_tdf157628_keeps_two_expected_rows_visible() {
+  let summary = render_summary("tdf157628.docx");
+  assert_page_contains(&summary, 0, "This is in first row");
+  assert_page_contains(&summary, 0, "This is second row");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:tdf157596_paragraph_numbering
+fn mapped_fixture_tdf157596_paragraph_numbering_keeps_imported_numbers() {
+  let summary = render_summary("tdf157596_paragraph_numbering.docx");
+  assert_page_contains_in_order(&summary, 0, &["1.", "2.", "3."]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf152872
+fn mapped_fixture_hidden_para_separator_collapses_hidden_paragraphs() {
+  let summary = render_summary("hidden-para-separator.docx");
+  assert_page_contains(&summary, 0, "C DE");
+  assert_page_text_occurrences(&summary, 0, "C DE", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf125300
+fn mapped_fixture_tdf125300_keeps_spacing_before_bottom_cell_border() {
+  let summary = render_summary("tdf125300.docx");
+  assert_path_top_from_page_top_close(&summary, 0, 59.3);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf122225
+fn mapped_fixture_tdf122225_keeps_chart_legend_and_axis_labels() {
+  let summary = render_summary("tdf122225.docx");
+  assert_page_text_occurrences(&summary, 0, "Advanced Diploma", 1);
+  assert_page_text_occurrences(&summary, 0, "Hispanic", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf134247
+fn mapped_fixture_legend_itemorder_min_keeps_first_legend_label() {
+  let summary = render_summary("legend-itemorder-min.docx");
+  assert_page_contains(&summary, 0, "1. adatsor");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf75659
+fn mapped_fixture_tdf75659_keeps_all_chart_legend_names() {
+  let summary = render_summary("tdf75659.docx");
+  assert_page_contains_in_order(&summary, 0, &["Series1", "Series2", "Series3"]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf126425
+fn mapped_fixture_long_legendentry_keeps_long_chart_legend_text() {
+  let summary = render_summary("long_legendentry.docx");
+  assert_page_contains(&summary, 0, "Data series with a long long title");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf115630
+fn mapped_fixture_tdf115630_keeps_inner_chart_area_width() {
+  let summary = render_summary("tdf115630.docx");
+  assert_page_contains(&summary, 0, "1. Column with long name");
+  assert_path_width_between(&summary, 0, 143.5, 146.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf128996
+fn mapped_fixture_tdf128996_keeps_long_category_axis_label_visible() {
+  let summary = render_summary("tdf128996.docx");
+  assert_page_contains(&summary, 0, "A very long category name 1");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf126244
+fn mapped_fixture_tdf126244_preserves_vertical_multilevel_axis_labels() {
+  let summary = render_summary("tdf126244.docx");
+  assert_page_contains(&summary, 0, "FIRST LEVEL");
+  assert_text_segment_taller_than_wide(&summary, 0, "FIRST LEVEL");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf69648
+fn mapped_fixture_tdf69648_keeps_textboxes_inside_group_shapes() {
+  let summary = render_summary("tdf69648.docx");
+  assert_matching_text_segments_inside_paths(&summary, 0, "Text in right box");
+  assert_matching_text_segments_inside_paths(&summary, 0, "Text in left box");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf117982
+fn mapped_fixture_tdf117982_keeps_first_table_cell_text_visible() {
+  let summary = render_summary("tdf117982.docx");
+  assert_page_starts_with(&summary, 0, "FOO AAA");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf128959
+fn mapped_fixture_tdf128959_keeps_split_table_cell_first_lines_visible() {
+  let summary = render_summary("tdf128959.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Maecenas porttitor congue",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf124423_DOCX
+fn mapped_fixture_tdf124423_keeps_fly_widths_relative_to_page() {
+  let summary = render_summary("tdf124423.docx");
+  assert_path_width_at_least_page_fraction(&summary, 0, 0.5);
+  assert_path_width_at_least_page_fraction(&summary, 0, 0.9);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf138782
+fn mapped_fixture_tdf138782_keeps_third_shape_inside_page() {
+  let summary = render_summary("tdf138782.docx");
+  assert_page_contains(&summary, 0, "10");
+  assert_rightmost_path_within_page_right(&summary, 0, 0.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf135035_DOCX
+fn mapped_fixture_tdf135035_keeps_nested_fly_widths_relative_to_parent() {
+  let summary = render_summary("tdf135035.docx");
+  assert_page_contains(&summary, 0, "A");
+  assert_path_width_at_least_page_fraction(&summary, 0, 0.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage
+fn mapped_fixture_tdf139336_columns_with_footnote_stays_two_pages() {
+  let summary = render_summary("tdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage.docx");
+  assert_eq!(summary.page_count, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:TestTdf161348
+fn mapped_fixture_fdo48718_keeps_floating_table_on_first_page() {
+  let summary = render_summary("fdo48718-1.docx");
+  assert_page_contains(&summary, 0, "INFORME DE ASISTENCIA");
+  assert_page_contains(&summary, 0, "ARGUMENTACIÓN JURÍDICA");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf159271
+fn mapped_fixture_fld_in_tbl_keeps_field_in_single_table_line() {
+  let summary = render_summary("fld-in-tbl.docx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(&summary, 0, "LOCATION", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf159259
+fn mapped_fixture_sdt_framepr_keeps_single_visible_paragraph() {
+  let summary = render_summary("sdt+framePr.docx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_text_occurrences(
+    &summary,
+    0,
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+    1,
+  );
 }

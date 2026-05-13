@@ -70,7 +70,7 @@ outputs. For this matrix, `covered` direct-PDF rows are the direct analogue;
 |---|---:|---:|---|
 | Direct PDF/object | `Direct PDF Tests` covered rows | 10 | Expressed with current PDF extraction assertions. |
 | Covered supplemental | `Covered Supplemental Tests` rows | 7 | Already represented locally with source-backed visible PDF color/alpha/text assertions. |
-| Projection required | `mapped` rows | 194 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
+| Projection required | `mapped` rows | 143 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
 | Review only | `review` rows | 0 | Broad-scan rows have been item-reviewed in this pass. |
 | Deferred/excluded | `deferred` / `excluded` rows | 26 | Keep out of the active PDF migration queue. |
 
@@ -95,7 +95,7 @@ test harness convenience, not a capability blocker.
 | Assertion class | Active rows | Rust path | Faithfulness note |
 |---|---:|---|---|
 | Direct PDF/object | 45 | Existing PDFium/lopdf extraction, plus small extensions for outline/form dictionaries when needed. | Expected values can be copied from LibreOffice PDF assertions. |
-| Layout dump projection | 134 | Convert LibreOffice layout dump frame/text/table/page assertions to PDF text/path/image bounds, object counts, text order, or page counts. | Do not copy XPath literally; preserve the upstream geometry/text relation after unit conversion and tolerances. |
+| Layout dump projection | 103 | Convert LibreOffice layout dump frame/text/table/page assertions to PDF text/path/image bounds, object counts, text order, or page counts. | Do not copy XPath literally; preserve the upstream geometry/text relation after unit conversion and tolerances. |
 | Raster/bitmap | 12 | Use PDFium page rendering plus `image`/`crc32fast`/PNG references for page or region snapshots. | Use LibreOffice pixel/color/bitmap expectation or checked-in reference images; do not derive expected images from current Rust output. |
 | Metafile/render XML | 6 | Project LibreOffice metafile text/path/polyline assertions to PDF text/path objects or raster snapshots. | Preserve the asserted rendered primitive, not the LibreOffice XML format. |
 | Graphics/color/effects | 12 | Assert PDF text/path/image colors, alpha, stroke/fill, bounds, or fall back to raster snapshots for effects. | Theme/color/effect expected values must remain LibreOffice-derived. |
@@ -103,12 +103,12 @@ test harness convenience, not a capability blocker.
 
 ## Scan Summary
 
-- Local covered PDF-rendering fixtures: 121.
+- Local covered PDF-rendering fixtures: 172.
 - Direct upstream DOCX -> PDF/object assertions: 10 rows, all covered.
 - Planned direct PDF rows remaining: 0.
 - Supplemental source-backed PDF-visible assertions already covered locally: 7
   rows.
-- Additional visible-output candidates listed individually below: 194 mapped
+- Additional visible-output candidates listed individually below: 143 mapped
   tests. Treat these as active TDD targets that may require new PDF extraction,
   layout projection, or snapshot capability before the Rust assertion can be
   written faithfully.
@@ -164,29 +164,29 @@ behavior.
 
 | Upstream test | Fixture | Source file | Status | PDF projection |
 |---|---|---|---|---|
-| `text.cxx::testNumberPortionNoformat` | `number-portion-noformat.docx` | `../core/sw/qa/core/text/text.cxx:1378` | `mapped` | Numbering portion visibility; project to PDF text. |
+| `text.cxx::testNumberPortionNoformat` | `number-portion-noformat.docx` | `../core/sw/qa/core/text/text.cxx:1378` | `covered` | Numbering portion visibility; project to PDF text. |
 | `text.cxx::testParaUpperMarginFlyIntersect` | `para-upper-margin-fly-intersect.docx` | `../core/sw/qa/core/text/text.cxx:1577` | `mapped` | Paragraph/fly intersection layout; project to text and object bounds. |
-| `calcmove.cxx::testIgnoreTopMargin` | `ignore-top-margin.docx` | `../core/sw/qa/core/layout/calcmove.cxx:29` | `mapped` | Top margin layout; project to text/object bounds. |
-| `calcmove.cxx::testIgnoreTopMarginTable` | `ignore-top-margin-table.docx` | `../core/sw/qa/core/layout/calcmove.cxx:46` | `mapped` | Table top margin layout; project to PDF table/text bounds. |
-| `calcmove.cxx::testIgnoreTopMarginPageStyleChange` | `ignore-top-margin-page-style-change.docx` | `../core/sw/qa/core/layout/calcmove.cxx:87` | `mapped` | Page-style top margin layout; project to page/text bounds. |
-| `ftnfrm.cxx::testInlineEndnotePosition` | `inline-endnote-position.docx` | `../core/sw/qa/core/layout/ftnfrm.cxx:121` | `mapped` | Endnote position; project to page/text bounds. |
-| `layout.cxx::testTableFlyOverlap` | `table-fly-overlap.docx` | `../core/sw/qa/core/layout/layout.cxx:52` | `mapped` | Table/fly overlap; project to object bounds. |
-| `layout.cxx::testTdf128195` | `tdf128195.docx` | `../core/sw/qa/core/layout/layout.cxx:73` | `mapped` | Layout dump assertion; project to page/text/object bounds. |
-| `layout.cxx::testBorderCollapseCompat` | `border-collapse-compat.docx` | `../core/sw/qa/core/layout/layout.cxx:91` | `mapped` | Collapsed border rendering; project to PDF paths. |
-| `layout.cxx::testTableFlyOverlapSpacing` | `table-fly-overlap-spacing.docx` | `../core/sw/qa/core/layout/layout.cxx:127` | `mapped` | Table/fly spacing; project to object bounds. |
-| `layout.cxx::testTextBoxAutoGrowVertical` | `textbox-autogrow-vertical.docx` | `../core/sw/qa/core/layout/layout.cxx:227` | `mapped` | Textbox vertical growth; project to text and shape bounds. |
-| `layout.cxx::testTextBoxInHeaderIsPositioned` | `header-textbox.docx` | `../core/sw/qa/core/layout/layout.cxx:258` | `mapped` | Header textbox position; project to PDF text/shape bounds. |
-| `layout.cxx::testVerticallyMergedCellBorder` | `vmerge-cell-border.docx` | `../core/sw/qa/core/layout/layout.cxx:464` | `mapped` | Merged-cell border; project to PDF paths. |
-| `layout.cxx::testInnerCellBorderIntersect` | `inner-border.docx` | `../core/sw/qa/core/layout/layout.cxx:562` | `mapped` | Inner table borders; project to PDF paths. |
-| `layout.cxx::testDoubleBorderVertical` | `double-border-vertical.docx` | `../core/sw/qa/core/layout/layout.cxx:677` | `mapped` | Vertical double border; project to PDF paths. |
-| `layout.cxx::testDoubleBorderHorizontal` | `double-border-horizontal.docx` | `../core/sw/qa/core/layout/layout.cxx:725` | `mapped` | Horizontal double border; project to PDF paths. |
-| `layout.cxx::testParaBorderInCellClip` | `para-border-in-cell-clip.docx` | `../core/sw/qa/core/layout/layout.cxx:773` | `mapped` | Paragraph border clipping; project to PDF clipping/path checks. |
-| `layout.cxx::testDoublePageBorder` | `double-page-border.docx` | `../core/sw/qa/core/layout/layout.cxx:793` | `mapped` | Page border geometry; project to PDF paths. |
-| `paintfrm.cxx::testRTLBorderMerge` | `rtl-table.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:75` | `mapped` | RTL table border merge; project to PDF paths. |
-| `paintfrm.cxx::testInlineEndnoteSeparatorPosition` | `inline-endnote-position.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:163` | `mapped` | Endnote separator position; project to PDF paths. |
-| `paintfrm.cxx::testEndnoteContSeparator` | `endnote-cont-separator.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:193` | `mapped` | Endnote continuation separator; project to PDF paths. |
+| `calcmove.cxx::testIgnoreTopMargin` | `ignore-top-margin.docx` | `../core/sw/qa/core/layout/calcmove.cxx:29` | `covered` | Top margin layout; project to text/object bounds. |
+| `calcmove.cxx::testIgnoreTopMarginTable` | `ignore-top-margin-table.docx` | `../core/sw/qa/core/layout/calcmove.cxx:46` | `covered` | Table top margin layout; project to PDF table/text bounds. |
+| `calcmove.cxx::testIgnoreTopMarginPageStyleChange` | `ignore-top-margin-page-style-change.docx` | `../core/sw/qa/core/layout/calcmove.cxx:87` | `covered` | Page-style top margin layout; project to page/text bounds. |
+| `ftnfrm.cxx::testInlineEndnotePosition` | `inline-endnote-position.docx` | `../core/sw/qa/core/layout/ftnfrm.cxx:121` | `covered` | Endnote position; project to page/text bounds. |
+| `layout.cxx::testTableFlyOverlap` | `table-fly-overlap.docx` | `../core/sw/qa/core/layout/layout.cxx:52` | `covered` | Table/fly overlap; project to object bounds. |
+| `layout.cxx::testTdf128195` | `tdf128195.docx` | `../core/sw/qa/core/layout/layout.cxx:73` | `covered` | Layout dump assertion; project to page/text/object bounds. |
+| `layout.cxx::testBorderCollapseCompat` | `border-collapse-compat.docx` | `../core/sw/qa/core/layout/layout.cxx:91` | `covered` | Collapsed border rendering; project to PDF paths. |
+| `layout.cxx::testTableFlyOverlapSpacing` | `table-fly-overlap-spacing.docx` | `../core/sw/qa/core/layout/layout.cxx:127` | `covered` | Table/fly spacing; project to object bounds. |
+| `layout.cxx::testTextBoxAutoGrowVertical` | `textbox-autogrow-vertical.docx` | `../core/sw/qa/core/layout/layout.cxx:227` | `covered` | Textbox vertical growth; project to text and shape bounds. |
+| `layout.cxx::testTextBoxInHeaderIsPositioned` | `header-textbox.docx` | `../core/sw/qa/core/layout/layout.cxx:258` | `covered` | Header textbox position; project to PDF text/shape bounds. |
+| `layout.cxx::testVerticallyMergedCellBorder` | `vmerge-cell-border.docx` | `../core/sw/qa/core/layout/layout.cxx:464` | `covered` | Merged-cell border; project to PDF paths. |
+| `layout.cxx::testInnerCellBorderIntersect` | `inner-border.docx` | `../core/sw/qa/core/layout/layout.cxx:562` | `covered` | Inner table borders; project to PDF paths. |
+| `layout.cxx::testDoubleBorderVertical` | `double-border-vertical.docx` | `../core/sw/qa/core/layout/layout.cxx:677` | `covered` | Vertical double border; project to PDF paths. |
+| `layout.cxx::testDoubleBorderHorizontal` | `double-border-horizontal.docx` | `../core/sw/qa/core/layout/layout.cxx:725` | `covered` | Horizontal double border; project to PDF paths. |
+| `layout.cxx::testParaBorderInCellClip` | `para-border-in-cell-clip.docx` | `../core/sw/qa/core/layout/layout.cxx:773` | `covered` | Paragraph border clipping; project to PDF clipping/path checks. |
+| `layout.cxx::testDoublePageBorder` | `double-page-border.docx` | `../core/sw/qa/core/layout/layout.cxx:793` | `covered` | Page border geometry; project to PDF paths. |
+| `paintfrm.cxx::testRTLBorderMerge` | `rtl-table.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:75` | `covered` | RTL table border merge; project to PDF paths. |
+| `paintfrm.cxx::testInlineEndnoteSeparatorPosition` | `inline-endnote-position.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:163` | `covered` | Endnote separator position; project to PDF paths. |
+| `paintfrm.cxx::testEndnoteContSeparator` | `endnote-cont-separator.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:193` | `covered` | Endnote continuation separator; project to PDF paths. |
 | `paintfrm.cxx::testTableRedlineRenderMode` | `redline-table.docx` | `../core/sw/qa/core/layout/paintfrm.cxx:235` | `mapped` | Redline table render mode; project to visible text/path changes. |
-| `tabfrm.cxx::testTablePrintAreaLeft` | `table-print-area-left.docx` | `../core/sw/qa/core/layout/tabfrm.cxx:35` | `mapped` | Table print-area position; project to table/text bounds. |
+| `tabfrm.cxx::testTablePrintAreaLeft` | `table-print-area-left.docx` | `../core/sw/qa/core/layout/tabfrm.cxx:35` | `covered` | Table print-area position; project to table/text bounds. |
 | `objectpositioning.cxx::testVertAlignBottomMarginWithFooter` | `bottom-margin-with-footer.docx` | `../core/sw/qa/core/objectpositioning/objectpositioning.cxx:184` | `mapped` | Floating object vertical alignment; project to image/shape bounds. |
 | `objectpositioning.cxx::testInsideOutsideVertAlignBottomMargin` | `inside-outside-vert-align.docx` | `../core/sw/qa/core/objectpositioning/objectpositioning.cxx:258` | `mapped` | Inside/outside vertical alignment; project to shape bounds. |
 | `objectpositioning.cxx::testVMLVertAlignBottomMargin` | `vml-vertical-alignment.docx` | `../core/sw/qa/core/objectpositioning/objectpositioning.cxx:279` | `mapped` | VML vertical alignment; project to shape bounds. |
@@ -201,33 +201,33 @@ behavior.
 
 | Upstream test | Fixture | Source file | Status | PDF projection |
 |---|---|---|---|---|
-| `layout.cxx::TestTdf136588` | `tdf136588.docx` | `../core/sw/qa/extras/layout/layout.cxx:276` | `mapped` | Layout dump; project to page/text/object bounds. |
-| `layout.cxx::testTdf88496` | `tdf88496.docx` | `../core/sw/qa/extras/layout/layout.cxx:949` | `mapped` | Layout dump; project to page/text/object bounds. |
-| `layout.cxx::TestTdf137025` | `tdf137025.docx` | `../core/sw/qa/extras/layout/layout.cxx:1438` | `mapped` | Detailed layout dump; project to PDF text/object bounds. |
-| `layout.cxx::TestTdf134277` | `tdf134277.docx` | `../core/sw/qa/extras/layout/layout.cxx:2192` | `mapped` | Layout regression; project to page/text bounds. |
-| `layout.cxx::testTdf116486` | `tdf116486.docx` | `../core/sw/qa/extras/layout/layout.cxx:2206` | `mapped` | Layout regression; project to visible page output. |
-| `layout.cxx::TestTdf142080` | `fdo43573-2-min.docx` | `../core/sw/qa/extras/layout/layout.cxx:2217` | `mapped` | Layout regression; project to page/text output. |
-| `layout.cxx::testTdf128198` | `tdf128198-1.docx` | `../core/sw/qa/extras/layout/layout.cxx:2247` | `mapped` | Layout regression; project to page/text output. |
-| `layout.cxx::testTdf106153` | `tdf106153.docx` | `../core/sw/qa/extras/layout/layout.cxx:2284` | `mapped` | Layout regression; project to page/text/object bounds. |
-| `layout.cxx::testTdf109137` | `tdf109137.docx` | `../core/sw/qa/extras/layout/layout.cxx:3581` | `mapped` | Layout regression; project to visible page output. |
-| `layout.cxx::testTdf157628` | `tdf157628.docx` | `../core/sw/qa/extras/layout/layout.cxx:3701` | `mapped` | Layout regression; project to visible page output. |
+| `layout.cxx::TestTdf136588` | `tdf136588.docx` | `../core/sw/qa/extras/layout/layout.cxx:276` | `covered` | Layout dump; project to page/text/object bounds. |
+| `layout.cxx::testTdf88496` | `tdf88496.docx` | `../core/sw/qa/extras/layout/layout.cxx:949` | `covered` | Layout dump; project to page/text/object bounds. |
+| `layout.cxx::TestTdf137025` | `tdf137025.docx` | `../core/sw/qa/extras/layout/layout.cxx:1438` | `covered` | Detailed layout dump; project to PDF text/object bounds. |
+| `layout.cxx::TestTdf134277` | `tdf134277.docx` | `../core/sw/qa/extras/layout/layout.cxx:2192` | `covered` | Layout regression; project to page/text bounds. |
+| `layout.cxx::testTdf116486` | `tdf116486.docx` | `../core/sw/qa/extras/layout/layout.cxx:2206` | `covered` | Layout regression; project to visible page output. |
+| `layout.cxx::TestTdf142080` | `fdo43573-2-min.docx` | `../core/sw/qa/extras/layout/layout.cxx:2217` | `covered` | Layout regression; project to page/text output. |
+| `layout.cxx::testTdf128198` | `tdf128198-1.docx` | `../core/sw/qa/extras/layout/layout.cxx:2247` | `covered` | Layout regression; project to page/text output. |
+| `layout.cxx::testTdf106153` | `tdf106153.docx` | `../core/sw/qa/extras/layout/layout.cxx:2284` | `covered` | Layout regression; project to page/text/object bounds. |
+| `layout.cxx::testTdf109137` | `tdf109137.docx` | `../core/sw/qa/extras/layout/layout.cxx:3581` | `covered` | Layout regression; project to visible page output. |
+| `layout.cxx::testTdf157628` | `tdf157628.docx` | `../core/sw/qa/extras/layout/layout.cxx:3701` | `covered` | Layout regression; project to visible page output. |
 | `layout.cxx::testTdf125893` | `tdf125893.docx` | `../core/sw/qa/extras/layout/layout.cxx:3751` | `mapped` | Layout regression; project to visible page output. |
 | `layout2.cxx::testTdf165322` | `CT-formatted-deletion.docx` | `../core/sw/qa/extras/layout/layout2.cxx:573` | `mapped` | Formatted deletion visibility; project to PDF text/decoration. |
-| `layout2.cxx::tdf157596_paragraph_numbering` | `tdf157596_paragraph_numbering.docx` | `../core/sw/qa/extras/layout/layout2.cxx:678` | `mapped` | Paragraph numbering layout; project to PDF text. |
+| `layout2.cxx::tdf157596_paragraph_numbering` | `tdf157596_paragraph_numbering.docx` | `../core/sw/qa/extras/layout/layout2.cxx:678` | `covered` | Paragraph numbering layout; project to PDF text. |
 | `layout2.cxx::testTdf149711_importDOCXMoveToParagraphMark` | `tdf149711.docx` | `../core/sw/qa/extras/layout/layout2.cxx:787` | `mapped` | Move-to paragraph mark rendering; project to PDF text/decoration. |
-| `layout2.cxx::testTdf152872` | `hidden-para-separator.docx` | `../core/sw/qa/extras/layout/layout2.cxx:805` | `mapped` | Hidden paragraph separator layout; project to PDF text/spacing. |
+| `layout2.cxx::testTdf152872` | `hidden-para-separator.docx` | `../core/sw/qa/extras/layout/layout2.cxx:805` | `covered` | Hidden paragraph separator layout; project to PDF text/spacing. |
 | `layout2.cxx::testTdf151954` | `tdf151954.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1189` | `mapped` | Layout regression; project to PDF text/object bounds. |
 | `layout2.cxx::testRedlineMovingDOCX` | `tdf104797.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1501` | `mapped` | Redline move rendering; project to PDF text/decoration. |
-| `layout2.cxx::testTdf125300` | `tdf125300.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1681` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout2.cxx::testTdf122225` | `tdf122225.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1756` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout2.cxx::testTdf134247` | `legend-itemorder-min.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1796` | `mapped` | Chart legend order; project to PDF text order. |
-| `layout2.cxx::testTdf75659` | `tdf75659.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1811` | `mapped` | Chart/layout regression; project to PDF text/path output. |
-| `layout2.cxx::testTdf126425` | `long_legendentry.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1843` | `mapped` | Long legend entry layout; project to PDF text bounds. |
+| `layout2.cxx::testTdf125300` | `tdf125300.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1681` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout2.cxx::testTdf122225` | `tdf122225.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1756` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout2.cxx::testTdf134247` | `legend-itemorder-min.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1796` | `covered` | Chart legend order; project to PDF text order. |
+| `layout2.cxx::testTdf75659` | `tdf75659.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1811` | `covered` | Chart/layout regression; project to PDF text/path output. |
+| `layout2.cxx::testTdf126425` | `long_legendentry.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1843` | `covered` | Long legend entry layout; project to PDF text bounds. |
 | `layout2.cxx::testUnusedOLEprops` | `tdf138465min.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1860` | `mapped` | OLE preview/layout output; project to image/object checks. |
-| `layout2.cxx::testTdf115630` | `tdf115630.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1920` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout2.cxx::testTdf128996` | `tdf128996.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2009` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout2.cxx::testTdf126244` | `tdf126244.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2023` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout2.cxx::testTdf69648` | `tdf69648.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2080` | `mapped` | Layout regression; project to PDF text/object bounds. |
+| `layout2.cxx::testTdf115630` | `tdf115630.docx` | `../core/sw/qa/extras/layout/layout2.cxx:1920` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout2.cxx::testTdf128996` | `tdf128996.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2009` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout2.cxx::testTdf126244` | `tdf126244.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2023` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout2.cxx::testTdf69648` | `tdf69648.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2080` | `covered` | Layout regression; project to PDF text/object bounds. |
 | `layout2.cxx::testTdf116256` | `tdf116256.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2118` | `mapped` | Layout regression; project to PDF page/text assertions. |
 | `layout3.cxx::testTdf134463` | `tdf134463.docx` | `../core/sw/qa/extras/layout/layout3.cxx:31` | `mapped` | Layout regression; project to PDF page/text assertions. |
 | `layout3.cxx::testTdf117188` | `tdf117188.docx` | `../core/sw/qa/extras/layout/layout3.cxx:39` | `mapped` | Layout regression; project to PDF text/object bounds. |
@@ -238,16 +238,16 @@ behavior.
 | `layout3.cxx::testTdf164905` | `tdf164905.docx` | `../core/sw/qa/extras/layout/layout3.cxx:567` | `mapped` | Layout regression; project to PDF text/object bounds. |
 | `layout3.cxx::testTdf163149` | `tdf163149.docx` | `../core/sw/qa/extras/layout/layout3.cxx:583` | `mapped` | Layout regression; project to PDF text/object bounds. |
 | `layout3.cxx::testTdf164499` | `tdf164499.docx` | `../core/sw/qa/extras/layout/layout3.cxx:1295` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout4.cxx::testTdf117982` | `tdf117982.docx` | `../core/sw/qa/extras/layout/layout4.cxx:446` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout4.cxx::testTdf128959` | `tdf128959.docx` | `../core/sw/qa/extras/layout/layout4.cxx:458` | `mapped` | Layout regression; project to PDF text/object bounds. |
+| `layout4.cxx::testTdf117982` | `tdf117982.docx` | `../core/sw/qa/extras/layout/layout4.cxx:446` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout4.cxx::testTdf128959` | `tdf128959.docx` | `../core/sw/qa/extras/layout/layout4.cxx:458` | `covered` | Layout regression; project to PDF text/object bounds. |
 | `layout4.cxx::testWriterImageNoCapture` | `writer-image-no-capture.docx` | `../core/sw/qa/extras/layout/layout4.cxx:555` | `mapped` | Image capture/layout; project to PDF image/object checks. |
-| `layout4.cxx::testTdf124423_DOCX` | `tdf124423.docx` | `../core/sw/qa/extras/layout/layout4.cxx:641` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout4.cxx::testTdf138782` | `tdf138782.docx` | `../core/sw/qa/extras/layout/layout4.cxx:706` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout4.cxx::testTdf135035_DOCX` | `tdf135035.docx` | `../core/sw/qa/extras/layout/layout4.cxx:722` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout4.cxx::testTdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage` | `tdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage.docx` | `../core/sw/qa/extras/layout/layout4.cxx:762` | `mapped` | Columns and footnote layout; project to PDF text/page bounds. |
-| `layout4.cxx::TestTdf161348` | `fdo48718-1.docx` | `../core/sw/qa/extras/layout/layout4.cxx:825` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout4.cxx::testTdf159271` | `fld-in-tbl.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1072` | `mapped` | Field-in-table layout; project to PDF text/table bounds. |
-| `layout4.cxx::testTdf159259` | `sdt+framePr.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1093` | `mapped` | Content control with frame properties; project to PDF text/object bounds. |
+| `layout4.cxx::testTdf124423_DOCX` | `tdf124423.docx` | `../core/sw/qa/extras/layout/layout4.cxx:641` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout4.cxx::testTdf138782` | `tdf138782.docx` | `../core/sw/qa/extras/layout/layout4.cxx:706` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout4.cxx::testTdf135035_DOCX` | `tdf135035.docx` | `../core/sw/qa/extras/layout/layout4.cxx:722` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout4.cxx::testTdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage` | `tdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage.docx` | `../core/sw/qa/extras/layout/layout4.cxx:762` | `covered` | Columns and footnote layout; project to PDF text/page bounds. |
+| `layout4.cxx::TestTdf161348` | `fdo48718-1.docx` | `../core/sw/qa/extras/layout/layout4.cxx:825` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout4.cxx::testTdf159271` | `fld-in-tbl.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1072` | `covered` | Field-in-table layout; project to PDF text/table bounds. |
+| `layout4.cxx::testTdf159259` | `sdt+framePr.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1093` | `covered` | Content control with frame properties; project to PDF text/object bounds. |
 | `layout4.cxx::TestTdf155229RowAtLeast` | `tdf155229_row_height_at_least.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1670` | `mapped` | Row height layout; project to PDF table bounds. |
 | `layout4.cxx::TestTdf164907_rowHeightAtLeast` | `tdf164907_rowHeightAtLeast.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1682` | `mapped` | Row height layout; project to PDF table bounds. |
 | `layout4.cxx::testTdf152298` | `tdf152298.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1918` | `mapped` | Layout regression; project to PDF page/text/object assertions. |

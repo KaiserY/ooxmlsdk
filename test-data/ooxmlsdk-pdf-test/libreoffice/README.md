@@ -278,6 +278,107 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/ooxmlexport/data/tdf169986_bottomSpacing.docx`.
 - `tdf167657_sectPr_bottomSpacing.docx`: copied from
   `../core/sw/qa/extras/ooxmlexport/data/tdf167657_sectPr_bottomSpacing.docx`.
+- `number-portion-noformat.docx`: copied from
+  `../core/sw/qa/core/text/data/number-portion-noformat.docx`.
+- `ignore-top-margin.docx`: copied from
+  `../core/sw/qa/core/layout/data/ignore-top-margin.docx`.
+- `ignore-top-margin-table.docx`: copied from
+  `../core/sw/qa/core/layout/data/ignore-top-margin-table.docx`.
+- `ignore-top-margin-page-style-change.docx`: copied from
+  `../core/sw/qa/core/layout/data/ignore-top-margin-page-style-change.docx`.
+- `inline-endnote-position.docx`: copied from
+  `../core/sw/qa/core/layout/data/inline-endnote-position.docx`.
+- `table-fly-overlap.docx`: copied from
+  `../core/sw/qa/core/layout/data/table-fly-overlap.docx`.
+- `table-fly-overlap-spacing.docx`: copied from
+  `../core/sw/qa/core/layout/data/table-fly-overlap-spacing.docx`.
+- `tdf128195.docx`: copied from
+  `../core/sw/qa/core/layout/data/tdf128195.docx`.
+- `border-collapse-compat.docx`: copied from
+  `../core/sw/qa/core/layout/data/border-collapse-compat.docx`.
+- `textbox-autogrow-vertical.docx`: copied from
+  `../core/sw/qa/core/layout/data/textbox-autogrow-vertical.docx`.
+- `header-textbox.docx`: copied from
+  `../core/sw/qa/core/layout/data/header-textbox.docx`.
+- `vmerge-cell-border.docx`: copied from
+  `../core/sw/qa/core/layout/data/vmerge-cell-border.docx`.
+- `inner-border.docx`: copied from
+  `../core/sw/qa/core/layout/data/inner-border.docx`.
+- `double-border-vertical.docx`: copied from
+  `../core/sw/qa/core/layout/data/double-border-vertical.docx`.
+- `double-border-horizontal.docx`: copied from
+  `../core/sw/qa/core/layout/data/double-border-horizontal.docx`.
+- `para-border-in-cell-clip.docx`: copied from
+  `../core/sw/qa/core/layout/data/para-border-in-cell-clip.docx`.
+- `double-page-border.docx`: copied from
+  `../core/sw/qa/core/layout/data/double-page-border.docx`.
+- `rtl-table.docx`: copied from
+  `../core/sw/qa/core/layout/data/rtl-table.docx`.
+- `endnote-cont-separator.docx`: copied from
+  `../core/sw/qa/core/layout/data/endnote-cont-separator.docx`.
+- `table-print-area-left.docx`: copied from
+  `../core/sw/qa/core/layout/data/table-print-area-left.docx`.
+- `tdf136588.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf136588.docx`.
+- `tdf88496.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf88496.docx`.
+- `tdf137025.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf137025.docx`.
+- `tdf134277.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134277.docx`.
+- `tdf116486.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf116486.docx`.
+- `fdo43573-2-min.docx`: copied from
+  `../core/sw/qa/extras/layout/data/fdo43573-2-min.docx`.
+- `tdf128198-1.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf128198-1.docx`.
+- `tdf106153.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf106153.docx`.
+- `tdf109137.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf109137.docx`.
+- `tdf157628.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf157628.docx`.
+- `tdf157596_paragraph_numbering.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf157596_paragraph_numbering.docx`.
+- `hidden-para-separator.docx`: copied from
+  `../core/sw/qa/extras/layout/data/hidden-para-separator.docx`.
+- `tdf125300.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf125300.docx`.
+- `tdf122225.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf122225.docx`.
+- `legend-itemorder-min.docx`: copied from
+  `../core/sw/qa/extras/layout/data/legend-itemorder-min.docx`.
+- `tdf75659.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf75659.docx`.
+- `long_legendentry.docx`: copied from
+  `../core/sw/qa/extras/layout/data/long_legendentry.docx`.
+- `tdf115630.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf115630.docx`.
+- `tdf128996.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf128996.docx`.
+- `tdf126244.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf126244.docx`.
+- `tdf69648.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf69648.docx`.
+- `tdf117982.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf117982.docx`.
+- `tdf128959.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf128959.docx`.
+- `tdf124423.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf124423.docx`.
+- `tdf138782.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf138782.docx`.
+- `tdf135035.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf135035.docx`.
+- `tdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage.docx`: copied
+  from
+  `../core/sw/qa/extras/layout/data/tdf139336_ColumnsWithFootnoteDoNotOccupyEntirePage.docx`.
+- `fdo48718-1.docx`: copied from
+  `../core/sw/qa/extras/layout/data/fdo48718-1.docx`.
+- `fld-in-tbl.docx`: copied from
+  `../core/sw/qa/extras/layout/data/fld-in-tbl.docx`.
+- `sdt+framePr.docx`: copied from
+  `../core/sw/qa/extras/layout/data/sdt+framePr.docx`.
 
 Assertion policy:
 

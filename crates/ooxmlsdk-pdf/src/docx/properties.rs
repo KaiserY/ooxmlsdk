@@ -61,8 +61,8 @@ pub(super) fn merge_run_style(
     return;
   };
 
-  if let Some(fonts) = properties.run_fonts() {
-    if let Some(font_family) = fonts
+  if let Some(fonts) = properties.run_fonts()
+    && let Some(font_family) = fonts
       .ascii
       .as_deref()
       .or(fonts.high_ansi.as_deref())
@@ -74,9 +74,8 @@ pub(super) fn merge_run_style(
       .or_else(|| theme_fonts.resolve(fonts.high_ansi_theme))
       .or_else(|| theme_fonts.resolve(fonts.east_asia_theme))
       .or_else(|| theme_fonts.resolve(fonts.complex_script_theme))
-    {
-      style.font_family = Some(font_family);
-    }
+  {
+    style.font_family = Some(font_family);
   }
 
   if let Some(bold) = properties.bold() {

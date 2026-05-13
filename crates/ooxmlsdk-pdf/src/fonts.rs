@@ -31,24 +31,27 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     families.push(fontdb::Family::Name(family));
     push_font_aliases(&mut families, family);
   } else {
-    families.push(fontdb::Family::SansSerif);
+    push_generic_font_families(&mut families);
   }
 
-  if let Some(id) = font_db().query(&fontdb::Query {
-    families: &families,
-    weight: query_weight(family, bold),
-    style: if italic {
-      fontdb::Style::Italic
-    } else {
-      fontdb::Style::Normal
-    },
-    ..fontdb::Query::default()
-  }) && let Some((data, index)) =
-    font_db().with_face_data(id, |data, index| (data.to_vec(), index))
-  {
-    let face = Some(FontFaceData { data, index });
-    cache.insert(key, face.clone());
-    return face;
+  if let Some(face) = query_font_face(&families, family, bold, italic) {
+    cache.insert(key, Some(face.clone()));
+    return Some(face);
+  }
+
+  // Source: LibreOffice vcl/unx/generic/fontmanager/fontconfig.cxx
+  // PrintFontManager::Substitute asks fontconfig for a replacement when the
+  // requested family is unavailable. Typst's text shaping follows the same
+  // broad model by selecting a fallback font after the requested families are
+  // exhausted. Keep named-family fallback explicit so exact installed fonts and
+  // source-backed aliases remain preferred.
+  if family.is_some_and(|family| !family.trim().is_empty()) {
+    let mut fallback_families = Vec::new();
+    push_generic_font_families(&mut fallback_families);
+    if let Some(face) = query_font_face(&fallback_families, family, bold, italic) {
+      cache.insert(key, Some(face.clone()));
+      return Some(face);
+    }
   }
 
   let fallback_paths = family
@@ -67,7 +70,44 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
     }
   }
 
+  if family.is_some_and(|family| !family.trim().is_empty()) {
+    for path in generic_fallback_font_paths(bold, italic) {
+      let Ok(data) = std::fs::read(path) else {
+        continue;
+      };
+      if ttf_parser::Face::parse(&data, 0).is_ok() {
+        let face = Some(FontFaceData { data, index: 0 });
+        cache.insert(key, face.clone());
+        return face;
+      }
+    }
+  }
+
   cache.insert(key, None);
+  None
+}
+
+fn query_font_face(
+  families: &[fontdb::Family<'_>],
+  family: Option<&str>,
+  bold: bool,
+  italic: bool,
+) -> Option<FontFaceData> {
+  if let Some(id) = font_db().query(&fontdb::Query {
+    families,
+    weight: query_weight(family, bold),
+    style: if italic {
+      fontdb::Style::Italic
+    } else {
+      fontdb::Style::Normal
+    },
+    ..fontdb::Query::default()
+  }) && let Some((data, index)) =
+    font_db().with_face_data(id, |data, index| (data.to_vec(), index))
+  {
+    return Some(FontFaceData { data, index });
+  }
+
   None
 }
 
@@ -137,6 +177,11 @@ fn push_font_aliases<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str
     ]),
     _ => {}
   }
+}
+
+fn push_generic_font_families(families: &mut Vec<fontdb::Family<'_>>) {
+  families.push(fontdb::Family::SansSerif);
+  families.push(fontdb::Family::Serif);
 }
 
 fn specific_fallback_font_paths(family: &str, bold: bool, italic: bool) -> &'static [&'static str] {
@@ -284,12 +329,22 @@ mod tests {
   use super::load_text_face;
 
   #[test]
-  fn missing_named_font_does_not_silently_fall_back_to_generic_sans() {
+  fn missing_named_font_uses_system_fallback() {
     let style = TextStyle {
       font_family: Some(Arc::from("CodexDefinitelyMissingFont")),
       ..Default::default()
     };
 
-    assert!(load_text_face(&style).is_none());
+    assert!(load_text_face(&style).is_some());
+  }
+
+  #[test]
+  fn din_bold_uses_system_fallback_when_family_is_not_installed() {
+    let style = TextStyle {
+      font_family: Some(Arc::from("DIN-Bold")),
+      ..Default::default()
+    };
+
+    assert!(load_text_face(&style).is_some());
   }
 }

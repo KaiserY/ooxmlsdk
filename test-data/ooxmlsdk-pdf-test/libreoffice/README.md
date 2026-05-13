@@ -192,6 +192,92 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/ooxmlexport/data/negative-cell-margin-twips.docx`.
 - `tdf153042_largeTab.docx`: copied from
   `../core/sw/qa/extras/ooxmlexport/data/tdf153042_largeTab.docx`.
+- `text-box-word-wrap.docx`: copied from
+  `../core/sw/qa/core/doc/data/text-box-word-wrap.docx`.
+- `tdf153042_noTab.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153042_noTab.docx`.
+- `tdf134063.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf134063.docx`.
+- `tdf148360.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf148360.docx`.
+- `tdf163894.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf163894.docx`.
+- `tdf163894_hidden.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf163894_hidden.docx`.
+- `tdf32363.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf32363.docx`.
+- `tdf163894_from_top.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf163894_from_top.docx`.
+- `tdf135595_HFtableWrap_c12.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf135595_HFtableWrap_c12.docx`.
+- `tdf78749.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf78749.docx`.
+- `TestFirstFooterDisabled.docx`: copied from
+  `../core/sw/qa/core/header_footer/data/TestFirstFooterDisabled.docx`.
+- `textbox-right-edge.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/textbox-right-edge.docx`.
+- `wpg-nested.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/wpg-nested.docx`.
+- `tdf151704_thinColumnHeight.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf151704_thinColumnHeight.docx`.
+- `tdf133000_numStyleFormatting.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133000_numStyleFormatting.docx`.
+- `tdf78352.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf78352.docx`.
+- `tdf83309.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf83309.docx`.
+- `tdf131801.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf131801.docx`.
+- `tdf135949_anchoredBeforeBreak.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf135949_anchoredBeforeBreak.docx`.
+- `tdf133070_testRelativeAnchorHeightFromBottomMarginHasFooter.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133070_testRelativeAnchorHeightFromBottomMarginHasFooter.docx`.
+- `tdf153128.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153128.docx`.
+- `bnc891663.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/bnc891663.docx`.
+- `listWithLgl.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx`.
+- `tdf160077_layoutInCell.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf160077_layoutInCell.docx`.
+- `tdf160077_layoutInCellB.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf160077_layoutInCellB.docx`.
+- `tdf160077_layoutInCellC.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf160077_layoutInCellC.docx`.
+- `tdf160077_layoutInCellD.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf160077_layoutInCellD.docx`.
+- `tdf153909_followTextFlow.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf153909_followTextFlow.docx`.
+- `tdf162541_notLayoutInCell_paraLeft.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf162541_notLayoutInCell_paraLeft.docx`.
+- `tdf162551_notLayoutInCell_charLeft_fromTop.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf162551_notLayoutInCell_charLeft_fromTop.docx`.
+- `tdf123324_testRelativeAnchorHeightFromTopMarginHasHeader.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf123324_testRelativeAnchorHeightFromTopMarginHasHeader.docx`.
+- `tdf123324_testRelativeAnchorHeightFromTopMarginNoHeader.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf123324_testRelativeAnchorHeightFromTopMarginNoHeader.docx`.
+- `tdf165492_exactWithBottomSpacing.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165492_exactWithBottomSpacing.docx`.
+- `tdf165492_atLeastWithBottomSpacing.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165492_atLeastWithBottomSpacing.docx`.
+- `tdf165047_consolidatedTopMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165047_consolidatedTopMargin.docx`.
+- `tdf165047_contextualSpacingTopMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165047_contextualSpacingTopMargin.docx`.
+- `tdf146346.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf146346.docx`.
+- `tdf165354.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165354.docx`.
+- `tdf166544_noTopMargin_fields.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf166544_noTopMargin_fields.docx`.
+- `tdf138020_all_rows_tblHeader.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf138020_all_rows_tblHeader.docx`.
+- `tdf166510_sectPr_bottomSpacing.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf166510_sectPr_bottomSpacing.docx`.
+- `tdf169986_bottomSpacing.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf169986_bottomSpacing.docx`.
+- `tdf167657_sectPr_bottomSpacing.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf167657_sectPr_bottomSpacing.docx`.
 
 Assertion policy:
 

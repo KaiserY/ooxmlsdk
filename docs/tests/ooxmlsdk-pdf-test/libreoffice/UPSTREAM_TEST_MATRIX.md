@@ -70,7 +70,7 @@ outputs. For this matrix, `covered` direct-PDF rows are the direct analogue;
 |---|---:|---:|---|
 | Direct PDF/object | `Direct PDF Tests` covered rows | 10 | Expressed with current PDF extraction assertions. |
 | Covered supplemental | `Covered Supplemental Tests` rows | 7 | Already represented locally with source-backed visible PDF color/alpha/text assertions. |
-| Projection required | `mapped` rows | 237 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
+| Projection required | `mapped` rows | 194 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
 | Review only | `review` rows | 0 | Broad-scan rows have been item-reviewed in this pass. |
 | Deferred/excluded | `deferred` / `excluded` rows | 26 | Keep out of the active PDF migration queue. |
 
@@ -95,20 +95,20 @@ test harness convenience, not a capability blocker.
 | Assertion class | Active rows | Rust path | Faithfulness note |
 |---|---:|---|---|
 | Direct PDF/object | 45 | Existing PDFium/lopdf extraction, plus small extensions for outline/form dictionaries when needed. | Expected values can be copied from LibreOffice PDF assertions. |
-| Layout dump projection | 176 | Convert LibreOffice layout dump frame/text/table/page assertions to PDF text/path/image bounds, object counts, text order, or page counts. | Do not copy XPath literally; preserve the upstream geometry/text relation after unit conversion and tolerances. |
-| Raster/bitmap | 13 | Use PDFium page rendering plus `image`/`crc32fast`/PNG references for page or region snapshots. | Use LibreOffice pixel/color/bitmap expectation or checked-in reference images; do not derive expected images from current Rust output. |
+| Layout dump projection | 134 | Convert LibreOffice layout dump frame/text/table/page assertions to PDF text/path/image bounds, object counts, text order, or page counts. | Do not copy XPath literally; preserve the upstream geometry/text relation after unit conversion and tolerances. |
+| Raster/bitmap | 12 | Use PDFium page rendering plus `image`/`crc32fast`/PNG references for page or region snapshots. | Use LibreOffice pixel/color/bitmap expectation or checked-in reference images; do not derive expected images from current Rust output. |
 | Metafile/render XML | 6 | Project LibreOffice metafile text/path/polyline assertions to PDF text/path objects or raster snapshots. | Preserve the asserted rendered primitive, not the LibreOffice XML format. |
 | Graphics/color/effects | 12 | Assert PDF text/path/image colors, alpha, stroke/fill, bounds, or fall back to raster snapshots for effects. | Theme/color/effect expected values must remain LibreOffice-derived. |
 | Other visible output | 34 | Mostly chart/layout/rendered-output cases; use text/path/image extraction first, snapshot when primitives are not stable enough. | Keep as active TDD targets when the final page output is the asserted behavior. |
 
 ## Scan Summary
 
-- Local covered PDF-rendering fixtures: 78.
+- Local covered PDF-rendering fixtures: 121.
 - Direct upstream DOCX -> PDF/object assertions: 10 rows, all covered.
 - Planned direct PDF rows remaining: 0.
 - Supplemental source-backed PDF-visible assertions already covered locally: 7
   rows.
-- Additional visible-output candidates listed individually below: 237 mapped
+- Additional visible-output candidates listed individually below: 194 mapped
   tests. Treat these as active TDD targets that may require new PDF extraction,
   layout projection, or snapshot capability before the Rust assertion can be
   written faithfully.
@@ -351,14 +351,14 @@ are `deferred`.
 | Upstream test | Fixture | Source file | Status | Signal |
 |---|---|---|---|---|
 | `doc.cxx::testTextBoxMakeFlyFrame` | `textbox-makeflyframe.docx` | `../core/sw/qa/core/doc/doc.cxx:219` | `deferred` | Copy/paste workflow; not direct source DOCX -> PDF rendering. |
-| `doc.cxx::testTextBoxWordWrap` | `text-box-word-wrap.docx` | `../core/sw/qa/core/doc/doc.cxx:730` | `mapped` | parseLayoutDump |
+| `doc.cxx::testTextBoxWordWrap` | `text-box-word-wrap.docx` | `../core/sw/qa/core/doc/doc.cxx:730` | `covered` | parseLayoutDump |
 | `doc.cxx::testEditListAutofmt` | `edit-list-autofmt.docx` | `../core/sw/qa/core/doc/doc.cxx:785` | `deferred` | Applies an edit command before the layout assertion. |
 | `number.cxx::testBadHeadingIndent` | `bad-heading-indent.docx` | `../core/sw/qa/core/doc/number.cxx:26` | `deferred` | Applies a style command before the layout assertion. |
 | `HeaderFooterTest.cxx::testFirstPageHeadersAndEmptyFooters` | `fdo66145.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:242` | `covered` | parseLayoutDump |
 | `HeaderFooterTest.cxx::testFirstHeaderFooterImport` | `first-header-footer.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:265` | `covered` | parseLayoutDump |
 | `HeaderFooterTest.cxx::testContSectBreakHeaderFooter` | `cont-sect-break-header-footer.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:439` | `covered` | parseLayoutDump |
 | `HeaderFooterTest.cxx::tdf166205_first_page_header_footer_visible` | `tdf166205_first_page_header_footer_visible.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:496` | `covered` | parseLayoutDump |
-| `HeaderFooterTest.cxx::testFirstPageFooterEnabled` | `TestFirstFooterDisabled.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:646` | `mapped` | parseLayoutDump |
+| `HeaderFooterTest.cxx::testFirstPageFooterEnabled` | `TestFirstFooterDisabled.docx` | `../core/sw/qa/core/header_footer/HeaderFooterTest.cxx:646` | `covered` | parseLayoutDump |
 | `txtnode.cxx::testSplitFlyAnchorSplit` | `floattable-anchor-split.docx` | `../core/sw/qa/core/txtnode/txtnode.cxx:490` | `mapped` | parseLayoutDump |
 | `unocore.cxx::testParagraphMarkerODFExport` | `paragraph-marker.docx` | `../core/sw/qa/core/unocore/unocore.cxx:851` | `deferred` | Assertion is after ODT save/reload, not source DOCX -> PDF rendering. |
 | `unocore.cxx::testParagraphMarkerFormattedRun` | `paragraph-marker-formatted-run.docx` | `../core/sw/qa/core/unocore/unocore.cxx:869` | `deferred` | Assertion is after ODT save/reload, not source DOCX -> PDF rendering. |
@@ -370,8 +370,8 @@ are `deferred`.
 | `odfimport.cxx::testTdf76322_columnBreakInHeader` | `tdf76322_columnBreakInHeader.docx` | `../core/sw/qa/extras/odfimport/odfimport.cxx:925` | `deferred` | Fixture is an ODF package despite the `.docx` suffix, so it is not a source DOCX -> PDF target for this suite. |
 | `ooxmlexport.cxx::testfdo81031` | `fdo81031.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport.cxx:71` | `covered` | Bitmap |
 | `ooxmlexport.cxx::testNumOverrideLvltext` | `num-override-lvltext.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport.cxx:750` | `covered` | parseLayoutDump |
-| `ooxmlexport.cxx::testTextboxRightEdge` | `textbox-right-edge.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport.cxx:777` | `mapped` | parseLayoutDump |
-| `ooxmlexport10.cxx::testWpgNested` | `wpg-nested.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:166` | `mapped` | parseLayoutDump |
+| `ooxmlexport.cxx::testTextboxRightEdge` | `textbox-right-edge.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport.cxx:777` | `covered` | parseLayoutDump |
+| `ooxmlexport10.cxx::testWpgNested` | `wpg-nested.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:166` | `covered` | parseLayoutDump |
 | `ooxmlexport10.cxx::testPictureWithSchemeColor` | `picture-with-schemecolor.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:502` | `covered` | Bitmap |
 | `ooxmlexport10.cxx::testI124106` | `i124106.docx`; `large-twips.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:642` | `mapped` | parseLayoutDump |
 | `ooxmlexport10.cxx::testNegativeCellMarginTwips` | `negative-cell-margin-twips.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:657` | `covered` | parseLayoutDump |
@@ -390,27 +390,27 @@ are `deferred`.
 | `ooxmlexport13.cxx::testTdf125324` | `tdf125324.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport13.cxx:1056` | `mapped` | parseLayoutDump |
 | `ooxmlexport14.cxx::testTdf128197` | `128197_compat14.docx`; `128197_compat15.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:69` | `covered` | parseLayoutDump |
 | `ooxmlexport14.cxx::testTdf135595_HFtableWrap` | `tdf135943_shapeWithText_LayoutInCell0_compat15.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:85` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf135595_HFtableWrap_c12` | `tdf135595_HFtableWrap_c12.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:131` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf151704_thinColumnHeight` | `tdf151704_thinColumnHeight.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:140` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf78749` | `tdf78749.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:163` | `mapped` | Bitmap |
-| `ooxmlexport14.cxx::testTdf133000_numStyleFormatting` | `tdf133000_numStyleFormatting.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:338` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf78352` | `tdf78352.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:523` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf83309` | `tdf83309.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:708` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf163894` | `tdf163894.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:795` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf163894_hidden` | `tdf163894_hidden.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:823` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf32363` | `tdf32363.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:855` | `mapped` | parseLayoutDump |
-| `ooxmlexport14.cxx::testTdf163894_from_top_to_beginning_of_the_documentMarguerite` | `tdf163894_from_top.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:892` | `mapped` | parseLayoutDump |
-| `ooxmlexport15.cxx::testTdf131801` | `tdf131801.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:54` | `mapped` | parseLayoutDump |
-| `ooxmlexport15.cxx::testTdf135949_anchoredBeforeBreak` | `tdf135949_anchoredBeforeBreak.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:763` | `mapped` | parseLayoutDump |
-| `ooxmlexport15.cxx::testTdf134063` | `tdf134063.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:936` | `mapped` | parseLayoutDump |
-| `ooxmlexport15.cxx::testRelativeAnchorHeightFromBottomMarginHasFooter` | `tdf133070_testRelativeAnchorHeightFromBottomMarginHasFooter.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:1028` | `mapped` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf135595_HFtableWrap_c12` | `tdf135595_HFtableWrap_c12.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:131` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf151704_thinColumnHeight` | `tdf151704_thinColumnHeight.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:140` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf78749` | `tdf78749.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:163` | `covered` | Bitmap |
+| `ooxmlexport14.cxx::testTdf133000_numStyleFormatting` | `tdf133000_numStyleFormatting.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:338` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf78352` | `tdf78352.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:523` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf83309` | `tdf83309.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:708` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf163894` | `tdf163894.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:795` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf163894_hidden` | `tdf163894_hidden.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:823` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf32363` | `tdf32363.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:855` | `covered` | parseLayoutDump |
+| `ooxmlexport14.cxx::testTdf163894_from_top_to_beginning_of_the_documentMarguerite` | `tdf163894_from_top.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:892` | `covered` | parseLayoutDump |
+| `ooxmlexport15.cxx::testTdf131801` | `tdf131801.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:54` | `covered` | parseLayoutDump |
+| `ooxmlexport15.cxx::testTdf135949_anchoredBeforeBreak` | `tdf135949_anchoredBeforeBreak.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:763` | `covered` | parseLayoutDump |
+| `ooxmlexport15.cxx::testTdf134063` | `tdf134063.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:936` | `covered` | parseLayoutDump |
+| `ooxmlexport15.cxx::testRelativeAnchorHeightFromBottomMarginHasFooter` | `tdf133070_testRelativeAnchorHeightFromBottomMarginHasFooter.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:1028` | `covered` | parseLayoutDump |
 | `ooxmlexport15.cxx::testRelativeAnchorHeightFromBottomMarginNoFooter` | `tdf133070_testRelativeAnchorHeightFromBottomMarginNoFooter.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:1066` | `mapped` | parseLayoutDump |
 | `ooxmlexport16.cxx::testTdf136841` | `tdf136841.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport16.cxx:783` | `covered` | Bitmap |
 | `ooxmlexport17.cxx::testTdf149313` | `tdf149313.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport17.cxx:1131` | `covered` | parseLayoutDump |
-| `ooxmlexport17.cxx::testTdf148360` | `tdf148360.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport17.cxx:1144` | `mapped` | parseLayoutDump |
+| `ooxmlexport17.cxx::testTdf148360` | `tdf148360.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport17.cxx:1144` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf147646` | `tdf147646_mergedCellNumbering.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:114` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf153042_largeTab` | `tdf153042_largeTab.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:131` | `covered` | parseLayoutDump |
-| `ooxmlexport18.cxx::testTdf153042_noTab` | `tdf153042_noTab.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:146` | `mapped` | parseLayoutDump |
+| `ooxmlexport18.cxx::testTdf153042_noTab` | `tdf153042_noTab.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:146` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf105035_framePrB` | `tdf105035_framePrB.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:229` | `mapped` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf105035_framePrC` | `tdf105035_framePrC.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:246` | `mapped` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf153613_anchoredAfterPgBreak` | `tdf153613_anchoredAfterPgBreak.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:340` | `covered` | parseLayoutDump |
@@ -421,43 +421,43 @@ are `deferred`.
 | `ooxmlexport18.cxx::testTdf153613_inlineAfterPgBreak2` | `tdf153613_inlineAfterPgBreak2.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:380` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf153613_textboxAfterPgBreak3` | `tdf153613_textboxAfterPgBreak3.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:397` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf147724` | `tdf147724.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:611` | `covered` | parseLayoutDump |
-| `ooxmlexport18.cxx::testTdf153128` | `tdf153128.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:849` | `mapped` | parseLayoutDump |
+| `ooxmlexport18.cxx::testTdf153128` | `tdf153128.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:849` | `covered` | parseLayoutDump |
 | `ooxmlexport18.cxx::testTdf155736` | `tdf155736_PageNumbers_footer.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:924` | `covered` | parseLayoutDump |
-| `ooxmlexport19.cxx::testBnc891663` | `bnc891663.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport19.cxx:154` | `mapped` | parseLayoutDump |
+| `ooxmlexport19.cxx::testBnc891663` | `bnc891663.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport19.cxx:154` | `covered` | parseLayoutDump |
 | `ooxmlexport19.cxx::testTdf95377` | `tdf95377.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport19.cxx:406` | `covered` | parseLayoutDump |
-| `ooxmlexport19.cxx::testTdf150408_isLvl_RoundTrip` | `listWithLgl.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport19.cxx:1118` | `mapped` | parseLayoutDump |
+| `ooxmlexport19.cxx::testTdf150408_isLvl_RoundTrip` | `listWithLgl.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport19.cxx:1118` | `covered` | parseLayoutDump |
 | `ooxmlexport2.cxx::testI120928` | `i120928.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport2.cxx:709` | `mapped` | Bitmap |
 | `ooxmlexport20.cxx::testTdf128646` | `tdf128646.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport20.cxx:218` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf160077_layoutInCell` | `tdf160077_layoutInCell.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:540` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf160077_layoutInCellB` | `tdf160077_layoutInCellB.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:566` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf160077_layoutInCellC` | `tdf160077_layoutInCellC.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:599` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf160077_layoutInCellD` | `tdf160077_layoutInCellD.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:625` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf153909_followTextFlow` | `tdf153909_followTextFlow.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:686` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf162541` | `tdf162541_notLayoutInCell_paraLeft.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:709` | `mapped` | parseLayoutDump |
-| `ooxmlexport21.cxx::testTdf162551` | `tdf162551_notLayoutInCell_charLeft_fromTop.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:736` | `mapped` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf160077_layoutInCell` | `tdf160077_layoutInCell.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:540` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf160077_layoutInCellB` | `tdf160077_layoutInCellB.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:566` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf160077_layoutInCellC` | `tdf160077_layoutInCellC.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:599` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf160077_layoutInCellD` | `tdf160077_layoutInCellD.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:625` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf153909_followTextFlow` | `tdf153909_followTextFlow.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:686` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf162541` | `tdf162541_notLayoutInCell_paraLeft.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:709` | `covered` | parseLayoutDump |
+| `ooxmlexport21.cxx::testTdf162551` | `tdf162551_notLayoutInCell_charLeft_fromTop.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:736` | `covered` | parseLayoutDump |
 | `ooxmlexport21.cxx::testTdf126533_noPageBitmap` | `tdf126533_noPageBitmap.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:867` | `mapped` | Bitmap |
 | `ooxmlexport21.cxx::testTdf126533_pageBitmap` | `tdf126533_pageBitmap.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:895` | `mapped` | Bitmap |
 | `ooxmlexport21.cxx::testTdf154369` | `tdf154369.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:923` | `covered` | parseLayoutDump |
 | `ooxmlexport21.cxx::testTdf162746` | `tdf162746.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:1204` | `mapped` | parseLayoutDump |
 | `ooxmlexport22.cxx::testTdf167770_marginInsideOutside` | `tdf167770_marginInsideOutside.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:82` | `mapped` | parseLayoutDump |
-| `ooxmlexport22.cxx::testTdf165492_exactWithBottomSpacing` | `tdf165492_exactWithBottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:180` | `mapped` | parseLayoutDump |
-| `ooxmlexport22.cxx::testTdf165492_atLeastWithBottomSpacing` | `tdf165492_atLeastWithBottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:202` | `mapped` | parseLayoutDump |
-| `ooxmlexport22.cxx::testTdf165047_consolidatedTopMargin` | `tdf165047_consolidatedTopMargin.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:224` | `mapped` | parseLayoutDump |
-| `ooxmlexport22.cxx::testTdf165047_contextualSpacingTopMargin` | `tdf165047_contextualSpacingTopMargin.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:243` | `mapped` | parseLayoutDump |
+| `ooxmlexport22.cxx::testTdf165492_exactWithBottomSpacing` | `tdf165492_exactWithBottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:180` | `covered` | parseLayoutDump |
+| `ooxmlexport22.cxx::testTdf165492_atLeastWithBottomSpacing` | `tdf165492_atLeastWithBottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:202` | `covered` | parseLayoutDump |
+| `ooxmlexport22.cxx::testTdf165047_consolidatedTopMargin` | `tdf165047_consolidatedTopMargin.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:224` | `covered` | parseLayoutDump |
+| `ooxmlexport22.cxx::testTdf165047_contextualSpacingTopMargin` | `tdf165047_contextualSpacingTopMargin.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:243` | `covered` | parseLayoutDump |
 | `ooxmlexport22.cxx::testTdf139418` | `tdf139418.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:582` | `mapped` | parseLayoutDump |
 | `ooxmlexport22.cxx::tdf167527_title_letters_cut_from_below` | `tdf167527_title_letters_cut_from_below.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:728` | `mapped` | dumpAndParse, MetafileXmlDump |
-| `ooxmlexport23.cxx::testTdf146346` | `tdf146346.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:542` | `mapped` | parseLayoutDump |
-| `ooxmlexport23.cxx::testTdf165354` | `tdf165354.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:692` | `mapped` | parseLayoutDump |
-| `ooxmlexport23.cxx::testRelativeAnchorHeightFromTopMarginHasHeader` | `tdf123324_testRelativeAnchorHeightFromTopMarginHasHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:837` | `mapped` | parseLayoutDump |
-| `ooxmlexport23.cxx::testRelativeAnchorHeightFromTopMarginNoHeader` | `tdf123324_testRelativeAnchorHeightFromTopMarginNoHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:849` | `mapped` | parseLayoutDump |
+| `ooxmlexport23.cxx::testTdf146346` | `tdf146346.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:542` | `covered` | parseLayoutDump |
+| `ooxmlexport23.cxx::testTdf165354` | `tdf165354.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:692` | `covered` | parseLayoutDump |
+| `ooxmlexport23.cxx::testRelativeAnchorHeightFromTopMarginHasHeader` | `tdf123324_testRelativeAnchorHeightFromTopMarginHasHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:837` | `covered` | parseLayoutDump |
+| `ooxmlexport23.cxx::testRelativeAnchorHeightFromTopMarginNoHeader` | `tdf123324_testRelativeAnchorHeightFromTopMarginNoHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:849` | `covered` | parseLayoutDump |
 | `ooxmlexport23.cxx::testVmlShapeTextWordWrap` | `tdf97618_testVmlShapeTextWordWrap.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:876` | `mapped` | parseLayoutDump |
 | `ooxmlexport24.cxx::testTdf37153` | `tdf37153_considerWrapOnObjPos.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport24.cxx:85` | `mapped` | parseLayoutDump |
 | `ooxmlexport24.cxx::testTdf107889` | `tdf107889.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport24.cxx:435` | `mapped` | parseLayoutDump |
-| `ooxmlexport25.cxx::testTdf166544_noTopMargin_fields` | `tdf166544_noTopMargin_fields.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:70` | `mapped` | parseLayoutDump |
-| `ooxmlexport25.cxx::testTdf138020_all_rows_tblHeader` | `tdf138020_all_rows_tblHeader.docx`; `tdf167843_tblLook_firstRow_tblHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:138` | `mapped` | parseLayoutDump |
-| `ooxmlexport25.cxx::testTdf166510_sectPr_bottomSpacing` | `tdf166510_sectPr_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:231` | `mapped` | parseLayoutDump |
-| `ooxmlexport25.cxx::testTdf169986_bottomSpacing` | `tdf169986_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:242` | `mapped` | parseLayoutDump |
-| `ooxmlexport25.cxx::testTdf167657_sectPr_bottomSpacing` | `tdf167657_sectPr_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:268` | `mapped` | parseLayoutDump |
+| `ooxmlexport25.cxx::testTdf166544_noTopMargin_fields` | `tdf166544_noTopMargin_fields.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:70` | `covered` | parseLayoutDump |
+| `ooxmlexport25.cxx::testTdf138020_all_rows_tblHeader` | `tdf138020_all_rows_tblHeader.docx`; `tdf167843_tblLook_firstRow_tblHeader.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:138` | `covered` | parseLayoutDump |
+| `ooxmlexport25.cxx::testTdf166510_sectPr_bottomSpacing` | `tdf166510_sectPr_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:231` | `covered` | parseLayoutDump |
+| `ooxmlexport25.cxx::testTdf169986_bottomSpacing` | `tdf169986_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:242` | `covered` | parseLayoutDump |
+| `ooxmlexport25.cxx::testTdf167657_sectPr_bottomSpacing` | `tdf167657_sectPr_bottomSpacing.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:268` | `covered` | parseLayoutDump |
 | `ooxmlexport25.cxx::testTdf165478_bottomAligned` | `tdf165478_bottomAligned.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:282` | `mapped` | parseLayoutDump |
 | `ooxmlexport25.cxx::testTdf150822` | `tdf150822.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:653` | `mapped` | parseLayoutDump |
 | `ooxmlexport26.cxx::testTdf64264` | `tdf64264.docx` | `../core/sw/qa/extras/ooxmlexport/ooxmlexport26.cxx:352` | `mapped` | parseLayoutDump |

@@ -184,6 +184,8 @@ fn is_test_data_open_only(file_name: &str) -> bool {
       | "libreoffice/spreadsheet/tdf134553.xlsx"
       | "libreoffice/word/comment-annotationref.docx"
       | "libreoffice/word/fdo63164-1.docx"
+      | "libreoffice/word/tdf119136.docx"
+      | "libreoffice/word/tdf96749.docx"
       | "libreoffice/presentation/chart-theme-override.pptx"
       | "libreoffice/presentation/import-characters.pptx"
       | "libreoffice/presentation/tdf147586.pptx"

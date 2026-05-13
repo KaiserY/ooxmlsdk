@@ -60,6 +60,18 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "SectionProperties",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "NumberingSymbolRunProperties",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
+      "ClassName": "ParagraphPropertiesBaseStyle",
+      "HaveDirectXmlOtherChildren": true
+    },
+    {
       "ClassName": "ParagraphBorders",
       "HaveDirectXmlOtherChildren": true
     },

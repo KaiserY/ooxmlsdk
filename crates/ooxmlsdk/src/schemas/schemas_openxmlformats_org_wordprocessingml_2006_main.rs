@@ -10907,6 +10907,7 @@ pub struct ParagraphMarkRunProperties {
 pub struct SectionProperties {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Physical Section Mark Character Revision ID
   #[sdk(attr(qname = "w:rsidRPr"))]
   #[sdk(string_length(min = 4u32, max = 4u32))]
@@ -12435,6 +12436,7 @@ pub struct RunPropertiesBaseStyle {
 pub struct ParagraphPropertiesBaseStyle {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the KeepNext Class.
   #[sdk(child(qname = "w:CT_OnOff/w:keepNext"))]
   pub keep_next: Option<KeepNext>,
@@ -12887,6 +12889,7 @@ pub struct PreviousParagraphProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_RPrList/w:rPr")]
 pub struct NumberingSymbolRunProperties {
+  pub xml_other_children: Vec<(usize, std::boxed::Box<str>)>,
   /// Defines the RunFonts Class.
   #[sdk(child(qname = "w:CT_Fonts/w:rFonts"))]
   pub run_fonts: Option<RunFonts>,

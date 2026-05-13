@@ -658,6 +658,7 @@ enum SchemaFloatKind {
 struct CanonicalOptions {
   normalize_float_lexemes: bool,
   sort_package_properties: bool,
+  sort_all_particle_children: bool,
 }
 
 impl CanonicalOptions {
@@ -665,6 +666,7 @@ impl CanonicalOptions {
     Self {
       normalize_float_lexemes: false,
       sort_package_properties: false,
+      sort_all_particle_children: false,
     }
   }
 
@@ -672,6 +674,7 @@ impl CanonicalOptions {
     Self {
       normalize_float_lexemes: true,
       sort_package_properties: is_package_properties_entry(entry_name),
+      sort_all_particle_children: true,
     }
   }
 
@@ -682,6 +685,9 @@ impl CanonicalOptions {
     }
     if self.sort_package_properties {
       enabled.push("package property order");
+    }
+    if self.sort_all_particle_children {
+      enabled.push("xsd:all child order");
     }
 
     if enabled.is_empty() {
@@ -845,6 +851,9 @@ fn normalize_xml_node_for_entry(
       if options.sort_package_properties
         && is_package_properties_sort_root(entry_name, &element.name)
       {
+        element.children.sort_by_key(xml_node_structural_sort_key);
+      }
+      if options.sort_all_particle_children && is_all_particle_sort_root(&element.name) {
         element.children.sort_by_key(xml_node_structural_sort_key);
       }
 
@@ -1370,6 +1379,7 @@ fn render_xml_node_to_string(
         out.push('>');
         if options.sort_package_properties
           && is_package_properties_sort_root(entry_name, &element.name)
+          || options.sort_all_particle_children && is_all_particle_sort_root(&element.name)
         {
           let mut children = element
             .children
@@ -1412,6 +1422,10 @@ fn is_package_properties_sort_root(entry_name: &str, name: &str) -> bool {
   is_core_properties_root(name)
     || is_extended_properties_root(name)
     || (entry_name == "docProps/app.xml" && split_expanded_name(name).1 == "Properties")
+}
+
+fn is_all_particle_sort_root(name: &str) -> bool {
+  name == "{urn:schemas-microsoft-com:office:office}shapelayout"
 }
 
 fn escape_xml_text(value: &str) -> String {

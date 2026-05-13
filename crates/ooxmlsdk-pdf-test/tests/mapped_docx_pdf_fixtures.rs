@@ -103,6 +103,26 @@ fn assert_page_text_occurrences_at_least(
   );
 }
 
+fn assert_page_text_segment_occurrences(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  expected_count: usize,
+) {
+  let normalized_expected = normalize_space(expected);
+  let count = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter(|segment| normalize_space(&segment.text) == normalized_expected)
+    .count();
+  assert_eq!(
+    count, expected_count,
+    "page {page_index} text segment {expected:?} occurrence mismatch; text_segments={:?}",
+    summary.text_segments
+  );
+}
+
 fn page_image_count(summary: &PdfSummary, page_index: usize) -> usize {
   summary
     .images
@@ -136,11 +156,43 @@ fn assert_page_image_count(summary: &PdfSummary, page_index: usize, expected: us
   );
 }
 
+fn assert_page_image_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = page_image_count(summary, page_index);
+  assert!(
+    count >= expected,
+    "expected at least {expected} images on page {page_index}, got {count}; images={:?}",
+    summary.images
+  );
+}
+
 fn assert_page_path_count(summary: &PdfSummary, page_index: usize, expected: usize) {
   assert_eq!(
     page_path_count(summary, page_index),
     expected,
     "paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_page_path_count_at_least(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = page_path_count(summary, page_index);
+  assert!(
+    count >= expected,
+    "expected at least {expected} paths on page {page_index}, got {count}; paths={:?}",
+    summary.paths
+  );
+}
+
+fn assert_page_filled_path_count(summary: &PdfSummary, page_index: usize, expected: usize) {
+  let count = summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index)
+    .filter(|path| path.fill_mode.as_deref().is_some_and(|mode| mode != "None"))
+    .count();
+  assert_eq!(
+    count, expected,
+    "filled path count mismatch; paths={:?}",
     summary.paths
   );
 }
@@ -209,6 +261,54 @@ fn assert_has_text_fill_color(summary: &PdfSummary, color: &str) {
       .any(|object| object.fill_color.as_deref() == Some(color)),
     "missing text fill color {color}; text_objects={:?}",
     summary.text_objects
+  );
+}
+
+fn assert_text_objects_share_non_black_fill_color(summary: &PdfSummary, texts: &[&str]) {
+  let mut colors = Vec::new();
+  for text in texts {
+    let object = summary
+      .text_objects
+      .iter()
+      .find(|object| normalize_space(&object.text).contains(text))
+      .unwrap_or_else(|| panic!("missing text object containing {text:?}"));
+    let color = object
+      .fill_color
+      .as_deref()
+      .unwrap_or_else(|| panic!("missing fill color for text object {object:?}"));
+    assert_ne!(
+      color, "#000000@ff",
+      "expected redline text {text:?} to use author color; object={object:?}"
+    );
+    colors.push(color);
+  }
+  assert!(
+    colors.windows(2).all(|window| window[0] == window[1]),
+    "expected redline text objects to share author color; colors={colors:?}"
+  );
+}
+
+fn assert_text_fill_color_count(summary: &PdfSummary, color: &str, expected_count: usize) {
+  let count = summary
+    .text_objects
+    .iter()
+    .filter(|object| object.fill_color.as_deref() == Some(color))
+    .count();
+  assert_eq!(
+    count, expected_count,
+    "text fill color {color} count mismatch; text_objects={:?}",
+    summary.text_objects
+  );
+}
+
+fn assert_has_path_fill_color(summary: &PdfSummary, color: &str) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .any(|path| path.fill_color.as_deref() == Some(color) && path.fill_mode.is_some()),
+    "missing filled path color {color}; paths={:?}",
+    summary.paths
   );
 }
 
@@ -328,6 +428,13 @@ fn vertical_path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<
     .collect()
 }
 
+fn rectangular_path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  path_bounds_on_page(summary, page_index)
+    .into_iter()
+    .filter(|bounds| bounds.width() > 10.0 && bounds.height() > 10.0)
+    .collect()
+}
+
 fn image_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
   summary
     .images
@@ -336,6 +443,59 @@ fn image_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBound
     .filter_map(|image| image.bounds.as_deref())
     .filter_map(|bounds| parse_pdf_rect(bounds).ok())
     .collect()
+}
+
+fn assert_image_centers_are_not_grayscale(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_count: usize,
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert_eq!(
+    image_bounds.len(),
+    expected_count,
+    "image bounds count mismatch; images={:?}",
+    summary.images
+  );
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 1200)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  for bounds in image_bounds {
+    let [r, g, b, _] = rendered
+      .sample_pdf_rect_center_rgba(bounds)
+      .unwrap_or_else(|| panic!("missing rendered image-center sample for bounds {bounds:?}"));
+    assert!(
+      !(r == g && r == b),
+      "expected image center to stay non-grayscale, got #{r:02x}{g:02x}{b:02x}; bounds={bounds:?}"
+    );
+  }
+}
+
+fn assert_image_centers_are_grayscale(
+  fixture_name: &str,
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_count: usize,
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert_eq!(
+    image_bounds.len(),
+    expected_count,
+    "image bounds count mismatch; images={:?}",
+    summary.images
+  );
+  let rendered = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, 1200)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  for bounds in image_bounds {
+    let [r, g, b, _] = rendered
+      .sample_pdf_rect_center_rgba(bounds)
+      .unwrap_or_else(|| panic!("missing rendered image-center sample for bounds {bounds:?}"));
+    let spread = r.max(g).max(b) - r.min(g).min(b);
+    assert!(
+      spread <= 8,
+      "expected image center to stay grayscale, got #{r:02x}{g:02x}{b:02x}; bounds={bounds:?}"
+    );
+  }
 }
 
 fn text_segment_bounds(summary: &PdfSummary, text: &str) -> PdfBounds {
@@ -545,6 +705,14 @@ fn assert_path_width_between(
   );
 }
 
+fn assert_path_width_at_least(summary: &PdfSummary, page_index: usize, minimum_width: f32) {
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.iter().any(|bounds| bounds.width() >= minimum_width),
+    "missing page {page_index} path width at least {minimum_width}pt; bounds={bounds:?}"
+  );
+}
+
 fn assert_path_width_at_least_page_fraction(
   summary: &PdfSummary,
   page_index: usize,
@@ -642,6 +810,14 @@ fn assert_any_path_height_less_than(summary: &PdfSummary, page_index: usize, max
   );
 }
 
+fn assert_any_path_has_positive_height(summary: &PdfSummary, page_index: usize) {
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.iter().any(|bounds| bounds.height() > 0.0),
+    "missing page {page_index} path with positive height; bounds={bounds:?}"
+  );
+}
+
 fn assert_path_height_close(summary: &PdfSummary, page_index: usize, expected_height: f32) {
   let bounds = path_bounds_on_page(summary, page_index);
   assert!(
@@ -703,6 +879,85 @@ fn assert_text_height_close(summary: &PdfSummary, page_index: usize, expected_he
   );
 }
 
+fn assert_any_text_height_less_than(summary: &PdfSummary, page_index: usize, maximum_height: f32) {
+  let bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  assert!(
+    bounds.iter().any(|bounds| bounds.height() < maximum_height),
+    "missing page {page_index} text height less than {maximum_height}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_any_text_height_greater_than(
+  summary: &PdfSummary,
+  page_index: usize,
+  minimum_height: f32,
+) {
+  let bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  assert!(
+    bounds.iter().any(|bounds| bounds.height() > minimum_height),
+    "missing page {page_index} text height greater than {minimum_height}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_any_text_and_path_height_close(summary: &PdfSummary, page_index: usize, tolerance: f32) {
+  let text_bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    text_bounds.iter().any(|text| {
+      path_bounds
+        .iter()
+        .any(|path| (text.height() - path.height()).abs() <= tolerance)
+    }),
+    "missing page {page_index} matching text/path heights within {tolerance}pt; text={text_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
+fn assert_any_image_and_path_height_close(summary: &PdfSummary, page_index: usize, tolerance: f32) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    image_bounds.iter().any(|image| {
+      path_bounds
+        .iter()
+        .any(|path| (image.height() - path.height()).abs() <= tolerance)
+    }),
+    "missing page {page_index} matching image/path heights within {tolerance}pt; images={image_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
+fn assert_any_image_or_path_height_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  minimum_height: f32,
+) {
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    image_bounds
+      .iter()
+      .any(|bounds| bounds.height() >= minimum_height)
+      || path_bounds
+        .iter()
+        .any(|bounds| bounds.height() >= minimum_height),
+    "missing page {page_index} image/path height at least {minimum_height}pt; images={image_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
 fn assert_matching_path_height_across_pages(
   summary: &PdfSummary,
   first_page_index: usize,
@@ -749,6 +1004,39 @@ fn assert_any_image_near_text_top(summary: &PdfSummary, text: &str, tolerance: f
       .iter()
       .any(|image| (image.top - text_bounds.top).abs() <= tolerance),
     "expected image top near {text:?}; text={text_bounds:?}; images={image_bounds:?}; tolerance={tolerance}"
+  );
+}
+
+fn assert_image_top_from_page_top_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_top: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert!(
+    image_bounds.iter().any(|image| {
+      let top_from_page_top = media_box.top - image.top;
+      (top_from_page_top - expected_top).abs() <= tolerance
+    }),
+    "missing page {page_index} image top {expected_top}pt +/- {tolerance} from page top; images={image_bounds:?}"
+  );
+}
+
+fn assert_text_bottom_from_page_top_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  expected_bottom: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let bottom_from_page_top = media_box.top - bounds.bottom;
+  assert!(
+    (bottom_from_page_top - expected_bottom).abs() <= tolerance,
+    "page {page_index} text {text:?} bottom {bottom_from_page_top}pt differs from {expected_bottom}pt +/- {tolerance}; bounds={bounds:?}; media_box={media_box:?}"
   );
 }
 
@@ -817,6 +1105,44 @@ fn assert_any_image_extends_left_of_page(summary: &PdfSummary, page_index: usize
   );
 }
 
+fn object_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  let mut bounds = image_bounds_on_page(summary, page_index);
+  bounds.extend(path_bounds_on_page(summary, page_index));
+  bounds
+}
+
+fn assert_any_object_left_from_page_left_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_left: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = object_bounds_on_page(summary, page_index);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| (bounds.left - media_box.left - expected_left).abs() <= tolerance),
+    "missing page {page_index} object left {expected_left}pt +/- {tolerance} from page left; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_any_object_right_from_page_right_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_right: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = object_bounds_on_page(summary, page_index);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| (media_box.right - bounds.right - expected_right).abs() <= tolerance),
+    "missing page {page_index} object right {expected_right}pt +/- {tolerance} from page right; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
 fn assert_path_top_from_page_top_close(summary: &PdfSummary, page_index: usize, expected_top: f32) {
   let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
   let bounds = path_bounds_on_page(summary, page_index);
@@ -825,6 +1151,98 @@ fn assert_path_top_from_page_top_close(summary: &PdfSummary, page_index: usize, 
       .iter()
       .any(|bounds| (media_box.top - bounds.top - expected_top).abs() <= 0.5),
     "missing page {page_index} path top {expected_top}pt from page top; bounds={bounds:?}"
+  );
+}
+
+fn assert_any_path_bottom_from_page_top_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_bottom: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = path_bounds_on_page(summary, page_index);
+  assert!(
+    bounds.iter().any(|bounds| {
+      let bottom_from_page_top = media_box.top - bounds.bottom;
+      (bottom_from_page_top - expected_bottom).abs() <= tolerance
+    }),
+    "missing page {page_index} path bottom {expected_bottom}pt +/- {tolerance} from page top; bounds={bounds:?}"
+  );
+}
+
+fn assert_first_two_rectangular_paths_do_not_overlap_vertically(
+  summary: &PdfSummary,
+  page_index: usize,
+) {
+  let mut paths = rectangular_path_bounds_on_page(summary, page_index);
+  paths.sort_by(|a, b| b.top.total_cmp(&a.top));
+  assert!(
+    paths.len() >= 2,
+    "expected at least two rectangular paths; paths={paths:?}"
+  );
+  assert!(
+    paths[0].bottom >= paths[1].top,
+    "expected first two rectangular paths to be vertically separated; paths={paths:?}"
+  );
+}
+
+fn assert_first_two_rectangular_path_tops_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  tolerance: f32,
+) {
+  let mut paths = rectangular_path_bounds_on_page(summary, page_index);
+  paths.sort_by(|a, b| b.top.total_cmp(&a.top));
+  assert!(
+    paths.len() >= 2,
+    "expected at least two rectangular paths; paths={paths:?}"
+  );
+  assert!(
+    (paths[0].top - paths[1].top).abs() <= tolerance,
+    "expected first two rectangular path tops to match; paths={paths:?}; tolerance={tolerance}"
+  );
+}
+
+fn assert_any_two_rectangular_path_heights_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  tolerance: f32,
+) {
+  let paths = rectangular_path_bounds_on_page(summary, page_index);
+  assert!(
+    paths.iter().enumerate().any(|(index, first)| {
+      paths
+        .iter()
+        .skip(index + 1)
+        .any(|second| (first.height() - second.height()).abs() <= tolerance)
+    }),
+    "missing two rectangular paths with matching heights within {tolerance}pt; paths={paths:?}"
+  );
+}
+
+fn assert_three_rectangular_paths_are_vertically_ordered(summary: &PdfSummary, page_index: usize) {
+  let mut paths = rectangular_path_bounds_on_page(summary, page_index);
+  paths.sort_by(|a, b| b.top.total_cmp(&a.top));
+  assert!(
+    paths.len() >= 3,
+    "expected at least three rectangular paths; paths={paths:?}"
+  );
+  assert!(
+    paths[0].bottom >= paths[1].top && paths[1].bottom >= paths[2].top,
+    "expected first three rectangular paths to be vertically ordered without overlap; paths={paths:?}"
+  );
+}
+
+fn assert_any_rectangular_path_above_another(summary: &PdfSummary, page_index: usize) {
+  let paths = rectangular_path_bounds_on_page(summary, page_index);
+  assert!(
+    paths.iter().any(|upper| {
+      paths
+        .iter()
+        .any(|lower| upper.bottom >= lower.top && upper.top > lower.top)
+    }),
+    "expected one rectangular path to be above another; paths={paths:?}"
   );
 }
 
@@ -898,11 +1316,68 @@ fn assert_any_text_segment_width_positive(summary: &PdfSummary, page_index: usiz
   );
 }
 
+fn assert_text_segment_width_less_than(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  maximum_width: f32,
+) {
+  let bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter(|segment| normalize_space(&segment.text) == normalize_space(text))
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  assert!(
+    bounds.iter().any(|bounds| bounds.width() < maximum_width),
+    "missing page {page_index} text segment {text:?} width less than {maximum_width}pt; bounds={bounds:?}; text_segments={:?}",
+    summary.text_segments
+  );
+}
+
 fn assert_text_segment_taller_than_wide(summary: &PdfSummary, page_index: usize, text: &str) {
   let bounds = text_segment_bounds_on_page(summary, page_index, text);
   assert!(
     bounds.height() > bounds.width(),
     "page {page_index} text {text:?} should be vertically oriented; bounds={bounds:?}"
+  );
+}
+
+fn assert_vertical_text_segment_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_count: usize,
+) {
+  let bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  let count = bounds
+    .iter()
+    .filter(|bounds| bounds.height() > bounds.width())
+    .count();
+  assert!(
+    count >= expected_count,
+    "expected at least {expected_count} vertical text segments on page {page_index}, got {count}; bounds={bounds:?}"
+  );
+}
+
+fn assert_any_path_segment_count_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected_segments: u32,
+) {
+  assert!(
+    summary
+      .paths
+      .iter()
+      .filter(|path| path.page_index == page_index)
+      .any(|path| path.segments >= expected_segments),
+    "missing page {page_index} path with at least {expected_segments} segments; paths={:?}",
+    summary.paths
   );
 }
 
@@ -946,6 +1421,115 @@ fn assert_max_horizontal_gap_at_most(summary: &PdfSummary, page_index: usize, ex
   assert!(
     max_gap <= expected_gap,
     "page {page_index} horizontal gap {max_gap} exceeds {expected_gap}pt"
+  );
+}
+
+fn assert_horizontal_path_decorates_text(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  through_text: bool,
+) {
+  let text_bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let paths = horizontal_path_bounds_on_page(summary, page_index);
+  let matched = paths.iter().any(|path| {
+    let x_overlap = path.left <= text_bounds.right && path.right >= text_bounds.left;
+    let path_center_y = path.bottom + path.height() / 2.0;
+    let y_match = if through_text {
+      path_center_y >= text_bounds.bottom && path_center_y <= text_bounds.top
+    } else {
+      path_center_y <= text_bounds.bottom + 3.0 && path_center_y >= text_bounds.bottom - 10.0
+    };
+    x_overlap && y_match
+  });
+  assert!(
+    matched,
+    "missing horizontal decoration path for text {text:?}; text_bounds={text_bounds:?}; paths={paths:?}"
+  );
+}
+
+fn assert_any_horizontal_path_crosses_any_text(summary: &PdfSummary, page_index: usize) {
+  let paths = horizontal_path_bounds_on_page(summary, page_index);
+  let text_bounds = summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
+    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
+    .collect::<Vec<_>>();
+  let matched = paths.iter().any(|path| {
+    let path_center_y = path.bottom + path.height() / 2.0;
+    text_bounds.iter().any(|bounds| {
+      path.left <= bounds.right
+        && path.right >= bounds.left
+        && path_center_y >= bounds.bottom
+        && path_center_y <= bounds.top
+    })
+  });
+  assert!(
+    matched,
+    "missing horizontal decoration path crossing text; paths={paths:?}; text_bounds={text_bounds:?}"
+  );
+}
+
+fn assert_rendered_pixel_rgb_close(
+  fixture_name: &str,
+  page_index: usize,
+  target_width: i32,
+  x: u32,
+  y: u32,
+  expected_rgb: [u8; 3],
+) {
+  let image = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, target_width)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let [r, g, b, _] = image
+    .pixel_rgba(x, y)
+    .unwrap_or_else(|| panic!("missing rendered pixel at ({x}, {y})"));
+  let diff = (i16::from(r) - i16::from(expected_rgb[0])).abs()
+    + (i16::from(g) - i16::from(expected_rgb[1])).abs()
+    + (i16::from(b) - i16::from(expected_rgb[2])).abs();
+  assert!(
+    diff <= 12,
+    "rendered pixel ({x}, {y}) color #{r:02x}{g:02x}{b:02x} differs from expected #{:02x}{:02x}{:02x}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+}
+
+fn assert_rendered_page_color_ratio(
+  fixture_name: &str,
+  page_index: usize,
+  target_width: i32,
+  expected_rgb: [u8; 3],
+  divisor: usize,
+) {
+  let image = rendered_page_image_for_fixture(&fixture(fixture_name), page_index, target_width)
+    .unwrap_or_else(|error| panic!("failed to render {fixture_name}: {error}"));
+  let mut expected_pixels = 0usize;
+  let mut other_pixels = 0usize;
+  for y in 0..image.height_px {
+    for x in 0..image.width_px {
+      let [r, g, b, _] = image.pixel_rgba(x, y).unwrap();
+      if [r, g, b] == expected_rgb {
+        expected_pixels += 1;
+      } else {
+        other_pixels += 1;
+      }
+    }
+  }
+  assert!(
+    expected_pixels > 0,
+    "missing expected rendered color #{:02x}{:02x}{:02x}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
+  );
+  assert!(
+    expected_pixels / divisor > other_pixels,
+    "rendered page color ratio mismatch for #{:02x}{:02x}{:02x}: expected_pixels={expected_pixels}, other_pixels={other_pixels}, divisor={divisor}",
+    expected_rgb[0],
+    expected_rgb[1],
+    expected_rgb[2]
   );
 }
 
@@ -2921,4 +3505,706 @@ fn mapped_fixture_tdf152298_splits_rowspan_table_follow_row_to_second_page() {
   let summary = render_summary("tdf152298.docx");
   assert_eq!(summary.page_count, 2);
   assert_page_contains_in_order(&summary, 1, &["1", "2", "3", "10"]);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/layout/paintfrm.cxx:testTableRedlineRenderMode
+fn mapped_fixture_redline_table_paints_default_row_redline_polygons() {
+  let summary = render_summary("redline-table.docx");
+  assert_page_filled_path_count(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/itrpaint.cxx:testRedlineRenderModeOmitInsertDelete
+fn mapped_fixture_redline_default_paints_baseline_delete_and_insert_text() {
+  let summary = render_summary("redline.docx");
+  assert_page_text_segment_count(&summary, 0, 3);
+  assert_page_contains_in_order(&summary, 0, &["baseline", "oldcontent", "newcontent"]);
+  assert_text_object_fill_color(&summary, "baseline", "#000000@ff");
+  assert_text_objects_share_non_black_fill_color(&summary, &["oldcontent", "newcontent"]);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/itrpaint.cxx:testAnchoredImageRedlineRenderModeOmitInsertDelete
+fn mapped_fixture_redline_image_anchored_default_keeps_three_color_images_without_frames() {
+  let summary = render_summary("redline-image-anchored.docx");
+  assert_page_image_count(&summary, 0, 3);
+  assert_image_centers_are_not_grayscale("redline-image-anchored.docx", &summary, 0, 3);
+  assert_page_path_count(&summary, 0, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/itrpaint.cxx:testInlineImageRedlineRenderModeOmitInsertDelete
+fn mapped_fixture_redline_image_inline_default_keeps_three_color_images_without_frames() {
+  let summary = render_summary("redline-image-inline.docx");
+  assert_page_image_count(&summary, 0, 3);
+  assert_image_centers_are_not_grayscale("redline-image-inline.docx", &summary, 0, 3);
+  assert_page_path_count(&summary, 0, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/porfld.cxx:testNumberPortionRedlineRenderMode
+fn mapped_fixture_redline_number_portion_default_underlines_inserted_number() {
+  let summary = render_summary("redline-number-portion.docx");
+  assert_page_contains(&summary, 0, "2.");
+  assert_horizontal_path_decorates_text(&summary, 0, "2.", false);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/text/porfld.cxx:testTabPortionRedlineRenderMode
+fn mapped_fixture_redline_bullet_default_strikes_deleted_tab_portion() {
+  let summary = render_summary("redline-bullet.docx");
+  assert_any_horizontal_path_crosses_any_text(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/tiledrendering/tiledrendering.cxx:testHighlightNumbering
+fn mapped_fixture_tdf114799_highlight_paints_yellow_numbering_highlight() {
+  render_summary("tdf114799_highlight.docx");
+  assert_rendered_pixel_rgb_close("tdf114799_highlight.docx", 0, 1024, 103, 148, [255, 255, 0]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/tiledrendering/tiledrendering.cxx:testHighlightNumbering_shd
+fn mapped_fixture_tdf114799_shd_keeps_numbering_unshaded() {
+  render_summary("tdf114799_shd.docx");
+  assert_rendered_pixel_rgb_close("tdf114799_shd.docx", 0, 1024, 103, 148, [255, 255, 255]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/tiledrendering/tiledrendering.cxx:testTdf159626_yellowPatternFill
+fn mapped_fixture_tdf159626_yellow_pattern_fill_is_primarily_yellow() {
+  render_summary("tdf159626_yellowPatternFill.docx");
+  assert_rendered_page_color_ratio(
+    "tdf159626_yellowPatternFill.docx",
+    0,
+    1024,
+    [255, 255, 0],
+    2,
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/tiledrendering/tiledrendering.cxx:testTdf159626_yellowPatternFillB
+fn mapped_fixture_tdf159626_yellow_pattern_fill_b_is_primarily_yellow() {
+  render_summary("tdf159626_yellowPatternFillB.docx");
+  assert_rendered_page_color_ratio(
+    "tdf159626_yellowPatternFillB.docx",
+    0,
+    1024,
+    [255, 255, 0],
+    2,
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/tiledrendering/tiledrendering.cxx:testTdf159626_blackPatternFill
+fn mapped_fixture_tdf159626_black_pattern_fill_is_primarily_black() {
+  render_summary("tdf159626_blackPatternFill.docx");
+  assert_rendered_page_color_ratio("tdf159626_blackPatternFill.docx", 0, 1024, [0, 0, 0], 10);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf165322
+fn mapped_fixture_ct_formatted_deletion_marks_deleted_paragraph_with_strikeout() {
+  let summary = render_summary("CT-formatted-deletion.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.",
+  );
+  assert_horizontal_path_decorates_text(
+    &summary,
+    0,
+    "Nunc viverra imperdiet enim. Fusce est. Vivamus a tellus.",
+    true,
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testRedlineMovingDOCX
+fn mapped_fixture_tdf104797_docx_move_redline_paints_green_moved_text() {
+  let summary = render_summary("tdf104797.docx");
+  assert_text_fill_color_count(&summary, "#008000@ff", 6);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:TestTdf155229RowAtLeast
+fn mapped_fixture_tdf155229_row_height_at_least_keeps_table_bottom_position() {
+  let summary = render_summary("tdf155229_row_height_at_least.docx");
+  assert_any_path_bottom_from_page_top_close(&summary, 0, 15494.0 / 20.0, 2.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:TestTdf164907_rowHeightAtLeast
+fn mapped_fixture_tdf164907_row_height_at_least_includes_top_and_bottom_padding() {
+  let summary = render_summary("tdf164907_rowHeightAtLeast.docx");
+  assert_eq!(summary.page_count, 1);
+  assert_any_path_bottom_from_page_top_close(&summary, 0, 2852.0 / 20.0, 2.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:testTdf105035_framePrB
+fn mapped_fixture_tdf105035_framepr_b_keeps_distinct_frames_separated() {
+  let summary = render_summary("tdf105035_framePrB.docx");
+  assert_first_two_rectangular_paths_do_not_overlap_vertically(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:testTdf105035_framePrC
+fn mapped_fixture_tdf105035_framepr_c_keeps_frames_overlapped_at_same_top() {
+  let summary = render_summary("tdf105035_framePrC.docx");
+  assert_first_two_rectangular_path_tops_close(&summary, 0, 1.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport24.cxx:testTdf37153
+fn mapped_fixture_tdf37153_keeps_layout_in_cell_text_above_cell_bottom() {
+  let summary = render_summary("tdf37153_considerWrapOnObjPos.docx");
+  assert_text_top_from_page_top_at_least(&summary, 0, "Bottom aligned", 3000.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:testTdf150822
+fn mapped_fixture_tdf150822_imports_three_vertical_text_layouts() {
+  let summary = render_summary("tdf150822.docx");
+  assert_vertical_text_segment_count_at_least(&summary, 0, 3);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf167526
+fn mapped_fixture_tdf167526_dummy_anchor_line_does_not_increment_line_numbering() {
+  let summary = render_summary("tdf167526.docx");
+  assert_page_contains(&summary, 0, "2");
+  assert_page_text_occurrences(&summary, 0, "2", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf167540
+fn mapped_fixture_tdf167540_keeps_line_numbers_and_tables_in_vertical_order() {
+  let summary = render_summary("tdf167540.docx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &[
+      "1",
+      "Text",
+      "2",
+      "First floating table",
+      "3",
+      "Second floating table",
+      "A normal table",
+      "4",
+      "More text",
+    ],
+  );
+  assert_text_tops_close(&summary, "1", "Text", 1.0);
+  assert_text_tops_close(&summary, "4", "More text", 1.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport26.cxx:testTdf64264
+fn mapped_fixture_tdf64264_repeats_only_single_table_header_on_second_page() {
+  let summary = render_summary("tdf64264.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains_in_order(&summary, 1, &["Repeating Table Header", "Text"]);
+  assert_page_text_occurrences(&summary, 1, "Repeating Table Header", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport26.cxx:testTdf58944RepeatingTableHeader
+fn mapped_fixture_tdf58944_repeating_header_keeps_table_content_on_second_page() {
+  let summary = render_summary("tdf58944-repeating-table-header.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains_in_order(&summary, 1, &["Test1", "Test2"]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport26.cxx:testTdf81100
+fn mapped_fixture_tdf81100_keeps_explicit_no_repeat_header_flow_across_three_pages() {
+  let summary = render_summary("tdf81100.docx");
+  assert_eq!(summary.page_count, 3);
+  assert_page_contains(&summary, 1, "Test");
+  assert_page_contains(&summary, 2, "Test");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf130804
+fn mapped_fixture_tdf130804_keeps_fly_height_equal_to_text_paragraph_height() {
+  let summary = render_summary("tdf130804.docx");
+  assert_any_text_and_path_height_close(&summary, 0, 3.0);
+  assert_text_top_from_page_top_close(&summary, 0, "Text after", 240.0 / 20.0, 2.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf105143
+fn mapped_fixture_tdf105143_keeps_shape_at_imported_vertical_position() {
+  let summary = render_summary("tdf105143.docx");
+  assert_path_top_from_page_top_close(&summary, 0, 6731.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testFloatingTableSectionColumns
+fn mapped_fixture_floating_table_section_columns_keeps_table_wider_than_column() {
+  let summary = render_summary("floating-table-section-columns.docx");
+  assert_path_width_at_least(&summary, 0, 10000.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf60351
+fn mapped_fixture_tdf60351_preserves_contour_polygon_shape() {
+  let summary = render_summary("tdf60351.docx");
+  assert_any_path_segment_count_at_least(&summary, 0, 6);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf98882
+fn mapped_fixture_tdf98882_keeps_image_content_height_equal_to_frame_height() {
+  let summary = render_summary("tdf98882.docx");
+  assert_any_image_and_path_height_close(&summary, 0, 2.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf100072
+fn mapped_fixture_tdf100072_keeps_shape_visible_inside_page() {
+  let summary = render_summary("tdf100072.docx");
+  assert_any_path_has_positive_height(&summary, 0);
+  assert_all_paths_within_page(&summary, 0, 1.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport2.cxx:testTdf114212
+fn mapped_fixture_tdf114212_keeps_first_fly_at_imported_top_position() {
+  let summary = render_summary("tdf114212.docx");
+  assert_path_top_from_page_top_close(&summary, 0, 1428.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport15.cxx:testRelativeAnchorHeightFromBottomMarginNoFooter
+fn mapped_fixture_tdf133070_no_footer_keeps_relative_anchor_height_from_margin_bottom() {
+  let summary = render_summary("tdf133070_testRelativeAnchorHeightFromBottomMarginNoFooter.docx");
+  assert_path_height_close(&summary, 0, 1147.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport4.cxx:testRelativeAnchorWidthFromRightMargin
+fn mapped_fixture_tdf133670_keeps_relative_anchor_width_from_right_margin() {
+  let summary = render_summary("tdf133670_testRelativeAnchorWidthFromRightMargin.docx");
+  assert_path_width_close(&summary, 0, 2408.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport25.cxx:testTdf165478_bottomAligned
+fn mapped_fixture_tdf165478_keeps_bottom_aligned_cell_text_and_image_inside_cell() {
+  let summary = render_summary("tdf165478_bottomAligned.docx");
+  assert_page_contains(&summary, 0, "Bottom aligned");
+  assert_text_bottom_from_page_top_close(&summary, 0, "Bottom aligned", 4423.0 / 20.0, 4.0);
+  assert_image_top_from_page_top_close(&summary, 0, 1887.0 / 20.0, 3.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:testTdf126533_noPageBitmap
+fn mapped_fixture_tdf126533_no_page_bitmap_ignores_background_bitmap_without_fillcolor() {
+  let summary = render_summary("tdf126533_noPageBitmap.docx");
+  assert_page_image_count(&summary, 0, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:testTdf126533_pageBitmap
+fn mapped_fixture_tdf126533_page_bitmap_keeps_visible_page_background_image() {
+  let summary = render_summary("tdf126533_pageBitmap.docx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport2.cxx:testI120928
+fn mapped_fixture_i120928_keeps_graphic_numbering_bullet_bitmap_visible() {
+  let summary = render_summary("i120928.docx");
+  assert_page_image_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport6.cxx:testDMLShapeFillBitmapCrop
+fn mapped_fixture_dml_shape_fill_bitmap_crop_keeps_picture_filled_shapes_visible() {
+  let summary = render_summary("dml-shape-fillbitmapcrop.docx");
+  assert_page_image_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/vml.cxx:tdf112450_vml_polyline
+fn mapped_fixture_tdf112450_vml_polyline_keeps_decoded_polyline_geometry() {
+  let summary = render_summary("tdf112450_vml_polyline.docx");
+  assert_path_width_close(&summary, 0, 6879.0 * 72.0 / 2540.0);
+  assert_path_height_close(&summary, 0, 1926.0 * 72.0 / 2540.0);
+  assert_path_width_close(&summary, 0, 6163.0 * 72.0 / 2540.0);
+  assert_path_height_close(&summary, 0, 2247.0 * 72.0 / 2540.0);
+  assert_path_width_close(&summary, 0, 5634.0 * 72.0 / 2540.0);
+  assert_path_height_close(&summary, 0, 2485.0 * 72.0 / 2540.0);
+}
+
+#[test]
+// Source: ../core/svx/qa/unit/customshapes.cxx:testTdf153000_MS0_SPT_25_31
+fn mapped_fixture_tdf153000_wordart_types_keep_non_rectangular_custom_shape_geometry() {
+  let summary = render_summary("tdf153000_WordArt_type_25_to_31.docx");
+  assert_any_path_segment_count_at_least(&summary, 0, 14);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testUnusedOLEprops
+fn mapped_fixture_tdf138465min_keeps_ole_formula_from_being_squashed() {
+  let summary = render_summary("tdf138465min.docx");
+  assert_any_image_or_path_height_at_least(&summary, 0, 300.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport23.cxx:testVmlShapeTextWordWrap
+fn mapped_fixture_tdf97618_vml_shape_text_wrap_keeps_shape_width() {
+  let summary = render_summary("tdf97618_testVmlShapeTextWordWrap.docx");
+  assert_path_width_close(&summary, 0, 2500.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:testI124106
+fn mapped_fixture_i124106_keeps_document_on_one_page() {
+  let summary = render_summary("i124106.docx");
+  assert_eq!(summary.page_count, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:testLargeTwips
+fn mapped_fixture_large_twips_keeps_cell_text_visible() {
+  let summary = render_summary("large-twips.docx");
+  assert_any_text_segment_width_positive(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:testGridBefore
+fn mapped_fixture_gridbefore_keeps_grid_before_cell_position() {
+  let summary = render_summary("gridbefore.docx");
+  assert_page_contains(&summary, 0, "A3");
+  assert!(
+    text_segment_left(&summary, "A3") > text_segment_left(&summary, "B2"),
+    "A3 should be to the right of B2"
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport13.cxx:testTdf125324
+fn mapped_fixture_tdf125324_keeps_floating_table_top_position() {
+  let summary = render_summary("tdf125324.docx");
+  assert_path_top_from_page_top_close(&summary, 0, 4193.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport21.cxx:testTdf162746
+fn mapped_fixture_tdf162746_keeps_page_body_table_width_below_header_float() {
+  let summary = render_summary("tdf162746.docx");
+  assert_path_width_close(&summary, 0, 9360.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport24.cxx:testTdf107889
+fn mapped_fixture_tdf107889_keeps_multipage_table_split_visible() {
+  let summary = render_summary("tdf107889.docx");
+  assert_eq!(summary.page_count, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport_de_locale.cxx:testTdf166850
+fn mapped_fixture_tdf166850_keeps_styleref_header_text_on_second_page() {
+  let summary = render_summary("tdf166850.docx");
+  assert_page_contains(&summary, 1, "Heading 1");
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/drawingml.cxx:testToplevelLineHorOffsetDOCX
+fn mapped_fixture_toplevel_line_hori_offset_keeps_vertical_line_geometry() {
+  let summary = render_summary("toplevel-line-hori-offset.docx");
+  assert_path_width_close(&summary, 0, 1.78 * 72.0 / 2540.0);
+  assert_path_height_close(&summary, 0, 4094.0 * 72.0 / 2540.0);
+  assert_path_top_from_page_top_close(&summary, 0, 0.0);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/drawingml.cxx:testDOCXVerticalLineRotation
+fn mapped_fixture_line_vertical_rotation_keeps_line_vertical() {
+  let summary = render_summary("line-vertical-rotation.docx");
+  assert_vertical_path_count_at_least(&summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testCustomshapePosition
+fn mapped_fixture_customshape_position_keeps_vertical_offset() {
+  let summary = render_summary("customshape-position.docx");
+  assert_path_top_from_page_top_close(&summary, 0, (581025.0 / 360.0) * 72.0 / 2540.0);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testMultipleGroupShapes
+fn mapped_fixture_multiple_group_shapes_keeps_two_group_shapes_visible() {
+  let summary = render_summary("multiple-group-shapes.docx");
+  assert_page_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/objectpositioning/objectpositioning.cxx:testInsideOutsideVertAlignBottomMargin
+fn mapped_fixture_inside_outside_vert_align_keeps_shapes_at_page_and_body_bottoms() {
+  let summary = render_summary("inside-outside-vert-align.docx");
+  assert_any_path_bottom_from_page_top_close(&summary, 0, 17098.0 / 20.0, 2.0);
+  assert_path_top_from_page_top_close(&summary, 0, 15694.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/core/objectpositioning/objectpositioning.cxx:testVMLVertAlignBottomMargin
+fn mapped_fixture_vml_vertical_alignment_keeps_bottom_margin_alignments() {
+  let summary = render_summary("vml-vertical-alignment.docx");
+  assert_path_top_from_page_top_close(&summary, 0, 11802.0 / 20.0);
+  assert_any_path_bottom_from_page_top_close(&summary, 0, 16124.0 / 20.0, 2.0);
+  assert_path_top_from_page_top_close(&summary, 0, 13741.0 / 20.0);
+  assert_any_path_bottom_from_page_top_close(&summary, 0, 14185.0 / 20.0, 2.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport10.cxx:testFdo38414
+fn mapped_fixture_fdo38414_keeps_merged_gridbefore_cell_heights_equal() {
+  let summary = render_summary("fdo38414.docx");
+  assert_any_two_rectangular_path_heights_close(&summary, 0, 0.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/rtfexport/rtfexport3.cxx:testTdf115180
+fn mapped_fixture_tdf115180_keeps_table_and_cell_widths() {
+  let summary = render_summary("tdf115180.docx");
+  assert_path_width_close(&summary, 0, 9360.0 / 20.0);
+  assert_path_width_close(&summary, 0, 9141.0 / 20.0);
+  assert_path_width_close(&summary, 0, 219.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/uiwriter/uiwriter4.cxx:testTdf98987
+fn mapped_fixture_tdf98987_keeps_rectangles_in_vertical_order() {
+  let summary = render_summary("tdf98987.docx");
+  assert_three_rectangular_paths_are_vertically_ordered(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/uiwriter/uiwriter4.cxx:testTdf99004
+fn mapped_fixture_tdf99004_keeps_textbox_and_rectangle_non_overlapping() {
+  let summary = render_summary("tdf99004.docx");
+  assert_first_two_rectangular_paths_do_not_overlap_vertically(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf106606
+fn mapped_fixture_tdf106606_keeps_graphic_bullets_for_both_numbering_lists() {
+  let summary = render_summary("tdf106606.docx");
+  assert_page_image_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testGlowOnGroup
+fn mapped_fixture_tdf156902_glow_group_keeps_two_child_shapes_visible() {
+  let summary = render_summary("tdf156902_GlowOnGroup.docx");
+  assert_page_path_count_at_least(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport26.cxx:testTdf119952_negativeMargins
+fn mapped_fixture_tdf119952_negative_margins_keep_header_footer_fly_text() {
+  let summary = render_summary("tdf119952_negativeMargins.docx");
+  assert_page_contains(&summary, 0, "f1");
+  assert_page_contains(&summary, 0, "f8");
+  assert_page_contains(&summary, 1, "p1");
+  assert_page_contains(&summary, 2, "aaaa");
+  assert_page_contains(&summary, 2, "eeee");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport20.cxx:testTdf128646
+fn mapped_fixture_tdf128646_keeps_layout_in_cell_shape_visible_with_table() {
+  let summary = render_summary("tdf128646.docx");
+  assert_any_rectangular_path_above_another(&summary, 0);
+  assert_rightmost_path_within_page_right(&summary, 0, 1.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf127606
+fn mapped_fixture_tdf117923_keeps_numbering_portion_text_and_font_height() {
+  let summary = render_summary("tdf117923.docx");
+  assert_page_contains(&summary, 0, "GHI GHI GHI GHI");
+  assert_page_contains(&summary, 0, "2.");
+  assert_text_height_close(&summary, 0, 220.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf153136
+fn mapped_fixture_tdf153136_preserves_space_character_line_height_rules() {
+  let summary = render_summary("tdf153136.docx");
+  assert_any_text_height_less_than(&summary, 0, 300.0 / 20.0);
+  assert_any_text_height_greater_than(&summary, 0, 1000.0 / 20.0);
+  assert_any_text_height_less_than(&summary, 1, 300.0 / 20.0);
+  assert_any_text_height_greater_than(&summary, 1, 1000.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport14.cxx:testTdf135943_shapeWithText_L0c15
+fn mapped_fixture_tdf135943_shape_text_stays_inside_frame_boundaries() {
+  let summary = render_summary("tdf135943_shapeWithText_LayoutInCell0_compat15.docx");
+  assert_text_inside_any_path(&summary, 0, "lk");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:testTdf167770_marginInsideOutside
+fn mapped_fixture_tdf167770_keeps_inside_outside_objects_on_page_margins() {
+  let summary = render_summary("tdf167770_marginInsideOutside.docx");
+  assert_any_object_left_from_page_left_close(&summary, 0, 0.0, 2.5);
+  assert_any_object_right_from_page_right_close(&summary, 0, 0.0, 2.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport7.cxx:testTDF87348
+fn mapped_fixture_tdf87348_linked_textboxes_keeps_visible_chain_members() {
+  let summary = render_summary("tdf87348_linkedTextboxes.docx");
+  assert_page_path_count_at_least(&summary, 0, 13);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/uiwriter/uiwriter9.cxx:testSplitFloatingTable
+fn mapped_fixture_floattable_split_keeps_follow_floating_table_on_second_page() {
+  let summary = render_summary("floattable-split.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_path_count_at_least(&summary, 0, 1);
+  assert_page_path_count_at_least(&summary, 1, 1);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testWriterFontwork
+fn mapped_fixture_tdf125885_wordart_keeps_fontwork_blue_fill() {
+  let summary = render_summary("tdf125885_WordArt.docx");
+  assert_has_path_fill_color(&summary, "#0000ff@ff");
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testWriterFontwork3
+fn mapped_fixture_tdf125885_wordart3_keeps_imported_gradient_colors_visible() {
+  let summary = render_summary("tdf125885_WordArt3.docx");
+  assert_has_path_fill_color(&summary, "#0000ff@ff");
+  assert_has_path_fill_color(&summary, "#f79646@ff");
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testWriterShapeFillNonAccentColor
+fn mapped_fixture_tdf152840_shape_fill_non_accent_colors_resolve_theme_fills() {
+  let summary = render_summary("tdf152840_theme_color_non_accent.docx");
+  assert_has_path_fill_color(&summary, "#ebddc3@ff");
+  assert_has_path_fill_color(&summary, "#ffcc99@ff");
+  assert_has_path_fill_color(&summary, "#ff0000@ff");
+  assert_has_path_fill_color(&summary, "#775f55@ff");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport8.cxx:testN793998
+fn mapped_fixture_n793998_keeps_tab_portion_past_paragraph_right_margin() {
+  let summary = render_summary("n793998.docx");
+  assert_max_horizontal_gap_at_least(&summary, 0, 3000.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/odfexport/odfexport4.cxx:testTdf159382_DOCX
+fn mapped_fixture_footnote_spacing_hanging_para_keeps_footnote_number_gap_small() {
+  let summary = render_summary("footnote_spacing_hanging_para.docx");
+  assert_text_segment_width_less_than(&summary, 0, "1", 100.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf116256
+fn mapped_fixture_tdf116256_keeps_follow_text_flow_textbox_inside_table_cell() {
+  let summary = render_summary("tdf116256.docx");
+  assert_page_text_occurrences(&summary, 0, "xxx", 2);
+  assert_matching_text_segments_inside_paths(&summary, 0, "xxx");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf124600
+fn mapped_fixture_tdf124600_keeps_second_body_paragraph_on_one_line() {
+  let summary = render_summary("tdf124600-layout.docx");
+  assert_page_text_segment_occurrences(
+    &summary,
+    0,
+    "nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam",
+    1,
+  );
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/vml.cxx:testWatermark
+fn mapped_fixture_watermark_keeps_picture_watermark_washout_visible() {
+  let summary = render_summary("watermark.docx");
+  assert_page_image_count(&summary, 0, 1);
+  assert_image_centers_are_grayscale("watermark.docx", &summary, 0, 1);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/drawingml.cxx:testCameraRotationRevolution
+fn mapped_fixture_camera_rotation_revolution_keeps_rotated_shapes_visible() {
+  let summary = render_summary("camera-rotation-revolution.docx");
+  assert_page_path_count_at_least(&summary, 0, 2);
+  assert_all_paths_within_page(&summary, 0, 1.0);
+}
+
+#[test]
+// Source: ../core/oox/qa/unit/shape.cxx:testTdf151518VertAnchor
+fn mapped_fixture_tdf151518_smartart_text_stays_inside_target_shapes() {
+  let summary = render_summary("tdf151518_SmartArtTextLocation.docx");
+  for text in [
+    "Target List",
+    "Nested Target",
+    "Stacked Venn",
+    "Grouped List",
+  ] {
+    assert_matching_text_segments_inside_paths(&summary, 0, text);
+  }
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:tdf167527_title_letters_cut_from_below
+fn mapped_fixture_tdf167527_field_shading_does_not_overlap_previous_text_row() {
+  let summary = render_summary("tdf167527_title_letters_cut_from_below.docx");
+  assert_page_contains(&summary, 0, "random text here");
+  assert_any_path_height_less_than(&summary, 0, 700.0 / 20.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/uiwriter/uiwriter3.cxx:testTdf147126
+fn mapped_fixture_tdf147126_keeps_group_draw_objects_inside_fly_frames() {
+  let summary = render_summary("tdf147126.docx");
+  assert_page_contains(&summary, 0, "Processo Metodológico da Pesquisa");
+  assert_page_path_count_at_least(&summary, 0, 7);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport22.cxx:testTdf139418
+fn mapped_fixture_tdf139418_keeps_vertical_docx_grid_text_portions() {
+  let summary = render_summary("tdf139418.docx");
+  assert_page_contains(&summary, 0, "enko Yoshi");
+  assert_text_segment_taller_than_wide(&summary, 0, "G");
+}
+
+#[test]
+// Source: ../core/sw/qa/core/txtnode/txtnode.cxx:testSplitFlyAnchorSplit
+fn mapped_fixture_floattable_anchor_split_keeps_initial_split_floating_table_pages() {
+  let summary = render_summary("floattable-anchor-split.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "First paragraph");
+  assert_page_path_count_at_least(&summary, 0, 1);
+  assert_page_path_count_at_least(&summary, 1, 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf122878
+fn mapped_fixture_tdf122878_keeps_body_paragraphs_above_footer_table() {
+  let summary = render_summary("tdf122878.docx");
+  assert_page_contains(&summary, 0, "1");
+  assert_page_contains(&summary, 0, "33");
+  assert_page_path_count_at_least(&summary, 0, 1);
 }

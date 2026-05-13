@@ -58,6 +58,8 @@ Core-derived visible-output DOCX fixtures:
   `../core/oox/qa/unit/data/tdf125885_WordArt2.docx`.
 - `tdf152840_WordArt_non_accent_color.docx`: copied from
   `../core/oox/qa/unit/data/tdf152840_WordArt_non_accent_color.docx`.
+- `tdf152840_theme_color_non_accent.docx`: copied from
+  `../core/oox/qa/unit/data/tdf152840_theme_color_non_accent.docx`.
 - `tdf152896_WordArt_color_darken.docx`: copied from
   `../core/oox/qa/unit/data/tdf152896_WordArt_color_darken.docx`.
 
@@ -178,6 +180,68 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/ooxmlexport/data/tdf102466.docx`.
 - `tdf95367_inheritFollowStyle.docx`: copied from
   `../core/sw/qa/extras/ooxmlexport/data/tdf95367_inheritFollowStyle.docx`.
+- `redline-table.docx`: copied from
+  `../core/sw/qa/core/layout/data/redline-table.docx`.
+- `redline.docx`: copied from
+  `../core/sw/qa/core/text/data/redline.docx`.
+- `redline-image-anchored.docx`: copied from
+  `../core/sw/qa/core/text/data/redline-image-anchored.docx`.
+- `redline-image-inline.docx`: copied from
+  `../core/sw/qa/core/text/data/redline-image-inline.docx`.
+- `redline-number-portion.docx`: copied from
+  `../core/sw/qa/core/text/data/redline-number-portion.docx`.
+- `redline-bullet.docx`: copied from
+  `../core/sw/qa/core/text/data/redline-bullet.docx`.
+- `tdf114799_highlight.docx`: copied from
+  `../core/sw/qa/extras/tiledrendering/data/tdf114799_highlight.docx`.
+- `tdf114799_shd.docx`: copied from
+  `../core/sw/qa/extras/tiledrendering/data/tdf114799_shd.docx`.
+- `tdf159626_yellowPatternFill.docx`: copied from
+  `../core/sw/qa/extras/tiledrendering/data/tdf159626_yellowPatternFill.docx`.
+- `tdf159626_yellowPatternFillB.docx`: copied from
+  `../core/sw/qa/extras/tiledrendering/data/tdf159626_yellowPatternFillB.docx`.
+- `tdf159626_blackPatternFill.docx`: copied from
+  `../core/sw/qa/extras/tiledrendering/data/tdf159626_blackPatternFill.docx`.
+- `CT-formatted-deletion.docx`: copied from
+  `../core/sw/qa/extras/layout/data/CT-formatted-deletion.docx`.
+- `tdf104797.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf104797.docx`.
+- `tdf155229_row_height_at_least.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf155229_row_height_at_least.docx`.
+- `tdf164907_rowHeightAtLeast.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf164907_rowHeightAtLeast.docx`.
+- `tdf167526.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf167526.docx`.
+- `tdf167540.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf167540.docx`.
+- `tdf105035_framePrB.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf105035_framePrB.docx`.
+- `tdf105035_framePrC.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf105035_framePrC.docx`.
+- `tdf37153_considerWrapOnObjPos.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf37153_considerWrapOnObjPos.docx`.
+- `tdf150822.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf150822.docx`.
+- `tdf64264.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf64264.docx`.
+- `tdf58944-repeating-table-header.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf58944-repeating-table-header.docx`.
+- `tdf81100.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf81100.docx`.
+- `tdf130804.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf130804.docx`.
+- `tdf105143.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf105143.docx`.
+- `floating-table-section-columns.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/floating-table-section-columns.docx`.
+- `tdf60351.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf60351.docx`.
+- `tdf98882.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf98882.docx`.
+- `tdf100072.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf100072.docx`.
+- `tdf114212.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf114212.docx`.
 - `tdf84678.docx`: copied from
   `../core/sw/qa/extras/ooxmlexport/data/tdf84678.docx`.
 - `tdf103544.docx`: copied from
@@ -477,6 +541,111 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/layout/data/writer-image-no-capture.docx`.
 - `tdf152298.docx`: copied from
   `../core/sw/qa/extras/layout/data/tdf152298.docx`.
+- `tdf133070_testRelativeAnchorHeightFromBottomMarginNoFooter.docx`: copied
+  from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133070_testRelativeAnchorHeightFromBottomMarginNoFooter.docx`.
+- `tdf133670_testRelativeAnchorWidthFromRightMargin.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf133670_testRelativeAnchorWidthFromRightMargin.docx`.
+- `tdf165478_bottomAligned.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf165478_bottomAligned.docx`.
+- `tdf126533_noPageBitmap.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf126533_noPageBitmap.docx`.
+- `tdf126533_pageBitmap.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf126533_pageBitmap.docx`.
+- `i120928.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/i120928.docx`.
+- `dml-shape-fillbitmapcrop.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/dml-shape-fillbitmapcrop.docx`.
+- `tdf112450_vml_polyline.docx`: copied from
+  `../core/oox/qa/unit/data/tdf112450_vml_polyline.docx`.
+- `tdf153000_WordArt_type_25_to_31.docx`: copied from
+  `../core/svx/qa/unit/data/tdf153000_WordArt_type_25_to_31.docx`.
+- `tdf138465min.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf138465min.docx`.
+- `tdf97618_testVmlShapeTextWordWrap.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf97618_testVmlShapeTextWordWrap.docx`.
+- `i124106.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/i124106.docx`.
+- `large-twips.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/large-twips.docx`.
+- `gridbefore.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/gridbefore.docx`.
+- `tdf125324.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf125324.docx`.
+- `tdf162746.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf162746.docx`.
+- `tdf107889.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf107889.docx`.
+- `tdf166850.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf166850.docx`.
+- `toplevel-line-hori-offset.docx`: copied from
+  `../core/oox/qa/unit/data/toplevel-line-hori-offset.docx`.
+- `line-vertical-rotation.docx`: copied from
+  `../core/oox/qa/unit/data/line-vertical-rotation.docx`.
+- `customshape-position.docx`: copied from
+  `../core/oox/qa/unit/data/customshape-position.docx`.
+- `multiple-group-shapes.docx`: copied from
+  `../core/oox/qa/unit/data/multiple-group-shapes.docx`.
+- `inside-outside-vert-align.docx`: copied from
+  `../core/sw/qa/core/objectpositioning/data/inside-outside-vert-align.docx`.
+- `vml-vertical-alignment.docx`: copied from
+  `../core/sw/qa/core/objectpositioning/data/vml-vertical-alignment.docx`.
+- `fdo38414.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/fdo38414.docx`.
+- `tdf115180.docx`: copied from
+  `../core/sw/qa/extras/rtfexport/data/tdf115180.docx`.
+- `tdf98987.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf98987.docx`.
+- `tdf99004.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf99004.docx`.
+- `tdf106606.docx`: copied from
+  `../core/sw/qa/extras/ooxmlimport/data/tdf106606.docx`.
+- `tdf156902_GlowOnGroup.docx`: copied from
+  `../core/oox/qa/unit/data/tdf156902_GlowOnGroup.docx`.
+- `tdf119952_negativeMargins.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf119952_negativeMargins.docx`.
+- `tdf128646.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf128646.docx`.
+- `tdf117923.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf117923.docx`.
+- `tdf153136.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf153136.docx`.
+- `tdf135943_shapeWithText_LayoutInCell0_compat15.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf135943_shapeWithText_LayoutInCell0_compat15.docx`.
+- `tdf167770_marginInsideOutside.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf167770_marginInsideOutside.docx`.
+- `tdf87348_linkedTextboxes.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf87348_linkedTextboxes.docx`.
+- `floattable-split.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/floattable-split.docx`.
+- `tdf125885_WordArt.docx`: copied from
+  `../core/oox/qa/unit/data/tdf125885_WordArt.docx`.
+- `tdf125885_WordArt3.docx`: copied from
+  `../core/oox/qa/unit/data/tdf125885_WordArt3.docx`.
+- `n793998.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/n793998.docx`.
+- `footnote_spacing_hanging_para.docx`: copied from
+  `../core/sw/qa/extras/odfexport/data/footnote_spacing_hanging_para.docx`.
+- `tdf116256.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf116256.docx`.
+- `tdf124600-layout.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf124600.docx`.
+- `watermark.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/watermark.docx`.
+- `camera-rotation-revolution.docx`: copied from
+  `../core/oox/qa/unit/data/camera-rotation-revolution.docx`.
+- `tdf151518_SmartArtTextLocation.docx`: copied from
+  `../core/oox/qa/unit/data/tdf151518_SmartArtTextLocation.docx`.
+- `tdf167527_title_letters_cut_from_below.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf167527_title_letters_cut_from_below.docx`.
+- `tdf147126.docx`: copied from
+  `../core/sw/qa/extras/uiwriter/data/tdf147126.docx`.
+- `tdf139418.docx`: copied from
+  `../core/sw/qa/extras/ooxmlexport/data/tdf139418.docx`.
+- `floattable-anchor-split.docx`: copied from
+  `../core/sw/qa/core/txtnode/data/floattable-anchor-split.docx`.
+- `tdf122878.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf122878.docx`.
 
 Assertion policy:
 

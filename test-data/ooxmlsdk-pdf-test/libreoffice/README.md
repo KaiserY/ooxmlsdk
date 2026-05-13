@@ -379,6 +379,104 @@ Mapped visible-output fixtures:
   `../core/sw/qa/extras/layout/data/fld-in-tbl.docx`.
 - `sdt+framePr.docx`: copied from
   `../core/sw/qa/extras/layout/data/sdt+framePr.docx`.
+- `tdf115094.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf115094.docx`.
+- `tdf112290.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf112290.docx`.
+- `tdf123651.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf123651.docx`.
+- `tdf64222.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf64222.docx`.
+- `tdf170381-split-float-table-in-normal-table.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170381-split-float-table-in-normal-table.docx`.
+- `tdf170381-split-float-table-in-float-table.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170381-split-float-table-in-float-table.docx`.
+- `tdf170620.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170620.docx`.
+- `tdf170630.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170630.docx`.
+- `tdf170846_1.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170846_1.docx`.
+- `tdf170846_2.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf170846_2.docx`.
+- `xaxis-labelbreak.docx`: copied from
+  `../core/sw/qa/extras/layout/data/xaxis-labelbreak.docx`.
+- `tdf138773.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf138773.docx`.
+- `tdf130969.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf130969.docx`.
+- `tdf129054.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf129054.docx`.
+- `testAreaChartNumberFormat.docx`: copied from
+  `../core/sw/qa/extras/layout/data/testAreaChartNumberFormat.docx`.
+- `tdf134866.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134866.docx`.
+- `tdf137116.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf137116.docx`.
+- `tdf137154.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf137154.docx`.
+- `outside_long_data_label.docx`: copied from
+  `../core/sw/qa/extras/layout/data/outside_long_data_label.docx`.
+- `tdf130031.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf130031.docx`.
+- `tdf138018.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf138018.docx`.
+- `tdf130380.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf130380.docx`.
+- `tdf129095.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf129095.docx`.
+- `tdf132956.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf132956.docx`.
+- `tdf122014.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf122014.docx`.
+- `tdf167202_footnote.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf167202_footnote.docx`.
+- `tdf134659.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134659.docx`.
+- `tdf134235.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134235.docx`.
+- `tdf134676.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134676.docx`.
+- `tdf134146.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134146.docx`.
+- `tdf136061.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf136061.docx`.
+- `tdf116925.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf116925.docx`.
+- `tdf117028.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf117028.docx`.
+- `tdf150200.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf150200.docx`.
+- `tdf150438.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf150438.docx`.
+- `tdf127118.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf127118.docx`.
+- `tdf141220.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf141220.docx`.
+- `tdf134685.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134685.docx`.
+- `tdf109077.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf109077.docx`.
+- `tdf164903.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf164903.docx`.
+- `tdf134463.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf134463.docx`.
+- `tdf117188.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf117188.docx`.
+- `tdf161718.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf161718.docx`.
+- `tdf130088.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf130088.docx`.
+- `tdf164905.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf164905.docx`.
+- `tdf163149.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf163149.docx`.
+- `tdf164499.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf164499.docx`.
+- `writer-image-no-capture.docx`: copied from
+  `../core/sw/qa/extras/layout/data/writer-image-no-capture.docx`.
+- `tdf152298.docx`: copied from
+  `../core/sw/qa/extras/layout/data/tdf152298.docx`.
 
 Assertion policy:
 

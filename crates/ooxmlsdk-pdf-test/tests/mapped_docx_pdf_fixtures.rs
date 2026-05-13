@@ -35,6 +35,16 @@ fn assert_page_contains(summary: &PdfSummary, page_index: usize, expected: &str)
   );
 }
 
+fn assert_page_not_contains(summary: &PdfSummary, page_index: usize, expected: &str) {
+  let text = page_text(summary, page_index);
+  let normalized_text = normalize_space(&text);
+  let normalized_expected = normalize_space(expected);
+  assert!(
+    !normalized_text.contains(&normalized_expected),
+    "unexpected page {page_index} text {expected:?}; page text:\n{text}"
+  );
+}
+
 fn assert_page_starts_with(summary: &PdfSummary, page_index: usize, expected: &str) {
   let text = page_text(summary, page_index);
   let normalized_text = normalize_space(&text);
@@ -78,6 +88,21 @@ fn assert_page_text_occurrences(
   );
 }
 
+fn assert_page_text_occurrences_at_least(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &str,
+  expected_count: usize,
+) {
+  let text = normalized_page_text(summary, page_index);
+  let count = normalized_occurrences(&text, expected);
+  assert!(
+    count >= expected_count,
+    "page {page_index} text {expected:?} occurrence mismatch: expected at least {expected_count}, got {count}; page text:\n{}",
+    page_text(summary, page_index)
+  );
+}
+
 fn page_image_count(summary: &PdfSummary, page_index: usize) -> usize {
   summary
     .images
@@ -91,6 +116,14 @@ fn page_path_count(summary: &PdfSummary, page_index: usize) -> usize {
     .paths
     .iter()
     .filter(|path| path.page_index == page_index)
+    .count()
+}
+
+fn page_text_segment_count(summary: &PdfSummary, page_index: usize) -> usize {
+  summary
+    .text_segments
+    .iter()
+    .filter(|segment| segment.page_index == page_index)
     .count()
 }
 
@@ -109,6 +142,15 @@ fn assert_page_path_count(summary: &PdfSummary, page_index: usize, expected: usi
     expected,
     "paths={:?}",
     summary.paths
+  );
+}
+
+fn assert_page_text_segment_count(summary: &PdfSummary, page_index: usize, expected: usize) {
+  assert_eq!(
+    page_text_segment_count(summary, page_index),
+    expected,
+    "text_segments={:?}",
+    summary.text_segments
   );
 }
 
@@ -185,6 +227,17 @@ fn assert_text_object_font_size(summary: &PdfSummary, text: &str, expected_size:
       .iter()
       .any(|object| object.scaled_font_size == expected_size),
     "missing font size {expected_size:?} for text {text:?}; objects={objects:?}"
+  );
+}
+
+fn assert_has_text_object_font_size(summary: &PdfSummary, expected_size: &str) {
+  assert!(
+    summary
+      .text_objects
+      .iter()
+      .any(|object| object.scaled_font_size == expected_size),
+    "missing text object font size {expected_size:?}; objects={:?}",
+    summary.text_objects
   );
 }
 
@@ -369,6 +422,22 @@ fn assert_text_top_from_page_top_at_least(
   assert!(
     top_from_page_top >= expected_top,
     "page {page_index} text {text:?} top {top_from_page_top}pt is less than {expected_top}pt; bounds={bounds:?}; media_box={media_box:?}"
+  );
+}
+
+fn assert_text_top_from_page_top_close(
+  summary: &PdfSummary,
+  page_index: usize,
+  text: &str,
+  expected_top: f32,
+  tolerance: f32,
+) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let top_from_page_top = media_box.top - bounds.top;
+  assert!(
+    (top_from_page_top - expected_top).abs() <= tolerance,
+    "page {page_index} text {text:?} top {top_from_page_top}pt differs from {expected_top}pt +/- {tolerance}; bounds={bounds:?}; media_box={media_box:?}"
   );
 }
 
@@ -697,6 +766,37 @@ fn assert_text_tops_close(
   );
 }
 
+fn assert_text_left_difference_close(
+  summary: &PdfSummary,
+  first_text: &str,
+  second_text: &str,
+  expected_difference: f32,
+  tolerance: f32,
+) {
+  let first = text_segment_bounds(summary, first_text);
+  let second = text_segment_bounds(summary, second_text);
+  let difference = first.left - second.left;
+  assert!(
+    (difference - expected_difference).abs() <= tolerance,
+    "text left difference for {first_text:?} and {second_text:?} is {difference}pt, expected {expected_difference}pt +/- {tolerance}; first={first:?}; second={second:?}"
+  );
+}
+
+fn assert_second_text_left_no_more_than(
+  summary: &PdfSummary,
+  first_text: &str,
+  second_text: &str,
+  maximum_delta: f32,
+) {
+  let first = text_segment_bounds(summary, first_text);
+  let second = text_segment_bounds(summary, second_text);
+  let delta = second.left - first.left;
+  assert!(
+    delta < maximum_delta,
+    "text left delta from {first_text:?} to {second_text:?} is {delta}pt, expected less than {maximum_delta}pt; first={first:?}; second={second:?}"
+  );
+}
+
 fn assert_any_image_left_of_text(summary: &PdfSummary, text: &str) {
   let text_bounds = text_segment_bounds(summary, text);
   let image_bounds = image_bounds_on_page(summary, 0);
@@ -705,6 +805,15 @@ fn assert_any_image_left_of_text(summary: &PdfSummary, text: &str) {
       .iter()
       .any(|image| image.left < text_bounds.left),
     "expected an image left of {text:?}; text={text_bounds:?}; images={image_bounds:?}"
+  );
+}
+
+fn assert_any_image_extends_left_of_page(summary: &PdfSummary, page_index: usize) {
+  let media_box = parse_pdf_rect(&summary.media_boxes[page_index]).unwrap();
+  let image_bounds = image_bounds_on_page(summary, page_index);
+  assert!(
+    image_bounds.iter().any(|image| image.left < media_box.left),
+    "expected page {page_index} image to extend left of page frame; media_box={media_box:?}; images={image_bounds:?}"
   );
 }
 
@@ -2356,4 +2465,460 @@ fn mapped_fixture_sdt_framepr_keeps_single_visible_paragraph() {
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
     1,
   );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf115094
+fn mapped_fixture_tdf115094_keeps_nested_objects_inside_table_cells() {
+  let summary = render_summary("tdf115094.docx");
+  assert_page_contains(&summary, 0, "Zufahrt");
+  assert_text_inside_any_path(&summary, 0, "Rollstuhlfahrer");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf112290
+fn mapped_fixture_tdf112290_keeps_second_line_text_portion() {
+  let summary = render_summary("tdf112290.docx");
+  assert_page_contains(&summary, 0, "Xxxx Xxxx");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf123651
+fn mapped_fixture_tdf123651_keeps_shape_above_second_lorem_ipsum() {
+  let summary = render_summary("tdf123651.docx");
+  assert_page_text_occurrences(
+    &summary,
+    0,
+    "Lorem ipsum dolor sit amet, consectetuer adipiscing elit.",
+    2,
+  );
+  assert_path_top_from_page_top_close(&summary, 0, 381.95);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf64222
+fn mapped_fixture_tdf64222_preserves_large_numbering_font_height() {
+  let summary = render_summary("tdf64222.docx");
+  assert_page_contains(&summary, 0, "Another one title of document");
+  assert_has_text_object_font_size(&summary, "28.00");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170381_split_float_table_in_normal_table
+fn mapped_fixture_tdf170381_normal_table_splits_float_table_across_two_pages() {
+  let summary = render_summary("tdf170381-split-float-table-in-normal-table.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "elit ipsum lorem dolor");
+  assert_page_contains(
+    &summary,
+    0,
+    "amet elit amet sit adipiscing adipiscing consectetur consectetur elit dolor",
+  );
+  assert_page_contains(&summary, 1, "adipiscing ipsum elit lorem");
+  assert_page_contains(&summary, 1, "consectetur dolor lorem ipsum");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170381_split_float_table_in_float_table
+fn mapped_fixture_tdf170381_float_table_splits_nested_float_table_across_two_pages() {
+  let summary = render_summary("tdf170381-split-float-table-in-float-table.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Table1 A1 dolor elit");
+  assert_page_contains(
+    &summary,
+    0,
+    "adipiscing dolor adipiscing amet ipsum elit sit elit lorem elit adipiscing dolor ipsum",
+  );
+  assert_page_contains(&summary, 0, "Table2 A22 elit");
+  assert_page_contains(&summary, 1, "Table2 A23");
+  assert_page_contains(&summary, 1, "Table2 A31");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170620_float_table_after_keep_with_next_para
+fn mapped_fixture_tdf170620_keeps_keep_with_next_paragraph_on_first_page() {
+  let summary = render_summary("tdf170620.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Keep-with-next paragraph");
+  assert_page_contains(&summary, 0, "Something");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170630
+fn mapped_fixture_tdf170630_splits_keep_with_next_float_table_to_two_pages() {
+  let summary = render_summary("tdf170630.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains(&summary, 0, "Keep-with-next paragraph");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170846_1
+fn mapped_fixture_tdf170846_1_moves_whole_floating_table_to_page_two() {
+  let summary = render_summary("tdf170846_1.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_not_contains(&summary, 0, "Some floating table");
+  assert_page_contains(&summary, 1, "Some floating table");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout6.cxx:testTdf170846_2
+fn mapped_fixture_tdf170846_2_moves_whole_nested_floating_table_to_page_two() {
+  let summary = render_summary("tdf170846_2.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_not_contains(&summary, 0, "adipiscing");
+  assert_page_contains(&summary, 1, "adipiscing");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf138194
+fn mapped_fixture_xaxis_labelbreak_keeps_wrapped_axis_label_visible() {
+  let summary = render_summary("xaxis-labelbreak.docx");
+  assert_page_text_segment_count(&summary, 0, 8);
+  assert_page_contains(
+    &summary,
+    0,
+    "really really long data label 1 made even longer",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf138773
+fn mapped_fixture_tdf138773_keeps_first_x_axis_label_on_one_line() {
+  let summary = render_summary("tdf138773.docx");
+  assert_page_text_occurrences(&summary, 0, "2000-01", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf130969
+fn mapped_fixture_tdf130969_preserves_y_axis_minimum_label() {
+  let summary = render_summary("tdf130969.docx");
+  assert_page_contains(&summary, 0, "0.35781");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf129054
+fn mapped_fixture_tdf129054_preserves_pie_chart_diameter() {
+  let summary = render_summary("tdf129054.docx");
+  assert_page_contains(&summary, 0, "Értékesítés");
+  assert_path_height_close(&summary, 0, 230.75);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf129173
+fn mapped_fixture_test_area_chart_number_format_keeps_first_area_data_label() {
+  let summary = render_summary("testAreaChartNumberFormat.docx");
+  assert_page_contains(&summary, 0, "56");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134866
+fn mapped_fixture_tdf134866_keeps_pie_chart_percent_label() {
+  let summary = render_summary("tdf134866.docx");
+  assert_page_contains(&summary, 0, "100%");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf137116
+fn mapped_fixture_tdf137116_keeps_second_label_outside_pie_slice() {
+  let summary = render_summary("tdf137116.docx");
+  assert_page_contains(&summary, 0, "datalabel2");
+  assert_page_contains(&summary, 0, "datalabel4");
+  assert_text_left_difference_close(&summary, "datalabel2", "datalabel4", 55.85, 5.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf137154
+fn mapped_fixture_tdf137154_keeps_first_and_fourth_data_labels_aligned() {
+  let summary = render_summary("tdf137154.docx");
+  assert_page_contains(&summary, 0, "long data label 1");
+  assert_page_contains(&summary, 0, "long data label 4");
+  assert_text_left_difference_close(&summary, "long data label 1", "long data label 4", 0.0, 2.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf138777
+fn mapped_fixture_outside_long_data_label_breaks_to_multiple_lines() {
+  let summary = render_summary("outside_long_data_label.docx");
+  assert_page_text_occurrences_at_least(&summary, 0, "really", 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf130031
+fn mapped_fixture_tdf130031_keeps_data_label_below_data_point() {
+  let summary = render_summary("tdf130031.docx");
+  assert_page_contains(&summary, 0, "23");
+  assert_text_top_from_page_top_close(&summary, 0, "23", 232.65, 2.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf138018
+fn mapped_fixture_tdf138018_omits_extra_pie_chart_leader_line() {
+  let summary = render_summary("tdf138018.docx");
+  assert_page_contains(&summary, 0, "Értékesítés");
+  assert_page_path_count(&summary, 0, 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf130380
+fn mapped_fixture_tdf130380_keeps_area_chart_from_shrinking() {
+  let summary = render_summary("tdf130380.docx");
+  assert_page_contains(&summary, 0, "1. adatsor");
+  assert_path_top_from_page_top_close(&summary, 0, 336.35);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf129095
+fn mapped_fixture_tdf129095_keeps_relative_inner_chart_area_visible() {
+  let summary = render_summary("tdf129095.docx");
+  assert_page_contains(&summary, 0, "Category 1");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf132956
+fn mapped_fixture_tdf132956_keeps_default_inner_chart_area_visible() {
+  let summary = render_summary("tdf132956.docx");
+  assert_page_contains(&summary, 0, "Category 1");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf122014
+fn mapped_fixture_tdf122014_keeps_word_chart_title_alignment() {
+  let summary = render_summary("tdf122014.docx");
+  assert_page_contains(&summary, 0, "Chart title alignment");
+  assert_second_text_left_no_more_than(&summary, "Chart title", "alignment", 5.0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf167202_footnote
+fn mapped_fixture_tdf167202_footnote_keeps_single_footnote_chart_numbering() {
+  let summary = render_summary("tdf167202_footnote.docx");
+  assert_page_contains(&summary, 0, "FOOTNOTE #1");
+  assert_page_text_segment_count(&summary, 0, 10);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134659
+fn mapped_fixture_tdf134659_keeps_axis_label_alignment() {
+  let summary = render_summary("tdf134659.docx");
+  assert_page_contains(&summary, 0, "Test the axis label aligment!");
+  assert_second_text_left_no_more_than(&summary, "Test the axis", "label aligment", 12.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134235
+fn mapped_fixture_tdf134235_keeps_long_chart_title_inside_chart_area() {
+  let summary = render_summary("tdf134235.docx");
+  assert_page_contains(&summary, 0, "When opened in Writer the long chart title");
+  assert_page_text_segment_count(&summary, 0, 14);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134676
+fn mapped_fixture_tdf134676_breaks_long_x_axis_title_to_multiple_lines() {
+  let summary = render_summary("tdf134676.docx");
+  assert_page_contains(&summary, 0, "default length of the axis title box");
+  assert_page_text_segment_count(&summary, 0, 14);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134146
+fn mapped_fixture_tdf134146_breaks_long_y_axis_title_to_multiple_lines() {
+  let summary = render_summary("tdf134146.docx");
+  assert_page_text_occurrences_at_least(&summary, 0, "Horizontal", 2);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf136061
+fn mapped_fixture_tdf136061_keeps_custom_data_label_text() {
+  let summary = render_summary("tdf136061.docx");
+  assert_page_contains(&summary, 0, "Customlabel");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf116925
+fn mapped_fixture_tdf116925_keeps_chart_text_white() {
+  let summary = render_summary("tdf116925.docx");
+  assert_page_contains(&summary, 0, "hello");
+  assert_text_object_fill_color(&summary, "hello", "#ffffff@ff");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf117028
+fn mapped_fixture_tdf117028_omits_white_background_polygon() {
+  let summary = render_summary("tdf117028.docx");
+  assert_page_contains(&summary, 0, "Hello");
+  assert_page_path_count(&summary, 0, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf150200_DOCX
+fn mapped_fixture_tdf150200_docx_preserves_dash_line_breaks() {
+  let summary = render_summary("tdf150200.docx");
+  assert_page_contains(&summary, 0, "-(dash)");
+  assert_page_contains(&summary, 0, "–(en-dash)");
+  assert_page_contains(&summary, 0, "—(em-dash)");
+  assert_page_contains(&summary, 0, "‒(figure dash)");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf150438_DOCX
+fn mapped_fixture_tdf150438_docx_preserves_quote_line_breaks() {
+  let summary = render_summary("tdf150438.docx");
+  assert_page_contains(&summary, 0, "“Lorem ipsum");
+  assert_page_contains(&summary, 0, "”Nunc viverra imperdiet enim.");
+  assert_page_contains(&summary, 0, "‘Aenean nec lorem.");
+  assert_page_contains(&summary, 0, "’Aenean nec lorem.");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf127118
+fn mapped_fixture_tdf127118_keeps_vertical_writing_in_split_merged_cell() {
+  let summary = render_summary("tdf127118.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_text_segment_taller_than_wide(&summary, 1, "1.");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf141220
+fn mapped_fixture_tdf141220_keeps_textbox_inside_shape() {
+  let summary = render_summary("tdf141220.docx");
+  assert_text_inside_any_path(&summary, 0, "Lorem ipsum");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf134685
+fn mapped_fixture_tdf134685_keeps_wide_table_cell_content_visible() {
+  let summary = render_summary("tdf134685.docx");
+  assert_page_contains(&summary, 0, "fffffffff");
+  assert_rightmost_text_within_rightmost_path(&summary, 0, 0.5);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf109077
+fn mapped_fixture_tdf109077_keeps_textbox_top_aligned_with_shape() {
+  let summary = render_summary("tdf109077.docx");
+  assert_page_contains(&summary, 0, "x1");
+  assert_text_inside_any_path(&summary, 0, "x1");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf164903
+fn mapped_fixture_tdf164903_ignores_inline_heading_top_margin() {
+  let summary = render_summary("tdf164903.docx");
+  assert_page_contains(&summary, 0, "Definitions");
+  assert_text_height_close(&summary, 0, 12.75);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf134463
+fn mapped_fixture_tdf134463_keeps_table_paragraph_border_from_expanding_previous_paragraph() {
+  let summary = render_summary("tdf134463.docx");
+  assert_page_contains_in_order(&summary, 0, &["A1", "A2", "B1", "B2"]);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf117188
+fn mapped_fixture_tdf117188_keeps_textbox_text_inside_zero_border_fly() {
+  let summary = render_summary("tdf117188.docx");
+  assert_text_inside_any_path(&summary, 0, "Der");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf161718
+fn mapped_fixture_tdf161718_keeps_header_footer_footnote_and_body_on_one_page() {
+  let summary = render_summary("tdf161718.docx");
+  assert_eq!(summary.page_count, 1);
+  assert_page_contains(&summary, 0, "Header Text");
+  assert_page_contains(&summary, 0, "Body text");
+  assert_page_contains(&summary, 0, "Footer Text.");
+  assert_page_contains(&summary, 0, "Footnote area");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf119908
+fn mapped_fixture_tdf119908_keeps_exceeding_line_portion_visible_for_shrinking() {
+  let summary = render_summary("tdf130088.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "viverra odio. Donec auctor molestie sem, sit amet tristique lectus hendrerit sed.",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf158333
+fn mapped_fixture_tdf158333_keeps_expected_shrunk_line_portions() {
+  let summary = render_summary("tdf130088.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "viverra odio. Donec auctor molestie sem, sit amet tristique lectus hendrerit sed.",
+  );
+  assert_page_contains(
+    &summary,
+    0,
+    "laoreet vel leo nec, volutpat facilisis eros. Donec consequat arcu ut diam tempor",
+  );
+  assert_page_contains(
+    &summary,
+    0,
+    "Donec auctor molestie sem, sit amet tristique lectus hendrerit sed. Cras sodales",
+  );
+  assert_page_contains(
+    &summary,
+    0,
+    "consequat arcu ut diam tempor luctus. Cum sociis natoque penatibus et magnis",
+  );
+  assert_page_contains(
+    &summary,
+    0,
+    "venenatis, quis commodo dolor posuere. Curabitur dignissim sapien quis",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf164905
+fn mapped_fixture_tdf164905_avoids_extra_toc_glue_portions() {
+  let summary = render_summary("tdf164905.docx");
+  assert_page_contains_in_order(
+    &summary,
+    0,
+    &["INHALT", "ORGANISATION UND", "VERANTWORTLICHKEIT"],
+  );
+  assert_page_text_occurrences(&summary, 0, "ORGANISATION UND", 1);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf163149
+fn mapped_fixture_tdf163149_keeps_second_shrunk_line_text_array_visible() {
+  let summary = render_summary("tdf163149.docx");
+  assert_page_contains(
+    &summary,
+    0,
+    "vulputate nisl commodo. Proin aliquet turpis ac posuere commodo. Curabitur facilisis mauris ac nulla dapibus",
+  );
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf164499
+fn mapped_fixture_tdf164499_keeps_tabulated_heading_page_number_on_own_line() {
+  let summary = render_summary("tdf164499.docx");
+  assert_page_contains(&summary, 0, "2.5.5");
+  assert_page_contains(&summary, 0, "pH-Messung");
+  assert_page_contains(&summary, 0, "hat und ich keine Werte habe?)");
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testWriterImageNoCapture
+fn mapped_fixture_writer_image_no_capture_allows_image_left_of_page_frame() {
+  let summary = render_summary("writer-image-no-capture.docx");
+  assert_any_image_extends_left_of_page(&summary, 0);
+}
+
+#[test]
+// Source: ../core/sw/qa/extras/layout/layout4.cxx:testTdf152298
+fn mapped_fixture_tdf152298_splits_rowspan_table_follow_row_to_second_page() {
+  let summary = render_summary("tdf152298.docx");
+  assert_eq!(summary.page_count, 2);
+  assert_page_contains_in_order(&summary, 1, &["1", "2", "3", "10"]);
 }

@@ -70,7 +70,7 @@ outputs. For this matrix, `covered` direct-PDF rows are the direct analogue;
 |---|---:|---:|---|
 | Direct PDF/object | `Direct PDF Tests` covered rows | 10 | Expressed with current PDF extraction assertions. |
 | Covered supplemental | `Covered Supplemental Tests` rows | 7 | Already represented locally with source-backed visible PDF color/alpha/text assertions. |
-| Projection required | `mapped` rows | 143 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
+| Projection required | `mapped` rows | 93 | Active DOCX -> PDF TDD targets; add the required PDF projection or snapshot capability as needed. |
 | Review only | `review` rows | 0 | Broad-scan rows have been item-reviewed in this pass. |
 | Deferred/excluded | `deferred` / `excluded` rows | 26 | Keep out of the active PDF migration queue. |
 
@@ -103,12 +103,12 @@ test harness convenience, not a capability blocker.
 
 ## Scan Summary
 
-- Local covered PDF-rendering fixtures: 172.
+- Local covered PDF-rendering fixtures: 222.
 - Direct upstream DOCX -> PDF/object assertions: 10 rows, all covered.
 - Planned direct PDF rows remaining: 0.
 - Supplemental source-backed PDF-visible assertions already covered locally: 7
   rows.
-- Additional visible-output candidates listed individually below: 143 mapped
+- Additional visible-output candidates listed individually below: 93 mapped
   tests. Treat these as active TDD targets that may require new PDF extraction,
   layout projection, or snapshot capability before the Rust assertion can be
   written faithfully.
@@ -229,18 +229,18 @@ behavior.
 | `layout2.cxx::testTdf126244` | `tdf126244.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2023` | `covered` | Layout regression; project to PDF page/text assertions. |
 | `layout2.cxx::testTdf69648` | `tdf69648.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2080` | `covered` | Layout regression; project to PDF text/object bounds. |
 | `layout2.cxx::testTdf116256` | `tdf116256.docx` | `../core/sw/qa/extras/layout/layout2.cxx:2118` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout3.cxx::testTdf134463` | `tdf134463.docx` | `../core/sw/qa/extras/layout/layout3.cxx:31` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout3.cxx::testTdf117188` | `tdf117188.docx` | `../core/sw/qa/extras/layout/layout3.cxx:39` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout3.cxx::testTdf161718` | `tdf161718.docx` | `../core/sw/qa/extras/layout/layout3.cxx:222` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout3.cxx::testTdf119908` | `tdf130088.docx` | `../core/sw/qa/extras/layout/layout3.cxx:239` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout3.cxx::testTdf158333` | `tdf130088.docx` | `../core/sw/qa/extras/layout/layout3.cxx:257` | `mapped` | Layout regression; project to PDF page/text assertions. |
+| `layout3.cxx::testTdf134463` | `tdf134463.docx` | `../core/sw/qa/extras/layout/layout3.cxx:31` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout3.cxx::testTdf117188` | `tdf117188.docx` | `../core/sw/qa/extras/layout/layout3.cxx:39` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout3.cxx::testTdf161718` | `tdf161718.docx` | `../core/sw/qa/extras/layout/layout3.cxx:222` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout3.cxx::testTdf119908` | `tdf130088.docx` | `../core/sw/qa/extras/layout/layout3.cxx:239` | `covered` | Layout regression; project to PDF page/text assertions. |
+| `layout3.cxx::testTdf158333` | `tdf130088.docx` | `../core/sw/qa/extras/layout/layout3.cxx:257` | `covered` | Layout regression; project to PDF page/text assertions. |
 | `layout3.cxx::testTdf158419` | `tdf130088.docx` | `../core/sw/qa/extras/layout/layout3.cxx:314` | `mapped` | Layout regression; project to PDF page/text assertions. |
-| `layout3.cxx::testTdf164905` | `tdf164905.docx` | `../core/sw/qa/extras/layout/layout3.cxx:567` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout3.cxx::testTdf163149` | `tdf163149.docx` | `../core/sw/qa/extras/layout/layout3.cxx:583` | `mapped` | Layout regression; project to PDF text/object bounds. |
-| `layout3.cxx::testTdf164499` | `tdf164499.docx` | `../core/sw/qa/extras/layout/layout3.cxx:1295` | `mapped` | Layout regression; project to PDF text/object bounds. |
+| `layout3.cxx::testTdf164905` | `tdf164905.docx` | `../core/sw/qa/extras/layout/layout3.cxx:567` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout3.cxx::testTdf163149` | `tdf163149.docx` | `../core/sw/qa/extras/layout/layout3.cxx:583` | `covered` | Layout regression; project to PDF text/object bounds. |
+| `layout3.cxx::testTdf164499` | `tdf164499.docx` | `../core/sw/qa/extras/layout/layout3.cxx:1295` | `covered` | Layout regression; project to PDF text/object bounds. |
 | `layout4.cxx::testTdf117982` | `tdf117982.docx` | `../core/sw/qa/extras/layout/layout4.cxx:446` | `covered` | Layout regression; project to PDF page/text assertions. |
 | `layout4.cxx::testTdf128959` | `tdf128959.docx` | `../core/sw/qa/extras/layout/layout4.cxx:458` | `covered` | Layout regression; project to PDF text/object bounds. |
-| `layout4.cxx::testWriterImageNoCapture` | `writer-image-no-capture.docx` | `../core/sw/qa/extras/layout/layout4.cxx:555` | `mapped` | Image capture/layout; project to PDF image/object checks. |
+| `layout4.cxx::testWriterImageNoCapture` | `writer-image-no-capture.docx` | `../core/sw/qa/extras/layout/layout4.cxx:555` | `covered` | Image capture/layout; project to PDF image/object checks. |
 | `layout4.cxx::testTdf124423_DOCX` | `tdf124423.docx` | `../core/sw/qa/extras/layout/layout4.cxx:641` | `covered` | Layout regression; project to PDF page/text assertions. |
 | `layout4.cxx::testTdf138782` | `tdf138782.docx` | `../core/sw/qa/extras/layout/layout4.cxx:706` | `covered` | Layout regression; project to PDF page/text assertions. |
 | `layout4.cxx::testTdf135035_DOCX` | `tdf135035.docx` | `../core/sw/qa/extras/layout/layout4.cxx:722` | `covered` | Layout regression; project to PDF page/text assertions. |
@@ -250,7 +250,7 @@ behavior.
 | `layout4.cxx::testTdf159259` | `sdt+framePr.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1093` | `covered` | Content control with frame properties; project to PDF text/object bounds. |
 | `layout4.cxx::TestTdf155229RowAtLeast` | `tdf155229_row_height_at_least.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1670` | `mapped` | Row height layout; project to PDF table bounds. |
 | `layout4.cxx::TestTdf164907_rowHeightAtLeast` | `tdf164907_rowHeightAtLeast.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1682` | `mapped` | Row height layout; project to PDF table bounds. |
-| `layout4.cxx::testTdf152298` | `tdf152298.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1918` | `mapped` | Layout regression; project to PDF page/text/object assertions. |
+| `layout4.cxx::testTdf152298` | `tdf152298.docx` | `../core/sw/qa/extras/layout/layout4.cxx:1918` | `covered` | Layout regression; project to PDF page/text/object assertions. |
 
 ## Chart And Metafile Rendering Candidates
 
@@ -259,37 +259,37 @@ LibreOffice asserts rendered metafile/text/path output instead of chart XML.
 
 | Upstream test | Fixture | Source file | Status | PDF projection |
 |---|---|---|---|---|
-| `layout5.cxx::testTdf138194` | `xaxis-labelbreak.docx` | `../core/sw/qa/extras/layout/layout5.cxx:48` | `mapped` | Chart axis label wrap; project to PDF text positions. |
-| `layout5.cxx::testTdf138773` | `tdf138773.docx` | `../core/sw/qa/extras/layout/layout5.cxx:108` | `mapped` | Chart rendered text/path output. |
-| `layout5.cxx::testTdf130969` | `tdf130969.docx` | `../core/sw/qa/extras/layout/layout5.cxx:184` | `mapped` | Chart rendered geometry. |
-| `layout5.cxx::testTdf129054` | `tdf129054.docx` | `../core/sw/qa/extras/layout/layout5.cxx:217` | `mapped` | Chart rendered geometry. |
-| `layout5.cxx::testTdf129173` | `testAreaChartNumberFormat.docx` | `../core/sw/qa/extras/layout/layout5.cxx:243` | `mapped` | Area-chart number-format text. |
-| `layout5.cxx::testTdf134866` | `tdf134866.docx` | `../core/sw/qa/extras/layout/layout5.cxx:258` | `mapped` | Chart label/shape output. |
-| `layout5.cxx::testTdf137116` | `tdf137116.docx` | `../core/sw/qa/extras/layout/layout5.cxx:273` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf137154` | `tdf137154.docx` | `../core/sw/qa/extras/layout/layout5.cxx:293` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf138777` | `outside_long_data_label.docx` | `../core/sw/qa/extras/layout/layout5.cxx:313` | `mapped` | Data label placement; project to PDF text bounds. |
-| `layout5.cxx::testTdf130031` | `tdf130031.docx` | `../core/sw/qa/extras/layout/layout5.cxx:331` | `mapped` | Chart line/path rendering. |
-| `layout5.cxx::testTdf138018` | `tdf138018.docx` | `../core/sw/qa/extras/layout/layout5.cxx:392` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf130380` | `tdf130380.docx` | `../core/sw/qa/extras/layout/layout5.cxx:409` | `mapped` | Chart geometry. |
-| `layout5.cxx::testTdf129095` | `tdf129095.docx` | `../core/sw/qa/extras/layout/layout5.cxx:432` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf132956` | `tdf132956.docx` | `../core/sw/qa/extras/layout/layout5.cxx:447` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf122014` | `tdf122014.docx` | `../core/sw/qa/extras/layout/layout5.cxx:580` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf167202_footnote` | `tdf167202_footnote.docx` | `../core/sw/qa/extras/layout/layout5.cxx:597` | `mapped` | Chart in footnote layout. |
-| `layout5.cxx::testTdf134659` | `tdf134659.docx` | `../core/sw/qa/extras/layout/layout5.cxx:621` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf134235` | `tdf134235.docx` | `../core/sw/qa/extras/layout/layout5.cxx:638` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf134676` | `tdf134676.docx` | `../core/sw/qa/extras/layout/layout5.cxx:655` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf134146` | `tdf134146.docx` | `../core/sw/qa/extras/layout/layout5.cxx:672` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf136061` | `tdf136061.docx` | `../core/sw/qa/extras/layout/layout5.cxx:691` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf116925` | `tdf116925.docx` | `../core/sw/qa/extras/layout/layout5.cxx:705` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf117028` | `tdf117028.docx` | `../core/sw/qa/extras/layout/layout5.cxx:725` | `mapped` | Chart rendered output. |
-| `layout5.cxx::testTdf150200_DOCX` | `tdf150200.docx` | `../core/sw/qa/extras/layout/layout5.cxx:924` | `mapped` | Chart/metafile text and path output. |
-| `layout5.cxx::testTdf150438_DOCX` | `tdf150438.docx` | `../core/sw/qa/extras/layout/layout5.cxx:976` | `mapped` | Chart/metafile text and path output. |
+| `layout5.cxx::testTdf138194` | `xaxis-labelbreak.docx` | `../core/sw/qa/extras/layout/layout5.cxx:48` | `covered` | Chart axis label wrap; project to PDF text positions. |
+| `layout5.cxx::testTdf138773` | `tdf138773.docx` | `../core/sw/qa/extras/layout/layout5.cxx:108` | `covered` | Chart rendered text/path output. |
+| `layout5.cxx::testTdf130969` | `tdf130969.docx` | `../core/sw/qa/extras/layout/layout5.cxx:184` | `covered` | Chart rendered geometry. |
+| `layout5.cxx::testTdf129054` | `tdf129054.docx` | `../core/sw/qa/extras/layout/layout5.cxx:217` | `covered` | Chart rendered geometry. |
+| `layout5.cxx::testTdf129173` | `testAreaChartNumberFormat.docx` | `../core/sw/qa/extras/layout/layout5.cxx:243` | `covered` | Area-chart number-format text. |
+| `layout5.cxx::testTdf134866` | `tdf134866.docx` | `../core/sw/qa/extras/layout/layout5.cxx:258` | `covered` | Chart label/shape output. |
+| `layout5.cxx::testTdf137116` | `tdf137116.docx` | `../core/sw/qa/extras/layout/layout5.cxx:273` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf137154` | `tdf137154.docx` | `../core/sw/qa/extras/layout/layout5.cxx:293` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf138777` | `outside_long_data_label.docx` | `../core/sw/qa/extras/layout/layout5.cxx:313` | `covered` | Data label placement; project to PDF text bounds. |
+| `layout5.cxx::testTdf130031` | `tdf130031.docx` | `../core/sw/qa/extras/layout/layout5.cxx:331` | `covered` | Chart line/path rendering. |
+| `layout5.cxx::testTdf138018` | `tdf138018.docx` | `../core/sw/qa/extras/layout/layout5.cxx:392` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf130380` | `tdf130380.docx` | `../core/sw/qa/extras/layout/layout5.cxx:409` | `covered` | Chart geometry. |
+| `layout5.cxx::testTdf129095` | `tdf129095.docx` | `../core/sw/qa/extras/layout/layout5.cxx:432` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf132956` | `tdf132956.docx` | `../core/sw/qa/extras/layout/layout5.cxx:447` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf122014` | `tdf122014.docx` | `../core/sw/qa/extras/layout/layout5.cxx:580` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf167202_footnote` | `tdf167202_footnote.docx` | `../core/sw/qa/extras/layout/layout5.cxx:597` | `covered` | Chart in footnote layout. |
+| `layout5.cxx::testTdf134659` | `tdf134659.docx` | `../core/sw/qa/extras/layout/layout5.cxx:621` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf134235` | `tdf134235.docx` | `../core/sw/qa/extras/layout/layout5.cxx:638` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf134676` | `tdf134676.docx` | `../core/sw/qa/extras/layout/layout5.cxx:655` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf134146` | `tdf134146.docx` | `../core/sw/qa/extras/layout/layout5.cxx:672` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf136061` | `tdf136061.docx` | `../core/sw/qa/extras/layout/layout5.cxx:691` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf116925` | `tdf116925.docx` | `../core/sw/qa/extras/layout/layout5.cxx:705` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf117028` | `tdf117028.docx` | `../core/sw/qa/extras/layout/layout5.cxx:725` | `covered` | Chart rendered output. |
+| `layout5.cxx::testTdf150200_DOCX` | `tdf150200.docx` | `../core/sw/qa/extras/layout/layout5.cxx:924` | `covered` | Chart/metafile text and path output. |
+| `layout5.cxx::testTdf150438_DOCX` | `tdf150438.docx` | `../core/sw/qa/extras/layout/layout5.cxx:976` | `covered` | Chart/metafile text and path output. |
 | `layout5.cxx::testTdf127606` | `tdf117923.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1027` | `mapped` | Metafile/text output. |
-| `layout5.cxx::testTdf127118` | `tdf127118.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1063` | `mapped` | Rendered output regression. |
-| `layout5.cxx::testTdf141220` | `tdf141220.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1072` | `mapped` | Rendered output regression. |
-| `layout5.cxx::testTdf134685` | `tdf134685.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1176` | `mapped` | Rendered output regression. |
-| `layout5.cxx::testTdf109077` | `tdf109077.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1186` | `mapped` | Rendered output regression. |
-| `layout5.cxx::testTdf164903` | `tdf164903.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1297` | `mapped` | Rendered output regression. |
+| `layout5.cxx::testTdf127118` | `tdf127118.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1063` | `covered` | Rendered output regression. |
+| `layout5.cxx::testTdf141220` | `tdf141220.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1072` | `covered` | Rendered output regression. |
+| `layout5.cxx::testTdf134685` | `tdf134685.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1176` | `covered` | Rendered output regression. |
+| `layout5.cxx::testTdf109077` | `tdf109077.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1186` | `covered` | Rendered output regression. |
+| `layout5.cxx::testTdf164903` | `tdf164903.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1297` | `covered` | Rendered output regression. |
 | `layout5.cxx::testTdf153136` | `tdf153136.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1361` | `mapped` | Detailed rendered text/path output. |
 | `layout5.cxx::testTdf167526` | `tdf167526.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1923` | `mapped` | Detailed rendered text/path output. |
 | `layout5.cxx::testTdf167540` | `tdf167540.docx` | `../core/sw/qa/extras/layout/layout5.cxx:1973` | `mapped` | Detailed rendered text/path output. |
@@ -299,17 +299,17 @@ LibreOffice asserts rendered metafile/text/path output instead of chart XML.
 | Upstream test | Fixture | Source file | Status | PDF projection |
 |---|---|---|---|---|
 | `layout6.cxx::testTdf122878` | `tdf122878.docx` | `../core/sw/qa/extras/layout/layout6.cxx:550` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf115094` | `tdf115094.docx` | `../core/sw/qa/extras/layout/layout6.cxx:572` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf112290` | `tdf112290.docx` | `../core/sw/qa/extras/layout/layout6.cxx:599` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf123651` | `tdf123651.docx` | `../core/sw/qa/extras/layout/layout6.cxx:918` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf64222` | `tdf64222.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1118` | `mapped` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf115094` | `tdf115094.docx` | `../core/sw/qa/extras/layout/layout6.cxx:572` | `covered` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf112290` | `tdf112290.docx` | `../core/sw/qa/extras/layout/layout6.cxx:599` | `covered` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf123651` | `tdf123651.docx` | `../core/sw/qa/extras/layout/layout6.cxx:918` | `covered` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf64222` | `tdf64222.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1118` | `covered` | Layout regression; project to PDF page/text output. |
 | `layout6.cxx::testTdf124600` | `tdf124600.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1319` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf170381_split_float_table_in_normal_table` | `tdf170381-split-float-table-in-normal-table.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1740` | `mapped` | Split floating table layout; project to PDF table bounds and page flow. |
-| `layout6.cxx::testTdf170381_split_float_table_in_float_table` | `tdf170381-split-float-table-in-float-table.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1862` | `mapped` | Nested split floating table layout; project to PDF table bounds and page flow. |
-| `layout6.cxx::testTdf170620_float_table_after_keep_with_next_para` | `tdf170620.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2018` | `mapped` | Floating table after keep-with-next paragraph; project to PDF table/page flow. |
-| `layout6.cxx::testTdf170630` | `tdf170630.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2085` | `mapped` | Layout regression; project to PDF page/text/table output. |
-| `layout6.cxx::testTdf170846_1` | `tdf170846_1.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2199` | `mapped` | Layout regression; project to PDF page/text output. |
-| `layout6.cxx::testTdf170846_2` | `tdf170846_2.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2209` | `mapped` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf170381_split_float_table_in_normal_table` | `tdf170381-split-float-table-in-normal-table.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1740` | `covered` | Split floating table layout; project to PDF table bounds and page flow. |
+| `layout6.cxx::testTdf170381_split_float_table_in_float_table` | `tdf170381-split-float-table-in-float-table.docx` | `../core/sw/qa/extras/layout/layout6.cxx:1862` | `covered` | Nested split floating table layout; project to PDF table bounds and page flow. |
+| `layout6.cxx::testTdf170620_float_table_after_keep_with_next_para` | `tdf170620.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2018` | `covered` | Floating table after keep-with-next paragraph; project to PDF table/page flow. |
+| `layout6.cxx::testTdf170630` | `tdf170630.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2085` | `covered` | Layout regression; project to PDF page/text/table output. |
+| `layout6.cxx::testTdf170846_1` | `tdf170846_1.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2199` | `covered` | Layout regression; project to PDF page/text output. |
+| `layout6.cxx::testTdf170846_2` | `tdf170846_2.docx` | `../core/sw/qa/extras/layout/layout6.cxx:2209` | `covered` | Layout regression; project to PDF page/text output. |
 
 ## Tiled Bitmap Rendering Candidates
 

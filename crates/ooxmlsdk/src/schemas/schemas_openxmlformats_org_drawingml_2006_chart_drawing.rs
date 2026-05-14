@@ -441,10 +441,10 @@ pub struct FromAnchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Relative X Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
-  pub x_position: crate::simple_type::DoubleValue,
+  pub x_position: XPosition,
   /// Relative Y Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
-  pub y_position: crate::simple_type::DoubleValue,
+  pub y_position: YPosition,
 }
 /// Ending Anchor Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -453,10 +453,10 @@ pub struct ToAnchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Relative X Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
-  pub x_position: crate::simple_type::DoubleValue,
+  pub x_position: XPosition,
   /// Relative Y Coordinate
   #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
-  pub y_position: crate::simple_type::DoubleValue,
+  pub y_position: YPosition,
 }
 /// Shape Extent.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

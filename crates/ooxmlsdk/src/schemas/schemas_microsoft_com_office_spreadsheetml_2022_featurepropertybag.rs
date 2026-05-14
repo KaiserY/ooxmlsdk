@@ -358,20 +358,20 @@ pub enum FeaturePropertyBagChoice {
 pub enum ArrayFeaturePropertyChoice {
   /// Defines the XsdunsignedInt Class.
   #[sdk(text_child(microsoft365, qname = "xsd:unsignedInt/xfpb:bagId"))]
-  XfpbBagId(crate::simple_type::UInt32Value),
+  XfpbBagId(XsdunsignedInt),
   /// Defines the Xsdinteger Class.
   #[sdk(text_child(microsoft365, qname = "xsd:integer/xfpb:i"))]
-  XfpbI(crate::simple_type::IntegerValue),
+  XfpbI(Xsdinteger),
   /// Defines the SXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xfpb:s"))]
-  XfpbS(crate::simple_type::StringValue),
+  XfpbS(SXsdstring),
   /// Defines the Xsdboolean Class.
   #[sdk(text_child(microsoft365, qname = "xsd:boolean/xfpb:b"))]
-  XfpbB(crate::simple_type::BooleanValue),
+  XfpbB(Xsdboolean),
   /// Defines the Xsddouble Class.
   #[sdk(text_child(microsoft365, qname = "xsd:double/xfpb:d"))]
-  XfpbD(crate::simple_type::DoubleValue),
+  XfpbD(Xsddouble),
   /// Defines the RelXsdstring Class.
   #[sdk(text_child(microsoft365, qname = "xsd:string/xfpb:rel"))]
-  XfpbRel(crate::simple_type::StringValue),
+  XfpbRel(RelXsdstring),
 }

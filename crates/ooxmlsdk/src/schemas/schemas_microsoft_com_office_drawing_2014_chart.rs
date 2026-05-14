@@ -208,7 +208,7 @@ pub struct CategoryFilterException {
 pub struct NumberDataType {
   /// Format Code
   #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
-  pub format_code: Option<crate::simple_type::StringValue>,
+  pub format_code: Option<crate::schemas::c::FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
   pub point_count: Option<crate::schemas::c::PointCount>,
@@ -310,7 +310,7 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 pub struct ChartDataPointUniqueIdMapEntry {
   /// Defines the XsdunsignedInt Class.
   #[sdk(text_child(office2016, qname = "xsd:unsignedInt/c16:ptidx"))]
-  pub xsdunsigned_int: crate::simple_type::UInt32Value,
+  pub xsdunsigned_int: XsdunsignedInt,
   /// Defines the UniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
   pub unique_id: std::boxed::Box<UniqueId>,
@@ -394,7 +394,7 @@ pub struct DLblChoiceSequence {
   pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
   #[sdk(text_child(qname = "xsd:string/c:separator"))]
-  pub separator: Option<crate::simple_type::StringValue>,
+  pub separator: Option<crate::schemas::c::Separator>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblChoice {

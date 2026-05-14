@@ -941,7 +941,7 @@ pub struct ConditionalFormattingRule {
   pub id: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub xne_f: Vec<crate::simple_type::StringValue>,
+  pub xne_f: Vec<crate::schemas::xne::Formula>,
   /// Defines the ColorScale Class.
   #[sdk(child(office2010, qname = "x14:CT_ColorScale/x14:colorScale"))]
   pub x14_color_scale: Option<ColorScale>,
@@ -1023,7 +1023,7 @@ pub struct DataValidation {
 pub struct DataValidationForumla1 {
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: crate::simple_type::StringValue,
+  pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the DataValidationForumla2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1031,7 +1031,7 @@ pub struct DataValidationForumla1 {
 pub struct DataValidationForumla2 {
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: crate::simple_type::StringValue,
+  pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the SparklineGroup Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1114,7 +1114,7 @@ pub struct SparklineGroup {
   pub low_marker_color: Option<LowMarkerColor>,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: Option<crate::simple_type::StringValue>,
+  pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
   pub sparklines: std::boxed::Box<Sparklines>,
@@ -1427,7 +1427,7 @@ pub struct Sparklines {
 pub struct Sparkline {
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: Option<crate::simple_type::StringValue>,
+  pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ReferenceSequence Class.
   #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
@@ -1700,7 +1700,7 @@ pub struct ConditionalFormattingValueObject {
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: Option<crate::simple_type::StringValue>,
+  pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -1787,7 +1787,7 @@ pub struct PivotUserEdit {
 pub struct TupleItems {
   /// Defines the Xstring Class.
   #[sdk(text_child(office2010, qname = "x:ST_Xstring/x14:tupleItem"))]
-  pub x14_tuple_item: Vec<crate::simple_type::StringValue>,
+  pub x14_tuple_item: Vec<Xstring>,
 }
 /// Defines the PivotArea Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2300,7 +2300,7 @@ pub struct SlicerCacheDefinitionExtensionList {
 pub enum PivotUserEditChoice {
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  XneF(crate::simple_type::StringValue),
+  XneF(crate::schemas::xne::Formula),
   /// Defines the PivotEditValue Class.
   #[sdk(child(office2010, qname = "x14:CT_PivotEditValue/x14:editValue"))]
   X14EditValue(std::boxed::Box<PivotEditValue>),

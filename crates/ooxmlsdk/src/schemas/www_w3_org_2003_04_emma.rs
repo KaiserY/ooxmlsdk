@@ -688,7 +688,7 @@ pub enum InterpretationChoice {
   EmmaLattice(std::boxed::Box<Lattice>),
   /// Defines the Literal Class.
   #[sdk(text_child(qname = "emma:CT_Literal/emma:literal"))]
-  EmmaLiteral(crate::simple_type::StringValue),
+  EmmaLiteral(Literal),
   /// Defines the ContextNode Class.
   #[sdk(child(qname = "msink:CT_CtxNode/msink:context"))]
   MsinkContext(std::boxed::Box<crate::schemas::msink::ContextNode>),

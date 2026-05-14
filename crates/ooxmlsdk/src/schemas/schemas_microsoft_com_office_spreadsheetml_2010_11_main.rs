@@ -562,7 +562,7 @@ pub struct WebExtension {
   pub application_reference: crate::simple_type::StringValue,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: crate::simple_type::StringValue,
+  pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the TimelineCacheReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -835,7 +835,7 @@ pub struct PivotValueCell {
   pub text: Option<SxvCellType>,
   /// Defines the Xstring Class.
   #[sdk(text_child(office2013, qname = "x:ST_Xstring/x15:v"))]
-  pub xstring: crate::simple_type::StringValue,
+  pub xstring: Xstring,
   /// Defines the PivotValueCellExtra Class.
   #[sdk(child(office2013, qname = "x15:CT_PivotValueCellExtra/x15:x"))]
   pub pivot_value_cell_extra: Option<PivotValueCellExtra>,

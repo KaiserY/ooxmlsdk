@@ -50,7 +50,7 @@ pub struct RelativeWidth {
   pub object_id: SizeRelativeHorizontallyValues,
   /// Defines the PercentageWidth Class.
   #[sdk(text_child(office2010, qname = "a:ST_PositivePercentage/wp14:pctWidth"))]
-  pub percentage_width: crate::simple_type::Int32Value,
+  pub percentage_width: PercentageWidth,
 }
 /// Defines the RelativeHeight Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -62,7 +62,7 @@ pub struct RelativeHeight {
   pub relative_from: SizeRelativeVerticallyValues,
   /// Defines the PercentageHeight Class.
   #[sdk(text_child(office2010, qname = "a:ST_PositivePercentage/wp14:pctHeight"))]
-  pub percentage_height: crate::simple_type::Int32Value,
+  pub percentage_height: PercentageHeight,
 }
 /// Defines the PercentageWidth Class.
 pub type PercentageWidth = crate::simple_type::Int32Value;

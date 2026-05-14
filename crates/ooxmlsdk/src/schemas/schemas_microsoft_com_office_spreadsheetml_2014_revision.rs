@@ -607,7 +607,7 @@ pub struct RevExDefinedName {
   pub comment: Option<crate::simple_type::StringValue>,
   /// Defines the FormulaFormula Class.
   #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:formula"))]
-  pub formula_formula: Option<crate::simple_type::StringValue>,
+  pub formula_formula: Option<FormulaFormula>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -857,10 +857,10 @@ pub struct RevCell {
   pub rep: Option<crate::simple_type::UInt32Value>,
   /// Defines the FFormula Class.
   #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:f"))]
-  pub f_formula: Option<crate::simple_type::StringValue>,
+  pub f_formula: Option<FFormula>,
   /// Defines the Xstring Class.
   #[sdk(text_child(office2016, qname = "x:ST_Xstring/xr:v"))]
-  pub xstring: Option<crate::simple_type::StringValue>,
+  pub xstring: Option<Xstring>,
   /// Defines the RstType Class.
   #[sdk(child(office2016, qname = "x:CT_Rst/xr:is"))]
   pub rst_type: Option<std::boxed::Box<RstType>>,
@@ -1216,7 +1216,7 @@ pub struct DataValidation {
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
   #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
-  pub list: Option<crate::simple_type::StringValue>,
+  pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
   pub formula1: Option<crate::schemas::x::Formula1>,
@@ -1325,7 +1325,7 @@ pub struct SparklineGroup {
   pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
   /// Defines the Formula Class.
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
-  pub formula: Option<crate::simple_type::StringValue>,
+  pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
   pub sparklines: std::boxed::Box<crate::schemas::x14::Sparklines>,

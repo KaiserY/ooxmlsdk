@@ -4232,7 +4232,7 @@ pub struct Run {
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
   /// Text String
   #[sdk(text_child(qname = "xsd:string/a:t"))]
-  pub text: crate::simple_type::StringValue,
+  pub text: Text,
 }
 /// Text Line Break.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4262,7 +4262,7 @@ pub struct Field {
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   /// Defines the Text Class.
   #[sdk(text_child(qname = "xsd:string/a:t"))]
-  pub text: Option<crate::simple_type::StringValue>,
+  pub text: Option<Text>,
 }
 /// Graphic Object.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11123,7 +11123,7 @@ pub enum TablePropertiesChoice3 {
   ATableStyle(std::boxed::Box<TableStyle>),
   /// Table Style ID.
   #[sdk(text_child(qname = "a:ST_Guid/a:tableStyleId"))]
-  ATableStyleId(crate::simple_type::StringValue),
+  ATableStyleId(TableStyleId),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LeftBorderChoice {

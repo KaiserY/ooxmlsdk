@@ -1228,7 +1228,7 @@ pub struct HlinkClickHyperlinkProps {
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
   #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
-  pub snd_data_img_data: Option<crate::simple_type::Base64BinaryValue>,
+  pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the HlinkHoverHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1257,7 +1257,7 @@ pub struct HlinkHoverHyperlinkProps {
   pub snd_name: Option<crate::simple_type::StringValue>,
   /// Defines the SndDataImgData Class.
   #[sdk(text_child(office2016, qname = "oac:CT_ImgData/oac:sndData"))]
-  pub snd_data_img_data: Option<crate::simple_type::Base64BinaryValue>,
+  pub snd_data_img_data: Option<SndDataImgData>,
 }
 /// Defines the ModifyHyperlinkProps Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

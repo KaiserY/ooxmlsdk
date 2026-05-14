@@ -10,7 +10,7 @@
 pub struct PivotSource {
   /// Pivot Name
   #[sdk(text_child(qname = "c:ST_Xstring/c:name"))]
-  pub pivot_table_name: crate::simple_type::StringValue,
+  pub pivot_table_name: crate::schemas::c::PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:fmtId"))]
   pub format_id: std::boxed::Box<crate::schemas::c::FormatId>,
@@ -90,7 +90,7 @@ pub struct Layout {
 pub struct FullReference {
   /// Defines the SequenceOfReferences Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:sqref"))]
-  pub sequence_of_references: crate::simple_type::StringValue,
+  pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the LevelReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -98,7 +98,7 @@ pub struct FullReference {
 pub struct LevelReference {
   /// Defines the SequenceOfReferences Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:sqref"))]
-  pub sequence_of_references: crate::simple_type::StringValue,
+  pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FormulaReference Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -106,7 +106,7 @@ pub struct LevelReference {
 pub struct FormulaReference {
   /// Defines the SequenceOfReferences Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:sqref"))]
-  pub sequence_of_references: crate::simple_type::StringValue,
+  pub sequence_of_references: SequenceOfReferences,
 }
 /// Defines the FilteredSeriesTitle Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -210,7 +210,7 @@ pub struct FilteredSurfaceSeries {
 pub struct DataLabelsRange {
   /// Defines the Formula Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:f"))]
-  pub formula: crate::simple_type::StringValue,
+  pub formula: Formula,
   /// Defines the DataLabelsRangeChache Class.
   #[sdk(child(office2013, qname = "c:CT_StrData/c15:dlblRangeCache"))]
   pub data_labels_range_chache: Option<std::boxed::Box<DataLabelsRangeChache>>,
@@ -751,7 +751,7 @@ pub struct DataLabel {
 pub struct CategoryFilterException {
   /// Defines the SequenceOfReferences Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:sqref"))]
-  pub sequence_of_references: crate::simple_type::StringValue,
+  pub sequence_of_references: SequenceOfReferences,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2013, qname = "a:CT_ShapeProperties/c15:spPr"))]
   pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
@@ -777,10 +777,10 @@ pub struct CategoryFilterException {
 pub struct DataLabelFieldTableEntry {
   /// Defines the TextFieldGuid Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:txfldGUID"))]
-  pub text_field_guid: crate::simple_type::StringValue,
+  pub text_field_guid: TextFieldGuid,
   /// Defines the Formula Class.
   #[sdk(text_child(office2013, qname = "xsd:string/c15:f"))]
-  pub formula: crate::simple_type::StringValue,
+  pub formula: Formula,
   /// Defines the DataLabelFieldTableCache Class.
   #[sdk(child(office2013, qname = "c:CT_StrData/c15:dlblFieldTableCache"))]
   pub data_label_field_table_cache: Option<std::boxed::Box<DataLabelFieldTableCache>>,
@@ -894,7 +894,7 @@ pub struct DataLabelChoiceSequence {
   pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
   #[sdk(text_child(qname = "xsd:string/c:separator"))]
-  pub separator: Option<crate::simple_type::StringValue>,
+  pub separator: Option<crate::schemas::c::Separator>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DataLabelChoice {

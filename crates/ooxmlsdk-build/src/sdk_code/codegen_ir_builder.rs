@@ -2378,10 +2378,7 @@ fn build_child_type_ref(
 ) -> Result<TypeRefDecl> {
   if child_kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild
     && child_type.api_kind == SchemaTypeApiKind::LeafTextWrapper
-    && child_type.attributes.is_empty()
-    && !child_type.have_xmlns_fields
-    && !child_type.have_xml_other_attrs
-    && child_type.xml_header == SchemaTypeXmlHeader::None
+    && child_type.text_value_type.starts_with("ListValue<")
   {
     return build_xml_content_type_ref(child_type, schema, context)?
       .ok_or_else(|| child_type.name.clone().into());
@@ -4488,8 +4485,62 @@ mod tests {
     assert_eq!(
       fields[1].type_ref,
       TypeRefDecl {
-        rust_type: "StringValue".to_string(),
-        module_path: Some("crate::simple_type".to_string()),
+        rust_type: "TextLeaf".to_string(),
+        module_path: None,
+      }
+    );
+  }
+
+  #[test]
+  fn keeps_list_valued_text_child_expanded_in_codegen_ir() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_List/t:list".to_string(),
+          class_name: "ListLeaf".to_string(),
+          base_class: "OpenXmlLeafTextElement".to_string(),
+          api_kind: SchemaTypeApiKind::LeafTextWrapper,
+          text_value_type: "ListValue<StringValue>".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          class_name: "Holder".to_string(),
+          children: vec![SchemaTypeChild {
+            particle_id: String::new(),
+            name: "t:CT_List/t:list".to_string(),
+            property_name: "ListChild".to_string(),
+            property_comments: "List child".to_string(),
+            kind: SchemaTypeChildKind::TextChild,
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder = ir.types.iter().find(|ty| ty.rust_name == "Holder").unwrap();
+    let field = holder
+      .members
+      .iter()
+      .find_map(|member| match member {
+        MemberDecl::Field(field) => Some(field),
+        _ => None,
+      })
+      .unwrap();
+
+    assert_eq!(
+      field.type_ref,
+      TypeRefDecl {
+        rust_type: "Vec<crate::simple_type::StringValue>".to_string(),
+        module_path: None,
       }
     );
   }

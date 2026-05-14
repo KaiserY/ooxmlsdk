@@ -10,16 +10,16 @@
 pub struct CustomXsn {
   /// Defines the XsnLocation Class.
   #[sdk(text_child(qname = "xsd:string/ntns:xsnLocation"))]
-  pub xsn_location: crate::simple_type::StringValue,
+  pub xsn_location: XsnLocation,
   /// Defines the CachedView Class.
   #[sdk(text_child(qname = "xsd:string/ntns:cached"))]
-  pub cached_view: crate::simple_type::StringValue,
+  pub cached_view: CachedView,
   /// Defines the OpenByDefault Class.
   #[sdk(text_child(qname = "xsd:string/ntns:openByDefault"))]
-  pub open_by_default: crate::simple_type::StringValue,
+  pub open_by_default: OpenByDefault,
   /// Defines the Scope Class.
   #[sdk(text_child(qname = "xsd:string/ntns:xsnScope"))]
-  pub scope: crate::simple_type::StringValue,
+  pub scope: Scope,
 }
 /// Defines the XsnLocation Class.
 pub type XsnLocation = crate::simple_type::StringValue;

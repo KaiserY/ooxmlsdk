@@ -1959,7 +1959,7 @@ pub type Text = crate::simple_type::StringValue;
 pub struct AttributeNameList {
   /// Attribute Name.
   #[sdk(text_child(qname = "xsd:string/p:attrName"))]
-  pub p_attr_name: Vec<crate::simple_type::StringValue>,
+  pub p_attr_name: Vec<AttributeName>,
 }
 /// Boolean Variant.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2463,7 +2463,7 @@ pub struct Comment {
   pub position: std::boxed::Box<Position>,
   /// Defines the Text Class.
   #[sdk(text_child(qname = "xsd:string/p:text"))]
-  pub text: crate::simple_type::StringValue,
+  pub text: Text,
   /// Defines the CommentExtensionList Class.
   #[sdk(child(qname = "p:CT_CommentExtensionList/p:extLst"))]
   pub comment_extension_list: Option<CommentExtensionList>,

@@ -90,7 +90,7 @@ pub struct RichValue {
   pub rich_value_fallback: Option<RichValueFallback>,
   /// Defines the Value Class.
   #[sdk(text_child(office2019, qname = "xlrd:CT_Value/xlrd:v"))]
-  pub xlrd_v: Vec<crate::simple_type::StringValue>,
+  pub xlrd_v: Vec<Value>,
 }
 /// Defines the ExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

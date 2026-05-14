@@ -18,49 +18,49 @@ pub struct CoreProperties {
   pub xml_header: crate::common::XmlHeaderType,
   /// cp:category
   #[sdk(text_child(qname = "cp:CT_Category/cp:category"))]
-  pub category: Option<crate::simple_type::StringValue>,
+  pub category: Option<Category>,
   /// cp:contentStatus
   #[sdk(text_child(qname = "cp:CT_ContentStatus/cp:contentStatus"))]
-  pub content_status: Option<crate::simple_type::StringValue>,
+  pub content_status: Option<ContentStatus>,
   /// dcterms:created
   #[sdk(child(qname = "dcterms:CT_Created/dcterms:created"))]
   pub created: Option<Created>,
   /// dc:creator
   #[sdk(text_child(qname = "dc:CT_Creator/dc:creator"))]
-  pub creator: Option<crate::simple_type::StringValue>,
+  pub creator: Option<Creator>,
   /// dc:description
   #[sdk(text_child(qname = "dc:CT_Description/dc:description"))]
-  pub description: Option<crate::simple_type::StringValue>,
+  pub description: Option<Description>,
   /// dc:identifier
   #[sdk(text_child(qname = "dc:CT_Identifier/dc:identifier"))]
-  pub identifier: Option<crate::simple_type::StringValue>,
+  pub identifier: Option<Identifier>,
   /// cp:keywords
   #[sdk(child(qname = "cp:CT_Keywords/cp:keywords"))]
   pub keywords: Option<Keywords>,
   /// dc:language
   #[sdk(text_child(qname = "dc:CT_Language/dc:language"))]
-  pub language: Option<crate::simple_type::StringValue>,
+  pub language: Option<Language>,
   /// cp:lastModifiedBy
   #[sdk(text_child(qname = "cp:CT_LastModifiedBy/cp:lastModifiedBy"))]
-  pub last_modified_by: Option<crate::simple_type::StringValue>,
+  pub last_modified_by: Option<LastModifiedBy>,
   /// cp:lastPrinted
   #[sdk(text_child(qname = "cp:CT_LastPrinted/cp:lastPrinted"))]
-  pub last_printed: Option<crate::simple_type::StringValue>,
+  pub last_printed: Option<LastPrinted>,
   /// dcterms:modified
   #[sdk(child(qname = "dcterms:CT_Modified/dcterms:modified"))]
   pub modified: Option<Modified>,
   /// cp:revision
   #[sdk(text_child(qname = "cp:CT_Revision/cp:revision"))]
-  pub revision: Option<crate::simple_type::StringValue>,
+  pub revision: Option<Revision>,
   /// dc:subject
   #[sdk(text_child(qname = "dc:CT_Subject/dc:subject"))]
-  pub subject: Option<crate::simple_type::StringValue>,
+  pub subject: Option<Subject>,
   /// dc:title
   #[sdk(text_child(qname = "dc:CT_Title/dc:title"))]
-  pub title: Option<crate::simple_type::StringValue>,
+  pub title: Option<Title>,
   /// cp:version
   #[sdk(text_child(qname = "cp:CT_Version/cp:version"))]
-  pub version: Option<crate::simple_type::StringValue>,
+  pub version: Option<Version>,
 }
 /// cp:category
 pub type Category = crate::simple_type::StringValue;

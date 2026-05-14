@@ -147,6 +147,7 @@ pub(crate) struct TypeContainmentGraph {
   empty_leaf_marker_docs: HashMap<String, String>,
   empty_leaf_marker_docs_by_rust_name: HashMap<String, String>,
   any_children_alias_keys: HashSet<String>,
+  leaf_text_alias_keys: HashSet<String>,
   module_alias_paths: HashMap<String, String>,
   nodes: HashSet<String>,
 }
@@ -164,6 +165,9 @@ impl TypeContainmentGraph {
       for type_decl in &module.types {
         let type_key = local_type_key(module, &type_decl.rust_name);
         graph.nodes.insert(type_key.clone());
+        if type_decl.kind == TypeKind::LeafTextAlias {
+          graph.leaf_text_alias_keys.insert(type_key.clone());
+        }
         if is_empty_leaf_marker_type(type_decl) {
           graph
             .empty_leaf_marker_docs
@@ -188,7 +192,7 @@ impl TypeContainmentGraph {
     for module in modules {
       for type_decl in &module.types {
         let owner_key = local_type_key(module, &type_decl.rust_name);
-        let owner_edges = graph.edges.entry(owner_key).or_default();
+        let mut owner_edges = Vec::new();
 
         for member in &type_decl.members {
           match member {
@@ -198,7 +202,7 @@ impl TypeContainmentGraph {
                   schema_type_key_from_ref(module, &field.type_ref)
                 }
                 FieldWireDecl::TextChild { .. } => {
-                  if is_value_like_type_ref(module, &field.type_ref) {
+                  if is_value_like_type_ref(module, &field.type_ref, &graph) {
                     None
                   } else {
                     schema_type_key_from_ref(module, &field.type_ref)
@@ -221,7 +225,7 @@ impl TypeContainmentGraph {
                   schema_type_key_from_ref(module, &variant.payload)
                 }
                 crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. } => {
-                  if is_value_like_type_ref(module, &variant.payload) {
+                  if is_value_like_type_ref(module, &variant.payload, &graph) {
                     None
                   } else {
                     schema_type_key_from_ref(module, &variant.payload)
@@ -237,6 +241,8 @@ impl TypeContainmentGraph {
             }
           }
         }
+
+        graph.edges.insert(owner_key, owner_edges);
       }
     }
 
@@ -256,6 +262,10 @@ impl TypeContainmentGraph {
 
   fn is_any_children_alias(&self, node: &str) -> bool {
     self.any_children_alias_keys.contains(node)
+  }
+
+  fn is_leaf_text_alias(&self, node: &str) -> bool {
+    self.leaf_text_alias_keys.contains(node)
   }
 
   fn rendered_module_path<'a>(&'a self, module_path: &'a str) -> &'a str {
@@ -2012,12 +2022,12 @@ fn helper_struct_is_inline_sequence_clippy_safe(
     match &field.wire {
       FieldWireDecl::TextChild { .. } => {
         !matches!(field.cardinality, Cardinality::Many)
-          && is_value_like_type_ref(module, &field.type_ref)
+          && is_value_like_type_ref(module, &field.type_ref, type_graph)
       }
       FieldWireDecl::Child { .. } => {
         !matches!(field.cardinality, Cardinality::Many)
           && (inline_sequence_field_forces_box(field)
-            || is_value_like_type_ref(module, &field.type_ref)
+            || is_value_like_type_ref(module, &field.type_ref, type_graph)
             || direct_child_field_needs_box(&type_decl.rust_name, field, module, type_graph, false))
       }
       _ => false,
@@ -2980,13 +2990,13 @@ fn type_from_decl_ref(type_ref: &TypeRefDecl, type_graph: &TypeContainmentGraph)
   }
 }
 
-fn is_value_like_type_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> bool {
+fn is_value_like_type_ref(
+  module: &SchemaModuleDecl,
+  type_ref: &TypeRefDecl,
+  type_graph: &TypeContainmentGraph,
+) -> bool {
   if matches!(type_ref.module_path.as_deref(), Some("crate::simple_type")) {
     return true;
-  }
-
-  if type_ref.module_path.is_some() {
-    return false;
   }
 
   if module
@@ -2997,9 +3007,11 @@ fn is_value_like_type_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> 
     return true;
   }
 
-  module.types.iter().any(|type_decl| {
-    type_decl.rust_name == type_ref.rust_type && type_decl.kind == TypeKind::LeafTextAlias
-  })
+  let Some(type_key) = schema_type_key_from_ref(module, type_ref) else {
+    return false;
+  };
+
+  type_graph.is_leaf_text_alias(&type_key)
 }
 
 fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
@@ -3063,7 +3075,8 @@ fn direct_child_field_needs_box(
 
   match &field.wire {
     FieldWireDecl::Child { .. } => {}
-    FieldWireDecl::TextChild { .. } if !is_value_like_type_ref(module, &field.type_ref) => {}
+    FieldWireDecl::TextChild { .. }
+      if !is_value_like_type_ref(module, &field.type_ref, type_graph) => {}
     FieldWireDecl::TextChild { .. } => return false,
     _ => return false,
   }
@@ -6067,9 +6080,61 @@ mod tests {
       .to_string();
 
     assert!(generated.contains("pub leaf_child : std :: boxed :: Box < Leaf >"));
-    assert!(generated.contains("pub text_child : Option < crate :: simple_type :: StringValue >"));
+    assert!(generated.contains("pub text_child : Option < TextLeaf >"));
     assert!(generated.contains("pub unknown_xml : Vec < std :: boxed :: Box < str > >"));
     assert!(!generated.contains("pub enum SequenceHolderChoice"));
+  }
+
+  #[test]
+  fn keeps_list_text_child_as_vec_in_generated_schema() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_List/t:list".to_string(),
+          class_name: "ListLeaf".to_string(),
+          base_class: "OpenXmlLeafTextElement".to_string(),
+          api_kind: SchemaTypeApiKind::LeafTextWrapper,
+          text_value_type: "ListValue<StringValue>".to_string(),
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "Holder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![SchemaTypeChild {
+            name: "wrapper".to_string(),
+            kind: SchemaTypeChildKind::Sequence,
+            children: vec![SchemaTypeChild {
+              kind: SchemaTypeChildKind::Choice,
+              children: vec![SchemaTypeChild {
+                name: "t:CT_List/t:list".to_string(),
+                property_name: "ListChild".to_string(),
+                property_comments: "List child".to_string(),
+                kind: SchemaTypeChildKind::TextChild,
+                ..Default::default()
+              }],
+              ..Default::default()
+            }],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let generated = gen_schema(&schema, None, &context, false)
+      .unwrap()
+      .to_string();
+
+    assert!(generated.contains("# [sdk (text_child (list , qname = \"t:CT_List/t:list\"))]"));
+    assert!(generated.contains("pub list_child : Vec < crate :: simple_type :: StringValue >"));
   }
 
   #[test]
@@ -6136,6 +6201,67 @@ mod tests {
     assert!(generated.contains("pub node : Option <"));
     assert!(generated.contains("std :: boxed :: Box < Node >"));
     assert!(!generated.contains("pub node : Option < Node >"));
+  }
+
+  #[test]
+  fn keeps_cross_module_text_child_leaf_alias_unboxed() {
+    let provider = SchemaModuleDecl {
+      module_name: "provider".to_string(),
+      target_namespace: "urn:provider".to_string(),
+      prefix: "p".to_string(),
+      typed_namespace: "Test.Provider".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "SharedText".to_string(),
+        docs: "Shared text".to_string(),
+        kind: TypeKind::LeafTextAlias,
+        xml_content: Some(TypeRefDecl {
+          rust_type: "StringValue".to_string(),
+          module_path: Some("crate::simple_type".to_string()),
+        }),
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+    let consumer = SchemaModuleDecl {
+      module_name: "consumer".to_string(),
+      target_namespace: "urn:consumer".to_string(),
+      prefix: "c".to_string(),
+      typed_namespace: "Test.Consumer".to_string(),
+      types: vec![TypeDecl {
+        rust_name: "Holder".to_string(),
+        xml_qname: Some("c:CT_Holder/c:holder".to_string()),
+        kind: TypeKind::ElementStruct,
+        element_kind: Some(ElementKind::Composite),
+        content_model: Some(ContentModelDecl::DirectChildrenOnly),
+        members: vec![MemberDecl::Field(FieldDecl {
+          rust_name: "shared_text".to_string(),
+          docs: "Shared text".to_string(),
+          wire: FieldWireDecl::TextChild {
+            qname: "p:CT_SharedText/p:sharedText".to_string(),
+          },
+          cardinality: Cardinality::One,
+          type_ref: TypeRefDecl {
+            rust_type: "SharedText".to_string(),
+            module_path: Some("crate::schemas::provider".to_string()),
+          },
+          validators: vec![],
+          ..Default::default()
+        })],
+        ..Default::default()
+      }],
+      ..Default::default()
+    };
+
+    let type_graph = TypeContainmentGraph::from_modules(&[&provider, &consumer]);
+    let generated = gen_schema_from_ir_with_type_graph(&consumer, false, &type_graph)
+      .unwrap()
+      .to_string();
+
+    assert!(generated.contains("pub shared_text : crate :: schemas :: p :: SharedText"));
+    assert!(
+      !generated
+        .contains("pub shared_text : std :: boxed :: Box < crate :: schemas :: p :: SharedText >")
+    );
   }
 
   #[test]

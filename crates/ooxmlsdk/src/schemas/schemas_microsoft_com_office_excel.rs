@@ -289,203 +289,203 @@ pub type ScriptLocation = crate::simple_type::IntegerValue;
 pub enum ClientDataChoice {
   /// Move with Cells.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MoveWithCells"))]
-  XvmlMoveWithCells(BooleanEntryWithBlankValues),
+  XvmlMoveWithCells(MoveWithCells),
   /// Resize with Cells.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:SizeWithCells"))]
-  XvmlSizeWithCells(BooleanEntryWithBlankValues),
+  XvmlSizeWithCells(ResizeWithCells),
   /// Anchor.
   #[sdk(text_child(qname = "xsd:string/xvml:Anchor"))]
-  XvmlAnchor(crate::simple_type::StringValue),
+  XvmlAnchor(Anchor),
   /// Lock Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Locked"))]
-  XvmlLocked(BooleanEntryWithBlankValues),
+  XvmlLocked(Locked),
   /// Default Size Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:DefaultSize"))]
-  XvmlDefaultSize(BooleanEntryWithBlankValues),
+  XvmlDefaultSize(DefaultSize),
   /// Print Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:PrintObject"))]
-  XvmlPrintObject(BooleanEntryWithBlankValues),
+  XvmlPrintObject(PrintObject),
   /// Macro Disable Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Disabled"))]
-  XvmlDisabled(BooleanEntryWithBlankValues),
+  XvmlDisabled(Disabled),
   /// AutoFill.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:AutoFill"))]
-  XvmlAutoFill(BooleanEntryWithBlankValues),
+  XvmlAutoFill(AutoFill),
   /// AutoLine.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:AutoLine"))]
-  XvmlAutoLine(BooleanEntryWithBlankValues),
+  XvmlAutoLine(AutoLine),
   /// Automatically Size.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:AutoPict"))]
-  XvmlAutoPict(BooleanEntryWithBlankValues),
+  XvmlAutoPict(AutoSizePicture),
   /// Reference to Custom Function.
   #[sdk(text_child(qname = "xvml:ST_Macro/xvml:FmlaMacro"))]
-  XvmlFmlaMacro(crate::simple_type::StringValue),
+  XvmlFmlaMacro(FormulaMacro),
   /// Horizontal Text Alignment.
   #[sdk(text_child(qname = "xsd:string/xvml:TextHAlign"))]
-  XvmlTextHAlign(crate::simple_type::StringValue),
+  XvmlTextHAlign(HorizontalTextAlignment),
   /// Vertical Text Alignment.
   #[sdk(text_child(qname = "xsd:string/xvml:TextVAlign"))]
-  XvmlTextVAlign(crate::simple_type::StringValue),
+  XvmlTextVAlign(VerticalTextAlignment),
   /// Text Lock.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:LockText"))]
-  XvmlLockText(BooleanEntryWithBlankValues),
+  XvmlLockText(LockText),
   /// East Asia Alignment Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:JustLastX"))]
-  XvmlJustLastX(BooleanEntryWithBlankValues),
+  XvmlJustLastX(JustifyLastLine),
   /// Password Edit.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:SecretEdit"))]
-  XvmlSecretEdit(BooleanEntryWithBlankValues),
+  XvmlSecretEdit(SecretEdit),
   /// Default Button.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Default"))]
-  XvmlDefault(BooleanEntryWithBlankValues),
+  XvmlDefault(DefaultButton),
   /// Help Button.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Help"))]
-  XvmlHelp(BooleanEntryWithBlankValues),
+  XvmlHelp(HelpButton),
   /// Cancel Button.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Cancel"))]
-  XvmlCancel(BooleanEntryWithBlankValues),
+  XvmlCancel(CancelButton),
   /// Dismiss Button.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Dismiss"))]
-  XvmlDismiss(BooleanEntryWithBlankValues),
+  XvmlDismiss(DismissButton),
   /// Primary Keyboard Accelerator.
   #[sdk(text_child(qname = "xsd:unsignedByte/xvml:Accel"))]
-  XvmlAccel(crate::simple_type::ByteValue),
+  XvmlAccel(AcceleratorPrimary),
   /// Secondary Keyboard Accelerator.
   #[sdk(text_child(qname = "xsd:unsignedByte/xvml:Accel2"))]
-  XvmlAccel2(crate::simple_type::ByteValue),
+  XvmlAccel2(AcceleratorSecondary),
   /// Comment Row Target.
   #[sdk(text_child(qname = "xsd:integer/xvml:Row"))]
-  XvmlRow(crate::simple_type::IntegerValue),
+  XvmlRow(CommentRowTarget),
   /// Comment Column Target.
   #[sdk(text_child(qname = "xsd:integer/xvml:Column"))]
-  XvmlColumn(crate::simple_type::IntegerValue),
+  XvmlColumn(CommentColumnTarget),
   /// Comment Visibility Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Visible"))]
-  XvmlVisible(BooleanEntryWithBlankValues),
+  XvmlVisible(Visible),
   /// Comment's Row is Hidden.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:RowHidden"))]
-  XvmlRowHidden(BooleanEntryWithBlankValues),
+  XvmlRowHidden(RowHidden),
   /// Comment's Column is Hidden.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:ColHidden"))]
-  XvmlColHidden(BooleanEntryWithBlankValues),
+  XvmlColHidden(ColumnHidden),
   /// Validation Type.
   #[sdk(text_child(qname = "xsd:integer/xvml:VTEdit"))]
-  XvmlVtEdit(crate::simple_type::IntegerValue),
+  XvmlVtEdit(InputValidationType),
   /// Multi-line.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MultiLine"))]
-  XvmlMultiLine(BooleanEntryWithBlankValues),
+  XvmlMultiLine(MultiLine),
   /// Vertical Scroll.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:VScroll"))]
-  XvmlVScroll(BooleanEntryWithBlankValues),
+  XvmlVScroll(VerticalScrollBar),
   /// Valid ID.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:ValidIds"))]
-  XvmlValidIds(BooleanEntryWithBlankValues),
+  XvmlValidIds(ValidIds),
   /// List Items Source Range.
   #[sdk(text_child(qname = "xsd:string/xvml:FmlaRange"))]
-  XvmlFmlaRange(crate::simple_type::StringValue),
+  XvmlFmlaRange(FormulaRange),
   /// Minimum Width.
   #[sdk(text_child(qname = "xsd:integer/xvml:WidthMin"))]
-  XvmlWidthMin(crate::simple_type::IntegerValue),
+  XvmlWidthMin(MinDropDownWidth),
   /// Selected Entry.
   #[sdk(text_child(qname = "xsd:integer/xvml:Sel"))]
-  XvmlSel(crate::simple_type::IntegerValue),
+  XvmlSel(SelectionEntry),
   /// Disable 3D.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:NoThreeD2"))]
-  XvmlNoThreeD2(BooleanEntryWithBlankValues),
+  XvmlNoThreeD2(Disable3DForListBoxAndDropDown),
   /// Selection Type.
   #[sdk(text_child(qname = "xsd:string/xvml:SelType"))]
-  XvmlSelType(crate::simple_type::StringValue),
+  XvmlSelType(SelectionType),
   /// Multiple Selections.
   #[sdk(text_child(qname = "xsd:string/xvml:MultiSel"))]
-  XvmlMultiSel(crate::simple_type::StringValue),
+  XvmlMultiSel(MultiSelections),
   /// Callback Type.
   #[sdk(text_child(qname = "xsd:string/xvml:LCT"))]
-  XvmlLct(crate::simple_type::StringValue),
+  XvmlLct(ListBoxCallbackType),
   /// Non-linked List Item.
   #[sdk(text_child(qname = "xsd:string/xvml:ListItem"))]
-  XvmlListItem(crate::simple_type::StringValue),
+  XvmlListItem(ListItem),
   /// Dropdown Style.
   #[sdk(text_child(qname = "xsd:string/xvml:DropStyle"))]
-  XvmlDropStyle(crate::simple_type::StringValue),
+  XvmlDropStyle(DropStyle),
   /// Dropdown Color Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Colored"))]
-  XvmlColored(BooleanEntryWithBlankValues),
+  XvmlColored(Colored),
   /// Dropdown Maximum Lines.
   #[sdk(text_child(qname = "xsd:integer/xvml:DropLines"))]
-  XvmlDropLines(crate::simple_type::IntegerValue),
+  XvmlDropLines(DropLines),
   /// Checked.
   #[sdk(text_child(qname = "xsd:integer/xvml:Checked"))]
-  XvmlChecked(crate::simple_type::IntegerValue),
+  XvmlChecked(Checked),
   /// Linked Formula.
   #[sdk(text_child(qname = "xsd:string/xvml:FmlaLink"))]
-  XvmlFmlaLink(crate::simple_type::StringValue),
+  XvmlFmlaLink(FormulaLink),
   /// Camera Source Range.
   #[sdk(text_child(qname = "xsd:string/xvml:FmlaPict"))]
-  XvmlFmlaPict(crate::simple_type::StringValue),
+  XvmlFmlaPict(FormulaPicture),
   /// Disable 3D.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:NoThreeD"))]
-  XvmlNoThreeD(BooleanEntryWithBlankValues),
+  XvmlNoThreeD(Disable3D),
   /// First Radio Button.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:FirstButton"))]
-  XvmlFirstButton(BooleanEntryWithBlankValues),
+  XvmlFirstButton(FirstButton),
   /// Linked Formula - Group Box.
   #[sdk(text_child(qname = "xsd:string/xvml:FmlaGroup"))]
-  XvmlFmlaGroup(crate::simple_type::StringValue),
+  XvmlFmlaGroup(FormulaGroup),
   /// Scroll bar position.
   #[sdk(text_child(qname = "xsd:integer/xvml:Val"))]
-  XvmlVal(crate::simple_type::IntegerValue),
+  XvmlVal(ScrollBarPosition),
   /// Scroll Bar Minimum.
   #[sdk(text_child(qname = "xsd:integer/xvml:Min"))]
-  XvmlMin(crate::simple_type::IntegerValue),
+  XvmlMin(ScrollBarMin),
   /// Scroll Bar Maximum.
   #[sdk(text_child(qname = "xsd:integer/xvml:Max"))]
-  XvmlMax(crate::simple_type::IntegerValue),
+  XvmlMax(ScrollBarMax),
   /// Scroll Bar Increment.
   #[sdk(text_child(qname = "xsd:integer/xvml:Inc"))]
-  XvmlInc(crate::simple_type::IntegerValue),
+  XvmlInc(ScrollBarIncrement),
   /// Scroll Bar Page Increment.
   #[sdk(text_child(qname = "xsd:integer/xvml:Page"))]
-  XvmlPage(crate::simple_type::IntegerValue),
+  XvmlPage(ScrollBarPageIncrement),
   /// Scroll Bar Orientation.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Horiz"))]
-  XvmlHoriz(BooleanEntryWithBlankValues),
+  XvmlHoriz(HorizontalScrollBar),
   /// Scroll Bar Width.
   #[sdk(text_child(qname = "xsd:integer/xvml:Dx"))]
-  XvmlDx(crate::simple_type::IntegerValue),
+  XvmlDx(ScrollBarWidth),
   /// ActiveX Control.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MapOCX"))]
-  XvmlMapOcx(BooleanEntryWithBlankValues),
+  XvmlMapOcx(MapOcxControl),
   /// Clipboard Format.
   #[sdk(text_child(qname = "xvml:ST_CF/xvml:CF"))]
-  XvmlCf(ClipboardFormatValues),
+  XvmlCf(ClipboardFormat),
   /// Camera Tool.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Camera"))]
-  XvmlCamera(BooleanEntryWithBlankValues),
+  XvmlCamera(CameraObject),
   /// Recalculation Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:RecalcAlways"))]
-  XvmlRecalcAlways(BooleanEntryWithBlankValues),
+  XvmlRecalcAlways(RecalculateAlways),
   /// Font AutoScale.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:AutoScale"))]
-  XvmlAutoScale(BooleanEntryWithBlankValues),
+  XvmlAutoScale(AutoScaleFont),
   /// Dynamic Data Exchange.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:DDE"))]
-  XvmlDde(BooleanEntryWithBlankValues),
+  XvmlDde(DdeObject),
   /// UI Object Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:UIObj"))]
-  XvmlUiObj(BooleanEntryWithBlankValues),
+  XvmlUiObj(UiObject),
   /// HTML Script Text.
   #[sdk(text_child(qname = "xsd:string/xvml:ScriptText"))]
-  XvmlScriptText(crate::simple_type::StringValue),
+  XvmlScriptText(ScriptText),
   /// HTML Script Attributes.
   #[sdk(text_child(qname = "xsd:string/xvml:ScriptExtended"))]
-  XvmlScriptExtended(crate::simple_type::StringValue),
+  XvmlScriptExtended(ScriptExtended),
   /// HTML Script Language.
   #[sdk(text_child(qname = "xsd:nonNegativeInteger/xvml:ScriptLanguage"))]
-  XvmlScriptLanguage(crate::simple_type::IntegerValue),
+  XvmlScriptLanguage(ScriptLanguage),
   /// HTML Script Location.
   #[sdk(text_child(qname = "xsd:nonNegativeInteger/xvml:ScriptLocation"))]
-  XvmlScriptLocation(crate::simple_type::IntegerValue),
+  XvmlScriptLocation(ScriptLocation),
   /// Text Formula.
   #[sdk(text_child(qname = "xsd:string/xvml:FmlaTxbx"))]
-  XvmlFmlaTxbx(crate::simple_type::StringValue),
+  XvmlFmlaTxbx(FormulaTextBox),
 }

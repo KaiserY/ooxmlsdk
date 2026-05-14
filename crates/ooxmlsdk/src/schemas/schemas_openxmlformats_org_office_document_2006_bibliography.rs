@@ -71,13 +71,13 @@ pub struct Sources {
 pub struct Person {
   /// Person's Last, or Family, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:Last"))]
-  pub b_last: Vec<crate::simple_type::StringValue>,
+  pub b_last: Vec<Last>,
   /// Person's First, or Given, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:First"))]
-  pub b_first: Vec<crate::simple_type::StringValue>,
+  pub b_first: Vec<First>,
   /// Person's Middle, or Other, Name.
   #[sdk(text_child(qname = "b:ST_String255/b:Middle"))]
-  pub b_middle: Vec<crate::simple_type::StringValue>,
+  pub b_middle: Vec<Middle>,
 }
 /// Person's Last, or Family, Name.
 pub type Last = crate::simple_type::StringValue;
@@ -420,7 +420,7 @@ pub enum AuthorChoice {
   BNameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
-  BCorporate(crate::simple_type::StringValue),
+  BCorporate(Corporate),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum PerformerChoice {
@@ -429,7 +429,7 @@ pub enum PerformerChoice {
   BNameList(std::boxed::Box<NameList>),
   /// Corporate Author.
   #[sdk(text_child(qname = "b:ST_String255/b:Corporate"))]
-  BCorporate(crate::simple_type::StringValue),
+  BCorporate(Corporate),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AuthorListChoice {
@@ -486,158 +486,158 @@ pub enum AuthorListChoice {
 pub enum SourceChoice {
   /// Abbreviated Case Number.
   #[sdk(text_child(qname = "b:ST_String255/b:AbbreviatedCaseNumber"))]
-  BAbbreviatedCaseNumber(crate::simple_type::StringValue),
+  BAbbreviatedCaseNumber(AbbreviatedCaseNumber),
   /// Album Title.
   #[sdk(text_child(qname = "b:ST_String255/b:AlbumTitle"))]
-  BAlbumTitle(crate::simple_type::StringValue),
+  BAlbumTitle(AlbumTitle),
   /// Contributors List.
   #[sdk(child(qname = "b:CT_AuthorType/b:Author"))]
   BAuthor(std::boxed::Box<AuthorList>),
   /// Book Title.
   #[sdk(text_child(qname = "b:ST_String255/b:BookTitle"))]
-  BBookTitle(crate::simple_type::StringValue),
+  BBookTitle(BookTitle),
   /// Broadcaster.
   #[sdk(text_child(qname = "b:ST_String255/b:Broadcaster"))]
-  BBroadcaster(crate::simple_type::StringValue),
+  BBroadcaster(Broadcaster),
   /// Broadcast Title.
   #[sdk(text_child(qname = "b:ST_String255/b:BroadcastTitle"))]
-  BBroadcastTitle(crate::simple_type::StringValue),
+  BBroadcastTitle(BroadcastTitle),
   /// Case Number.
   #[sdk(text_child(qname = "b:ST_String255/b:CaseNumber"))]
-  BCaseNumber(crate::simple_type::StringValue),
+  BCaseNumber(CaseNumber),
   /// Chapter Number.
   #[sdk(text_child(qname = "b:ST_String255/b:ChapterNumber"))]
-  BChapterNumber(crate::simple_type::StringValue),
+  BChapterNumber(ChapterNumber),
   /// City.
   #[sdk(text_child(qname = "b:ST_String255/b:City"))]
-  BCity(crate::simple_type::StringValue),
+  BCity(City),
   /// Comments.
   #[sdk(text_child(qname = "b:ST_String255/b:Comments"))]
-  BComments(crate::simple_type::StringValue),
+  BComments(Comments),
   /// Conference or Proceedings Name.
   #[sdk(text_child(qname = "b:ST_String255/b:ConferenceName"))]
-  BConferenceName(crate::simple_type::StringValue),
+  BConferenceName(ConferenceName),
   /// Country or Region.
   #[sdk(text_child(qname = "b:ST_String255/b:CountryRegion"))]
-  BCountryRegion(crate::simple_type::StringValue),
+  BCountryRegion(CountryRegion),
   /// Court.
   #[sdk(text_child(qname = "b:ST_String255/b:Court"))]
-  BCourt(crate::simple_type::StringValue),
+  BCourt(Court),
   /// Day.
   #[sdk(text_child(qname = "b:ST_String255/b:Day"))]
-  BDay(crate::simple_type::StringValue),
+  BDay(Day),
   /// Day Accessed.
   #[sdk(text_child(qname = "b:ST_String255/b:DayAccessed"))]
-  BDayAccessed(crate::simple_type::StringValue),
+  BDayAccessed(DayAccessed),
   /// Department.
   #[sdk(text_child(qname = "b:ST_String255/b:Department"))]
-  BDepartment(crate::simple_type::StringValue),
+  BDepartment(Department),
   /// Distributor.
   #[sdk(text_child(qname = "b:ST_String255/b:Distributor"))]
-  BDistributor(crate::simple_type::StringValue),
+  BDistributor(Distributor),
   /// Editor.
   #[sdk(text_child(qname = "b:ST_String255/b:Edition"))]
-  BEdition(crate::simple_type::StringValue),
+  BEdition(Edition),
   /// GUID.
   #[sdk(text_child(qname = "b:ST_String255/b:Guid"))]
-  BGuid(crate::simple_type::StringValue),
+  BGuid(GuidString),
   /// Institution.
   #[sdk(text_child(qname = "b:ST_String255/b:Institution"))]
-  BInstitution(crate::simple_type::StringValue),
+  BInstitution(Institution),
   /// Internet Site Title.
   #[sdk(text_child(qname = "b:ST_String255/b:InternetSiteTitle"))]
-  BInternetSiteTitle(crate::simple_type::StringValue),
+  BInternetSiteTitle(InternetSiteTitle),
   /// Issue.
   #[sdk(text_child(qname = "b:ST_String255/b:Issue"))]
-  BIssue(crate::simple_type::StringValue),
+  BIssue(Issue),
   /// Journal Name.
   #[sdk(text_child(qname = "b:ST_String255/b:JournalName"))]
-  BJournalName(crate::simple_type::StringValue),
+  BJournalName(JournalName),
   /// Locale ID.
   #[sdk(text_child(qname = "b:ST_String255/b:LCID"))]
-  BLcid(crate::simple_type::StringValue),
+  BLcid(LcId),
   /// Medium.
   #[sdk(text_child(qname = "b:ST_String255/b:Medium"))]
-  BMedium(crate::simple_type::StringValue),
+  BMedium(Medium),
   /// Month.
   #[sdk(text_child(qname = "b:ST_String255/b:Month"))]
-  BMonth(crate::simple_type::StringValue),
+  BMonth(Month),
   /// Month Accessed.
   #[sdk(text_child(qname = "b:ST_String255/b:MonthAccessed"))]
-  BMonthAccessed(crate::simple_type::StringValue),
+  BMonthAccessed(MonthAccessed),
   /// Number of Volumes.
   #[sdk(text_child(qname = "b:ST_String255/b:NumberVolumes"))]
-  BNumberVolumes(crate::simple_type::StringValue),
+  BNumberVolumes(NumberVolumes),
   /// Pages.
   #[sdk(text_child(qname = "b:ST_String255/b:Pages"))]
-  BPages(crate::simple_type::StringValue),
+  BPages(Pages),
   /// Patent Number.
   #[sdk(text_child(qname = "b:ST_String255/b:PatentNumber"))]
-  BPatentNumber(crate::simple_type::StringValue),
+  BPatentNumber(PatentNumber),
   /// Periodical Title.
   #[sdk(text_child(qname = "b:ST_String255/b:PeriodicalTitle"))]
-  BPeriodicalTitle(crate::simple_type::StringValue),
+  BPeriodicalTitle(PeriodicalTitle),
   /// Production Company.
   #[sdk(text_child(qname = "b:ST_String255/b:ProductionCompany"))]
-  BProductionCompany(crate::simple_type::StringValue),
+  BProductionCompany(ProductionCompany),
   /// Publication Title.
   #[sdk(text_child(qname = "b:ST_String255/b:PublicationTitle"))]
-  BPublicationTitle(crate::simple_type::StringValue),
+  BPublicationTitle(PublicationTitle),
   /// Publisher.
   #[sdk(text_child(qname = "b:ST_String255/b:Publisher"))]
-  BPublisher(crate::simple_type::StringValue),
+  BPublisher(Publisher),
   /// Recording Number.
   #[sdk(text_child(qname = "b:ST_String255/b:RecordingNumber"))]
-  BRecordingNumber(crate::simple_type::StringValue),
+  BRecordingNumber(RecordingNumber),
   /// Reference Order.
   #[sdk(text_child(qname = "b:ST_String255/b:RefOrder"))]
-  BRefOrder(crate::simple_type::StringValue),
+  BRefOrder(ReferenceOrder),
   /// Reporter.
   #[sdk(text_child(qname = "b:ST_String255/b:Reporter"))]
-  BReporter(crate::simple_type::StringValue),
+  BReporter(Reporter),
   /// Source Type.
   #[sdk(text_child(qname = "b:ST_SourceType/b:SourceType"))]
-  BSourceType(DataSourceValues),
+  BSourceType(SourceType),
   /// Short Title.
   #[sdk(text_child(qname = "b:ST_String255/b:ShortTitle"))]
-  BShortTitle(crate::simple_type::StringValue),
+  BShortTitle(ShortTitle),
   /// Standard Number.
   #[sdk(text_child(qname = "b:ST_String255/b:StandardNumber"))]
-  BStandardNumber(crate::simple_type::StringValue),
+  BStandardNumber(StandardNumber),
   /// State or Province.
   #[sdk(text_child(qname = "b:ST_String255/b:StateProvince"))]
-  BStateProvince(crate::simple_type::StringValue),
+  BStateProvince(StateProvince),
   /// Station.
   #[sdk(text_child(qname = "b:ST_String255/b:Station"))]
-  BStation(crate::simple_type::StringValue),
+  BStation(Station),
   /// Tag.
   #[sdk(text_child(qname = "b:ST_String255/b:Tag"))]
-  BTag(crate::simple_type::StringValue),
+  BTag(Tag),
   /// Theater.
   #[sdk(text_child(qname = "b:ST_String255/b:Theater"))]
-  BTheater(crate::simple_type::StringValue),
+  BTheater(Theater),
   /// Thesis Type.
   #[sdk(text_child(qname = "b:ST_String255/b:ThesisType"))]
-  BThesisType(crate::simple_type::StringValue),
+  BThesisType(ThesisType),
   /// Title.
   #[sdk(text_child(qname = "b:ST_String255/b:Title"))]
-  BTitle(crate::simple_type::StringValue),
+  BTitle(Title),
   /// Type.
   #[sdk(text_child(qname = "b:ST_String255/b:Type"))]
-  BType(crate::simple_type::StringValue),
+  BType(PatentType),
   /// URL.
   #[sdk(text_child(qname = "b:ST_String255/b:URL"))]
-  BUrl(crate::simple_type::StringValue),
+  BUrl(UrlString),
   /// Version.
   #[sdk(text_child(qname = "b:ST_String255/b:Version"))]
-  BVersion(crate::simple_type::StringValue),
+  BVersion(Version),
   /// Volume.
   #[sdk(text_child(qname = "b:ST_String255/b:Volume"))]
-  BVolume(crate::simple_type::StringValue),
+  BVolume(Volume),
   /// Year.
   #[sdk(text_child(qname = "b:ST_String255/b:Year"))]
-  BYear(crate::simple_type::StringValue),
+  BYear(Year),
   /// Year Accessed.
   #[sdk(text_child(qname = "b:ST_String255/b:YearAccessed"))]
-  BYearAccessed(crate::simple_type::StringValue),
+  BYearAccessed(YearAccessed),
 }

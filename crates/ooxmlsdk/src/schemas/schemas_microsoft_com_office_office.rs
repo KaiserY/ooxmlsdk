@@ -652,13 +652,13 @@ pub struct OleObject {
   pub update_mode: Option<OleUpdateModeValues>,
   /// Embedded Object Alternate Image Request
   #[sdk(text_child(qname = "o:ST_OLELinkType/o:LinkType"))]
-  pub link_type: Option<OleLinkValues>,
+  pub link_type: Option<LinkType>,
   /// Embedded Object Cannot Be Refreshed
   #[sdk(text_child(qname = "o:ST_TrueFalseBlank/o:LockedField"))]
-  pub locked_field: Option<crate::simple_type::TrueFalseBlankValue>,
+  pub locked_field: Option<LockedField>,
   /// WordprocessingML Field Switches
   #[sdk(text_child(qname = "xsd:string/o:FieldCodes"))]
-  pub field_codes: Option<crate::simple_type::StringValue>,
+  pub field_codes: Option<FieldCodes>,
 }
 /// Complex.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

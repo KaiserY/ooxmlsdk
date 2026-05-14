@@ -10,22 +10,22 @@
 pub struct CoverPageProperties {
   /// Defines the PublishDate Class.
   #[sdk(text_child(qname = "cppr:ST_PublishDate/cppr:PublishDate"))]
-  pub publish_date: crate::simple_type::StringValue,
+  pub publish_date: PublishDate,
   /// Defines the DocumentAbstract Class.
   #[sdk(text_child(qname = "xsd:string/cppr:Abstract"))]
-  pub document_abstract: crate::simple_type::StringValue,
+  pub document_abstract: DocumentAbstract,
   /// Defines the CompanyAddress Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyAddress"))]
-  pub company_address: crate::simple_type::StringValue,
+  pub company_address: CompanyAddress,
   /// Defines the CompanyPhoneNumber Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyPhone"))]
-  pub company_phone_number: crate::simple_type::StringValue,
+  pub company_phone_number: CompanyPhoneNumber,
   /// Defines the CompanyFaxNumber Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyFax"))]
-  pub company_fax_number: crate::simple_type::StringValue,
+  pub company_fax_number: CompanyFaxNumber,
   /// Defines the CompanyEmailAddress Class.
   #[sdk(text_child(qname = "xsd:string/cppr:CompanyEmail"))]
-  pub company_email_address: crate::simple_type::StringValue,
+  pub company_email_address: CompanyEmailAddress,
 }
 /// Defines the PublishDate Class.
 pub type PublishDate = crate::simple_type::StringValue;

@@ -16,16 +16,19 @@ pub(super) fn push_drawing_textboxes(
   style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
-  super::push_drawing_textboxes_impl(drawing, inlines, style, styles, images);
+  super::push_drawing_textboxes_impl(drawing, inlines, style, styles, images, hyperlinks);
 }
 
 pub(super) fn push_drawing_shapes(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
   styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
-  super::push_drawing_shapes_impl(drawing, inlines, styles);
+  super::push_drawing_shapes_impl(drawing, inlines, styles, images, hyperlinks);
 }
 
 pub(super) fn pict_image(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {
@@ -38,8 +41,9 @@ pub(super) fn push_pict_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
-  super::push_pict_textboxes_impl(picture, inlines, base_style, styles, images);
+  super::push_pict_textboxes_impl(picture, inlines, base_style, styles, images, hyperlinks);
 }
 
 pub(super) fn push_pict_shapes(picture: &w::Picture, inlines: &mut Vec<InlineItem>) {

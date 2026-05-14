@@ -453,6 +453,48 @@ fn path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds
     .collect()
 }
 
+fn path_geometry_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
+  summary
+    .paths
+    .iter()
+    .filter(|path| path.page_index == page_index)
+    .filter_map(path_geometry_bounds)
+    .collect()
+}
+
+fn path_geometry_bounds(
+  path: &ooxmlsdk_pdf_test::pdf_extract::PathObjectSummary,
+) -> Option<PdfBounds> {
+  let mut left = f32::INFINITY;
+  let mut right = f32::NEG_INFINITY;
+  let mut bottom = f32::INFINITY;
+  let mut top = f32::NEG_INFINITY;
+  for segment in &path.segment_details {
+    let x = segment.x.parse::<f32>().ok()?;
+    let y = segment.y.parse::<f32>().ok()?;
+    left = left.min(x);
+    right = right.max(x);
+    bottom = bottom.min(y);
+    top = top.max(y);
+  }
+  (left.is_finite() && right.is_finite() && bottom.is_finite() && top.is_finite()).then_some(
+    PdfBounds {
+      left,
+      bottom,
+      right,
+      top,
+    },
+  )
+}
+
+fn path_geometry_bounds_all_pages(summary: &PdfSummary) -> Vec<PdfBounds> {
+  summary
+    .paths
+    .iter()
+    .filter_map(|path| path_geometry_bounds(path))
+    .collect()
+}
+
 fn horizontal_path_bounds_on_page(summary: &PdfSummary, page_index: usize) -> Vec<PdfBounds> {
   path_bounds_on_page(summary, page_index)
     .into_iter()
@@ -729,6 +771,32 @@ fn assert_path_width_close(summary: &PdfSummary, page_index: usize, expected_wid
   );
 }
 
+fn assert_path_geometry_width_close(summary: &PdfSummary, page_index: usize, expected_width: f32) {
+  let bounds = path_geometry_bounds_on_page(summary, page_index);
+  assert!(
+    bounds
+      .iter()
+      .any(|bounds| (bounds.width() - expected_width).abs() <= 0.5),
+    "missing page {page_index} path geometry width {expected_width}pt; bounds={bounds:?}"
+  );
+}
+
+fn assert_path_geometry_width_count_close(
+  summary: &PdfSummary,
+  expected_width: f32,
+  expected_count: usize,
+) {
+  let bounds = path_geometry_bounds_all_pages(summary);
+  let count = bounds
+    .iter()
+    .filter(|bounds| (bounds.width() - expected_width).abs() <= 0.5)
+    .count();
+  assert!(
+    count >= expected_count,
+    "expected at least {expected_count} path geometries with width {expected_width}pt, got {count}; bounds={bounds:?}"
+  );
+}
+
 fn assert_path_width_between(
   summary: &PdfSummary,
   page_index: usize,
@@ -821,23 +889,6 @@ fn assert_middle_horizontal_border_is_inset(summary: &PdfSummary, page_index: us
       .iter()
       .any(|bounds| bounds.left > left + 0.5 && bounds.right < right - 0.5),
     "missing inset middle horizontal border on page {page_index}; bounds={bounds:?}"
-  );
-}
-
-fn assert_path_width_count_close(
-  summary: &PdfSummary,
-  page_index: usize,
-  expected_width: f32,
-  expected_count: usize,
-) {
-  let bounds = path_bounds_on_page(summary, page_index);
-  let count = bounds
-    .iter()
-    .filter(|bounds| (bounds.width() - expected_width).abs() <= 0.5)
-    .count();
-  assert!(
-    count >= expected_count,
-    "expected at least {expected_count} page {page_index} paths with width {expected_width}pt, got {count}; bounds={bounds:?}"
   );
 }
 
@@ -2118,15 +2169,15 @@ fn mapped_fixture_tdf156078_keeps_right_tab_number_at_top_right() {
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport3.cxx:testRelativeAnchorWidthFromLeftMargin
 fn mapped_fixture_tdf132976_preserves_anchor_width_from_left_margin() {
   let summary = render_summary("tdf132976_testRelativeAnchorWidthFromLeftMargin.docx");
-  assert_path_width_close(&summary, 0, 56.65);
+  assert_path_geometry_width_close(&summary, 0, 56.65);
 }
 
 #[test]
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport3.cxx:testRelativeAnchorWidthFromInsideOutsideMargin
 fn mapped_fixture_tdf133861_preserves_inside_outside_anchor_widths() {
   let summary = render_summary("tdf133861_RelativeAnchorWidthFromInsideOutsideMargin.docx");
-  assert_path_width_count_close(&summary, 0, 72.0, 2);
-  assert_path_width_count_close(&summary, 0, 127.6, 2);
+  assert_path_geometry_width_count_close(&summary, 72.0, 2);
+  assert_path_geometry_width_count_close(&summary, 127.6, 2);
 }
 
 #[test]
@@ -3828,7 +3879,7 @@ fn mapped_fixture_tdf133070_no_footer_keeps_relative_anchor_height_from_margin_b
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport4.cxx:testRelativeAnchorWidthFromRightMargin
 fn mapped_fixture_tdf133670_keeps_relative_anchor_width_from_right_margin() {
   let summary = render_summary("tdf133670_testRelativeAnchorWidthFromRightMargin.docx");
-  assert_path_width_close(&summary, 0, 2408.0 / 20.0);
+  assert_path_geometry_width_close(&summary, 0, 2408.0 / 20.0);
 }
 
 #[test]

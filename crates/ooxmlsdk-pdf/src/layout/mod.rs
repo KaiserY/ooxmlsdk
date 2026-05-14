@@ -4,26 +4,54 @@ use std::collections::{HashMap, HashSet};
 use icu_segmenter::LineSegmenter;
 
 use crate::docx::{
-  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingImagePlacement,
-  HorizontalImageAlignment, HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide,
-  InlineItem, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
+  Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
+  FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
+  FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
+  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem,
+  InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
   SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
-  TableCellVerticalAlignment, TableRow, TextStyle, VerticalImageAlignment, VerticalImageReference,
+  TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
+  VerticalImageAlignment, VerticalImageReference,
 };
 use crate::error::Result;
 use crate::options::PdfOptions;
 use crate::text_metrics::{baseline_offset_in_line, inline_text_box_height, measure_text};
-const PARAGRAPH_SPACING_AFTER_PT: f32 = 6.0;
+use crate::units;
+
+// Word document defaults used by LibreOffice import/export are 11pt text,
+// 0.5in tab stops, and widow/orphan control of two lines.
+const PARAGRAPH_SPACING_AFTER_PT: f32 = 0.0;
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_FONT_SIZE_PT: f32 = 11.0;
 const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
-const TABLE_ROW_MIN_HEIGHT_PT: f32 = DEFAULT_LINE_HEIGHT_PT;
+// Source: LibreOffice sw/inc/swtypes.hxx defines MINLAY as the minimal
+// Writer frame size, including table rows.
+const LO_MIN_FRAME_SIZE_PT: f32 = 23.0 / units::TWIPS_PER_POINT;
+const TABLE_ROW_MIN_HEIGHT_PT: f32 = LO_MIN_FRAME_SIZE_PT;
 const TABLE_SPACING_AFTER_PT: f32 = 0.0;
-const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = 72.0 / 25.4;
-const FOOTNOTE_AREA_MAX_FRACTION: f32 = 0.4;
+const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = units::POINTS_PER_INCH / units::MILLIMETERS_PER_INCH;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
 const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
+const UNBOUNDED_LAYOUT_EXTENT_PT: f32 = f32::MAX / 4.0;
+const MEASURE_SCRATCH_PAGE_HEIGHT_PT: f32 = UNBOUNDED_LAYOUT_EXTENT_PT;
+const LAYOUT_EPSILON_PT: f32 = 0.1;
+// Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
+// sets OOXML document defaults to proportional line spacing 115.
+const LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT: f32 = 115.0;
+const PERCENT_SCALE: f32 = 100.0;
+// Source: LibreOffice sw/source/core/layout/pagedesc.cxx
+// SwPageFootnoteInfo defaults: line width 10 twips, relative width 25%,
+// top/bottom distance 57 twips.
+const LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION: f32 = 0.25;
+const LO_FOOTNOTE_SEPARATOR_STROKE_PT: f32 = 10.0 / units::TWIPS_PER_POINT;
+const LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
+const LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
+// Source: LibreOffice sw/source/core/text/itrform2.cxx keeps the laid-out
+// SwLineLayout real height separate from the content-control GetCharRect()
+// widget rectangle, whose block is expanded by 20 twips on both vertical
+// sides in SwContentControlPortion::DescribePDFControl().
+const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 = 40.0 / units::TWIPS_PER_POINT;
 
 fn inline_text_height(style: &TextStyle) -> f32 {
   inline_text_box_height(style)
@@ -60,7 +88,7 @@ fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &T
 }
 
 fn word_auto_line_height(style: &TextStyle) -> f32 {
-  style.font_size_pt * 1.15
+  style.font_size_pt * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
 }
 
 fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyle) -> f32 {
@@ -70,9 +98,22 @@ fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyl
   }
 }
 
+fn line_real_height(
+  paragraph: &crate::docx::Paragraph,
+  line_height: f32,
+  has_content_control: bool,
+) -> f32 {
+  if paragraph.format.bidi && has_content_control {
+    line_height + LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT
+  } else {
+    line_height
+  }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct LayoutDocument {
   pub pages: Vec<Page>,
+  pub form_widgets: Vec<crate::docx::FormWidget>,
   pub follows: Vec<FrameFollow>,
   pub frames: Vec<LayoutFrame>,
   pub outline_entries: Vec<OutlineEntry>,
@@ -93,6 +134,7 @@ pub(crate) struct OutlineEntry {
   pub page_index: usize,
   pub x_pt: f32,
   pub y_pt: f32,
+  pub merged_hidden_separator: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -400,6 +442,13 @@ pub(crate) struct TextItem {
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
   pub decoration_span_start_x_pt: Option<f32>,
+  pub pdf_text_segmentation: PdfTextSegmentation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PdfTextSegmentation {
+  Line,
+  Portion,
 }
 
 #[derive(Clone, Debug)]
@@ -470,6 +519,13 @@ struct FlowContext {
   content_width: f32,
   default_tab_stop_pt: f32,
   repeating_slots: RepeatingSlotState,
+  text_segmentation: TextSegmentation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextSegmentation {
+  Body,
+  DrawingLayer,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -622,6 +678,7 @@ impl<'a> RootFrameLayout<'a> {
 
     LayoutDocument {
       pages: self.pages,
+      form_widgets: self.document.form_widgets.clone(),
       follows: self.follows,
       frames: self.frames,
       outline_entries: self.outline_entries,
@@ -723,7 +780,7 @@ impl<'a> RootFrameLayout<'a> {
       self.current.section_page_index,
     )
     .0;
-    self.y > body_top + 0.1
+    self.y > body_top + LAYOUT_EPSILON_PT
   }
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {
@@ -1183,6 +1240,21 @@ impl<'a> RootFrameLayout<'a> {
     if text.is_empty() {
       return;
     }
+    // Source: LibreOffice sw/source/core/text/EnhancedPDFExportHelper.cxx
+    // iterates the document outline node list while
+    // DocumentOutlineNodesManager::GetExpandTextMerged() consults merged
+    // paragraph layout. In tdf131728 this leaves the last style-separator
+    // child visible once more before the next top-level heading.
+    if level == 0
+      && self
+        .outline_entries
+        .last()
+        .is_some_and(|entry| entry.level > level && entry.merged_hidden_separator)
+    {
+      if let Some(previous) = self.outline_entries.last().cloned() {
+        self.outline_entries.push(previous);
+      }
+    }
     if let Some((page_index, text_item)) = first_text_item_from(&self.pages, &self.current, start) {
       self.outline_entries.push(OutlineEntry {
         level,
@@ -1190,27 +1262,35 @@ impl<'a> RootFrameLayout<'a> {
         page_index,
         x_pt: text_item.x_pt,
         y_pt: text_item.y_pt,
+        merged_hidden_separator: paragraph.format.outline_text_inlines.is_some(),
       });
     }
   }
 }
 
 fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
-  paragraph
-    .inlines
-    .iter()
-    .filter_map(|inline| match inline {
-      InlineItem::Text(text) => Some(text.text.as_str()),
-      InlineItem::Image(_)
-      | InlineItem::Shape(_)
-      | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_)
-      | InlineItem::PageBreak
-      | InlineItem::ColumnBreak => None,
-    })
-    .collect::<String>()
-    .trim()
-    .to_string()
+  let mut text = paragraph.list_label.clone().unwrap_or_default();
+  let inline_count = paragraph
+    .format
+    .outline_text_inlines
+    .unwrap_or(paragraph.inlines.len());
+  text.push_str(
+    &paragraph
+      .inlines
+      .iter()
+      .take(inline_count)
+      .filter_map(|inline| match inline {
+        InlineItem::Text(text) => Some(text.text.as_str()),
+        InlineItem::Image(_)
+        | InlineItem::Shape(_)
+        | InlineItem::FormWidgetStart(_)
+        | InlineItem::FormWidgetEnd(_)
+        | InlineItem::PageBreak
+        | InlineItem::ColumnBreak => None,
+      })
+      .collect::<String>(),
+  );
+  text.trim_end().to_string()
 }
 
 fn first_text_item_from(
@@ -1347,7 +1427,7 @@ struct FrameSegmentStart {
 
 fn follow_kind_for_block(block: &Block) -> FollowFrameKind {
   match block {
-    Block::Paragraph(_) => FollowFrameKind::Paragraph,
+    Block::Paragraph(_) | Block::Frame(_) => FollowFrameKind::Paragraph,
     Block::Table(_) => FollowFrameKind::Table,
   }
 }
@@ -1385,7 +1465,7 @@ fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) 
     let mut line_end = index + 1;
     let mut bounds = item_bounds(&items[index]);
     while line_end < item_end
-      && item_line_y(&items[line_end]).is_some_and(|next_y| (next_y - y).abs() < 0.1)
+      && item_line_y(&items[line_end]).is_some_and(|next_y| (next_y - y).abs() < LAYOUT_EPSILON_PT)
     {
       if let Some((x1, y1, x2, y2)) = item_bounds(&items[line_end]) {
         bounds = Some(match bounds {
@@ -1519,6 +1599,11 @@ fn block_frame_influences(
           bounds: None,
         });
       }
+    }
+    Block::Frame(frame) => {
+      influences.extend(frame.blocks.iter().flat_map(|block| {
+        block_frame_influences(block, document, emitted_footnotes, flow, block_index)
+      }));
     }
   }
   influences
@@ -2295,6 +2380,7 @@ fn flow_context(
     content_width: column_width.max(DEFAULT_FONT_SIZE_PT),
     default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::Body,
   }
 }
 
@@ -2417,7 +2503,7 @@ fn prepare_block_flow(
     return (flow, y);
   }
   let required_height = keep_group_height(block, next, flow);
-  if y + required_height <= flow.content_bottom || y <= flow.content_top_pt + 0.1 {
+  if y + required_height <= flow.content_bottom || y <= flow.content_top_pt + LAYOUT_EPSILON_PT {
     return (flow, y);
   }
   advance_section_flow(flow, current, pages)
@@ -2429,7 +2515,7 @@ fn block_should_stay_together(block: &Block, next: Option<&Block>) -> bool {
       paragraph.format.keep_lines
         || (paragraph.format.keep_with_next && matches!(next, Some(Block::Paragraph(_))))
     }
-    Block::Table(_) => false,
+    Block::Table(_) | Block::Frame(_) => false,
   }
 }
 
@@ -2453,6 +2539,7 @@ fn estimated_block_height(block: &Block, flow: FlowContext) -> f32 {
       .map(table_row_height)
       .sum::<f32>()
       .max(TABLE_ROW_MIN_HEIGHT_PT),
+    Block::Frame(frame) => frame_content_height(frame, flow),
   }
 }
 
@@ -2581,6 +2668,9 @@ fn layout_document_block(
 ) -> (FlowContext, f32) {
   match block {
     Block::Paragraph(paragraph) => {
+      if let Some(frame) = paragraph_frame(paragraph) {
+        return layout_floating_frame(&frame, flow, current, pages, y);
+      }
       let mut flow = flow;
       if paragraph.format.page_break_before && !current.items.is_empty() {
         pages.push(std::mem::replace(
@@ -2625,7 +2715,122 @@ fn layout_document_block(
       )
     }
     Block::Table(table) => layout_table(table, flow, current, pages, y),
+    Block::Frame(frame) => layout_floating_frame(frame, flow, current, pages, y),
   }
+}
+
+fn paragraph_frame(paragraph: &crate::docx::Paragraph) -> Option<FloatingFrame> {
+  let frame = paragraph.format.frame?;
+  let mut content = paragraph.clone();
+  content.format.frame = None;
+  Some(FloatingFrame {
+    blocks: vec![Block::Paragraph(content)],
+    width_pt: frame.width_pt,
+    height_pt: frame.height_pt,
+    height_rule: frame.height_rule,
+    placement: frame.placement,
+    fill_color: paragraph.format.shading,
+    borders: paragraph.format.borders,
+  })
+}
+
+fn layout_floating_frame(
+  frame: &FloatingFrame,
+  flow: FlowContext,
+  current: &mut Page,
+  _pages: &mut Vec<Page>,
+  y: f32,
+) -> (FlowContext, f32) {
+  let width = frame
+    .width_pt
+    .unwrap_or(flow.content_width)
+    .max(DEFAULT_FONT_SIZE_PT);
+  let measured_height = frame_content_height(
+    frame,
+    FlowContext {
+      content_width: width,
+      ..flow
+    },
+  );
+  let height = match frame.height_rule {
+    FrameHeightRule::Auto => frame.height_pt.unwrap_or(measured_height),
+    FrameHeightRule::AtLeast => frame.height_pt.unwrap_or(0.0).max(measured_height),
+    FrameHeightRule::Exact => frame.height_pt.unwrap_or(measured_height),
+  }
+  .max(DEFAULT_LINE_HEIGHT_PT);
+  let (x, frame_y) = floating_frame_position(frame.placement, flow, y, width, height);
+  if frame.fill_color.is_some() || frame.borders != Default::default() {
+    current.items.push(PageItem::Rect(RectItem {
+      x_pt: x,
+      y_pt: frame_y,
+      width_pt: width,
+      height_pt: height,
+      fill_color: frame.fill_color,
+      stroke: frame
+        .borders
+        .top
+        .or(frame.borders.left)
+        .or(frame.borders.right)
+        .or(frame.borders.bottom),
+    }));
+  }
+  let frame_flow = FlowContext {
+    content_top_pt: frame_y,
+    content_left_pt: x,
+    content_bottom: if matches!(frame.height_rule, FrameHeightRule::Exact) {
+      frame_y + height
+    } else {
+      UNBOUNDED_LAYOUT_EXTENT_PT
+    },
+    body_content_bottom_pt: if matches!(frame.height_rule, FrameHeightRule::Exact) {
+      frame_y + height
+    } else {
+      UNBOUNDED_LAYOUT_EXTENT_PT
+    },
+    content_width: width,
+    ..flow
+  };
+  let mut frame_page = empty_page(flow.setup, current.section_index);
+  let mut frame_pages = Vec::new();
+  let mut block_y = frame_y;
+  for (index, block) in frame.blocks.iter().enumerate() {
+    let previous = index
+      .checked_sub(1)
+      .and_then(|index| frame.blocks.get(index));
+    let next = frame.blocks.get(index + 1);
+    let (_, next_y) = layout_document_block(
+      previous,
+      block,
+      next,
+      frame_flow,
+      &mut frame_page,
+      &mut frame_pages,
+      block_y,
+    );
+    block_y = next_y;
+  }
+  let visible_page = frame_pages.into_iter().next().unwrap_or(frame_page);
+  current
+    .items
+    .extend(visible_page.items.into_iter().filter(|item| {
+      !matches!(frame.height_rule, FrameHeightRule::Exact)
+        || table_cell_item_intersects_vertical_bounds(item, frame_y, frame_y + height)
+    }));
+  let occupied_bottom = frame_y + height.max(block_y - frame_y) + frame.placement.margin_bottom_pt;
+  if frame_wrap_blocks_flow(frame.placement.wrap) {
+    (flow, y.max(occupied_bottom))
+  } else {
+    (flow, y)
+  }
+}
+
+fn frame_content_height(frame: &FloatingFrame, flow: FlowContext) -> f32 {
+  frame
+    .blocks
+    .iter()
+    .map(|block| estimated_block_height(block, flow))
+    .sum::<f32>()
+    .max(DEFAULT_LINE_HEIGHT_PT)
 }
 
 fn block_area(flow: FlowContext) -> BlockArea {
@@ -2659,6 +2864,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     content_width: area.content_width,
     default_tab_stop_pt: area.default_tab_stop_pt,
     repeating_slots: area.repeating_slots,
+    text_segmentation: TextSegmentation::Body,
   }
 }
 
@@ -2684,17 +2890,18 @@ fn layout_note_separator(
     y = setup.margin_top_pt;
   }
 
-  y += 4.0;
+  y += LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT;
+  let content_width = (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(0.0);
   current.items.push(PageItem::Line(LineItem {
     x1_pt: setup.margin_left_pt,
     y1_pt: y,
-    x2_pt: setup.margin_left_pt + 120.0,
-    y2_pt: y + 0.5,
-    width_pt: 0.5,
+    x2_pt: setup.margin_left_pt + content_width * LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION,
+    y2_pt: y + LO_FOOTNOTE_SEPARATOR_STROKE_PT,
+    width_pt: LO_FOOTNOTE_SEPARATOR_STROKE_PT,
     color: RgbColor { r: 0, g: 0, b: 0 },
     kind: LineItemKind::FilledRect,
   }));
-  y + 8.0
+  y + LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT
 }
 
 fn footnote_boss_reserve(
@@ -2709,7 +2916,7 @@ fn footnote_boss_reserve(
   }
 
   let available_height = flow.content_bottom - flow.content_top_pt;
-  let reserved_height = height.min(available_height * FOOTNOTE_AREA_MAX_FRACTION);
+  let reserved_height = height.min(available_height);
   let footnote_top = flow.content_bottom - reserved_height;
   (
     FlowContext {
@@ -2752,7 +2959,7 @@ fn measured_note_blocks_height(blocks: &[Block], flow: FlowContext) -> f32 {
   let mut scratch = empty_section_page(
     PageSetup {
       width_pt: flow.setup.width_pt,
-      height_pt: 100_000.0,
+      height_pt: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
       margin_left_pt: flow.setup.margin_left_pt,
       margin_right_pt: flow.setup.margin_right_pt,
       margin_top_pt: 0.0,
@@ -2881,6 +3088,7 @@ fn collect_endnote_ids_from_blocks(blocks: &[Block], ids: &mut Vec<i64>) {
           }
         }
       }
+      Block::Frame(frame) => collect_endnote_ids_from_blocks(&frame.blocks, ids),
     }
   }
 }
@@ -2974,6 +3182,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
           repeating_slots: RepeatingSlotState::default(),
+          text_segmentation: TextSegmentation::Body,
         },
       );
     }
@@ -2999,6 +3208,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           content_width,
           default_tab_stop_pt: document.default_tab_stop_pt,
           repeating_slots: RepeatingSlotState::default(),
+          text_segmentation: TextSegmentation::Body,
         },
       );
     }
@@ -3066,8 +3276,8 @@ fn is_page_background_item(item: &PageItem, setup: PageSetup) -> bool {
     PageItem::Fill(fill)
       if fill.x_pt == 0.0
         && fill.y_pt == 0.0
-        && (fill.width_pt - setup.width_pt).abs() <= 0.1
-        && (fill.height_pt - setup.height_pt).abs() <= 0.1
+        && (fill.width_pt - setup.width_pt).abs() <= LAYOUT_EPSILON_PT
+        && (fill.height_pt - setup.height_pt).abs() <= LAYOUT_EPSILON_PT
   )
 }
 
@@ -3166,12 +3376,12 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
         continue;
       }
       let separator_top = top + ((bottom - top) - DEFAULT_LINE_HEIGHT_PT).max(0.0);
-      let separator_bottom = (bottom - 0.1).max(separator_top);
+      let separator_bottom = (bottom - LAYOUT_EPSILON_PT).max(separator_top);
       let geometry = column_geometry(page.setup, columns);
       for column_index in 1..geometry.widths.len() {
         let gap = geometry.gaps.get(column_index - 1).copied().unwrap_or(0.0);
         let x_left = geometry.lefts[column_index] - gap / 2.0;
-        let x_right = x_left + 0.1;
+        let x_right = x_left + LAYOUT_EPSILON_PT;
         page.items.push(PageItem::Line(LineItem {
           x1_pt: x_left,
           y1_pt: separator_top,
@@ -3343,6 +3553,10 @@ fn layout_repeating_block(
       let (_, y) = layout_table(table, flow, page, discarded_pages, y);
       y
     }
+    Block::Frame(frame) => {
+      let (_, y) = layout_floating_frame(frame, flow, page, discarded_pages, y);
+      y
+    }
   }
 }
 
@@ -3370,6 +3584,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           form_widget_id: None,
           paragraph_bidi: false,
           decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
         }));
       }
       y += DEFAULT_LINE_HEIGHT_PT;
@@ -3383,6 +3598,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
 
   LayoutDocument {
     pages: output_pages,
+    form_widgets: Vec::new(),
     follows: Vec::new(),
     frames: Vec::new(),
     outline_entries: Vec::new(),
@@ -3404,8 +3620,50 @@ fn layout_table(
   pages: &mut Vec<Page>,
   y: f32,
 ) -> (FlowContext, f32) {
+  if table.placement.is_some() {
+    return layout_floating_table(table, flow, current, pages, y);
+  }
   TableFrameLayout::new(table, block_area(flow))
     .map_or((flow, y), |layout| layout.format(current, pages, y))
+}
+
+fn layout_floating_table(
+  table: &Table,
+  flow: FlowContext,
+  current: &mut Page,
+  _pages: &mut Vec<Page>,
+  y: f32,
+) -> (FlowContext, f32) {
+  let Some(placement) = table.placement else {
+    return (flow, y);
+  };
+  let Some(layout) = TableFrameLayout::new(table, block_area(flow)) else {
+    return (flow, y);
+  };
+  let table_width = (layout.frame.right_pt - layout.frame.left_pt).max(DEFAULT_FONT_SIZE_PT);
+  let (x, frame_y) = floating_frame_position(placement, flow, y, table_width, 0.0);
+  let frame_flow = FlowContext {
+    content_top_pt: frame_y,
+    content_left_pt: x,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    content_width: table_width,
+    ..flow
+  };
+  let mut frame_page = empty_page(flow.setup, current.section_index);
+  let mut frame_pages = Vec::new();
+  let (_, bottom_y) = TableFrameLayout::new(table, block_area(frame_flow))
+    .map_or((frame_flow, frame_y), |layout| {
+      layout.format(&mut frame_page, &mut frame_pages, frame_y)
+    });
+  let visible_page = frame_pages.into_iter().next().unwrap_or(frame_page);
+  current.items.extend(visible_page.items);
+  let occupied_bottom = bottom_y + placement.margin_bottom_pt;
+  if frame_wrap_blocks_flow(placement.wrap) {
+    (flow, y.max(occupied_bottom))
+  } else {
+    (flow, y)
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -3466,9 +3724,9 @@ impl<'a> TableFrameLayout<'a> {
       if layout.should_split_row(&row_frame, current) {
         let mut remaining_height = row_height;
         let mut content_offset = 0.0;
-        while remaining_height > 0.1 {
+        while remaining_height > LAYOUT_EPSILON_PT {
           let available_height = (layout.frame.block.content_bottom - y).max(0.0);
-          if available_height <= 0.1 {
+          if available_height <= LAYOUT_EPSILON_PT {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
@@ -3495,7 +3753,7 @@ impl<'a> TableFrameLayout<'a> {
           y += fragment_height;
           remaining_height -= fragment_height;
           content_offset += fragment_height;
-          if remaining_height > 0.1 {
+          if remaining_height > LAYOUT_EPSILON_PT {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
@@ -3572,7 +3830,7 @@ impl<'a> TableFrameLayout<'a> {
 
     !row.row.cant_split
       || row.fits_empty_body_region()
-      || row.y > self.frame.block.content_top_pt + 0.1
+      || row.y > self.frame.block.content_top_pt + LAYOUT_EPSILON_PT
   }
 
   fn should_split_row(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
@@ -3618,7 +3876,7 @@ fn extend_border_segment(
     Some(current)
       if f32::abs(current.x_pt - next.x_pt) < 0.01
         && current.border == next.border
-        && f32::abs(current.end_y_pt - next.start_y_pt) < 0.25 =>
+        && f32::abs(current.end_y_pt - next.start_y_pt) < LAYOUT_EPSILON_PT =>
     {
       current.end_y_pt = next.end_y_pt;
     }
@@ -3746,10 +4004,10 @@ impl RowFrame<'_, '_> {
     if self.row.repeat_header {
       return FragmentSplitKind::RepeatedHeader;
     }
-    if content_offset > 0.1 {
+    if content_offset > LAYOUT_EPSILON_PT {
       return FragmentSplitKind::Follow;
     }
-    if row_bottom + 0.1 < self.bottom() {
+    if row_bottom + LAYOUT_EPSILON_PT < self.bottom() {
       return FragmentSplitKind::Master;
     }
     FragmentSplitKind::Complete
@@ -3891,12 +4149,12 @@ impl RowFrame<'_, '_> {
     };
     let mut left_pt = left_pt;
     let mut right_pt = right_pt;
-    if (left_pt - self.table_frame.left_pt).abs() < 0.1
+    if (left_pt - self.table_frame.left_pt).abs() < LAYOUT_EPSILON_PT
       && let Some(border) = borders.left
     {
       left_pt += border.width_pt;
     }
-    if (right_pt - self.table_frame.right_pt).abs() < 0.1
+    if (right_pt - self.table_frame.right_pt).abs() < LAYOUT_EPSILON_PT
       && let Some(border) = borders.right
     {
       right_pt -= border.width_pt;
@@ -4475,11 +4733,12 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     columns: SectionColumns::default(),
     content_top_pt: text_y,
     content_left_pt: text_left,
-    content_bottom: f32::MAX / 4.0,
-    body_content_bottom_pt: f32::MAX / 4.0,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::Body,
   };
   let mut nested_page = empty_page(setup, current.section_index);
   let mut discarded_pages = Vec::new();
@@ -4536,6 +4795,98 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
   }
 }
 
+fn layout_shape_text_box(
+  current: &mut Page,
+  parent_flow: FlowContext,
+  shape: &crate::docx::InlineShape,
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32,
+) {
+  if shape.text_box_blocks.is_empty() {
+    return;
+  }
+
+  let content_left = x + shape.text_inset_left_pt;
+  let content_top = y + shape.text_inset_top_pt;
+  let content_width =
+    (width - shape.text_inset_left_pt - shape.text_inset_right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let content_bottom = y + height - shape.text_inset_bottom_pt;
+  if content_bottom <= content_top {
+    return;
+  }
+
+  let measure_flow = FlowContext {
+    setup: parent_flow.setup,
+    section_index: current.section_index,
+    section_page_index: parent_flow.section_page_index,
+    column_index: parent_flow.column_index,
+    columns: SectionColumns::default(),
+    content_top_pt: content_top,
+    content_left_pt: content_left,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    content_width,
+    default_tab_stop_pt: parent_flow.default_tab_stop_pt,
+    repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::DrawingLayer,
+  };
+  let content_height = shape
+    .text_box_blocks
+    .iter()
+    .map(|block| estimated_block_height(block, measure_flow))
+    .sum::<f32>();
+  let text_y = match shape.text_vertical_alignment {
+    TextBoxVerticalAlignment::Top => content_top,
+    TextBoxVerticalAlignment::Center => {
+      content_top + ((content_bottom - content_top - content_height) / 2.0).max(0.0)
+    }
+    TextBoxVerticalAlignment::Bottom => (content_bottom - content_height).max(content_top),
+  };
+
+  let flow = FlowContext {
+    // Source: LibreOffice imports WPS text boxes as drawing shapes
+    // (oox/source/shape/WpsContext.cxx + drawingml/shape.cxx). Shape text is
+    // formatted inside the Sdr object and clipped/overflowed there; it does
+    // not create follow pages in the document body when it reaches the shape
+    // bottom.
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    ..measure_flow
+  };
+  let mut nested_page = empty_page(parent_flow.setup, current.section_index);
+  let mut discarded_pages = Vec::new();
+  let mut y = text_y;
+  for (index, block) in shape.text_box_blocks.iter().enumerate() {
+    if y > content_bottom {
+      break;
+    }
+    let previous = index
+      .checked_sub(1)
+      .and_then(|index| shape.text_box_blocks.get(index));
+    let next = shape.text_box_blocks.get(index + 1);
+    let (_, next_y) = layout_document_block(
+      previous,
+      block,
+      next,
+      flow,
+      &mut nested_page,
+      &mut discarded_pages,
+      y,
+    );
+    y = next_y;
+  }
+
+  let visible_page = discarded_pages.into_iter().next().unwrap_or(nested_page);
+  current.items.extend(
+    visible_page
+      .items
+      .into_iter()
+      .filter(|item| table_cell_item_intersects_vertical_bounds(item, content_top, content_bottom)),
+  );
+}
+
 fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
   let content_width =
     (cell_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
@@ -4547,11 +4898,12 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     columns: SectionColumns::default(),
     content_top_pt: 0.0,
     content_left_pt: 0.0,
-    content_bottom: f32::MAX / 4.0,
-    body_content_bottom_pt: f32::MAX / 4.0,
+    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::Body,
   };
   let content = cell
     .blocks
@@ -4574,6 +4926,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
         .map(table_row_height)
         .sum::<f32>()
         .max(TABLE_ROW_MIN_HEIGHT_PT),
+      Block::Frame(frame) => frame_content_height(frame, flow),
     })
     .sum::<f32>()
     .max(inline_text_height(&table_cell_first_line_style(cell)));
@@ -4604,7 +4957,9 @@ fn floating_image_position(
   image_width: f32,
   image_height: f32,
 ) -> (f32, f32) {
-  let (base_x, reference_width) = match placement.horizontal_relative_to {
+  let horizontal_reference = effective_horizontal_reference(placement);
+  let vertical_reference = effective_vertical_reference(placement);
+  let (base_x, reference_width) = match horizontal_reference {
     HorizontalImageReference::Page => (0.0, flow.setup.width_pt),
     HorizontalImageReference::Margin => (
       flow.setup.margin_left_pt,
@@ -4612,14 +4967,31 @@ fn floating_image_position(
     ),
     HorizontalImageReference::Column => (flow.content_left_pt, flow.content_width),
     HorizontalImageReference::Character => (current_x, 0.0),
+    HorizontalImageReference::LeftMargin => (0.0, horizontal_page_left_width(flow)),
+    HorizontalImageReference::RightMargin => (
+      flow.setup.width_pt - horizontal_page_right_width(flow),
+      horizontal_page_right_width(flow),
+    ),
+    HorizontalImageReference::InsideMargin => horizontal_inside_outside_base(true, flow),
+    HorizontalImageReference::OutsideMargin => horizontal_inside_outside_base(false, flow),
   };
-  let (base_y, reference_height) = match placement.vertical_relative_to {
+  let (base_y, reference_height) = match vertical_reference {
     VerticalImageReference::Page => (0.0, flow.setup.height_pt),
     VerticalImageReference::Margin => (
       flow.setup.margin_top_pt,
       flow.setup.height_pt - flow.setup.margin_top_pt - flow.setup.margin_bottom_pt,
     ),
     VerticalImageReference::Paragraph | VerticalImageReference::Line => (current_y, 0.0),
+    VerticalImageReference::TopMargin => (0.0, flow.setup.margin_top_pt),
+    VerticalImageReference::BottomMargin => (
+      flow.setup.height_pt - flow.setup.margin_bottom_pt,
+      flow.setup.margin_bottom_pt,
+    ),
+    VerticalImageReference::InsideMargin => (0.0, flow.setup.margin_top_pt),
+    VerticalImageReference::OutsideMargin => (
+      flow.setup.height_pt - flow.setup.margin_bottom_pt,
+      flow.setup.margin_bottom_pt,
+    ),
   };
   (
     base_x
@@ -4631,6 +5003,186 @@ fn floating_image_position(
   )
 }
 
+fn floating_frame_position(
+  placement: FloatingFramePlacement,
+  flow: FlowContext,
+  current_y: f32,
+  frame_width: f32,
+  frame_height: f32,
+) -> (f32, f32) {
+  let (base_x, reference_width) = match placement.horizontal_anchor {
+    FrameHorizontalAnchor::Text => (flow.content_left_pt, flow.content_width),
+    FrameHorizontalAnchor::Margin => (
+      flow.setup.margin_left_pt,
+      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt,
+    ),
+    FrameHorizontalAnchor::Page => (0.0, flow.setup.width_pt),
+  };
+  let (base_y, reference_height) = match placement.vertical_anchor {
+    FrameVerticalAnchor::Text => (current_y, 0.0),
+    FrameVerticalAnchor::Margin => (
+      flow.setup.margin_top_pt,
+      flow.setup.height_pt - flow.setup.margin_top_pt - flow.setup.margin_bottom_pt,
+    ),
+    FrameVerticalAnchor::Page => (0.0, flow.setup.height_pt),
+  };
+  (
+    base_x
+      + aligned_frame_horizontal_offset(
+        placement.horizontal_alignment,
+        reference_width,
+        frame_width,
+      )
+      + placement.horizontal_offset_pt
+      + placement.margin_left_pt,
+    base_y
+      + aligned_frame_vertical_offset(placement.vertical_alignment, reference_height, frame_height)
+      + placement.vertical_offset_pt
+      + placement.margin_top_pt,
+  )
+}
+
+fn aligned_frame_horizontal_offset(
+  alignment: Option<FrameHorizontalAlignment>,
+  reference_width: f32,
+  frame_width: f32,
+) -> f32 {
+  let available = (reference_width - frame_width).max(0.0);
+  match alignment {
+    Some(FrameHorizontalAlignment::Center) => available / 2.0,
+    Some(FrameHorizontalAlignment::Right) | Some(FrameHorizontalAlignment::Outside) => available,
+    Some(FrameHorizontalAlignment::Left) | Some(FrameHorizontalAlignment::Inside) | None => 0.0,
+  }
+}
+
+fn aligned_frame_vertical_offset(
+  alignment: Option<FrameVerticalAlignment>,
+  reference_height: f32,
+  frame_height: f32,
+) -> f32 {
+  let available = (reference_height - frame_height).max(0.0);
+  match alignment {
+    Some(FrameVerticalAlignment::Center) => available / 2.0,
+    Some(FrameVerticalAlignment::Bottom) | Some(FrameVerticalAlignment::Outside) => available,
+    Some(FrameVerticalAlignment::Top)
+    | Some(FrameVerticalAlignment::Inside)
+    | Some(FrameVerticalAlignment::Inline)
+    | None => 0.0,
+  }
+}
+
+fn frame_wrap_blocks_flow(wrap: FrameWrapMode) -> bool {
+  matches!(wrap, FrameWrapMode::None | FrameWrapMode::NotBeside)
+}
+
+fn effective_horizontal_reference(placement: FloatingImagePlacement) -> HorizontalImageReference {
+  if placement.layout_in_cell {
+    return placement.horizontal_relative_to;
+  }
+  match placement.horizontal_relative_to {
+    HorizontalImageReference::Column | HorizontalImageReference::Character => {
+      HorizontalImageReference::Margin
+    }
+    reference => reference,
+  }
+}
+
+fn effective_vertical_reference(placement: FloatingImagePlacement) -> VerticalImageReference {
+  if placement.layout_in_cell {
+    return placement.vertical_relative_to;
+  }
+  match placement.vertical_relative_to {
+    VerticalImageReference::Paragraph | VerticalImageReference::Line => {
+      VerticalImageReference::Page
+    }
+    reference => reference,
+  }
+}
+
+fn relative_floating_width(placement: FloatingImagePlacement, flow: FlowContext) -> Option<f32> {
+  let reference = placement.relative_width_to?;
+  let pct = placement.relative_width_pct?;
+  if pct <= 0.0 {
+    return None;
+  }
+  Some((horizontal_reference_width(reference, flow) * pct).max(0.0))
+}
+
+fn relative_floating_height(placement: FloatingImagePlacement, flow: FlowContext) -> Option<f32> {
+  let reference = placement.relative_height_to?;
+  let pct = placement.relative_height_pct?;
+  if pct <= 0.0 {
+    return None;
+  }
+  Some((vertical_reference_height(reference, flow) * pct).max(0.0))
+}
+
+fn horizontal_reference_width(reference: HorizontalImageReference, flow: FlowContext) -> f32 {
+  match reference {
+    HorizontalImageReference::Page => flow.setup.width_pt,
+    HorizontalImageReference::Margin => {
+      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt
+    }
+    HorizontalImageReference::Column => flow.content_width,
+    HorizontalImageReference::Character => 0.0,
+    HorizontalImageReference::LeftMargin => horizontal_page_left_width(flow),
+    HorizontalImageReference::RightMargin => horizontal_page_right_width(flow),
+    HorizontalImageReference::InsideMargin => horizontal_inside_outside_width(true, flow),
+    HorizontalImageReference::OutsideMargin => horizontal_inside_outside_width(false, flow),
+  }
+}
+
+fn horizontal_page_left_width(flow: FlowContext) -> f32 {
+  if flow.setup.mirror_margins {
+    horizontal_inside_outside_width(false, flow)
+  } else {
+    flow.setup.margin_left_pt
+  }
+}
+
+fn horizontal_page_right_width(flow: FlowContext) -> f32 {
+  if flow.setup.mirror_margins {
+    horizontal_inside_outside_width(true, flow)
+  } else {
+    flow.setup.margin_right_pt
+  }
+}
+
+fn horizontal_inside_outside_width(inside: bool, flow: FlowContext) -> f32 {
+  let odd_page = flow.section_page_index.is_multiple_of(2);
+  match (inside, odd_page) {
+    (true, true) | (false, false) => flow.setup.margin_right_pt,
+    (true, false) | (false, true) => flow.setup.margin_left_pt,
+  }
+}
+
+fn horizontal_inside_outside_base(inside: bool, flow: FlowContext) -> (f32, f32) {
+  let width = horizontal_inside_outside_width(inside, flow);
+  let odd_page = flow.section_page_index.is_multiple_of(2);
+  let left_side = matches!((inside, odd_page), (false, true) | (true, false));
+  if left_side {
+    (0.0, width)
+  } else {
+    (flow.setup.width_pt - width, width)
+  }
+}
+
+fn vertical_reference_height(reference: VerticalImageReference, flow: FlowContext) -> f32 {
+  match reference {
+    VerticalImageReference::Page => flow.setup.height_pt,
+    VerticalImageReference::Margin => {
+      flow.setup.height_pt - flow.setup.margin_top_pt - flow.setup.margin_bottom_pt
+    }
+    VerticalImageReference::Paragraph | VerticalImageReference::Line => 0.0,
+    VerticalImageReference::TopMargin | VerticalImageReference::InsideMargin => {
+      flow.setup.margin_top_pt
+    }
+    VerticalImageReference::BottomMargin | VerticalImageReference::OutsideMargin => {
+      flow.setup.margin_bottom_pt
+    }
+  }
+}
+
 fn aligned_horizontal_offset(
   alignment: Option<HorizontalImageAlignment>,
   reference_width: f32,
@@ -4639,8 +5191,8 @@ fn aligned_horizontal_offset(
   let available = (reference_width - image_width).max(0.0);
   match alignment {
     Some(HorizontalImageAlignment::Center) => available / 2.0,
-    Some(HorizontalImageAlignment::Right) => available,
-    Some(HorizontalImageAlignment::Left) | None => 0.0,
+    Some(HorizontalImageAlignment::Right) | Some(HorizontalImageAlignment::Outside) => available,
+    Some(HorizontalImageAlignment::Left) | Some(HorizontalImageAlignment::Inside) | None => 0.0,
   }
 }
 
@@ -4652,8 +5204,8 @@ fn aligned_vertical_offset(
   let available = (reference_height - image_height).max(0.0);
   match alignment {
     Some(VerticalImageAlignment::Center) => available / 2.0,
-    Some(VerticalImageAlignment::Bottom) => available,
-    Some(VerticalImageAlignment::Top) | None => 0.0,
+    Some(VerticalImageAlignment::Bottom) | Some(VerticalImageAlignment::Outside) => available,
+    Some(VerticalImageAlignment::Top) | Some(VerticalImageAlignment::Inside) | None => 0.0,
   }
 }
 
@@ -4878,6 +5430,7 @@ struct TextLineAdvance<'a> {
   line_right: f32,
   justify: bool,
   line_item_start_index: &'a mut usize,
+  line_has_form_widget: &'a mut bool,
 }
 
 struct TextFrameLayout<'a> {
@@ -4940,8 +5493,10 @@ impl<'a> TextFrameLayout<'a> {
         item_end: advance.current.items.len(),
       },
     );
-    advance.state.finish_line(y, *line_height);
-    let mut next_y = y + *line_height;
+    let real_height = line_real_height(self.paragraph, *line_height, *advance.line_has_form_widget);
+    advance.state.finish_line(y, real_height);
+    let mut next_y = y + real_height;
+    *advance.line_has_form_widget = false;
     *line_height = advance.active.frame.base_line_height;
     let mut next_flow = advance.active.flow;
     let mut next_frame = advance.active.frame;
@@ -5049,12 +5604,13 @@ impl<'a> TextFrameLayout<'a> {
         y_pt: y,
         line_height_pt: line_height,
         text: label.clone(),
-        style: TextStyle::default(),
+        style: paragraph.list_label_style.clone(),
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
         form_widget_id: None,
         paragraph_bidi: false,
         decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
       }));
       x = default_line_left;
     }
@@ -5062,6 +5618,7 @@ impl<'a> TextFrameLayout<'a> {
     let justify_wrapped_lines =
       paragraph.format.alignment == ParagraphAlignment::Justify && paragraph.list_label.is_none();
     let mut active_form_widget_ids = Vec::new();
+    let mut line_has_form_widget = false;
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
@@ -5073,9 +5630,15 @@ impl<'a> TextFrameLayout<'a> {
             dynamic_field: run.dynamic_field,
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
+            segmentation: flow.text_segmentation,
           };
 
-          for segment in text_segments_with_offsets(&run.text) {
+          let segments = if flow.text_segmentation == TextSegmentation::DrawingLayer {
+            drawing_layer_text_segments_with_offsets(&run.text)
+          } else {
+            text_segments_with_offsets(&run.text)
+          };
+          for segment in segments {
             if segment.text == "\n" {
               text_state.set_position(InlineCursor {
                 inline_index,
@@ -5106,6 +5669,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_right,
                   justify: false,
                   line_item_start_index: &mut line_item_start_index,
+                  line_has_form_widget: &mut line_has_form_widget,
                 },
                 y,
                 &mut line_height,
@@ -5157,6 +5721,7 @@ impl<'a> TextFrameLayout<'a> {
                     line_right,
                     justify: justify_wrapped_lines,
                     line_item_start_index: &mut line_item_start_index,
+                    line_has_form_widget: &mut line_has_form_widget,
                   },
                   y,
                   &mut line_height,
@@ -5215,6 +5780,7 @@ impl<'a> TextFrameLayout<'a> {
                   line_right,
                   justify: justify_wrapped_lines,
                   line_item_start_index: &mut line_item_start_index,
+                  line_has_form_widget: &mut line_has_form_widget,
                 },
                 y,
                 &mut line_height,
@@ -5268,6 +5834,7 @@ impl<'a> TextFrameLayout<'a> {
                           line_right,
                           justify: justify_wrapped_lines,
                           line_item_start_index: &mut line_item_start_index,
+                          line_has_form_widget: &mut line_has_form_widget,
                         },
                         y,
                         &mut line_height,
@@ -5290,6 +5857,7 @@ impl<'a> TextFrameLayout<'a> {
                       text_offset,
                     });
                     line_height = include_text_height(line_height, text_frame, &run.style);
+                    line_has_form_widget |= meta.form_widget_id.is_some();
                     emitted = true;
                   }
                   continue;
@@ -5322,6 +5890,7 @@ impl<'a> TextFrameLayout<'a> {
                       line_right,
                       justify: justify_wrapped_lines,
                       line_item_start_index: &mut line_item_start_index,
+                      line_has_form_widget: &mut line_has_form_widget,
                     },
                     y,
                     &mut line_height,
@@ -5344,6 +5913,7 @@ impl<'a> TextFrameLayout<'a> {
                   text_offset,
                 });
                 line_height = include_text_height(line_height, text_frame, &run.style);
+                line_has_form_widget |= meta.form_widget_id.is_some();
                 emitted = true;
               }
               continue;
@@ -5359,18 +5929,21 @@ impl<'a> TextFrameLayout<'a> {
               text_offset: segment.end,
             });
             line_height = include_text_height(line_height, text_frame, &run.style);
+            line_has_form_widget |= meta.form_widget_id.is_some();
             emitted = true;
-            flush_text(
-              current,
-              TextPlacement {
-                x_pt: chunk_x,
-                y_pt: y,
-                line_height_pt: line_height,
-              },
-              &mut chunk,
-              &run.style,
-              meta,
-            );
+            if flow.text_segmentation == TextSegmentation::DrawingLayer {
+              flush_text(
+                current,
+                TextPlacement {
+                  x_pt: chunk_x,
+                  y_pt: y,
+                  line_height_pt: line_height,
+                },
+                &mut chunk,
+                &run.style,
+                meta,
+              );
+            }
           }
 
           flush_text(
@@ -5404,11 +5977,11 @@ impl<'a> TextFrameLayout<'a> {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
           if let crate::docx::ImagePlacement::Floating(placement) = image.placement {
-            let (width, height) = fit_image_to_line(
-              image_frame_width(image),
-              image_frame_height(image),
-              flow.content_width,
-            );
+            let frame_width =
+              relative_floating_width(placement, flow).unwrap_or_else(|| image_frame_width(image));
+            let frame_height = relative_floating_height(placement, flow)
+              .unwrap_or_else(|| image_frame_height(image));
+            let (width, height) = fit_image_to_line(frame_width, frame_height, flow.content_width);
             let (image_x, image_y) = floating_image_position(placement, flow, x, y, width, height);
             let image_item_start = current.items.len();
             current.items.push(PageItem::Image(ImageItem {
@@ -5511,6 +6084,7 @@ impl<'a> TextFrameLayout<'a> {
                 line_right,
                 justify: justify_wrapped_lines,
                 line_item_start_index: &mut line_item_start_index,
+                line_has_form_widget: &mut line_has_form_widget,
               },
               y,
               &mut line_height,
@@ -5543,25 +6117,52 @@ impl<'a> TextFrameLayout<'a> {
         InlineItem::Shape(shape) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
-          let place_rect = |current: &mut Page, x_pt: f32, y_pt: f32| {
-            current.items.push(PageItem::Rect(RectItem {
-              x_pt,
-              y_pt,
-              width_pt: shape.width_pt,
-              height_pt: shape.height_pt,
-              fill_color: shape.fill_color,
-              stroke: shape.stroke,
-            }));
+          let place_shape = |current: &mut Page,
+                             shape_flow: FlowContext,
+                             x_pt: f32,
+                             y_pt: f32,
+                             width_pt: f32,
+                             height_pt: f32| {
+            if shape.geometry == InlineShapeGeometry::Line
+              && shape.fill_color.is_none()
+              && let Some(stroke) = shape.stroke
+            {
+              push_styled_line(
+                current,
+                x_pt,
+                y_pt,
+                x_pt + width_pt,
+                y_pt + height_pt,
+                stroke,
+              );
+              return;
+            }
+            if shape.fill_color.is_some() || shape.stroke.is_some() {
+              current.items.push(PageItem::Rect(RectItem {
+                x_pt,
+                y_pt,
+                width_pt,
+                height_pt,
+                fill_color: shape.fill_color,
+                stroke: shape.stroke,
+              }));
+            }
+            layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
           };
 
           match shape.placement {
             crate::docx::ImagePlacement::Floating(placement) => {
+              let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
+              let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
               let (shape_x, shape_y) =
-                floating_image_position(placement, flow, x, y, shape.width_pt, shape.height_pt);
-              place_rect(
+                floating_image_position(placement, flow, x, y, width, height);
+              place_shape(
                 current,
+                flow,
                 shape_x + shape.offset_x_pt,
                 shape_y + shape.offset_y_pt,
+                width,
+                height,
               );
             }
             crate::docx::ImagePlacement::Inline => {
@@ -5580,6 +6181,7 @@ impl<'a> TextFrameLayout<'a> {
                     line_right,
                     justify: justify_wrapped_lines,
                     line_item_start_index: &mut line_item_start_index,
+                    line_has_form_widget: &mut line_has_form_widget,
                   },
                   y,
                   &mut line_height,
@@ -5589,7 +6191,14 @@ impl<'a> TextFrameLayout<'a> {
                 base_line_height = text_frame.base_line_height;
                 x = line_left;
               }
-              place_rect(current, x + shape.offset_x_pt, y + shape.offset_y_pt);
+              place_shape(
+                current,
+                flow,
+                x + shape.offset_x_pt,
+                y + shape.offset_y_pt,
+                shape.width_pt,
+                shape.height_pt,
+              );
               x += shape.width_pt;
               line_height = line_height.max(shape.height_pt);
             }
@@ -5606,6 +6215,7 @@ impl<'a> TextFrameLayout<'a> {
           base_line_height = text_frame.base_line_height;
           x = line_left;
           line_item_start_index = current.items.len();
+          line_has_form_widget = false;
           emitted = false;
           pending_tab = None;
         }
@@ -5627,6 +6237,7 @@ impl<'a> TextFrameLayout<'a> {
           base_line_height = text_frame.base_line_height;
           x = line_left;
           line_item_start_index = current.items.len();
+          line_has_form_widget = false;
           emitted = column_emitted;
           pending_tab = None;
         }
@@ -5647,8 +6258,9 @@ impl<'a> TextFrameLayout<'a> {
           item_end: current.items.len(),
         },
       );
-      text_state.finish_paragraph(y, line_height, emitted);
-      paragraph_bottom = y + line_height;
+      let real_height = line_real_height(paragraph, line_height, line_has_form_widget);
+      text_state.finish_paragraph(y, real_height, emitted);
+      paragraph_bottom = y + real_height;
       y = paragraph_bottom + self.spacing_after_pt;
     } else {
       paragraph_bottom = y + base_line_height;
@@ -5728,6 +6340,52 @@ fn text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
     .collect()
 }
 
+fn drawing_layer_text_segments_with_offsets(text: &str) -> Vec<TextSegment> {
+  let mut output = Vec::new();
+  let mut start = 0usize;
+
+  for (index, ch) in text.char_indices() {
+    if ch == '\n' || ch == '\t' {
+      if start < index {
+        output.push(TextSegment {
+          text: text[start..index].to_string(),
+          start,
+          end: index,
+        });
+      }
+      let end = index + ch.len_utf8();
+      output.push(TextSegment {
+        text: ch.to_string(),
+        start: index,
+        end,
+      });
+      start = end;
+      continue;
+    }
+    if !ch.is_whitespace() {
+      continue;
+    }
+    if start < index {
+      output.push(TextSegment {
+        text: text[start..index].to_string(),
+        start,
+        end: index,
+      });
+      start = index;
+    }
+  }
+
+  if start < text.len() {
+    output.push(TextSegment {
+      text: text[start..].to_string(),
+      start,
+      end: text.len(),
+    });
+  }
+
+  output
+}
+
 fn emergency_break_segments(text: &str) -> Vec<String> {
   if text.chars().all(|ch| ch.is_ascii_alphabetic()) && text.chars().count() > 8 {
     let mut pieces = hypher::hyphenate(text, hypher::Lang::English)
@@ -5782,7 +6440,7 @@ fn next_tab_stop(
   if let Some(stop) = tab_stops
     .iter()
     .copied()
-    .find(|stop| stop.position_pt > relative_x + 0.1)
+    .find(|stop| stop.position_pt > relative_x + LAYOUT_EPSILON_PT)
   {
     return ResolvedTabStop {
       x_pt: line_left + stop.position_pt,
@@ -5967,119 +6625,12 @@ fn justify_line_items(
   line_left: f32,
   line_right: f32,
 ) {
-  if start_index >= items.len() {
-    return;
-  }
-
-  let line_end = items.len();
-  let line_text_indices = items[start_index..line_end]
-    .iter()
-    .enumerate()
-    .filter_map(|(offset, item)| match item {
-      PageItem::Text(text) if f32::abs(text.y_pt - y) < 0.01 => Some(start_index + offset),
-      _ => None,
-    })
-    .collect::<Vec<_>>();
-  let Some(last_text_index) = line_text_indices.last().copied() else {
-    return;
-  };
-
-  let mut line_width: f32 = 0.0;
-  let mut space_count = 0usize;
-  for index in &line_text_indices {
-    let PageItem::Text(text) = &items[*index] else {
-      continue;
-    };
-    let measured_text = if *index == last_text_index {
-      text.text.trim_end_matches(' ')
-    } else {
-      &text.text
-    };
-    line_width = line_width.max(text.x_pt + measure_text(measured_text, &text.style) - line_left);
-    space_count += measured_text.chars().filter(|ch| *ch == ' ').count();
-  }
-
-  let extra = line_right - line_left - line_width;
-  if space_count == 0 || extra <= 0.0 {
-    return;
-  }
-
-  let extra_per_space = extra / space_count as f32;
-  let mut rebuilt = Vec::with_capacity(line_end - start_index + space_count);
-  let mut text_index = 0usize;
-  for item in items.drain(start_index..line_end) {
-    let PageItem::Text(text) = item else {
-      rebuilt.push(item);
-      continue;
-    };
-    if f32::abs(text.y_pt - y) >= 0.01 {
-      rebuilt.push(PageItem::Text(text));
-      continue;
-    }
-    text_index += 1;
-    let trim_trailing_spaces = text_index == line_text_indices.len();
-    if !text.text.contains(' ') {
-      rebuilt.push(PageItem::Text(text));
-      continue;
-    }
-    rebuilt.extend(justified_text_segments(
-      text,
-      extra_per_space,
-      trim_trailing_spaces,
-    ));
-  }
-  items.splice(start_index..start_index, rebuilt);
-}
-
-fn justified_text_segments(
-  mut text: TextItem,
-  extra_per_space: f32,
-  trim_trailing_spaces: bool,
-) -> Vec<PageItem> {
-  if trim_trailing_spaces {
-    text.text.truncate(text.text.trim_end_matches(' ').len());
-  }
-  let mut items = Vec::new();
-  let mut cursor_x = text.x_pt;
-  let mut current = String::new();
-  for ch in text.text.chars() {
-    if ch == ' ' {
-      if !current.is_empty() {
-        let width = measure_text(&current, &text.style);
-        items.push(PageItem::Text(TextItem {
-          x_pt: cursor_x,
-          y_pt: text.y_pt,
-          line_height_pt: text.line_height_pt,
-          text: std::mem::take(&mut current),
-          style: text.style.clone(),
-          hyperlink_url: text.hyperlink_url.clone(),
-          dynamic_field: text.dynamic_field,
-          form_widget_id: text.form_widget_id,
-          paragraph_bidi: text.paragraph_bidi,
-          decoration_span_start_x_pt: text.decoration_span_start_x_pt,
-        }));
-        cursor_x += width;
-      }
-      cursor_x += measure_text(" ", &text.style) + extra_per_space;
-    } else {
-      current.push(ch);
-    }
-  }
-  if !current.is_empty() {
-    items.push(PageItem::Text(TextItem {
-      x_pt: cursor_x,
-      y_pt: text.y_pt,
-      line_height_pt: text.line_height_pt,
-      text: current,
-      style: text.style.clone(),
-      hyperlink_url: text.hyperlink_url,
-      dynamic_field: text.dynamic_field,
-      form_widget_id: text.form_widget_id,
-      paragraph_bidi: text.paragraph_bidi,
-      decoration_span_start_x_pt: text.decoration_span_start_x_pt,
-    }));
-  }
-  items
+  // Source: LibreOffice vcl/source/pdf/pdfwriter_impl.cxx::drawLayout()
+  // writes one PDF text object for a laid-out line and carries justification
+  // through glyph positioning / text arrays. Splitting a justified Writer line
+  // into per-word text objects changes PDFium object counts and does not match
+  // Writer's export model.
+  let _ = (items, start_index, y, line_left, line_right);
 }
 
 fn item_y(item: &PageItem) -> Option<f32> {
@@ -6113,30 +6664,31 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
 }
 
 fn fit_image_to_line(width: f32, height: f32, max_width: f32) -> (f32, f32) {
-  let width = width.max(1.0);
-  let height = height.max(1.0);
+  if width <= f32::EPSILON || height <= f32::EPSILON || max_width <= f32::EPSILON {
+    return (0.0, 0.0);
+  }
   if width <= max_width {
     (width, height)
   } else {
-    let scale = max_width.max(1.0) / width;
+    let scale = max_width / width;
     (width * scale, height * scale)
   }
 }
 
 fn image_frame_width(image: &crate::docx::InlineImage) -> f32 {
-  (image.width_pt + image.effect_left_pt + image.effect_right_pt).max(1.0)
+  (image.width_pt + image.effect_left_pt + image.effect_right_pt).max(0.0)
 }
 
 fn image_frame_height(image: &crate::docx::InlineImage) -> f32 {
-  (image.height_pt + image.effect_top_pt + image.effect_bottom_pt).max(1.0)
+  (image.height_pt + image.effect_top_pt + image.effect_bottom_pt).max(0.0)
 }
 
 fn visible_image_width(image: &crate::docx::InlineImage) -> f32 {
-  image.width_pt.max(1.0)
+  image.width_pt.max(0.0)
 }
 
 fn visible_image_height(image: &crate::docx::InlineImage) -> f32 {
-  image.height_pt.max(1.0)
+  image.height_pt.max(0.0)
 }
 
 fn force_page_break(
@@ -6144,21 +6696,21 @@ fn force_page_break(
   current: &mut Page,
   pages: &mut Vec<Page>,
 ) -> (FlowContext, f32) {
-  let mut next_flow = flow;
-  if !current.items.is_empty() {
-    next_flow = FlowContext {
-      section_page_index: flow.section_page_index + 1,
-      ..flow
-    };
-    pages.push(std::mem::replace(
-      current,
-      empty_section_page(
-        flow.setup,
-        current.section_index,
-        next_flow.section_page_index,
-      ),
-    ));
-  }
+  // Source: Writer treats an explicit text page break as a real page
+  // transition even when the current page has no painted objects yet; see
+  // sw/qa/core/text/itrform2.cxx:testContentControlHeaderPDFExport.
+  let mut next_flow = FlowContext {
+    section_page_index: flow.section_page_index + 1,
+    ..flow
+  };
+  pages.push(std::mem::replace(
+    current,
+    empty_section_page(
+      flow.setup,
+      current.section_index,
+      next_flow.section_page_index,
+    ),
+  ));
   next_flow = body_flow_for_page(flow_with_column(next_flow, 0), pages.len() + 1);
   (next_flow, next_flow.content_top_pt)
 }
@@ -6176,6 +6728,7 @@ struct TextChunkMeta<'a> {
   dynamic_field: Option<DynamicFieldKind>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
+  segmentation: TextSegmentation,
 }
 
 fn flush_text(
@@ -6200,12 +6753,19 @@ fn flush_text(
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
     decoration_span_start_x_pt: None,
+    pdf_text_segmentation: match meta.segmentation {
+      TextSegmentation::Body => PdfTextSegmentation::Line,
+      TextSegmentation::DrawingLayer => PdfTextSegmentation::Portion,
+    },
   }));
 }
 
 fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
   if border.compound {
-    let stroke_width = (border.width_pt / 3.0).max(0.25);
+    let stroke_width = border.width_pt / 3.0;
+    if stroke_width <= f32::EPSILON {
+      return;
+    }
     let offset = stroke_width;
     if f32::abs(y2 - y1) < f32::abs(x2 - x1) {
       push_line_item(
@@ -6359,6 +6919,7 @@ mod tests {
         ..Default::default()
       },
       list_label: None,
+      list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
     };
 
@@ -6449,6 +7010,7 @@ mod tests {
       runs: vec![run],
       format: ParagraphFormat::default(),
       list_label: None,
+      list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
     })];
 
@@ -6522,6 +7084,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
+      placement: None,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![
@@ -6599,6 +7162,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: TableAlignment::Left,
+      placement: None,
       borders: None,
       cell_spacing_pt: 2.0,
       rows: vec![

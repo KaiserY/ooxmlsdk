@@ -3,13 +3,14 @@ use std::sync::Arc;
 
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
 
-use super::units;
+use crate::units;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub default_tab_stop_pt: f32,
   pub even_and_odd_headers: bool,
+  pub form_widgets: Vec<FormWidget>,
   pub sections: Vec<ImportedSection>,
   pub header_blocks: Vec<Block>,
   pub footer_blocks: Vec<Block>,
@@ -76,6 +77,26 @@ pub(crate) enum SectionBreakKind {
 pub(crate) enum Block {
   Paragraph(Paragraph),
   Table(Table),
+  Frame(FloatingFrame),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FloatingFrame {
+  pub blocks: Vec<Block>,
+  pub width_pt: Option<f32>,
+  pub height_pt: Option<f32>,
+  pub height_rule: FrameHeightRule,
+  pub placement: FloatingFramePlacement,
+  pub fill_color: Option<RgbColor>,
+  pub borders: CellBordersModel,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FrameHeightRule {
+  #[default]
+  Auto,
+  AtLeast,
+  Exact,
 }
 
 #[derive(Clone, Debug)]
@@ -87,6 +108,7 @@ pub(crate) struct Paragraph {
   pub runs: Vec<TextRun>,
   pub format: ParagraphFormat,
   pub list_label: Option<String>,
+  pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
 }
 
@@ -97,6 +119,7 @@ pub(crate) struct Table {
   pub preferred_width_pct: Option<f32>,
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
+  pub placement: Option<FloatingFramePlacement>,
   pub borders: Option<TableBordersModel>,
   pub cell_spacing_pt: f32,
   pub rows: Vec<TableRow>,
@@ -205,6 +228,8 @@ impl Default for BorderStyle {
 pub(crate) struct ParagraphFormat {
   pub spacing_before_pt: f32,
   pub spacing_after_pt: f32,
+  pub spacing_before_set: bool,
+  pub spacing_after_set: bool,
   pub line_height_pt: Option<f32>,
   pub line_height_rule: LineHeightRule,
   pub indent_left_pt: f32,
@@ -220,7 +245,96 @@ pub(crate) struct ParagraphFormat {
   pub keep_lines: bool,
   pub contextual_spacing: bool,
   pub hidden_separator: bool,
+  pub outline_text_inlines: Option<usize>,
   pub outline_level: Option<u8>,
+  pub frame: Option<ParagraphFrameProperties>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ParagraphFrameProperties {
+  pub width_pt: Option<f32>,
+  pub height_pt: Option<f32>,
+  pub height_rule: FrameHeightRule,
+  pub placement: FloatingFramePlacement,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FloatingFramePlacement {
+  pub horizontal_anchor: FrameHorizontalAnchor,
+  pub vertical_anchor: FrameVerticalAnchor,
+  pub horizontal_alignment: Option<FrameHorizontalAlignment>,
+  pub vertical_alignment: Option<FrameVerticalAlignment>,
+  pub horizontal_offset_pt: f32,
+  pub vertical_offset_pt: f32,
+  pub wrap: FrameWrapMode,
+  pub margin_top_pt: f32,
+  pub margin_right_pt: f32,
+  pub margin_bottom_pt: f32,
+  pub margin_left_pt: f32,
+}
+
+impl Default for FloatingFramePlacement {
+  fn default() -> Self {
+    Self {
+      horizontal_anchor: FrameHorizontalAnchor::Text,
+      vertical_anchor: FrameVerticalAnchor::Text,
+      horizontal_alignment: None,
+      vertical_alignment: None,
+      horizontal_offset_pt: 0.0,
+      vertical_offset_pt: 0.0,
+      wrap: FrameWrapMode::Around,
+      margin_top_pt: 0.0,
+      margin_right_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      margin_left_pt: 0.0,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FrameHorizontalAnchor {
+  #[default]
+  Text,
+  Margin,
+  Page,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FrameVerticalAnchor {
+  #[default]
+  Text,
+  Margin,
+  Page,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameHorizontalAlignment {
+  Left,
+  Center,
+  Right,
+  Inside,
+  Outside,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FrameVerticalAlignment {
+  Inline,
+  Top,
+  Center,
+  Bottom,
+  Inside,
+  Outside,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum FrameWrapMode {
+  #[default]
+  Auto,
+  Around,
+  Tight,
+  Through,
+  None,
+  NotBeside,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -262,16 +376,36 @@ pub(crate) struct TextRun {
   pub dynamic_field: Option<DynamicFieldKind>,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug)]
+pub(crate) struct FormWidget {
+  pub id: u32,
+  pub kind: FormWidgetKind,
+  pub entries: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FormWidgetKind {
+  Text,
+  DropDownList,
+  ComboBox,
+}
+
+#[derive(Clone, Debug, Default)]
 pub(crate) struct FormWidgetIdAllocator {
   next_id: u32,
+  widgets: Vec<FormWidget>,
 }
 
 impl FormWidgetIdAllocator {
-  pub(crate) fn next_id(&mut self) -> u32 {
+  pub(crate) fn next_widget(&mut self, kind: FormWidgetKind, entries: Vec<String>) -> u32 {
     let id = self.next_id;
     self.next_id = self.next_id.saturating_add(1);
+    self.widgets.push(FormWidget { id, kind, entries });
     id
+  }
+
+  pub(crate) fn widgets(&self) -> &[FormWidget] {
+    &self.widgets
   }
 }
 
@@ -315,11 +449,32 @@ pub(crate) struct InlineImage {
 pub(crate) struct InlineShape {
   pub width_pt: f32,
   pub height_pt: f32,
+  pub geometry: InlineShapeGeometry,
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
   pub fill_color: Option<RgbColor>,
   pub stroke: Option<BorderStyle>,
   pub placement: ImagePlacement,
+  pub text_box_blocks: Vec<Block>,
+  pub text_inset_left_pt: f32,
+  pub text_inset_top_pt: f32,
+  pub text_inset_right_pt: f32,
+  pub text_inset_bottom_pt: f32,
+  pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum InlineShapeGeometry {
+  Rectangle,
+  Line,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TextBoxVerticalAlignment {
+  #[default]
+  Top,
+  Center,
+  Bottom,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -348,6 +503,13 @@ pub(crate) struct FloatingImagePlacement {
   pub wrap: ImageWrapMode,
   pub wrap_side: ImageWrapSide,
   pub behind_text: bool,
+  pub layout_in_cell: bool,
+  pub allow_overlap: bool,
+  pub relative_height: u32,
+  pub relative_width_to: Option<HorizontalImageReference>,
+  pub relative_width_pct: Option<f32>,
+  pub relative_height_to: Option<VerticalImageReference>,
+  pub relative_height_pct: Option<f32>,
   pub margin_top_pt: f32,
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
@@ -368,6 +530,8 @@ pub(crate) enum HorizontalImageAlignment {
   Left,
   Center,
   Right,
+  Inside,
+  Outside,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -375,6 +539,8 @@ pub(crate) enum VerticalImageAlignment {
   Top,
   Center,
   Bottom,
+  Inside,
+  Outside,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -384,6 +550,10 @@ pub(crate) enum HorizontalImageReference {
   Margin,
   Column,
   Character,
+  LeftMargin,
+  RightMargin,
+  InsideMargin,
+  OutsideMargin,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -393,6 +563,10 @@ pub(crate) enum VerticalImageReference {
   Margin,
   Paragraph,
   Line,
+  TopMargin,
+  BottomMargin,
+  InsideMargin,
+  OutsideMargin,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -464,6 +638,7 @@ pub(crate) struct PageSetup {
   pub margin_right_pt: f32,
   pub margin_bottom_pt: f32,
   pub margin_left_pt: f32,
+  pub mirror_margins: bool,
   pub top_margin_was_negative: bool,
   pub bottom_margin_was_negative: bool,
   pub header_distance_pt: f32,
@@ -483,6 +658,7 @@ impl Default for PageSetup {
       margin_right_pt: 72.0,
       margin_bottom_pt: 72.0,
       margin_left_pt: 72.0,
+      mirror_margins: false,
       top_margin_was_negative: false,
       bottom_margin_was_negative: false,
       header_distance_pt: 36.0,

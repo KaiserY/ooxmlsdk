@@ -1,14 +1,37 @@
 use image::codecs::jpeg::JpegEncoder;
 use image::{ColorType, ImageEncoder};
 
+// Source: LibreOffice vcl/source/filter/wmf/emfwr.cxx writes these Win32 EMF
+// record ids. The byte offsets below are the EMR_STRETCHDIBITS /
+// EMR_SETDIBITSTODEVICE record layout fields.
 const EMF_HEADER_SIZE: usize = 108;
+const EMF_RECORD_HEADER_SIZE: usize = 8;
 const EMR_EOF: u32 = 14;
 const EMR_SET_DIBITS_TO_DEVICE: u32 = 80;
 const EMR_STRETCH_DIBITS: u32 = 81;
+const EMR_BITMAP_INFO_OFFSET_OFFSET: usize = 48;
+const EMR_BITMAP_INFO_SIZE_OFFSET: usize = 52;
+const EMR_BITMAP_BITS_OFFSET_OFFSET: usize = 56;
+const EMR_BITMAP_BITS_SIZE_OFFSET: usize = 60;
 
+// Source: LibreOffice vcl/source/bitmap/dibtools.cxx parses BITMAPINFOHEADER
+// values and keeps DIB scanlines aligned to four bytes.
+const BITMAPINFOHEADER_SIZE: usize = 40;
+const BITMAP_WIDTH_OFFSET: usize = 4;
+const BITMAP_HEIGHT_OFFSET: usize = 8;
+const BITMAP_PLANES_OFFSET: usize = 12;
+const BITMAP_BIT_COUNT_OFFSET: usize = 14;
+const BITMAP_COMPRESSION_OFFSET: usize = 16;
+const DIB_PLANES: u16 = 1;
+const DIB_BIT_COUNT_24: u16 = 24;
+const DIB_BIT_COUNT_32: u16 = 32;
+const RGB_BYTES_PER_PIXEL: usize = 3;
+const BGRA_BYTES_PER_PIXEL: usize = 4;
+const DIB_ROW_ALIGNMENT_BYTES: usize = 4;
 const BI_RGB: u32 = 0;
 const BI_JPEG: u32 = 4;
 const BI_PNG: u32 = 5;
+const JPEG_QUALITY: u8 = 75;
 
 pub(crate) fn decode_metafile_as_jpeg(
   data: &[u8],
@@ -43,10 +66,10 @@ fn decode_emf_as_jpeg(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
   let mut pos = EMF_HEADER_SIZE;
   let mut bitmap_record = None;
 
-  while pos + 8 <= data.len() {
+  while pos + EMF_RECORD_HEADER_SIZE <= data.len() {
     let record_type = read_u32(data, pos)?;
     let record_size = read_u32(data, pos + 4)? as usize;
-    if record_size < 8 || pos + record_size > data.len() {
+    if record_size < EMF_RECORD_HEADER_SIZE || pos + record_size > data.len() {
       return Err(format!(
         "invalid EMF record at offset {pos}: type=0x{record_type:08x} size={record_size}"
       ));
@@ -84,16 +107,16 @@ fn decode_bitmap_record_as_jpeg(
 ) -> Result<Vec<u8>, String> {
   let (off_bmi_src, cb_bmi_src, off_bits_src, cb_bits_src) = match record_type {
     EMR_STRETCH_DIBITS => (
-      read_u32(data, record_offset + 48)? as usize,
-      read_u32(data, record_offset + 52)? as usize,
-      read_u32(data, record_offset + 56)? as usize,
-      read_u32(data, record_offset + 60)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_INFO_OFFSET_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_INFO_SIZE_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_BITS_OFFSET_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_BITS_SIZE_OFFSET)? as usize,
     ),
     EMR_SET_DIBITS_TO_DEVICE => (
-      read_u32(data, record_offset + 48)? as usize,
-      read_u32(data, record_offset + 52)? as usize,
-      read_u32(data, record_offset + 56)? as usize,
-      read_u32(data, record_offset + 60)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_INFO_OFFSET_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_INFO_SIZE_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_BITS_OFFSET_OFFSET)? as usize,
+      read_u32(data, record_offset + EMR_BITMAP_BITS_SIZE_OFFSET)? as usize,
     ),
     _ => {
       return Err(format!(
@@ -113,22 +136,22 @@ fn decode_bitmap_record_as_jpeg(
   if bmi_end > data.len() || bits_end > data.len() {
     return Err("EMF bitmap record points outside the file".into());
   }
-  if cb_bmi_src < 40 {
+  if cb_bmi_src < BITMAPINFOHEADER_SIZE {
     return Err("EMF bitmap info header is too small".into());
   }
 
   let header_size = read_u32(data, bmi_start)? as usize;
-  if header_size < 40 {
+  if header_size < BITMAPINFOHEADER_SIZE {
     return Err(format!("unsupported BITMAPINFOHEADER size: {header_size}"));
   }
 
-  let width = read_i32(data, bmi_start + 4)?;
-  let height = read_i32(data, bmi_start + 8)?;
-  let planes = read_u16(data, bmi_start + 12)?;
-  let bit_count = read_u16(data, bmi_start + 14)?;
-  let compression = read_u32(data, bmi_start + 16)?;
+  let width = read_i32(data, bmi_start + BITMAP_WIDTH_OFFSET)?;
+  let height = read_i32(data, bmi_start + BITMAP_HEIGHT_OFFSET)?;
+  let planes = read_u16(data, bmi_start + BITMAP_PLANES_OFFSET)?;
+  let bit_count = read_u16(data, bmi_start + BITMAP_BIT_COUNT_OFFSET)?;
+  let compression = read_u32(data, bmi_start + BITMAP_COMPRESSION_OFFSET)?;
 
-  if planes != 1 {
+  if planes != DIB_PLANES {
     return Err(format!("unsupported DIB planes value: {planes}"));
   }
 
@@ -151,11 +174,11 @@ fn dib_to_jpeg(bits: &[u8], width: i32, height: i32, bit_count: u16) -> Result<V
   let height_abs = height.unsigned_abs() as usize;
 
   let bytes_per_pixel = match bit_count {
-    24 => 3usize,
-    32 => 4usize,
+    DIB_BIT_COUNT_24 => RGB_BYTES_PER_PIXEL,
+    DIB_BIT_COUNT_32 => BGRA_BYTES_PER_PIXEL,
     other => return Err(format!("unsupported BI_RGB bit depth: {other}")),
   };
-  let row_stride = (width * bytes_per_pixel).next_multiple_of(4);
+  let row_stride = (width * bytes_per_pixel).next_multiple_of(DIB_ROW_ALIGNMENT_BYTES);
   let required_size = row_stride
     .checked_mul(height_abs)
     .ok_or_else(|| "bitmap dimensions overflow".to_string())?;
@@ -166,28 +189,32 @@ fn dib_to_jpeg(bits: &[u8], width: i32, height: i32, bit_count: u16) -> Result<V
     ));
   }
 
-  let mut rgb = vec![0u8; width * height_abs * 3];
+  let mut rgb = vec![0u8; width * height_abs * RGB_BYTES_PER_PIXEL];
   for row in 0..height_abs {
     let src_row = if top_down { row } else { height_abs - 1 - row };
     let src_offset = src_row * row_stride;
-    let dest_offset = row * width * 3;
+    let dest_offset = row * width * RGB_BYTES_PER_PIXEL;
     let src = &bits[src_offset..src_offset + row_stride];
-    let dest = &mut rgb[dest_offset..dest_offset + width * 3];
+    let dest = &mut rgb[dest_offset..dest_offset + width * RGB_BYTES_PER_PIXEL];
 
     match bit_count {
-      24 => {
+      DIB_BIT_COUNT_24 => {
         for col in 0..width {
-          let src_pixel = &src[col * 3..col * 3 + 3];
-          let dest_pixel = &mut dest[col * 3..col * 3 + 3];
+          let src_pixel =
+            &src[col * RGB_BYTES_PER_PIXEL..col * RGB_BYTES_PER_PIXEL + RGB_BYTES_PER_PIXEL];
+          let dest_pixel =
+            &mut dest[col * RGB_BYTES_PER_PIXEL..col * RGB_BYTES_PER_PIXEL + RGB_BYTES_PER_PIXEL];
           dest_pixel[0] = src_pixel[2];
           dest_pixel[1] = src_pixel[1];
           dest_pixel[2] = src_pixel[0];
         }
       }
-      32 => {
+      DIB_BIT_COUNT_32 => {
         for col in 0..width {
-          let src_pixel = &src[col * 4..col * 4 + 4];
-          let dest_pixel = &mut dest[col * 3..col * 3 + 3];
+          let src_pixel =
+            &src[col * BGRA_BYTES_PER_PIXEL..col * BGRA_BYTES_PER_PIXEL + BGRA_BYTES_PER_PIXEL];
+          let dest_pixel =
+            &mut dest[col * RGB_BYTES_PER_PIXEL..col * RGB_BYTES_PER_PIXEL + RGB_BYTES_PER_PIXEL];
           dest_pixel[0] = src_pixel[2];
           dest_pixel[1] = src_pixel[1];
           dest_pixel[2] = src_pixel[0];
@@ -208,7 +235,7 @@ fn png_to_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
 
 fn rgb_to_jpeg(rgb: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
   let mut output = Vec::new();
-  let encoder = JpegEncoder::new_with_quality(&mut output, 75);
+  let encoder = JpegEncoder::new_with_quality(&mut output, JPEG_QUALITY);
   encoder
     .write_image(rgb, width, height, ColorType::Rgb8.into())
     .map_err(|err| err.to_string())?;

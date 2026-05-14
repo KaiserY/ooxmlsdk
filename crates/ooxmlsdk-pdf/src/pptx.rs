@@ -2,12 +2,17 @@ use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_drawingml_2006_main as a;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_presentationml_2006_main as p;
 
-use crate::docx::PageSetup;
 use crate::error::Result;
 use crate::layout::{self, LayoutDocument};
 use crate::options::PdfOptions;
+use crate::units;
 
-const EMUS_PER_POINT: f32 = 12_700.0;
+// Source: LibreOffice sd/source/filter/eppt/pptx-epptbase.cxx falls back to
+// a 28000 x 21000 mm100 master page when exporting a presentation with no page
+// property value.
+const LO_DEFAULT_SLIDE_WIDTH_MM100: f32 = 28_000.0;
+const LO_DEFAULT_SLIDE_HEIGHT_MM100: f32 = 21_000.0;
+const DEFAULT_PRESENTATION_MARGIN_PT: f32 = 0.0;
 
 pub(crate) fn layout(
   package: &mut PresentationDocument,
@@ -19,23 +24,27 @@ pub(crate) fn layout(
     presentation
       .slide_size
       .as_ref()
-      .map(|size| PageSetup {
-        width_pt: size.cx as f32 / EMUS_PER_POINT,
-        height_pt: size.cy as f32 / EMUS_PER_POINT,
-        margin_top_pt: 36.0,
-        margin_right_pt: 36.0,
-        margin_bottom_pt: 36.0,
-        margin_left_pt: 36.0,
-        ..PageSetup::default()
+      .map(|size| crate::docx::PageSetup {
+        width_pt: units::emu_to_points(i64::from(size.cx)),
+        height_pt: units::emu_to_points(i64::from(size.cy)),
+        margin_top_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_right_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_bottom_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_left_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        ..crate::docx::PageSetup::default()
       })
-      .unwrap_or(PageSetup {
-        width_pt: 960.0,
-        height_pt: 540.0,
-        margin_top_pt: 36.0,
-        margin_right_pt: 36.0,
-        margin_bottom_pt: 36.0,
-        margin_left_pt: 36.0,
-        ..PageSetup::default()
+      .unwrap_or(crate::docx::PageSetup {
+        width_pt: units::millimeters_to_points(
+          LO_DEFAULT_SLIDE_WIDTH_MM100 / units::MM100_PER_MILLIMETER,
+        ),
+        height_pt: units::millimeters_to_points(
+          LO_DEFAULT_SLIDE_HEIGHT_MM100 / units::MM100_PER_MILLIMETER,
+        ),
+        margin_top_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_right_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_bottom_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        margin_left_pt: DEFAULT_PRESENTATION_MARGIN_PT,
+        ..crate::docx::PageSetup::default()
       })
   };
 

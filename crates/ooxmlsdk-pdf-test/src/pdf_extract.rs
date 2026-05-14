@@ -702,13 +702,14 @@ fn raw_outline_titles(document: &LopdfDocument) -> Result<Vec<String>, String> {
   };
 
   let mut titles = Vec::new();
-  collect_outline_siblings(document, first, &mut titles)?;
+  collect_outline_siblings(document, first, 0, &mut titles)?;
   Ok(titles)
 }
 
 fn collect_outline_siblings(
   document: &LopdfDocument,
   first: &LopdfObject,
+  level: usize,
   titles: &mut Vec<String>,
 ) -> Result<(), String> {
   let mut current = Some(first.clone());
@@ -719,10 +720,13 @@ fn collect_outline_siblings(
       .map_err(|error| error.to_string())
       .and_then(|value| lopdf_text(document, value))
     {
-      titles.push(title);
+      // Source: LibreOffice vcl/source/pdf/PDFiumLibrary.cxx
+      // lcl_getBookmarks() prefixes one space per bookmark level when exposing
+      // PDFium bookmark titles to tests.
+      titles.push(format!("{}{}", " ".repeat(level), title));
     }
     if let Ok(child) = item.get(b"First") {
-      collect_outline_siblings(document, child, titles)?;
+      collect_outline_siblings(document, child, level + 1, titles)?;
     }
     current = item.get(b"Next").ok().cloned();
   }

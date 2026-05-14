@@ -14,6 +14,7 @@ mod options;
 mod pptx;
 mod render;
 mod text_metrics;
+mod units;
 mod xlsx;
 
 use std::collections::HashSet;
@@ -157,6 +158,11 @@ fn validate_block_fonts(block: &docx::Block, seen: &mut HashSet<FontValidationKe
         }
       }
     }
+    docx::Block::Frame(frame) => {
+      for block in &frame.blocks {
+        validate_block_fonts(block, seen)?;
+      }
+    }
   }
   Ok(())
 }
@@ -227,6 +233,7 @@ mod tests {
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -241,6 +248,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
@@ -299,6 +307,8 @@ mod tests {
       hyperlink_url: None,
       dynamic_field: None,
     };
+    let expected_advance = crate::text_metrics::inline_text_box_height(&shifted.style)
+      .max(crate::text_metrics::inline_text_box_height(&base.style));
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup {
         width_pt: 160.0,
@@ -311,6 +321,7 @@ mod tests {
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -333,6 +344,7 @@ mod tests {
         runs: vec![base, shifted, next],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       })],
     };
@@ -341,7 +353,7 @@ mod tests {
     let base = text_item(&layout, "Base");
     let next = text_item(&layout, "Next");
 
-    assert!(next.y_pt - base.y_pt >= 22.0);
+    assert!(next.y_pt - base.y_pt >= expected_advance);
   }
 
   #[test]
@@ -374,6 +386,7 @@ mod tests {
         },
         default_tab_stop_pt: 36.0,
         even_and_odd_headers: false,
+        form_widgets: Vec::new(),
         sections: Vec::new(),
         title_page: false,
         header_blocks: Vec::new(),
@@ -399,6 +412,7 @@ mod tests {
             ..Default::default()
           },
           list_label: None,
+          list_label_style: crate::docx::TextStyle::default(),
           list_label_hyperlink_url: None,
         })],
       };
@@ -410,7 +424,14 @@ mod tests {
     }
 
     assert!((line_gap(crate::docx::LineHeightRule::Exact) - 10.0).abs() < 0.1);
-    assert!(line_gap(crate::docx::LineHeightRule::AtLeast) > 35.0);
+    let tall_style = crate::docx::TextStyle {
+      font_size_pt: 30.0,
+      ..Default::default()
+    };
+    assert!(
+      line_gap(crate::docx::LineHeightRule::AtLeast)
+        >= crate::text_metrics::inline_text_box_height(&tall_style)
+    );
   }
 
   #[test]
@@ -429,6 +450,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       }
     }
@@ -458,6 +480,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
+      placement: None,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
@@ -475,6 +498,7 @@ mod tests {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -512,6 +536,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       }
     }
@@ -545,6 +570,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
+      placement: None,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![
@@ -600,6 +626,7 @@ mod tests {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -644,6 +671,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       }
     }
@@ -668,6 +696,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
+      placement: None,
       borders: Some(crate::docx::TableBordersModel {
         inside_vertical: Some(crate::docx::BorderStyle::default()),
         ..crate::docx::TableBordersModel::default()
@@ -688,6 +717,7 @@ mod tests {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -731,6 +761,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       }
     }
@@ -741,6 +772,7 @@ mod tests {
       preferred_width_pct: None,
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
+      placement: None,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
@@ -768,6 +800,7 @@ mod tests {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -803,6 +836,7 @@ mod tests {
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -817,6 +851,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
@@ -877,6 +912,7 @@ mod tests {
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -891,6 +927,7 @@ mod tests {
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format,
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
@@ -947,6 +984,7 @@ mod tests {
           ..Default::default()
         },
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       }
     }
@@ -963,6 +1001,7 @@ mod tests {
       page,
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: true,
       header_blocks: Vec::new(),
@@ -1014,6 +1053,7 @@ mod tests {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -1032,6 +1072,7 @@ mod tests {
         runs: Vec::new(),
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       })],
     };
@@ -1093,6 +1134,13 @@ mod tests {
         wrap: crate::docx::ImageWrapMode::Square,
         wrap_side: crate::docx::ImageWrapSide::BothSides,
         behind_text: false,
+        layout_in_cell: true,
+        allow_overlap: true,
+        relative_height: 0,
+        relative_width_to: None,
+        relative_width_pct: None,
+        relative_height_to: None,
+        relative_height_pct: None,
         margin_top_pt: 0.0,
         margin_right_pt: 6.0,
         margin_bottom_pt: 0.0,
@@ -1118,6 +1166,7 @@ mod tests {
       runs: vec![intro],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
     };
     let following = crate::docx::Paragraph {
@@ -1127,12 +1176,14 @@ mod tests {
       runs: vec![follow],
       format: crate::docx::ParagraphFormat::default(),
       list_label: None,
+      list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
     };
     let doc = crate::docx::DocxDocument {
       page,
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -1202,6 +1253,13 @@ mod tests {
         wrap: crate::docx::ImageWrapMode::Through,
         wrap_side: crate::docx::ImageWrapSide::BothSides,
         behind_text: false,
+        layout_in_cell: true,
+        allow_overlap: true,
+        relative_height: 0,
+        relative_width_to: None,
+        relative_width_pct: None,
+        relative_height_to: None,
+        relative_height_pct: None,
         margin_top_pt: 0.0,
         margin_right_pt: 0.0,
         margin_bottom_pt: 0.0,
@@ -1220,6 +1278,7 @@ mod tests {
       },
       default_tab_stop_pt: 36.0,
       even_and_odd_headers: false,
+      form_widgets: Vec::new(),
       sections: Vec::new(),
       title_page: false,
       header_blocks: Vec::new(),
@@ -1241,6 +1300,7 @@ mod tests {
         runs: vec![run],
         format: crate::docx::ParagraphFormat::default(),
         list_label: None,
+        list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
       })],
     };

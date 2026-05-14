@@ -1,9 +1,14 @@
 use super::{
-  ParagraphFormat, ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle,
-  ThemeColors, ThemeFonts, merge_paragraph_format, resolve_run_color, resolve_text_fill,
-  resolve_text_outline, units,
+  LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE, LO_SMALL_CAPS_FONT_SCALE, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE,
+  LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat,
+  ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
+  merge_paragraph_format, resolve_run_color, resolve_text_fill, resolve_text_outline,
 };
+use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+
+// Source: OOXML w:sz stores font sizes in half-points.
+const WML_FONT_SIZE_UNITS_PER_POINT: f32 = 2.0;
 
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
@@ -87,7 +92,8 @@ pub(super) fn merge_run_style(
   if let Some(font_size) = properties.font_size()
     && let Ok(half_points) = font_size.val.parse::<f32>()
   {
-    style.font_size_pt = (half_points / 2.0).max(1.0);
+    style.font_size_pt =
+      (half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
   if let Some(color) = properties.color()
     && let Some(rgb) = resolve_run_color(color, theme_colors)
@@ -111,7 +117,7 @@ pub(super) fn merge_run_style(
       .unwrap_or(style.outline_width_pt);
   }
   if let Some(spacing) = properties.spacing() {
-    style.character_spacing_pt = spacing.val as f32 / 20.0;
+    style.character_spacing_pt = units::twips_to_points(spacing.val as f32);
   }
   if let Some(underline) = properties.underline() {
     style.underline = !matches!(underline.val, Some(w::UnderlineValues::None));
@@ -128,7 +134,8 @@ pub(super) fn merge_run_style(
   if let Some(small_caps) = properties.small_caps()
     && small_caps.val.is_none_or(|value| value.as_bool())
   {
-    style.font_size_pt = (style.font_size_pt * 0.85).max(1.0);
+    style.font_size_pt =
+      (style.font_size_pt * LO_SMALL_CAPS_FONT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
   if let Some(vanish) = properties.vanish() {
     style.hidden = vanish.val.is_none_or(|value| value.as_bool());
@@ -136,12 +143,14 @@ pub(super) fn merge_run_style(
   if let Some(vertical_alignment) = properties.vertical_text_alignment() {
     match vertical_alignment.val {
       w::VerticalPositionValues::Superscript => {
-        style.baseline_shift_pt = style.font_size_pt * 0.35;
-        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
+        style.baseline_shift_pt = style.font_size_pt * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
+        style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+          .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
       }
       w::VerticalPositionValues::Subscript => {
-        style.baseline_shift_pt = -(style.font_size_pt * 0.2);
-        style.font_size_pt = (style.font_size_pt * 0.75).max(1.0);
+        style.baseline_shift_pt = style.font_size_pt * LO_SUBSCRIPT_BASELINE_SHIFT_SCALE;
+        style.font_size_pt = (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE)
+          .max(MIN_ESCAPEMENT_FONT_SIZE_PT);
       }
       w::VerticalPositionValues::Baseline => {
         style.baseline_shift_pt = 0.0;

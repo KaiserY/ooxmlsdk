@@ -8,6 +8,22 @@ use unicode_script::{Script as UnicodeScriptValue, UnicodeScript};
 use crate::docx::TextStyle;
 use crate::fonts::{FontFaceData, load_text_face};
 
+// Last-resort vertical metrics when no usable font face can be loaded. Keep
+// this out of horizontal measurement: LibreOffice and Typst both shape with
+// real font data instead of estimating glyph advances by character class.
+const FALLBACK_ASCENT_EM: f32 = 0.8;
+const FALLBACK_DESCENT_EM: f32 = 0.2;
+const FALLBACK_LINE_GAP_EM: f32 = 0.05;
+// Source: LibreOffice vcl/source/font/fontmetric.cxx
+// FontMetricData::ImplInitTextLineSize.
+const LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR: f32 = 10.0;
+const LO_TEXT_LINE_MAX_DESCENT_DIVISOR: f32 = 3.0;
+const LO_TEXT_LINE_WIDTH_FRACTION_OF_DESCENT: f32 = 0.25;
+const LO_TEXT_LINE_MIN_WIDTH_PT: f32 = 1.0;
+const LO_TEXT_LINE_WIDTH_HALF_DIVISOR: f32 = 2.0;
+const LO_TEXT_LINE_STRIKEOUT_OFFSET_DIVISOR: f32 = 3.0;
+const LO_TEXT_LINE_UNDERLINE_BASELINE_OFFSET_PT: f32 = 1.0;
+
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedText {
   pub glyphs: Vec<ShapedGlyph>,
@@ -35,6 +51,14 @@ impl TextVerticalMetrics {
   }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TextDecorationMetrics {
+  pub underline_offset_pt: f32,
+  pub underline_width_pt: f32,
+  pub strikethrough_offset_pt: f32,
+  pub strikethrough_width_pt: f32,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedGlyph {
   pub glyph_id: u32,
@@ -50,9 +74,7 @@ pub(crate) fn measure_text(text: &str, style: &TextStyle) -> f32 {
     return 0.0;
   }
 
-  FontMetricsCache::get()
-    .measure(text, style)
-    .unwrap_or_else(|| approximate_text_width(text, style.font_size_pt))
+  FontMetricsCache::get().measure(text, style).unwrap_or(0.0)
 }
 
 pub(crate) fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
@@ -67,12 +89,15 @@ pub(crate) fn shape_text(text: &str, style: &TextStyle) -> Option<ShapedText> {
 }
 
 pub(crate) fn vertical_metrics(style: &TextStyle) -> TextVerticalMetrics {
-  normalize_vertical_metrics(
-    FontMetricsCache::get()
-      .vertical_metrics(style)
-      .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt)),
-    style.font_size_pt,
-  )
+  FontMetricsCache::get()
+    .vertical_metrics(style)
+    .unwrap_or_else(|| approximate_vertical_metrics(style.font_size_pt))
+}
+
+pub(crate) fn text_decoration_metrics(style: &TextStyle) -> TextDecorationMetrics {
+  FontMetricsCache::get()
+    .decoration_metrics(style)
+    .unwrap_or_else(|| approximate_decoration_metrics(style.font_size_pt))
 }
 
 pub(crate) fn inline_text_box_height(style: &TextStyle) -> f32 {
@@ -86,36 +111,43 @@ pub(crate) fn baseline_offset_in_line(style: &TextStyle, line_height_pt: f32) ->
   extra_leading_pt + metrics.leading_above_pt() + metrics.ascent_pt - style.baseline_shift_pt
 }
 
-fn approximate_text_width(text: &str, font_size: f32) -> f32 {
-  text
-    .chars()
-    .map(|ch| match ch {
-      ' ' => font_size * 0.28,
-      '\t' => font_size * 1.12,
-      ch if ch.is_ascii_punctuation() => font_size * 0.3,
-      ch if ch.is_ascii() => font_size * 0.52,
-      _ => font_size,
-    })
-    .sum()
-}
-
 fn approximate_vertical_metrics(font_size: f32) -> TextVerticalMetrics {
   TextVerticalMetrics {
-    ascent_pt: font_size * 0.8,
-    descent_pt: font_size * 0.2,
-    line_gap_pt: font_size * 0.05,
+    ascent_pt: font_size * FALLBACK_ASCENT_EM,
+    descent_pt: font_size * FALLBACK_DESCENT_EM,
+    line_gap_pt: font_size * FALLBACK_LINE_GAP_EM,
   }
 }
 
-fn normalize_vertical_metrics(
-  mut metrics: TextVerticalMetrics,
-  font_size: f32,
-) -> TextVerticalMetrics {
-  let min_line_height_pt = font_size * 1.25;
-  if metrics.line_height_pt() < min_line_height_pt {
-    metrics.line_gap_pt += min_line_height_pt - metrics.line_height_pt();
+fn approximate_decoration_metrics(font_size: f32) -> TextDecorationMetrics {
+  // Source: LibreOffice vcl/source/font/fontmetric.cxx
+  // FontMetricData::ImplInitTextLineSize. This branch is only used when no
+  // usable OpenType underline/strikeout metrics can be loaded for the face.
+  let metrics = approximate_vertical_metrics(font_size);
+  let descent = if metrics.descent_pt > 0.0 {
+    metrics.descent_pt
+  } else {
+    (metrics.ascent_pt / LO_TEXT_LINE_DESCENT_FALLBACK_DIVISOR).max(LO_TEXT_LINE_MIN_WIDTH_PT)
+  };
+  let descent = if LO_TEXT_LINE_MAX_DESCENT_DIVISOR * descent > metrics.ascent_pt {
+    metrics.ascent_pt / LO_TEXT_LINE_MAX_DESCENT_DIVISOR
+  } else {
+    descent
+  };
+  let line_width =
+    (descent * LO_TEXT_LINE_WIDTH_FRACTION_OF_DESCENT).max(LO_TEXT_LINE_MIN_WIDTH_PT);
+  let half_line_width =
+    (line_width / LO_TEXT_LINE_WIDTH_HALF_DIVISOR).max(LO_TEXT_LINE_MIN_WIDTH_PT);
+  TextDecorationMetrics {
+    underline_offset_pt: descent / LO_TEXT_LINE_WIDTH_HALF_DIVISOR
+      + LO_TEXT_LINE_UNDERLINE_BASELINE_OFFSET_PT
+      - half_line_width,
+    underline_width_pt: line_width,
+    strikethrough_offset_pt: (metrics.ascent_pt - metrics.line_gap_pt)
+      / LO_TEXT_LINE_STRIKEOUT_OFFSET_DIVISOR
+      + half_line_width,
+    strikethrough_width_pt: line_width,
   }
-  metrics
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -171,6 +203,11 @@ impl FontMetricsCache {
   fn vertical_metrics(&self, style: &TextStyle) -> Option<TextVerticalMetrics> {
     let font = self.select(style)?;
     Some(font.vertical_metrics(style.font_size_pt))
+  }
+
+  fn decoration_metrics(&self, style: &TextStyle) -> Option<TextDecorationMetrics> {
+    let font = self.select(style)?;
+    font.decoration_metrics(style.font_size_pt)
   }
 
   fn select(&self, style: &TextStyle) -> Option<FontMetrics> {
@@ -269,6 +306,24 @@ impl FontMetrics {
       descent_pt: self.vertical.descent_units * scale,
       line_gap_pt: self.vertical.line_gap_units * scale,
     }
+  }
+
+  fn decoration_metrics(&self, font_size: f32) -> Option<TextDecorationMetrics> {
+    let face = ttf_parser::Face::parse(&self.face.data, self.face.index).ok()?;
+    let scale = font_size / face.units_per_em().max(1) as f32;
+    let underline = face.underline_metrics()?;
+    let strikethrough = face.strikeout_metrics()?;
+    let underline_width_pt = (underline.thickness as f32 * scale).abs();
+    let strikethrough_width_pt = (strikethrough.thickness as f32 * scale).abs();
+    if underline_width_pt <= f32::EPSILON || strikethrough_width_pt <= f32::EPSILON {
+      return None;
+    }
+    Some(TextDecorationMetrics {
+      underline_offset_pt: -(underline.position as f32) * scale,
+      underline_width_pt,
+      strikethrough_offset_pt: strikethrough.position as f32 * scale,
+      strikethrough_width_pt,
+    })
   }
 }
 

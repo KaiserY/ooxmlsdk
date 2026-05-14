@@ -21,15 +21,31 @@ use krilla::{Document, SerializeSettings};
 use lopdf::{Document as LopdfDocument, Object as LopdfObject, dictionary};
 
 use super::emf_wmf;
-use crate::docx::{DynamicFieldKind, RgbColor, TextStyle};
+use crate::docx::{DynamicFieldKind, FormWidget, FormWidgetKind, RgbColor, TextStyle};
 use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, OutlineEntry,
-  PageItem, RectItem, TextItem,
+  PageItem, PdfTextSegmentation, RectItem, TextItem,
 };
 use crate::options::PdfOptions;
-use crate::text_metrics::{baseline_offset_in_line, measure_text, shape_text};
+use crate::text_metrics::{
+  baseline_offset_in_line, measure_text, shape_text, text_decoration_metrics, vertical_metrics,
+};
+
+const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
+// Source: LibreOffice sw/source/core/text/itrform2.cxx
+// SwContentControlPortion::DescribePDFControl() expands content-control widget
+// bounds by 20 twips before handing them to PDFWriter.
+const LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
+const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 =
+  LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+// Source: LibreOffice vcl/source/pdf/pdfwriter_impl.cxx
+// PDFWriterImpl::emitWidgetAnnotations() applies iRectMargin = 1 for
+// non-signature widget annotation rectangles.
+const LO_PDF_WIDGET_ANNOTATION_MARGIN_PT: f32 = 1.0 / 1000.0;
+const LO_PDF_COMBO_BOX_FLAGS: i64 = 0x00060000;
+const LO_PDF_DROPDOWN_LIST_FLAGS: i64 = 0x00020000;
 
 pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<Vec<u8>> {
   debug_assert!(
@@ -219,13 +235,17 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   let fonts = FontSet::load()?;
 
   for page in &paint.pages {
-    let settings = PageSettings::from_wh(page.width_pt.max(3.0), page.height_pt.max(3.0))
+    let settings = PageSettings::from_wh(page.width_pt, page.height_pt)
       .ok_or_else(|| PdfError::Krilla("invalid page size".to_string()))?;
 
     let mut pdf_page = pdf.start_page_with(settings);
     let mut surface = pdf_page.surface();
     let mut link_annotations = Vec::new();
-    for item in &page.items {
+    for item in page
+      .items
+      .iter()
+      .filter(|item| paint_item_intersects_page(item, page.width_pt, page.height_pt))
+    {
       draw_paint_item(
         &mut surface,
         item,
@@ -250,19 +270,23 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
   inject_form_widget_annotations(document, pdf)
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct WidgetAnnotationSpec {
   page_index: usize,
   rect: [f32; 4],
+  field_type: &'static [u8],
+  field_value: String,
+  field_flags: Option<i64>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct WidgetBounds {
   left: f32,
   top: f32,
   right: f32,
   bottom: f32,
   paragraph_bidi: bool,
+  text: String,
 }
 
 fn inject_form_widget_annotations(document: &LayoutDocument, pdf: Vec<u8>) -> Result<Vec<u8>> {
@@ -281,6 +305,15 @@ fn inject_form_widget_annotations(document: &LayoutDocument, pdf: Vec<u8>) -> Re
     let annotation_id = patched.add_object(dictionary! {
       "Type" => LopdfObject::Name(b"Annot".to_vec()),
       "Subtype" => LopdfObject::Name(b"Widget".to_vec()),
+      "FT" => LopdfObject::Name(annotation.field_type.to_vec()),
+      "V" => LopdfObject::String(
+        annotation.field_value.clone().into_bytes(),
+        lopdf::StringFormat::Literal,
+      ),
+      "DV" => LopdfObject::String(
+        annotation.field_value.into_bytes(),
+        lopdf::StringFormat::Literal,
+      ),
       "Rect" => LopdfObject::Array(
         annotation
           .rect
@@ -289,6 +322,13 @@ fn inject_form_widget_annotations(document: &LayoutDocument, pdf: Vec<u8>) -> Re
           .collect(),
       ),
     });
+    if let Some(field_flags) = annotation.field_flags {
+      patched
+        .get_object_mut(annotation_id)
+        .and_then(LopdfObject::as_dict_mut)
+        .map_err(|error| PdfError::Lopdf(format!("{error}")))?
+        .set("Ff", LopdfObject::Integer(field_flags));
+    }
     let page = patched
       .get_object_mut(*page_id)
       .and_then(LopdfObject::as_dict_mut)
@@ -326,6 +366,13 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
       let Some(widget_id) = text.form_widget_id else {
         continue;
       };
+      if !document
+        .form_widgets
+        .iter()
+        .any(|widget| widget.id == widget_id)
+      {
+        continue;
+      }
       let width = measure_text(&text.text, &text.style);
       let bounds = WidgetBounds {
         left: text.x_pt,
@@ -333,6 +380,7 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
         right: text.x_pt + width,
         bottom: text.y_pt + text.line_height_pt,
         paragraph_bidi: text.paragraph_bidi,
+        text: text.text.clone(),
       };
       widgets
         .entry(widget_id)
@@ -342,32 +390,58 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
           current.right = current.right.max(bounds.right);
           current.bottom = current.bottom.max(bounds.bottom);
           current.paragraph_bidi |= bounds.paragraph_bidi;
+          current.text.push_str(&bounds.text);
         })
         .or_insert(bounds);
     }
     let page_height = page.setup.height_pt;
     let content_left = page.setup.margin_left_pt;
     let content_right = page.setup.width_pt - page.setup.margin_right_pt;
-    let has_bidi_widgets = widgets.values().any(|bounds| bounds.paragraph_bidi);
     let mut page_annotations = widgets
-      .into_values()
-      .map(|bounds| {
+      .into_iter()
+      .filter_map(|(widget_id, bounds)| {
+        let widget = document
+          .form_widgets
+          .iter()
+          .find(|widget| widget.id == widget_id)?;
         let (left, right) = if bounds.paragraph_bidi {
           let mirrored_left = content_left + content_right - bounds.right;
           let mirrored_right = content_left + content_right - bounds.left;
-          (mirrored_left - 1.001, mirrored_right + 1.001)
+          (mirrored_left, mirrored_right)
         } else {
-          (bounds.left - 1.001, bounds.right + 1.001)
+          (bounds.left, bounds.right)
         };
-        WidgetAnnotationSpec {
+        let left = lo_swrect_leading_edge(left) - LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+        let top = lo_swrect_leading_edge(bounds.top);
+        let right = lo_swrect_trailing_x_edge(right) + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+        let bottom =
+          lo_swrect_leading_edge(bounds.bottom) + LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT;
+        // Source: LibreOffice sw/source/core/text/itrform2.cxx obtains the
+        // widget location from SwTextCursor::GetCharRect() after the bidi text
+        // frame has been laid out. In this path the exported bidi control
+        // rectangle is one Writer expansion unit lower than the text ink box.
+        let bidi_block_offset = if bounds.paragraph_bidi {
+          LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT
+        } else {
+          0.0
+        };
+        let (field_type, field_value, field_flags) = widget_annotation_field(widget, &bounds.text);
+        Some(WidgetAnnotationSpec {
           page_index,
+          field_type,
+          field_value,
+          field_flags,
           rect: [
-            round_annotation_coordinate(left),
-            round_annotation_coordinate(page_height - (bounds.bottom - 6.151)),
-            round_annotation_coordinate(right),
-            round_annotation_coordinate(page_height - (bounds.top - 6.949)),
+            round_annotation_coordinate(left - LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
+            round_annotation_coordinate(
+              page_height - bottom - bidi_block_offset + LO_PDF_WIDGET_ANNOTATION_MARGIN_PT,
+            ),
+            round_annotation_coordinate(right + LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
+            round_annotation_coordinate(
+              page_height - top - bidi_block_offset - LO_PDF_WIDGET_ANNOTATION_MARGIN_PT,
+            ),
           ],
-        }
+        })
       })
       .collect::<Vec<_>>();
     page_annotations.sort_by(|left, right| {
@@ -376,34 +450,39 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
         .reverse()
         .then_with(|| left.rect[0].total_cmp(&right.rect[0]))
     });
-    if has_bidi_widgets {
-      let mut current_row_top = None;
-      let mut row_index = 0usize;
-      for annotation in &mut page_annotations {
-        let row_top = annotation.rect[3];
-        if current_row_top
-          .map(|current: f32| (current - row_top).abs() > 0.5)
-          .unwrap_or(true)
-        {
-          current_row_top = Some(row_top);
-          if row_index > 0 {
-            let offset = 13.4 * row_index as f32;
-            let correction = 0.25 * row_index as f32;
-            annotation.rect[1] += offset - correction;
-            annotation.rect[3] += offset - correction;
-          }
-          row_index += 1;
-        } else if row_index > 1 {
-          let offset = 13.4 * (row_index - 1) as f32;
-          let correction = 0.25 * (row_index - 1) as f32;
-          annotation.rect[1] += offset - correction;
-          annotation.rect[3] += offset - correction;
-        }
-      }
-    }
     annotations.extend(page_annotations);
   }
   annotations
+}
+
+fn lo_swrect_leading_edge(value: f32) -> f32 {
+  (value * crate::units::TWIPS_PER_POINT).floor() / crate::units::TWIPS_PER_POINT
+}
+
+fn lo_swrect_trailing_x_edge(value: f32) -> f32 {
+  (value * crate::units::TWIPS_PER_POINT).ceil() / crate::units::TWIPS_PER_POINT
+}
+
+fn widget_annotation_field(
+  widget: &FormWidget,
+  text: &str,
+) -> (&'static [u8], String, Option<i64>) {
+  match widget.kind {
+    FormWidgetKind::Text => (b"Tx", text.to_string(), None),
+    FormWidgetKind::ComboBox => (b"Ch", text.to_string(), Some(LO_PDF_COMBO_BOX_FLAGS)),
+    FormWidgetKind::DropDownList => {
+      let value = if widget.entries.iter().any(|entry| entry == text) {
+        text.to_string()
+      } else {
+        widget
+          .entries
+          .first()
+          .cloned()
+          .unwrap_or_else(|| text.to_string())
+      };
+      (b"Ch", value, Some(LO_PDF_DROPDOWN_LIST_FLAGS))
+    }
+  }
 }
 
 fn round_annotation_coordinate(value: f32) -> f32 {
@@ -539,7 +618,9 @@ impl InternalLinkTargets {
                 .or_insert(InternalLinkPosition {
                   page_index,
                   x_pt: text.item.x_pt,
-                  y_pt: (text.baseline_y - 10.0).max(0.0),
+                  // Source: Typst typst-pdf/src/link.rs pos_to_xyz shifts
+                  // position links upward by 10pt so baseline targets remain visible.
+                  y_pt: (text.baseline_y - INTERNAL_LINK_DESTINATION_SHIFT_PT).max(0.0),
                 });
             }
           }
@@ -634,10 +715,10 @@ impl PaintDocument {
       .iter()
       .enumerate()
       .map(|(page_index, page)| {
-        let line_owners = paint_line_owners(document, page_index, page.items.len());
-        let decoration_metadata = decoration_render_metadata(&page.items);
-        let items = page
-          .items
+        let layout_items = coalesced_writer_text_items(&page.items);
+        let line_owners = paint_line_owners(document, page_index, layout_items.len());
+        let decoration_metadata = decoration_render_metadata(&layout_items);
+        let items = layout_items
           .iter()
           .enumerate()
           .map(|(item_index, item)| match item {
@@ -673,6 +754,51 @@ impl PaintDocument {
   }
 }
 
+fn coalesced_writer_text_items(items: &[PageItem]) -> Vec<PageItem> {
+  let mut output: Vec<PageItem> = Vec::with_capacity(items.len());
+  for item in items {
+    let PageItem::Text(text) = item else {
+      output.push(item.clone());
+      continue;
+    };
+    if let Some(PageItem::Text(previous)) = output.last_mut()
+      && writer_text_items_coalesce(previous, text)
+    {
+      previous.text.push_str(&text.text);
+      previous.line_height_pt = previous.line_height_pt.max(text.line_height_pt);
+      continue;
+    }
+    output.push(PageItem::Text(text.clone()));
+  }
+  output
+}
+
+fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
+  if current.pdf_text_segmentation != next.pdf_text_segmentation
+    || current.form_widget_id.is_some()
+    || next.form_widget_id.is_some()
+  {
+    return false;
+  }
+  if current.pdf_text_segmentation == PdfTextSegmentation::Portion
+    && (current.text.contains('\t') || next.text.contains('\t'))
+  {
+    return false;
+  }
+  if current.style != next.style
+    || current.hyperlink_url != next.hyperlink_url
+    || current.dynamic_field != next.dynamic_field
+    || current.paragraph_bidi != next.paragraph_bidi
+    || current.decoration_span_start_x_pt != next.decoration_span_start_x_pt
+    || (current.y_pt - next.y_pt).abs() >= 0.01
+    || (current.line_height_pt - next.line_height_pt).abs() >= 0.01
+  {
+    return false;
+  }
+  let current_right = current.x_pt + measure_text(&current.text, &current.style);
+  (current_right - next.x_pt).abs() < 0.25
+}
+
 impl PaintText {
   fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
     let glyphs = shaped_pdf_glyphs(&text.text, &text.style);
@@ -686,36 +812,42 @@ impl PaintText {
         text.y_pt + baseline_offset_in_line(&text.style, text.line_height_pt)
       }
     };
+    let vertical_metrics = vertical_metrics(&text.style);
+    let text_box_y_pt =
+      baseline_y - vertical_metrics.ascent_pt - vertical_metrics.leading_above_pt();
+    let text_box_height_pt = vertical_metrics.line_height_pt();
     let highlight = text.style.highlight.map(|color| PaintRect {
       x_pt: text.x_pt,
-      y_pt: baseline_y - text.style.font_size_pt,
+      y_pt: text_box_y_pt,
       width_pt,
-      height_pt: text.style.font_size_pt * 1.25,
+      height_pt: text_box_height_pt,
       color,
     });
-    let decoration_width = (text.style.font_size_pt / 18.0).max(0.5);
+    let decoration_metrics = text_decoration_metrics(&text.style);
     let decoration_start_x_pt = text.decoration_span_start_x_pt.unwrap_or(text.x_pt);
+    let underline_y_pt = baseline_y + decoration_metrics.underline_offset_pt;
     let underline = text.style.underline.then_some(PaintStrokeLine {
       x1_pt: decoration_start_x_pt,
-      y1_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
+      y1_pt: underline_y_pt,
       x2_pt: text.x_pt + width_pt,
-      y2_pt: baseline_y + (text.style.font_size_pt * 0.12).max(1.0),
-      width_pt: decoration_width,
+      y2_pt: underline_y_pt,
+      width_pt: decoration_metrics.underline_width_pt,
       color: text.style.color,
     });
+    let strikethrough_y_pt = baseline_y - decoration_metrics.strikethrough_offset_pt;
     let strikethrough = text.style.strikethrough.then_some(PaintStrokeLine {
       x1_pt: decoration_start_x_pt,
-      y1_pt: baseline_y - (text.style.font_size_pt * 0.32),
+      y1_pt: strikethrough_y_pt,
       x2_pt: text.x_pt + width_pt,
-      y2_pt: baseline_y - (text.style.font_size_pt * 0.32),
-      width_pt: decoration_width,
+      y2_pt: strikethrough_y_pt,
+      width_pt: decoration_metrics.strikethrough_width_pt,
       color: text.style.color,
     });
     let link = text.hyperlink_url.as_ref().map(|url| PaintLink {
       x_pt: text.x_pt,
-      y_pt: baseline_y - text.style.font_size_pt,
+      y_pt: text_box_y_pt,
       width_pt,
-      height_pt: text.style.font_size_pt * 1.25,
+      height_pt: text_box_height_pt,
       url: url.clone(),
     });
 
@@ -828,14 +960,17 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
   if let Some(kind) = text.dynamic_field {
     return vec![(PaintTextPortionKind::Field(kind), 0..text.text.len())];
   }
-  if text.hyperlink_url.is_some() && !text.text.contains('\t') {
+  let split_portions = text.pdf_text_segmentation == PdfTextSegmentation::Portion
+    || text.style.underline
+    || text.style.strikethrough;
+  if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
     return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
   }
 
   let mut ranges = Vec::new();
   let mut start = 0usize;
   for (index, ch) in text.text.char_indices() {
-    if ch != '\t' {
+    if ch != '\t' && !(split_portions && ch.is_whitespace()) {
       continue;
     }
     if start < index {
@@ -846,8 +981,14 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
       };
       ranges.push((kind, start..index));
     }
-    ranges.push((PaintTextPortionKind::Tab, index..index + ch.len_utf8()));
-    start = index + ch.len_utf8();
+    if ch == '\t' {
+      ranges.push((PaintTextPortionKind::Tab, index..index + ch.len_utf8()));
+      start = index + ch.len_utf8();
+    } else if split_portions {
+      if start < index {
+        start = index;
+      }
+    }
   }
   if start < text.text.len() {
     let kind = if text.hyperlink_url.is_some() {
@@ -992,6 +1133,57 @@ fn draw_paint_item(
       }
     }
     PaintItem::Line(line) => draw_line_item(surface, line),
+  }
+}
+
+fn paint_item_intersects_page(item: &PaintItem, page_width_pt: f32, page_height_pt: f32) -> bool {
+  // Source: LibreOffice sw/source/core/view/vprint.cxx intersects output with
+  // the page rectangle before SwRootFrame::PaintSwFrame(); drawing layers also
+  // receive the page frame in sw/source/core/view/vdraw.cxx.
+  let Some((left, top, right, bottom)) = paint_item_bounds(item) else {
+    return true;
+  };
+  right > 0.0 && bottom > 0.0 && left < page_width_pt && top < page_height_pt
+}
+
+fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
+  match item {
+    PaintItem::Text(text) => {
+      let item = &text.item;
+      Some((
+        item.x_pt,
+        item.y_pt,
+        item.x_pt + text.width_pt,
+        item.y_pt + item.line_height_pt,
+      ))
+    }
+    PaintItem::Image(image) => Some((
+      image.x_pt,
+      image.y_pt,
+      image.x_pt + image.width_pt,
+      image.y_pt + image.height_pt,
+    )),
+    PaintItem::Rect(rect) => Some((
+      rect.x_pt,
+      rect.y_pt,
+      rect.x_pt + rect.width_pt,
+      rect.y_pt + rect.height_pt,
+    )),
+    PaintItem::Fill(fill) => Some((
+      fill.x_pt,
+      fill.y_pt,
+      fill.x_pt + fill.width_pt,
+      fill.y_pt + fill.height_pt,
+    )),
+    PaintItem::Line(line) => {
+      let half_width = line.width_pt / 2.0;
+      Some((
+        line.x1_pt.min(line.x2_pt) - half_width,
+        line.y1_pt.min(line.y2_pt) - half_width,
+        line.x1_pt.max(line.x2_pt) + half_width,
+        line.y1_pt.max(line.y2_pt) + half_width,
+      ))
+    }
   }
 }
 
@@ -1240,27 +1432,29 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
 }
 
 fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
-  let mut path = PathBuilder::new();
   if let Some(fill_color) = rect.fill_color {
     surface.set_fill(Some(Fill {
       paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
       opacity: NormalizedF32::ONE,
       rule: FillRule::EvenOdd,
     }));
-  } else {
-    surface.set_fill(None);
+    surface.set_stroke(None);
+    draw_rect_path(surface, rect);
   }
 
   if let Some(stroke) = rect.stroke {
+    surface.set_fill(None);
     surface.set_stroke(Some(Stroke {
       width: stroke.width_pt,
       paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
       ..Default::default()
     }));
-  } else {
-    surface.set_stroke(None);
+    draw_rect_path(surface, rect);
   }
+}
 
+fn draw_rect_path(surface: &mut Surface<'_>, rect: &RectItem) {
+  let mut path = PathBuilder::new();
   path.move_to(rect.x_pt, rect.y_pt + rect.height_pt);
   path.line_to(rect.x_pt, rect.y_pt);
   path.line_to(rect.x_pt + rect.width_pt, rect.y_pt);
@@ -1272,8 +1466,16 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
 }
 
 fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Image) {
-  let width = image.width_pt.max(1.0);
-  let height = image.height_pt.max(1.0);
+  if image.width_pt <= f32::EPSILON || image.height_pt <= f32::EPSILON {
+    return;
+  }
+  let width = image.width_pt;
+  let height = image.height_pt;
+  let visible_width = 1.0 - image.crop.left - image.crop.right;
+  let visible_height = 1.0 - image.crop.top - image.crop.bottom;
+  if visible_width <= f32::EPSILON || visible_height <= f32::EPSILON {
+    return;
+  }
   surface.push_transform(&Transform::from_translate(image.x_pt, image.y_pt));
   let mut pop_count = 1;
 
@@ -1302,8 +1504,6 @@ fn draw_image_item(surface: &mut Surface<'_>, image: &ImageItem, pdf_image: Imag
     pop_count += 2;
   }
 
-  let visible_width = (1.0 - image.crop.left - image.crop.right).max(0.001);
-  let visible_height = (1.0 - image.crop.top - image.crop.bottom).max(0.001);
   let draw_width = width / visible_width;
   let draw_height = height / visible_height;
   if let Some(size) = Size::from_wh(draw_width, draw_height) {
@@ -1603,8 +1803,11 @@ fn fill(style: &TextStyle) -> Fill {
 
 fn stroke(style: &TextStyle) -> Option<Stroke> {
   let color = style.outline_color?;
+  if style.outline_width_pt <= f32::EPSILON {
+    return None;
+  }
   Some(Stroke {
-    width: style.outline_width_pt.max(0.1),
+    width: style.outline_width_pt,
     paint: rgb::Color::new(color.r, color.g, color.b).into(),
     opacity: NormalizedF32::new(style.outline_opacity.clamp(0.0, 1.0))
       .unwrap_or(NormalizedF32::ZERO),

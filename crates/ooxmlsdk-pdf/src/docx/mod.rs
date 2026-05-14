@@ -4,7 +4,6 @@ mod package;
 mod properties;
 mod table;
 mod text;
-mod units;
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -13,8 +12,9 @@ use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
 use ooxmlsdk::schemas::{
-  schemas_microsoft_com_office_word_2010_wordml as w14, schemas_microsoft_com_vml as v,
-  schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_microsoft_com_office_word_2010_wordml as w14,
+  schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
+  schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
@@ -27,6 +27,7 @@ use quick_xml::events::Event;
 
 use crate::error::Result;
 use crate::options::PdfOptions;
+use crate::units;
 
 pub(crate) use model::*;
 use package::{HyperlinkCatalog, ImageCatalog};
@@ -34,6 +35,31 @@ use table::{TableConditionalStyleMask, TableLookModel};
 use text::{ParagraphImportBase, paragraph_model, paragraph_model_with_base};
 
 const DEFAULT_TAB_STOP_PT: f32 = 36.0;
+// Source: LibreOffice sw/source/writerfilter/dmapper/SectionColumnHandler.cxx
+// initializes w:cols/@space to 720 twips.
+const DEFAULT_SECTION_COLUMN_GAP_PT: f32 = 720.0 / units::TWIPS_PER_POINT;
+const DEFAULT_TEXTBOX_MIN_WIDTH_PT: f32 = 11.0;
+const DEFAULT_TEXTBOX_MIN_HEIGHT_PT: f32 = 14.0;
+// LibreOffice oox/source/shape/WpsContext.cxx uses the OOXML spec defaults:
+// left/right 91440 EMU, top/bottom 45720 EMU.
+const DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT: f32 = 91_440.0 / units::EMUS_PER_POINT;
+const DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT: f32 = 45_720.0 / units::EMUS_PER_POINT;
+const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
+const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
+const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
+const VML_DEFAULT_STROKE_WEIGHT_EMU: i64 = 1;
+// Source: LibreOffice include/editeng/escapementitem.hxx and
+// sw/source/writerfilter/dmapper/DomainMapper.cxx. DOCX vertAlign maps to
+// DFLT_ESC_PROP with DFLT_ESC_SUPER / DFLT_ESC_SUB.
+const LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE: f32 = 0.58;
+const LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE: f32 = 0.33;
+const LO_SUBSCRIPT_BASELINE_SHIFT_SCALE: f32 = -0.08;
+const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
+const MIN_IMPORTED_LINE_HEIGHT_PT: f32 = 0.1;
+const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
+const COMMENT_REFERENCE_FONT_SCALE: f32 = 0.75;
+// Source: LibreOffice include/editeng/svxfont.hxx SMALL_CAPS_PERCENTAGE.
+const LO_SMALL_CAPS_FONT_SCALE: f32 = 0.80;
 
 pub(crate) fn extract(
   package: &mut WordprocessingDocument,
@@ -47,6 +73,7 @@ pub(crate) fn extract(
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
+  let mirror_margins = mirror_margins(package, &main);
   let document = main.root_element(package)?;
   let page_background = document
     .document_background
@@ -74,6 +101,7 @@ pub(crate) fn extract(
   }
   for section in &mut sections {
     section.page.background = page_background;
+    section.page.mirror_margins = mirror_margins;
   }
   resolve_section_repeating_blocks(package, &main, &styles, &mut sections, &mut form_widget_ids);
   let page = sections
@@ -109,11 +137,13 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.title_page)
     .unwrap_or(false);
+  let form_widgets = form_widget_ids.widgets().to_vec();
 
   Ok(DocxDocument {
     page,
     default_tab_stop_pt,
     even_and_odd_headers,
+    form_widgets,
     sections,
     header_blocks,
     footer_blocks,
@@ -392,7 +422,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
   Block::Paragraph(Paragraph {
     inlines: vec![InlineItem::Text(TextRun {
       text,
-      style,
+      style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
     })],
@@ -402,6 +432,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     runs: Vec::new(),
     format: ParagraphFormat::default(),
     list_label: None,
+    list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
   })
 }
@@ -515,7 +546,7 @@ fn percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option
   attr_value(event, key)?
     .parse::<f32>()
     .ok()
-    .map(|value| (value / 100_000.0).clamp(0.0, 1.0))
+    .map(|value| (value / units::DRAWINGML_PERCENT_SCALE).clamp(0.0, 1.0))
 }
 
 fn alpha_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> f32 {
@@ -529,6 +560,19 @@ fn even_and_odd_headers(package: &mut WordprocessingDocument, main: &MainDocumen
     .and_then(|settings| {
       settings
         .w_even_and_odd_headers
+        .as_ref()
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
+}
+
+fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .mirror_margins
         .as_ref()
         .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
     })
@@ -713,6 +757,10 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   if let Some(Block::Paragraph(previous)) = blocks.last_mut()
     && previous.format.hidden_separator
   {
+    previous
+      .format
+      .outline_text_inlines
+      .get_or_insert(previous.inlines.len());
     previous.format.hidden_separator = paragraph.format.hidden_separator;
     previous
       .footnote_reference_ids
@@ -721,6 +769,19 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
       .endnote_reference_ids
       .append(&mut paragraph.endnote_reference_ids);
     previous.inlines.append(&mut paragraph.inlines);
+    return;
+  }
+  if let Some(frame) = paragraph.format.frame {
+    paragraph.format.frame = None;
+    blocks.push(Block::Frame(FloatingFrame {
+      blocks: vec![Block::Paragraph(paragraph.clone())],
+      width_pt: frame.width_pt,
+      height_pt: frame.height_pt,
+      height_rule: frame.height_rule,
+      placement: frame.placement,
+      fill_color: paragraph.format.shading,
+      borders: paragraph.format.borders,
+    }));
     return;
   }
   blocks.push(Block::Paragraph(paragraph));
@@ -912,7 +973,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
     .as_ref()
     .and_then(twips_measure_to_points)
     .filter(|gap| gap.is_finite() && *gap >= 0.0)
-    .unwrap_or(36.0);
+    .unwrap_or(DEFAULT_SECTION_COLUMN_GAP_PT);
   if !equal_width && !columns.w_col.is_empty() {
     let explicit_widths_pt = columns
       .w_col
@@ -1428,6 +1489,9 @@ fn table_model(
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
+    placement: properties
+      .and_then(|properties| properties.table_position_properties.as_ref())
+      .map(table_position_placement),
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
       .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
@@ -1455,6 +1519,106 @@ fn table_model(
         .map(|(row_index, row)| table_row_model(row, &mut context, row_index))
         .collect()
     },
+  }
+}
+
+fn table_position_placement(properties: &w::TablePositionProperties) -> FloatingFramePlacement {
+  FloatingFramePlacement {
+    horizontal_anchor: frame_horizontal_anchor(properties.horizontal_anchor),
+    vertical_anchor: frame_vertical_anchor(properties.vertical_anchor),
+    horizontal_alignment: properties
+      .table_position_x_alignment
+      .map(frame_horizontal_alignment),
+    vertical_alignment: properties
+      .table_position_y_alignment
+      .map(frame_vertical_alignment),
+    horizontal_offset_pt: properties
+      .table_position_x
+      .as_ref()
+      .and_then(signed_twips_measure_to_points)
+      .unwrap_or(0.0),
+    vertical_offset_pt: properties
+      .table_position_y
+      .as_ref()
+      .and_then(signed_twips_measure_to_points)
+      .unwrap_or(0.0),
+    wrap: FrameWrapMode::Around,
+    margin_top_pt: properties
+      .top_from_text
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0),
+    margin_right_pt: properties
+      .right_from_text
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0),
+    margin_bottom_pt: properties
+      .bottom_from_text
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0),
+    margin_left_pt: properties
+      .left_from_text
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0),
+  }
+}
+
+fn frame_horizontal_anchor(value: Option<w::HorizontalAnchorValues>) -> FrameHorizontalAnchor {
+  match value.unwrap_or_default() {
+    w::HorizontalAnchorValues::Text => FrameHorizontalAnchor::Text,
+    w::HorizontalAnchorValues::Margin => FrameHorizontalAnchor::Margin,
+    w::HorizontalAnchorValues::Page => FrameHorizontalAnchor::Page,
+  }
+}
+
+fn frame_vertical_anchor(value: Option<w::VerticalAnchorValues>) -> FrameVerticalAnchor {
+  match value.unwrap_or_default() {
+    w::VerticalAnchorValues::Text => FrameVerticalAnchor::Text,
+    w::VerticalAnchorValues::Margin => FrameVerticalAnchor::Margin,
+    w::VerticalAnchorValues::Page => FrameVerticalAnchor::Page,
+  }
+}
+
+fn frame_horizontal_alignment(value: w::HorizontalAlignmentValues) -> FrameHorizontalAlignment {
+  match value {
+    w::HorizontalAlignmentValues::Left => FrameHorizontalAlignment::Left,
+    w::HorizontalAlignmentValues::Center => FrameHorizontalAlignment::Center,
+    w::HorizontalAlignmentValues::Right => FrameHorizontalAlignment::Right,
+    w::HorizontalAlignmentValues::Inside => FrameHorizontalAlignment::Inside,
+    w::HorizontalAlignmentValues::Outside => FrameHorizontalAlignment::Outside,
+  }
+}
+
+fn frame_vertical_alignment(value: w::VerticalAlignmentValues) -> FrameVerticalAlignment {
+  match value {
+    w::VerticalAlignmentValues::Inline => FrameVerticalAlignment::Inline,
+    w::VerticalAlignmentValues::Top => FrameVerticalAlignment::Top,
+    w::VerticalAlignmentValues::Center => FrameVerticalAlignment::Center,
+    w::VerticalAlignmentValues::Bottom => FrameVerticalAlignment::Bottom,
+    w::VerticalAlignmentValues::Inside => FrameVerticalAlignment::Inside,
+    w::VerticalAlignmentValues::Outside => FrameVerticalAlignment::Outside,
+  }
+}
+
+fn frame_wrap_mode(value: Option<w::TextWrappingValues>) -> FrameWrapMode {
+  match value.unwrap_or_default() {
+    w::TextWrappingValues::Auto => FrameWrapMode::Auto,
+    w::TextWrappingValues::Around => FrameWrapMode::Around,
+    w::TextWrappingValues::Tight => FrameWrapMode::Tight,
+    w::TextWrappingValues::Through => FrameWrapMode::Through,
+    w::TextWrappingValues::None => FrameWrapMode::None,
+    w::TextWrappingValues::NotBeside => FrameWrapMode::NotBeside,
+  }
+}
+
+fn frame_height_rule(value: Option<w::HeightRuleValues>) -> FrameHeightRule {
+  match value.unwrap_or_default() {
+    w::HeightRuleValues::Auto => FrameHeightRule::Auto,
+    w::HeightRuleValues::AtLeast => FrameHeightRule::AtLeast,
+    w::HeightRuleValues::Exact => FrameHeightRule::Exact,
   }
 }
 
@@ -2065,9 +2229,9 @@ fn border_style(
 
   Some(BorderStyle {
     width_pt: size
-      .map(|value| value as f32 / 8.0)
-      .unwrap_or(0.5)
-      .max(0.25),
+      .map(|value| value as f32 / units::WORD_BORDER_SIZE_UNITS_PER_POINT)
+      .unwrap_or(WML_DEFAULT_BORDER_WIDTH_PT)
+      .max(WML_MIN_BORDER_WIDTH_PT),
     spacing_pt: space.unwrap_or(0) as f32,
     color: color.and_then(parse_hex_color).unwrap_or_default(),
     compound: border_value_is_compound(value),
@@ -2115,11 +2279,13 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
+    format.spacing_before_set = spacing.before.is_some();
     format.spacing_before_pt = spacing
       .before
       .as_ref()
       .and_then(twips_measure_to_points)
       .unwrap_or(0.0);
+    format.spacing_after_set = spacing.after.is_some();
     format.spacing_after_pt = spacing
       .after
       .as_ref()
@@ -2130,7 +2296,9 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
         None | Some(w::LineSpacingRuleValues::Auto) => {
           format.line_height_rule = LineHeightRule::Auto;
           if let Some(value) = signed_twips_measure_to_twips(line) {
-            format.line_height_pt = Some((value / 240.0).max(0.1));
+            format.line_height_pt = Some(
+              (value / units::WORD_LINE_HEIGHT_UNITS_PER_LINE).max(MIN_IMPORTED_LINE_HEIGHT_PT),
+            );
           }
         }
         Some(w::LineSpacingRuleValues::AtLeast) => {
@@ -2208,6 +2376,49 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
       .ok()
       .filter(|level| *level <= 8);
   }
+
+  if let Some(frame) = properties.frame_properties() {
+    format.frame = Some(paragraph_frame_properties(frame));
+  }
+}
+
+fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFrameProperties {
+  let horizontal_space = frame
+    .horizontal_space
+    .as_ref()
+    .and_then(twips_measure_to_points)
+    .unwrap_or(0.0);
+  let vertical_space = frame
+    .vertical_space
+    .as_ref()
+    .and_then(twips_measure_to_points)
+    .unwrap_or(0.0);
+  ParagraphFrameProperties {
+    width_pt: frame.width.as_ref().and_then(twips_measure_to_points),
+    height_pt: frame.height.as_ref().and_then(twips_measure_to_points),
+    height_rule: frame_height_rule(frame.height_type),
+    placement: FloatingFramePlacement {
+      horizontal_anchor: frame_horizontal_anchor(frame.horizontal_position),
+      vertical_anchor: frame_vertical_anchor(frame.vertical_position),
+      horizontal_alignment: frame.x_align.map(frame_horizontal_alignment),
+      vertical_alignment: frame.y_align.map(frame_vertical_alignment),
+      horizontal_offset_pt: frame
+        .x
+        .as_ref()
+        .and_then(signed_twips_measure_to_points)
+        .unwrap_or(0.0),
+      vertical_offset_pt: frame
+        .y
+        .as_ref()
+        .and_then(signed_twips_measure_to_points)
+        .unwrap_or(0.0),
+      wrap: frame_wrap_mode(frame.wrap),
+      margin_top_pt: vertical_space,
+      margin_right_pt: horizontal_space,
+      margin_bottom_pt: vertical_space,
+      margin_left_pt: horizontal_space,
+    },
+  }
 }
 
 fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
@@ -2233,7 +2444,7 @@ fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
     .filter(|stop| stop.position_pt.is_finite() && stop.position_pt >= 0.0)
     .collect::<Vec<_>>();
   stops.sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
-  stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < 0.1);
+  stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
   stops
 }
 
@@ -2282,23 +2493,14 @@ fn paragraph_inlines(
         );
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
-        let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
-        for item in &hyperlink.hyperlink_choice {
-          if let w::HyperlinkChoice::WR(run) = item {
-            push_run_or_complex_field(
-              run,
-              &mut inlines,
-              base_style.clone(),
-              RunImportContext {
-                styles,
-                images,
-                hyperlinks,
-              },
-              hyperlink_url.as_deref(),
-              &mut complex_field,
-            );
-          }
-        }
+        push_hyperlink_content(
+          hyperlink,
+          &mut inlines,
+          base_style.clone(),
+          None,
+          &mut inline_context,
+          &mut complex_field,
+        );
       }
       w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
         w::ParagraphChoice2::WIns(inserted) => {
@@ -2528,6 +2730,95 @@ fn hyperlink_url(hyperlink: &w::Hyperlink, hyperlinks: &HyperlinkCatalog) -> Opt
     .map(ToString::to_string)
 }
 
+fn push_hyperlink_content(
+  hyperlink: &w::Hyperlink,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  inherited_url: Option<&str>,
+  context: &mut InlineImportContext<'_>,
+  complex_field: &mut Option<ComplexFieldState>,
+) {
+  let hyperlink_url = self::hyperlink_url(hyperlink, context.hyperlinks)
+    .or_else(|| inherited_url.map(ToString::to_string));
+  for item in &hyperlink.hyperlink_choice {
+    match item {
+      w::HyperlinkChoice::WR(run) => push_run_or_complex_field(
+        run,
+        inlines,
+        base_style.clone(),
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
+        hyperlink_url.as_deref(),
+        complex_field,
+      ),
+      w::HyperlinkChoice::WFldSimple(field) => push_simple_field(
+        field,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        context.form_widget_ids,
+      ),
+      w::HyperlinkChoice::WHyperlink(nested) => push_hyperlink_content(
+        nested,
+        inlines,
+        base_style.clone(),
+        hyperlink_url.as_deref(),
+        context,
+        complex_field,
+      ),
+      w::HyperlinkChoice::WSdt(sdt) => push_sdt_run(
+        sdt,
+        inlines,
+        base_style.clone(),
+        hyperlink_url.as_deref(),
+        context,
+      ),
+      w::HyperlinkChoice::WIns(inserted) => push_inserted_run(
+        inserted,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url.as_deref(),
+      ),
+      w::HyperlinkChoice::WDel(deleted) => push_deleted_run(
+        deleted,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url.as_deref(),
+      ),
+      w::HyperlinkChoice::WMoveFrom(moved) => push_move_from_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url.as_deref(),
+      ),
+      w::HyperlinkChoice::WMoveTo(moved) => push_move_to_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        context.styles,
+        context.images,
+        context.hyperlinks,
+        hyperlink_url.as_deref(),
+      ),
+      _ => {}
+    }
+  }
+}
+
 fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>) {
   let mut footnotes = Vec::new();
   let mut endnotes = Vec::new();
@@ -2537,27 +2828,28 @@ fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>
         collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes)
       }
       w::ParagraphChoice::WFldSimple(field) => {
-        for choice in &field.simple_field_choice {
-          if let w::SimpleFieldChoice::WR(run) = choice {
-            collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
-          }
-        }
+        collect_simple_field_note_reference_ids(field, &mut footnotes, &mut endnotes);
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
-        for choice in &hyperlink.hyperlink_choice {
-          if let w::HyperlinkChoice::WR(run) = choice {
-            collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
-          }
-        }
+        collect_hyperlink_note_reference_ids(hyperlink, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::Choice(choice) => {
-        if let w::ParagraphChoice2::WIns(inserted) = choice.as_ref() {
-          for choice in &inserted.inserted_run_choice {
-            if let w::InsertedRunChoice::WR(run) = choice {
-              collect_run_note_reference_ids(run, &mut footnotes, &mut endnotes);
-            }
-          }
+      w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
+        w::ParagraphChoice2::WIns(inserted) => {
+          collect_inserted_run_note_reference_ids(inserted, &mut footnotes, &mut endnotes);
         }
+        w::ParagraphChoice2::WDel(deleted) => {
+          collect_deleted_run_note_reference_ids(deleted, &mut footnotes, &mut endnotes);
+        }
+        w::ParagraphChoice2::WMoveFrom(moved) => {
+          collect_move_from_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
+        }
+        w::ParagraphChoice2::WMoveTo(moved) => {
+          collect_move_to_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
+        }
+        _ => {}
+      },
+      w::ParagraphChoice::WSdt(sdt) => {
+        collect_sdt_run_note_reference_ids(sdt, &mut footnotes, &mut endnotes);
       }
       _ => {}
     }
@@ -2578,6 +2870,211 @@ fn collect_run_note_reference_ids(run: &w::Run, footnotes: &mut Vec<i64>, endnot
       w::RunChoice::WEndnoteReference(reference) if reference.id > 0 => {
         endnotes.push(reference.id);
       }
+      _ => {}
+    }
+  }
+}
+
+fn collect_simple_field_note_reference_ids(
+  field: &w::SimpleField,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &field.simple_field_choice {
+    match choice {
+      w::SimpleFieldChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::SimpleFieldChoice::WFldSimple(field) => {
+        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      }
+      w::SimpleFieldChoice::WHyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      }
+      w::SimpleFieldChoice::WSdt(sdt) => {
+        collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn collect_hyperlink_note_reference_ids(
+  hyperlink: &w::Hyperlink,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &hyperlink.hyperlink_choice {
+    match choice {
+      w::HyperlinkChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::HyperlinkChoice::WFldSimple(field) => {
+        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WHyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WSdt(sdt) => {
+        collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::HyperlinkChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn collect_sdt_run_note_reference_ids(
+  sdt: &w::SdtRun,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  let Some(content) = sdt.sdt_content_run.as_ref() else {
+    return;
+  };
+  for choice in &content.sdt_content_run_choice {
+    match choice {
+      w::SdtContentRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::SdtContentRunChoice::WFldSimple(field) => {
+        collect_simple_field_note_reference_ids(field, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WHyperlink(hyperlink) => {
+        collect_hyperlink_note_reference_ids(hyperlink, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WSdt(sdt) => {
+        collect_sdt_run_note_reference_ids(sdt, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::SdtContentRunChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      _ => {}
+    }
+  }
+}
+
+fn collect_inserted_run_note_reference_ids(
+  inserted: &w::InsertedRun,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &inserted.inserted_run_choice {
+    match choice {
+      w::InsertedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
+        w::InsertedRunChoice2::WIns(inserted) => {
+          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+        }
+        w::InsertedRunChoice2::WDel(deleted) => {
+          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+        }
+        w::InsertedRunChoice2::WMoveFrom(moved) => {
+          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        w::InsertedRunChoice2::WMoveTo(moved) => {
+          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn collect_deleted_run_note_reference_ids(
+  deleted: &w::DeletedRun,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &deleted.deleted_run_choice {
+    match choice {
+      w::DeletedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::DeletedRunChoice::Choice(choice) => match choice.as_ref() {
+        w::DeletedRunChoice2::WIns(inserted) => {
+          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+        }
+        w::DeletedRunChoice2::WDel(deleted) => {
+          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+        }
+        w::DeletedRunChoice2::WMoveFrom(moved) => {
+          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        w::DeletedRunChoice2::WMoveTo(moved) => {
+          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn collect_move_from_run_note_reference_ids(
+  moved: &w::MoveFromRun,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &moved.move_from_run_choice {
+    match choice {
+      w::MoveFromRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::MoveFromRunChoice::Choice(choice) => match choice.as_ref() {
+        w::MoveFromRunChoice2::WIns(inserted) => {
+          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+        }
+        w::MoveFromRunChoice2::WDel(deleted) => {
+          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+        }
+        w::MoveFromRunChoice2::WMoveFrom(moved) => {
+          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        w::MoveFromRunChoice2::WMoveTo(moved) => {
+          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn collect_move_to_run_note_reference_ids(
+  moved: &w::MoveToRun,
+  footnotes: &mut Vec<i64>,
+  endnotes: &mut Vec<i64>,
+) {
+  for choice in &moved.move_to_run_choice {
+    match choice {
+      w::MoveToRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
+      w::MoveToRunChoice::Choice(choice) => match choice.as_ref() {
+        w::MoveToRunChoice2::WIns(inserted) => {
+          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+        }
+        w::MoveToRunChoice2::WDel(deleted) => {
+          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+        }
+        w::MoveToRunChoice2::WMoveFrom(moved) => {
+          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        w::MoveToRunChoice2::WMoveTo(moved) => {
+          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+        }
+        _ => {}
+      },
       _ => {}
     }
   }
@@ -2615,20 +3112,16 @@ fn push_simple_field(
         None,
       ),
       w::SimpleFieldChoice::WHyperlink(hyperlink) => {
-        let hyperlink_url = hyperlink_url(hyperlink, hyperlinks);
-        for item in &hyperlink.hyperlink_choice {
-          if let w::HyperlinkChoice::WR(run) = item {
-            push_run(
-              run,
-              inlines,
-              base_style.clone(),
-              styles,
-              images,
-              hyperlinks,
-              hyperlink_url.as_deref(),
-            );
-          }
-        }
+        let mut complex_field = None;
+        push_hyperlink_content(
+          hyperlink,
+          inlines,
+          base_style.clone(),
+          None,
+          &mut inline_context,
+          &mut complex_field,
+        );
+        flush_unclosed_complex_field(inlines, &mut complex_field);
       }
       w::SimpleFieldChoice::WFldSimple(field) => {
         push_simple_field(
@@ -2734,8 +3227,15 @@ fn push_run(
         if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_drawing_shapes(drawing, inlines, styles);
-        drawing::push_drawing_textboxes(drawing, inlines, style.clone(), styles, images);
+        drawing::push_drawing_shapes(drawing, inlines, styles, images, hyperlinks);
+        drawing::push_drawing_textboxes(
+          drawing,
+          inlines,
+          style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       w::RunChoice::WPict(picture) => {
         flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
@@ -2743,7 +3243,14 @@ fn push_run(
           inlines.push(InlineItem::Image(image));
         }
         drawing::push_pict_shapes(picture, inlines);
-        drawing::push_pict_textboxes(picture, inlines, base_style.clone(), styles, images);
+        drawing::push_pict_textboxes(
+          picture,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::XmlAny(xml) => {
@@ -2808,6 +3315,39 @@ fn push_ruby_base(
           hyperlink_url,
         );
       }
+      w::RubyBaseChoice::WDel(deleted) => {
+        push_deleted_run(
+          deleted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::RubyBaseChoice::WMoveFrom(moved) => {
+        push_move_from_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::RubyBaseChoice::WMoveTo(moved) => {
+        push_move_to_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
       _ => {}
     }
   }
@@ -2826,15 +3366,8 @@ fn push_sdt_run(
   let widget_id = sdt
     .sdt_properties
     .as_ref()
-    .filter(|properties| {
-      properties.sdt_properties_choice.iter().any(|choice| {
-        matches!(
-          choice,
-          w::SdtPropertiesChoice::WComboBox(_) | w::SdtPropertiesChoice::WDropDownList(_)
-        )
-      })
-    })
-    .map(|_| context.form_widget_ids.next_id());
+    .and_then(sdt_form_widget)
+    .map(|(kind, entries)| context.form_widget_ids.next_widget(kind, entries));
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetStart(widget_id));
   }
@@ -2862,21 +3395,16 @@ fn push_sdt_run(
         );
       }
       w::SdtContentRunChoice::WHyperlink(hyperlink) => {
-        let nested_url = self::hyperlink_url(hyperlink, context.hyperlinks)
-          .or_else(|| hyperlink_url.map(ToString::to_string));
-        for item in &hyperlink.hyperlink_choice {
-          if let w::HyperlinkChoice::WR(run) = item {
-            push_run(
-              run,
-              inlines,
-              base_style.clone(),
-              context.styles,
-              context.images,
-              context.hyperlinks,
-              nested_url.as_deref(),
-            );
-          }
-        }
+        let mut complex_field = None;
+        push_hyperlink_content(
+          hyperlink,
+          inlines,
+          base_style.clone(),
+          hyperlink_url,
+          context,
+          &mut complex_field,
+        );
+        flush_unclosed_complex_field(inlines, &mut complex_field);
       }
       w::SdtContentRunChoice::WSdt(sdt) => push_sdt_run(
         sdt.as_ref(),
@@ -2896,15 +3424,84 @@ fn push_sdt_run(
           hyperlink_url,
         );
       }
-      w::SdtContentRunChoice::WDel(_)
-      | w::SdtContentRunChoice::WMoveFrom(_)
-      | w::SdtContentRunChoice::WMoveTo(_) => {}
+      w::SdtContentRunChoice::WDel(deleted) => {
+        push_deleted_run(
+          deleted.as_ref(),
+          inlines,
+          base_style.clone(),
+          context.styles,
+          context.images,
+          context.hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::SdtContentRunChoice::WMoveFrom(moved) => {
+        push_move_from_run(
+          moved.as_ref(),
+          inlines,
+          base_style.clone(),
+          context.styles,
+          context.images,
+          context.hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::SdtContentRunChoice::WMoveTo(moved) => {
+        push_move_to_run(
+          moved.as_ref(),
+          inlines,
+          base_style.clone(),
+          context.styles,
+          context.images,
+          context.hyperlinks,
+          hyperlink_url,
+        );
+      }
       _ => {}
     }
   }
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetEnd(widget_id));
   }
+}
+
+fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec<String>)> {
+  let mut kind = FormWidgetKind::Text;
+  let mut entries = Vec::new();
+  for choice in &properties.sdt_properties_choice {
+    match choice {
+      w::SdtPropertiesChoice::WComboBox(combo_box) => {
+        kind = FormWidgetKind::ComboBox;
+        entries = sdt_list_item_display_texts(&combo_box.w_list_item);
+      }
+      w::SdtPropertiesChoice::WDropDownList(drop_down) => {
+        kind = FormWidgetKind::DropDownList;
+        entries = sdt_list_item_display_texts(&drop_down.w_list_item);
+      }
+      w::SdtPropertiesChoice::WDate(_) => {
+        kind = FormWidgetKind::Text;
+      }
+      w::SdtPropertiesChoice::WRichText | w::SdtPropertiesChoice::WText(_) => {
+        kind = FormWidgetKind::Text;
+      }
+      _ => {}
+    }
+  }
+  Some((kind, entries))
+}
+
+fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
+  items
+    .iter()
+    .map(|item| {
+      item
+        .display_text
+        .as_ref()
+        .or(item.value.as_ref())
+        .cloned()
+        .unwrap_or_default()
+    })
+    .collect()
 }
 
 fn push_run_xml_any(
@@ -2920,8 +3517,8 @@ fn push_run_xml_any(
     if let Some(image) = drawing::inline_image(&drawing, images, hyperlinks) {
       inlines.push(InlineItem::Image(image));
     }
-    drawing::push_drawing_shapes(&drawing, inlines, styles);
-    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images);
+    drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
+    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
     return;
   }
 
@@ -2930,7 +3527,7 @@ fn push_run_xml_any(
       inlines.push(InlineItem::Image(image));
     }
     drawing::push_pict_shapes(&picture, inlines);
-    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images);
+    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
   }
 }
 
@@ -3242,8 +3839,9 @@ fn note_reference_style(style: &TextStyle) -> TextStyle {
     return style.clone();
   }
   let mut reference_style = style.clone();
-  reference_style.baseline_shift_pt = style.font_size_pt * 0.35;
-  reference_style.font_size_pt = (style.font_size_pt * 0.58).max(1.0);
+  reference_style.baseline_shift_pt = style.font_size_pt * LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE;
+  reference_style.font_size_pt =
+    (style.font_size_pt * LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   reference_style
 }
 
@@ -3259,7 +3857,8 @@ fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextSt
   inlines.push(InlineItem::Text(TextRun {
     text: format!("[{id}]"),
     style: TextStyle {
-      font_size_pt: (style.font_size_pt * 0.75).max(1.0),
+      font_size_pt: (style.font_size_pt * COMMENT_REFERENCE_FONT_SCALE)
+        .max(MIN_ESCAPEMENT_FONT_SIZE_PT),
       color: RgbColor {
         r: 0x80,
         g: 0x40,
@@ -3596,34 +4195,60 @@ fn effect_extent_bottom(extent: Option<&wp::EffectExtent>) -> f32 {
 
 fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
   let margins = floating_wrap_margins(anchor);
+  let simple_position = anchor
+    .simple_pos
+    .as_ref()
+    .is_some_and(|value| value.as_bool())
+    .then_some(anchor.simple_position.as_ref())
+    .flatten();
   FloatingImagePlacement {
-    horizontal_relative_to: anchor
-      .horizontal_position
-      .as_deref()
-      .map(horizontal_image_reference)
+    horizontal_relative_to: simple_position
+      .map(|_| HorizontalImageReference::Page)
+      .or_else(|| {
+        anchor
+          .horizontal_position
+          .as_deref()
+          .map(horizontal_image_reference)
+      })
       .unwrap_or_default(),
-    vertical_relative_to: anchor
-      .vertical_position
-      .as_deref()
-      .map(vertical_image_reference)
+    vertical_relative_to: simple_position
+      .map(|_| VerticalImageReference::Page)
+      .or_else(|| {
+        anchor
+          .vertical_position
+          .as_deref()
+          .map(vertical_image_reference)
+      })
       .unwrap_or_default(),
-    horizontal_alignment: anchor
-      .horizontal_position
-      .as_deref()
-      .and_then(horizontal_position_alignment),
-    vertical_alignment: anchor
-      .vertical_position
-      .as_deref()
-      .and_then(vertical_position_alignment),
-    horizontal_offset_pt: anchor
-      .horizontal_position
-      .as_deref()
-      .and_then(horizontal_position_offset)
+    horizontal_alignment: simple_position.map(|_| None).unwrap_or_else(|| {
+      anchor
+        .horizontal_position
+        .as_deref()
+        .and_then(horizontal_position_alignment)
+    }),
+    vertical_alignment: simple_position.map(|_| None).unwrap_or_else(|| {
+      anchor
+        .vertical_position
+        .as_deref()
+        .and_then(vertical_position_alignment)
+    }),
+    horizontal_offset_pt: simple_position
+      .map(|position| units::emu_to_points(position.x))
+      .or_else(|| {
+        anchor
+          .horizontal_position
+          .as_deref()
+          .and_then(horizontal_position_offset)
+      })
       .unwrap_or(0.0),
-    vertical_offset_pt: anchor
-      .vertical_position
-      .as_deref()
-      .and_then(vertical_position_offset)
+    vertical_offset_pt: simple_position
+      .map(|position| units::emu_to_points(position.y))
+      .or_else(|| {
+        anchor
+          .vertical_position
+          .as_deref()
+          .and_then(vertical_position_offset)
+      })
       .unwrap_or(0.0),
     wrap: anchor
       .anchor_choice
@@ -3636,10 +4261,53 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .map(image_wrap_side)
       .unwrap_or_default(),
     behind_text: anchor.behind_doc.as_bool(),
+    layout_in_cell: anchor.layout_in_cell.as_bool(),
+    allow_overlap: anchor.allow_overlap.as_bool(),
+    relative_height: anchor.relative_height,
+    relative_width_to: anchor
+      .wp14_size_rel_h
+      .as_ref()
+      .map(|relative| relative_width_reference(relative.object_id)),
+    relative_width_pct: anchor
+      .wp14_size_rel_h
+      .as_ref()
+      .map(|relative| relative.percentage_width as f32 / units::DRAWINGML_PERCENT_SCALE),
+    relative_height_to: anchor
+      .wp14_size_rel_v
+      .as_ref()
+      .map(|relative| relative_height_reference(relative.relative_from)),
+    relative_height_pct: anchor
+      .wp14_size_rel_v
+      .as_ref()
+      .map(|relative| relative.percentage_height as f32 / units::DRAWINGML_PERCENT_SCALE),
     margin_top_pt: margins.top_pt,
     margin_right_pt: margins.right_pt,
     margin_bottom_pt: margins.bottom_pt,
     margin_left_pt: margins.left_pt,
+  }
+}
+
+fn relative_width_reference(
+  value: wp14::SizeRelativeHorizontallyValues,
+) -> HorizontalImageReference {
+  match value {
+    wp14::SizeRelativeHorizontallyValues::Margin => HorizontalImageReference::Margin,
+    wp14::SizeRelativeHorizontallyValues::Page => HorizontalImageReference::Page,
+    wp14::SizeRelativeHorizontallyValues::LeftMargin => HorizontalImageReference::LeftMargin,
+    wp14::SizeRelativeHorizontallyValues::RightMargin => HorizontalImageReference::RightMargin,
+    wp14::SizeRelativeHorizontallyValues::InsideMargin => HorizontalImageReference::InsideMargin,
+    wp14::SizeRelativeHorizontallyValues::OutsideMargin => HorizontalImageReference::OutsideMargin,
+  }
+}
+
+fn relative_height_reference(value: wp14::SizeRelativeVerticallyValues) -> VerticalImageReference {
+  match value {
+    wp14::SizeRelativeVerticallyValues::Margin => VerticalImageReference::Margin,
+    wp14::SizeRelativeVerticallyValues::Page => VerticalImageReference::Page,
+    wp14::SizeRelativeVerticallyValues::TopMargin => VerticalImageReference::TopMargin,
+    wp14::SizeRelativeVerticallyValues::BottomMargin => VerticalImageReference::BottomMargin,
+    wp14::SizeRelativeVerticallyValues::InsideMargin => VerticalImageReference::InsideMargin,
+    wp14::SizeRelativeVerticallyValues::OutsideMargin => VerticalImageReference::OutsideMargin,
   }
 }
 
@@ -3652,6 +4320,13 @@ struct ImageWrapMargins {
 }
 
 fn floating_wrap_margins(anchor: &wp::Anchor) -> ImageWrapMargins {
+  if matches!(
+    anchor.anchor_choice.as_ref(),
+    Some(wp::AnchorChoice::WpWrapNone)
+  ) {
+    return ImageWrapMargins::default();
+  }
+
   let mut margins = ImageWrapMargins {
     top_pt: optional_emu_to_points(anchor.distance_from_top),
     right_pt: optional_emu_to_points(anchor.distance_from_right),
@@ -3697,11 +4372,11 @@ fn horizontal_image_reference(position: &wp::HorizontalPosition) -> HorizontalIm
     wp::HorizontalRelativePositionValues::Page => HorizontalImageReference::Page,
     wp::HorizontalRelativePositionValues::Column => HorizontalImageReference::Column,
     wp::HorizontalRelativePositionValues::Character => HorizontalImageReference::Character,
-    wp::HorizontalRelativePositionValues::Margin
-    | wp::HorizontalRelativePositionValues::LeftMargin
-    | wp::HorizontalRelativePositionValues::RightMargin
-    | wp::HorizontalRelativePositionValues::InsideMargin
-    | wp::HorizontalRelativePositionValues::OutsideMargin => HorizontalImageReference::Margin,
+    wp::HorizontalRelativePositionValues::Margin => HorizontalImageReference::Margin,
+    wp::HorizontalRelativePositionValues::LeftMargin => HorizontalImageReference::LeftMargin,
+    wp::HorizontalRelativePositionValues::RightMargin => HorizontalImageReference::RightMargin,
+    wp::HorizontalRelativePositionValues::InsideMargin => HorizontalImageReference::InsideMargin,
+    wp::HorizontalRelativePositionValues::OutsideMargin => HorizontalImageReference::OutsideMargin,
   }
 }
 
@@ -3710,11 +4385,11 @@ fn vertical_image_reference(position: &wp::VerticalPosition) -> VerticalImageRef
     wp::VerticalRelativePositionValues::Page => VerticalImageReference::Page,
     wp::VerticalRelativePositionValues::Paragraph => VerticalImageReference::Paragraph,
     wp::VerticalRelativePositionValues::Line => VerticalImageReference::Line,
-    wp::VerticalRelativePositionValues::Margin
-    | wp::VerticalRelativePositionValues::TopMargin
-    | wp::VerticalRelativePositionValues::BottomMargin
-    | wp::VerticalRelativePositionValues::InsideMargin
-    | wp::VerticalRelativePositionValues::OutsideMargin => VerticalImageReference::Margin,
+    wp::VerticalRelativePositionValues::Margin => VerticalImageReference::Margin,
+    wp::VerticalRelativePositionValues::TopMargin => VerticalImageReference::TopMargin,
+    wp::VerticalRelativePositionValues::BottomMargin => VerticalImageReference::BottomMargin,
+    wp::VerticalRelativePositionValues::InsideMargin => VerticalImageReference::InsideMargin,
+    wp::VerticalRelativePositionValues::OutsideMargin => VerticalImageReference::OutsideMargin,
   }
 }
 
@@ -3731,13 +4406,11 @@ fn horizontal_position_alignment(
 ) -> Option<HorizontalImageAlignment> {
   match position.horizontal_position_choice.as_ref()? {
     wp::HorizontalPositionChoice::WpAlign(alignment) => match alignment {
-      wp::HorizontalAlignmentValues::Left | wp::HorizontalAlignmentValues::Inside => {
-        Some(HorizontalImageAlignment::Left)
-      }
+      wp::HorizontalAlignmentValues::Left => Some(HorizontalImageAlignment::Left),
       wp::HorizontalAlignmentValues::Center => Some(HorizontalImageAlignment::Center),
-      wp::HorizontalAlignmentValues::Right | wp::HorizontalAlignmentValues::Outside => {
-        Some(HorizontalImageAlignment::Right)
-      }
+      wp::HorizontalAlignmentValues::Right => Some(HorizontalImageAlignment::Right),
+      wp::HorizontalAlignmentValues::Inside => Some(HorizontalImageAlignment::Inside),
+      wp::HorizontalAlignmentValues::Outside => Some(HorizontalImageAlignment::Outside),
     },
     wp::HorizontalPositionChoice::WpPosOffset(_)
     | wp::HorizontalPositionChoice::Wp14PctPosHOffset(_) => None,
@@ -3756,13 +4429,21 @@ fn vertical_position_offset(position: &wp::VerticalPosition) -> Option<f32> {
 fn vertical_position_alignment(position: &wp::VerticalPosition) -> Option<VerticalImageAlignment> {
   match position.vertical_position_choice.as_ref()? {
     wp::VerticalPositionChoice::WpAlign(alignment) => match alignment {
-      wp::VerticalAlignmentValues::Top | wp::VerticalAlignmentValues::Inside => {
-        Some(VerticalImageAlignment::Top)
-      }
-      wp::VerticalAlignmentValues::Center => Some(VerticalImageAlignment::Center),
-      wp::VerticalAlignmentValues::Bottom | wp::VerticalAlignmentValues::Outside => {
+      wp::VerticalAlignmentValues::Top
+        if position.relative_from == wp::VerticalRelativePositionValues::Line =>
+      {
         Some(VerticalImageAlignment::Bottom)
       }
+      wp::VerticalAlignmentValues::Bottom
+        if position.relative_from == wp::VerticalRelativePositionValues::Line =>
+      {
+        Some(VerticalImageAlignment::Top)
+      }
+      wp::VerticalAlignmentValues::Top => Some(VerticalImageAlignment::Top),
+      wp::VerticalAlignmentValues::Center => Some(VerticalImageAlignment::Center),
+      wp::VerticalAlignmentValues::Bottom => Some(VerticalImageAlignment::Bottom),
+      wp::VerticalAlignmentValues::Inside => Some(VerticalImageAlignment::Inside),
+      wp::VerticalAlignmentValues::Outside => Some(VerticalImageAlignment::Outside),
     },
     wp::VerticalPositionChoice::WpPosOffset(_)
     | wp::VerticalPositionChoice::Wp14PctPosVOffset(_) => None,
@@ -3774,7 +4455,7 @@ fn image_wrap_mode(choice: &wp::AnchorChoice) -> ImageWrapMode {
     wp::AnchorChoice::WpWrapNone => ImageWrapMode::Through,
     wp::AnchorChoice::WpWrapSquare(_) => ImageWrapMode::Square,
     wp::AnchorChoice::WpWrapTight(_) => ImageWrapMode::Tight,
-    wp::AnchorChoice::WpWrapThrough(_) => ImageWrapMode::Through,
+    wp::AnchorChoice::WpWrapThrough(_) => ImageWrapMode::Square,
     wp::AnchorChoice::WpWrapTopAndBottom(_) => ImageWrapMode::TopBottom,
   }
 }
@@ -3805,6 +4486,7 @@ fn push_drawing_textboxes_impl(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   if drawing_is_hidden(drawing) {
     return;
@@ -3814,12 +4496,37 @@ fn push_drawing_textboxes_impl(
     return;
   };
 
+  let placement = match drawing.drawing_choice.as_ref() {
+    Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
+    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+      ImagePlacement::Floating(floating_image_placement(anchor))
+    }
+    None => return,
+  };
+
   for child in &graphic_data.xml_children {
-    if push_drawing_textbox_runs_from_xml(child, inlines, base_style.clone(), styles) {
+    let text_box_frames = drawingml_textbox_frames_from_xml(
+      child,
+      placement,
+      DrawingMlGroupTransform::identity(),
+      styles,
+      images,
+      hyperlinks,
+      false,
+    );
+    if !text_box_frames.is_empty() {
+      inlines.extend(text_box_frames.into_iter().map(InlineItem::Shape));
       continue;
     }
     if let Some(content) = drawing_textbox_content(child) {
-      push_textbox_content(&content, inlines, base_style.clone(), styles, images);
+      push_textbox_content(
+        &content,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+      );
     } else if let Some(text) = drawing_textbox_text(child) {
       inlines.push(InlineItem::Text(TextRun {
         text,
@@ -3831,135 +4538,184 @@ fn push_drawing_textboxes_impl(
   }
 }
 
-fn push_drawing_textbox_runs_from_xml(
+fn drawingml_textbox_frames_from_xml(
   xml: &str,
-  inlines: &mut Vec<InlineItem>,
-  base_style: TextStyle,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
   styles: &StylesCatalog,
-) -> bool {
-  if !xml.contains("txbxContent") {
-    return false;
-  }
-
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  skip_container_root: bool,
+) -> Vec<InlineShape> {
+  let mut frames = Vec::new();
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(false);
-
-  let mut textbox_depth = 0usize;
-  let mut paragraph_style = base_style.clone();
-  let mut run_style = paragraph_style.clone();
-  let mut paragraph_has_content = false;
-  let mut in_run = false;
-  let mut in_text = false;
-  let mut text = String::new();
-  let mut emitted = false;
+  let mut skipped_container_root = false;
 
   loop {
     match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
-        textbox_depth += 1;
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"txbxContent") => {
-        textbox_depth = textbox_depth.saturating_sub(1);
-      }
-      Ok(Event::Start(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") =>
-      {
-        paragraph_style = base_style.clone();
-        run_style = paragraph_style.clone();
-        paragraph_has_content = false;
-      }
-      Ok(Event::End(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"p") =>
-      {
-        if paragraph_has_content {
-          inlines.push(InlineItem::Text(TextRun {
-            text: "\n".into(),
-            style: base_style.clone(),
-            hyperlink_url: None,
-            dynamic_field: None,
-          }));
-          emitted = true;
-        }
-      }
-      Ok(Event::Start(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"rPr") =>
-      {
-        let Some(fragment) = read_outer_xml_fragment(&mut reader, event) else {
+      Ok(Event::Start(event)) if skip_container_root && !skipped_container_root => {
+        skipped_container_root = true;
+        if qname_ends_with(event.name().as_ref(), b"wgp") {
           continue;
-        };
-        let fragment = textbox_fragment_with_namespaces(fragment);
-        if in_run {
-          run_style = paragraph_style.clone();
-          if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
-            run_style = properties::run_style(Some(&properties), run_style, styles);
-          }
-          apply_text_effect_overrides_from_fragment(&mut run_style, &fragment, styles);
-        } else {
-          paragraph_style = base_style.clone();
-          if let Ok(properties) = w::RunProperties::from_bytes(fragment.as_bytes()) {
-            paragraph_style = properties::run_style(Some(&properties), paragraph_style, styles);
-          }
-          apply_text_effect_overrides_from_fragment(&mut paragraph_style, &fragment, styles);
-          run_style = paragraph_style.clone();
         }
       }
-      Ok(Event::Start(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"r") =>
-      {
-        in_run = true;
-        run_style = paragraph_style.clone();
-        text.clear();
-      }
-      Ok(Event::End(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"r") =>
-      {
-        let had_text = !text.is_empty();
-        flush_run_text(inlines, &mut text, run_style.clone(), None);
-        if had_text {
-          paragraph_has_content = true;
-          emitted = true;
-        }
-        in_run = false;
-      }
-      Ok(Event::Start(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") =>
-      {
-        in_text = true;
-      }
-      Ok(Event::End(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"t") =>
-      {
-        in_text = false;
-      }
-      Ok(Event::Empty(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"tab") =>
-      {
-        text.push('\t');
-      }
-      Ok(Event::Empty(event))
-        if textbox_depth > 0 && qname_ends_with(event.name().as_ref(), b"br") =>
-      {
-        text.push('\n');
-      }
-      Ok(Event::Text(event)) if textbox_depth > 0 && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          text.push_str(value.as_ref());
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wgp") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
+          let child_transform = drawingml_group_transform_from_fragment(&fragment)
+            .map(|xfrm| transform.child(xfrm))
+            .unwrap_or(transform);
+          frames.extend(drawingml_textbox_frames_from_xml(
+            &fragment,
+            placement,
+            child_transform,
+            styles,
+            images,
+            hyperlinks,
+            true,
+          ));
         }
       }
-      Ok(Event::CData(event)) if textbox_depth > 0 && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          text.push_str(value.as_ref());
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
+          && let Some(frame) = drawingml_textbox_frame_from_fragment(
+            &fragment, placement, transform, styles, images, hyperlinks,
+          )
+        {
+          frames.push(frame);
         }
       }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
+      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+        let mut writer = Writer::new(Vec::new());
+        if writer.write_event(Event::Empty(event.into_owned())).is_ok()
+          && let Ok(fragment) = String::from_utf8(writer.into_inner())
+          && let Some(frame) = drawingml_textbox_frame_from_fragment(
+            &fragment, placement, transform, styles, images, hyperlinks,
+          )
+        {
+          frames.push(frame);
+        }
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
     }
   }
 
-  emitted
+  frames
 }
 
+fn drawingml_textbox_frame_from_fragment(
+  xml: &str,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineShape> {
+  let content = drawing_textbox_content(xml)?;
+  let text_box = text_box_frame_from_drawingml(xml, &content, styles, images, hyperlinks);
+  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
+  let width_pt =
+    (shape_width_pt - text_box.left_pt - text_box.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT);
+  let height_pt =
+    (shape_height_pt - text_box.top_pt - text_box.bottom_pt).max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT);
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    geometry: InlineShapeGeometry::Rectangle,
+    offset_x_pt: offset_x_pt + text_box.left_pt,
+    offset_y_pt: offset_y_pt + text_box.top_pt,
+    fill_color: None,
+    stroke: None,
+    placement,
+    text_box_blocks: text_box.blocks,
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: text_box.vertical_alignment,
+  })
+}
+
+#[derive(Clone, Debug)]
+struct TextBoxFrameContent {
+  blocks: Vec<Block>,
+  left_pt: f32,
+  top_pt: f32,
+  right_pt: f32,
+  bottom_pt: f32,
+  vertical_alignment: TextBoxVerticalAlignment,
+}
+
+impl TextBoxFrameContent {
+  fn new(blocks: Vec<Block>) -> Self {
+    Self {
+      blocks,
+      left_pt: DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT,
+      top_pt: DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT,
+      right_pt: DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT,
+      bottom_pt: DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT,
+      vertical_alignment: TextBoxVerticalAlignment::Top,
+    }
+  }
+}
+
+fn text_box_frame_from_drawingml(
+  xml: &str,
+  content: &w::TextBoxContent,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> TextBoxFrameContent {
+  let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
+  if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
+    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
+  }
+  frame
+}
+
+fn apply_drawingml_textbox_body_properties(xml: &str, frame: &mut TextBoxFrameContent) {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"bodyPr") =>
+      {
+        frame.left_pt = attr_value(&event, b"lIns")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(frame.left_pt);
+        frame.top_pt = attr_value(&event, b"tIns")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(frame.top_pt);
+        frame.right_pt = attr_value(&event, b"rIns")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(frame.right_pt);
+        frame.bottom_pt = attr_value(&event, b"bIns")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(frame.bottom_pt);
+        frame.vertical_alignment = match attr_value(&event, b"anchor").as_deref() {
+          Some("ctr") => TextBoxVerticalAlignment::Center,
+          Some("b") | Some("bottom") => TextBoxVerticalAlignment::Bottom,
+          _ => frame.vertical_alignment,
+        };
+        break;
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+}
+
+#[cfg(test)]
 fn apply_text_effect_overrides_from_fragment(
   style: &mut TextStyle,
   fragment: &str,
@@ -4046,6 +4802,8 @@ fn push_drawing_shapes_impl(
   drawing: &w::Drawing,
   inlines: &mut Vec<InlineItem>,
   styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   if drawing_is_hidden(drawing) {
     return;
@@ -4067,41 +4825,142 @@ fn push_drawing_shapes_impl(
     inlines.extend(drawingml_shapes_from_xml(
       xml,
       placement,
-      &styles.theme_colors,
+      DrawingMlGroupTransform::identity(),
+      styles,
+      images,
+      hyperlinks,
+      false,
     ));
   }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DrawingMlGroupTransform {
+  scale_x: f32,
+  scale_y: f32,
+  translate_x_pt: f32,
+  translate_y_pt: f32,
+}
+
+impl DrawingMlGroupTransform {
+  fn identity() -> Self {
+    Self {
+      scale_x: 1.0,
+      scale_y: 1.0,
+      translate_x_pt: 0.0,
+      translate_y_pt: 0.0,
+    }
+  }
+
+  fn child(self, xfrm: DrawingMlGroupXfrm) -> Self {
+    let scale_x = if xfrm.child_width_pt != 0.0 {
+      xfrm.width_pt / xfrm.child_width_pt
+    } else {
+      1.0
+    };
+    let scale_y = if xfrm.child_height_pt != 0.0 {
+      xfrm.height_pt / xfrm.child_height_pt
+    } else {
+      1.0
+    };
+    Self {
+      scale_x: self.scale_x * scale_x,
+      scale_y: self.scale_y * scale_y,
+      translate_x_pt: self.translate_x_pt
+        + self.scale_x * (xfrm.offset_x_pt - xfrm.child_offset_x_pt * scale_x),
+      translate_y_pt: self.translate_y_pt
+        + self.scale_y * (xfrm.offset_y_pt - xfrm.child_offset_y_pt * scale_y),
+    }
+  }
+
+  fn rect(self, x_pt: f32, y_pt: f32, width_pt: f32, height_pt: f32) -> (f32, f32, f32, f32) {
+    (
+      self.translate_x_pt + x_pt * self.scale_x,
+      self.translate_y_pt + y_pt * self.scale_y,
+      width_pt * self.scale_x.abs(),
+      height_pt * self.scale_y.abs(),
+    )
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct DrawingMlGroupXfrm {
+  offset_x_pt: f32,
+  offset_y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  child_offset_x_pt: f32,
+  child_offset_y_pt: f32,
+  child_width_pt: f32,
+  child_height_pt: f32,
 }
 
 fn drawingml_shapes_from_xml(
   xml: &str,
   placement: ImagePlacement,
-  theme_colors: &ThemeColors,
+  transform: DrawingMlGroupTransform,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  skip_container_root: bool,
 ) -> Vec<InlineItem> {
   let mut shapes = Vec::new();
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(false);
+  let mut skipped_container_root = false;
 
   loop {
     match reader.read_event() {
+      Ok(Event::Start(event)) if skip_container_root && !skipped_container_root => {
+        skipped_container_root = true;
+        if qname_ends_with(event.name().as_ref(), b"wgp") {
+          continue;
+        }
+      }
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wgp") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
+          let child_transform = drawingml_group_transform_from_fragment(&fragment)
+            .map(|xfrm| transform.child(xfrm))
+            .unwrap_or(transform);
+          shapes.extend(drawingml_shapes_from_xml(
+            &fragment,
+            placement,
+            child_transform,
+            styles,
+            images,
+            hyperlinks,
+            true,
+          ));
+        }
+      }
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(shape) = drawingml_shape_from_fragment(&fragment, placement, theme_colors)
+          && let Some(shape) =
+            drawingml_shape_from_fragment(&fragment, placement, transform, styles)
         {
           shapes.push(InlineItem::Shape(shape));
         }
       }
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pic") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(shape) = drawingml_picture_frame_from_fragment(&fragment, placement)
-        {
-          shapes.push(InlineItem::Shape(shape));
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
+          if let Some(image) = drawingml_picture_image_from_fragment(
+            &fragment, placement, transform, images, hyperlinks,
+          ) {
+            shapes.push(InlineItem::Image(image));
+          }
+          if let Some(shape) =
+            drawingml_picture_frame_from_fragment(&fragment, placement, transform)
+          {
+            shapes.push(InlineItem::Shape(shape));
+          }
         }
       }
       Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
         let mut writer = Writer::new(Vec::new());
         if writer.write_event(Event::Empty(event.into_owned())).is_ok()
           && let Ok(fragment) = String::from_utf8(writer.into_inner())
-          && let Some(shape) = drawingml_shape_from_fragment(&fragment, placement, theme_colors)
+          && let Some(shape) =
+            drawingml_shape_from_fragment(&fragment, placement, transform, styles)
         {
           shapes.push(InlineItem::Shape(shape));
         }
@@ -4139,70 +4998,131 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
 fn drawingml_shape_from_fragment(
   xml: &str,
   placement: ImagePlacement,
-  theme_colors: &ThemeColors,
+  transform: DrawingMlGroupTransform,
+  styles: &StylesCatalog,
 ) -> Option<InlineShape> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  let fill_color = drawingml_shape_fill_color(&sp_pr, theme_colors);
-  let stroke = drawingml_shape_stroke(&sp_pr, theme_colors);
+  let fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors)
+    .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors));
+  let stroke = drawingml_shape_stroke(&sp_pr, &styles.theme_colors)
+    .or_else(|| drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines));
   if fill_color.is_none() && stroke.is_none() {
     return None;
   }
 
-  let mut reader = Reader::from_str(&sp_pr);
-  reader.config_mut().trim_text(false);
-  let mut offset_x_pt = 0.0f32;
-  let mut offset_y_pt = 0.0f32;
-  let mut width_pt = 0.0f32;
-  let mut height_pt = 0.0f32;
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"off") => {
-        offset_x_pt = attr_value(&event, b"x")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(offset_x_pt);
-        offset_y_pt = attr_value(&event, b"y")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(offset_y_pt);
-      }
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
-        width_pt = attr_value(&event, b"cx")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(width_pt);
-        height_pt = attr_value(&event, b"cy")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(height_pt);
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
-  }
-
-  if width_pt <= 0.0 || height_pt <= 0.0 {
-    return None;
-  }
+  let geometry = drawingml_shape_geometry_kind(&sp_pr);
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    drawingml_geometry_from_sp_pr(&sp_pr, geometry)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
   Some(InlineShape {
     width_pt,
     height_pt,
+    geometry,
     offset_x_pt,
     offset_y_pt,
     fill_color,
     stroke,
     placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
 
-fn drawingml_picture_frame_from_fragment(
-  xml: &str,
-  placement: ImagePlacement,
-) -> Option<InlineShape> {
+fn drawingml_shape_geometry(xml: &str) -> Option<(f32, f32, f32, f32)> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  let mut reader = Reader::from_str(&sp_pr);
+  drawingml_geometry_from_sp_pr(&sp_pr, drawingml_shape_geometry_kind(&sp_pr))
+}
+
+fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXfrm> {
+  let grp_sp_pr = first_named_xml_fragment(xml, b"grpSpPr")?;
+  let xfrm = first_named_xml_fragment(&grp_sp_pr, b"xfrm")?;
+  let mut reader = Reader::from_str(&xfrm);
+  reader.config_mut().trim_text(false);
+  let mut group = DrawingMlGroupXfrm::default();
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"off") => {
+        group.offset_x_pt = attr_value(&event, b"x")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.offset_x_pt);
+        group.offset_y_pt = attr_value(&event, b"y")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.offset_y_pt);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"ext") => {
+        group.width_pt = attr_value(&event, b"cx")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.width_pt);
+        group.height_pt = attr_value(&event, b"cy")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.height_pt);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chOff") => {
+        group.child_offset_x_pt = attr_value(&event, b"x")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.child_offset_x_pt);
+        group.child_offset_y_pt = attr_value(&event, b"y")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.child_offset_y_pt);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chExt") => {
+        group.child_width_pt = attr_value(&event, b"cx")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.child_width_pt);
+        group.child_height_pt = attr_value(&event, b"cy")
+          .and_then(|value| value.parse::<i64>().ok())
+          .map(units::emu_to_points)
+          .unwrap_or(group.child_height_pt);
+      }
+      Event::Eof => return Some(group),
+      _ => {}
+    }
+  }
+}
+
+fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
+  let mut reader = Reader::from_str(sp_pr);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"prstGeom") =>
+      {
+        if attr_value(&event, b"prst")
+          .as_deref()
+          .is_some_and(|value| value.eq_ignore_ascii_case("line"))
+        {
+          return InlineShapeGeometry::Line;
+        }
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  InlineShapeGeometry::Rectangle
+}
+
+fn drawingml_geometry_from_sp_pr(
+  sp_pr: &str,
+  geometry: InlineShapeGeometry,
+) -> Option<(f32, f32, f32, f32)> {
+  let mut reader = Reader::from_str(sp_pr);
   reader.config_mut().trim_text(false);
   let mut offset_x_pt = 0.0f32;
   let mut offset_y_pt = 0.0f32;
@@ -4236,28 +5156,164 @@ fn drawingml_picture_frame_from_fragment(
     }
   }
 
-  if width_pt <= 0.0 || height_pt <= 0.0 {
-    return None;
+  match geometry {
+    InlineShapeGeometry::Rectangle if width_pt <= 0.0 || height_pt <= 0.0 => return None,
+    InlineShapeGeometry::Line if width_pt <= 0.0 && height_pt <= 0.0 => return None,
+    InlineShapeGeometry::Rectangle | InlineShapeGeometry::Line => {}
   }
+
+  Some((offset_x_pt, offset_y_pt, width_pt, height_pt))
+}
+
+fn drawingml_picture_frame_from_fragment(
+  xml: &str,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+) -> Option<InlineShape> {
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
   Some(InlineShape {
     width_pt,
     height_pt,
+    geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt,
     offset_y_pt,
     fill_color: None,
     stroke: None,
     placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
+}
+
+fn drawingml_picture_image_from_fragment(
+  xml: &str,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineImage> {
+  let properties = drawing_image_properties_from_xml(xml)?;
+  let relationship_id = properties.relationship_id?;
+  let resource = images.by_relationship_id.get(&relationship_id)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
+  let hyperlink_url = properties
+    .hyperlink_relationship_id
+    .as_deref()
+    .and_then(|relationship_id| hyperlinks.target(relationship_id))
+    .map(ToString::to_string);
+  Some(InlineImage {
+    data: resource.data.clone(),
+    content_type: resource.content_type.clone(),
+    width_pt,
+    height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
+    crop: properties.crop,
+    rotation_deg: properties.rotation_deg,
+    flip_horizontal: properties.flip_horizontal,
+    flip_vertical: properties.flip_vertical,
+    alt_text: drawingml_picture_alt_text(xml),
+    hyperlink_url,
+    placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
+  })
+}
+
+fn drawingml_picture_alt_text(xml: &str) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"cNvPr") =>
+      {
+        if let Some(description) = attr_value(&event, b"descr") {
+          return Some(description.to_string());
+        }
+        if let Some(name) = attr_value(&event, b"name") {
+          return Some(name.to_string());
+        }
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn drawingml_child_placement(
+  placement: ImagePlacement,
+  offset_x_pt: f32,
+  offset_y_pt: f32,
+) -> ImagePlacement {
+  match placement {
+    ImagePlacement::Inline => ImagePlacement::Inline,
+    ImagePlacement::Floating(mut floating) => {
+      floating.horizontal_alignment = None;
+      floating.vertical_alignment = None;
+      floating.horizontal_offset_pt += offset_x_pt;
+      floating.vertical_offset_pt += offset_y_pt;
+      ImagePlacement::Floating(floating)
+    }
+  }
 }
 
 fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
   drawingml_color_from_named_fragment(xml, b"solidFill", theme_colors).map(|color| color.color)
 }
 
+fn drawingml_shape_style_color(
+  xml: &str,
+  local_name: &[u8],
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  drawingml_color_from_named_fragment(xml, local_name, theme_colors).map(|color| color.color)
+}
+
+fn drawingml_shape_style_stroke(
+  xml: &str,
+  theme_colors: &ThemeColors,
+  theme_lines: &ThemeLineStyles,
+) -> Option<BorderStyle> {
+  let fragment = first_named_xml_fragment(xml, b"lnRef")?;
+  let index = drawingml_style_ref_index(&fragment)?;
+  let width_pt = theme_lines.width_pt(index)?;
+  let color = drawingml_color_from_named_fragment(&fragment, b"schemeClr", theme_colors)?.color;
+  Some(BorderStyle {
+    width_pt,
+    spacing_pt: 0.0,
+    color,
+    compound: false,
+  })
+}
+
+fn drawingml_style_ref_index(xml: &str) -> Option<usize> {
+  let mut reader = Reader::from_str(xml);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"lnRef") =>
+      {
+        return attr_value(&event, b"idx")?.parse::<usize>().ok();
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
 fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<BorderStyle> {
   let line_fragment = first_named_xml_fragment(xml, b"ln")?;
-  let mut width_pt = 0.5f32;
+  let mut width_pt = units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU);
   let mut reader = Reader::from_str(&line_fragment);
   reader.config_mut().trim_text(false);
 
@@ -4311,6 +5367,15 @@ fn drawingml_color_from_named_fragment(
       }
       Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
         let color = color_attr(&event, b"val")?;
+        return Some(ResolvedColor {
+          color,
+          opacity: 1.0,
+        });
+      }
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"sysClr") =>
+      {
+        let color = color_attr(&event, b"lastClr").or_else(|| color_attr(&event, b"val"))?;
         return Some(ResolvedColor {
           color,
           opacity: 1.0,
@@ -4398,7 +5463,9 @@ fn vml_inline_shape(
   let stroke = stroke_color
     .and_then(parse_vml_color)
     .map(|color| BorderStyle {
-      width_pt: stroke_weight.and_then(vml_measure_to_points).unwrap_or(0.5),
+      width_pt: stroke_weight
+        .and_then(vml_measure_to_points)
+        .unwrap_or_else(|| units::emu_to_points(VML_DEFAULT_STROKE_WEIGHT_EMU)),
       spacing_pt: 0.0,
       color,
       compound: false,
@@ -4410,12 +5477,97 @@ fn vml_inline_shape(
   Some(InlineShape {
     width_pt,
     height_pt,
+    geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color,
     stroke,
     placement: style.placement(),
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
+}
+
+fn vml_textbox_frame(
+  shape_style: Option<&str>,
+  textbox: &v::TextBox,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Option<InlineShape> {
+  if vml_style_is_hidden(shape_style) {
+    return None;
+  }
+
+  let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
+    return None;
+  };
+  let style = vml_image_style(shape_style);
+  let (shape_width_pt, shape_height_pt) = style.size_pt?;
+  let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
+  apply_vml_textbox_properties(textbox, &mut frame);
+  let width_pt =
+    (shape_width_pt - frame.left_pt - frame.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT);
+  let height_pt =
+    (shape_height_pt - frame.top_pt - frame.bottom_pt).max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT);
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    geometry: InlineShapeGeometry::Rectangle,
+    offset_x_pt: frame.left_pt,
+    offset_y_pt: frame.top_pt,
+    fill_color: None,
+    stroke: None,
+    placement: style.placement(),
+    text_box_blocks: frame.blocks,
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: frame.vertical_alignment,
+  })
+}
+
+fn apply_vml_textbox_properties(textbox: &v::TextBox, frame: &mut TextBoxFrameContent) {
+  if let Some(inset) = textbox.inset.as_deref() {
+    let mut values = inset.split(',').map(str::trim);
+    frame.left_pt = values
+      .next()
+      .and_then(vml_measure_to_points)
+      .unwrap_or(frame.left_pt);
+    frame.top_pt = values
+      .next()
+      .and_then(vml_measure_to_points)
+      .unwrap_or(frame.top_pt);
+    frame.right_pt = values
+      .next()
+      .and_then(vml_measure_to_points)
+      .unwrap_or(frame.right_pt);
+    frame.bottom_pt = values
+      .next()
+      .and_then(vml_measure_to_points)
+      .unwrap_or(frame.bottom_pt);
+  }
+
+  if let Some(style) = textbox.style.as_deref() {
+    for declaration in style.split(';') {
+      let Some((name, value)) = declaration.split_once(':') else {
+        continue;
+      };
+      if name.trim().eq_ignore_ascii_case("v-text-anchor") {
+        frame.vertical_alignment = match value.trim().to_ascii_lowercase().as_str() {
+          "middle" => TextBoxVerticalAlignment::Center,
+          "bottom" => TextBoxVerticalAlignment::Bottom,
+          _ => frame.vertical_alignment,
+        };
+      }
+    }
+  }
 }
 
 fn parse_vml_color(value: &str) -> Option<RgbColor> {
@@ -4441,9 +5593,17 @@ fn push_pict_textboxes_impl(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   for choice in &picture.picture_choice {
-    push_picture_choice_textboxes(choice, inlines, base_style.clone(), styles, images);
+    push_picture_choice_textboxes(
+      choice,
+      inlines,
+      base_style.clone(),
+      styles,
+      images,
+      hyperlinks,
+    );
   }
 }
 
@@ -4463,19 +5623,20 @@ fn push_picture_choice_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   match choice {
     w::PictureChoice::VGroup(group) => {
-      push_group_textboxes(group, inlines, base_style, styles, images);
+      push_group_textboxes(group, inlines, base_style, styles, images, hyperlinks);
     }
     w::PictureChoice::VImage(image) => {
-      push_image_file_textboxes(image, inlines, base_style, styles, images);
+      push_image_file_textboxes(image, inlines, base_style, styles, images, hyperlinks);
     }
     w::PictureChoice::VRect(rectangle) => {
-      push_rectangle_textboxes(rectangle, inlines, base_style, styles, images);
+      push_rectangle_textboxes(rectangle, inlines, base_style, styles, images, hyperlinks);
     }
     w::PictureChoice::VShape(shape) => {
-      push_shape_textboxes(shape, inlines, base_style, styles, images);
+      push_shape_textboxes(shape, inlines, base_style, styles, images, hyperlinks);
     }
     _ => {}
   }
@@ -4497,20 +5658,49 @@ fn push_group_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   for choice in &group.group_choice {
     match choice {
       v::GroupChoice::VGroup(group) => {
-        push_group_textboxes(group, inlines, base_style.clone(), styles, images);
+        push_group_textboxes(
+          group,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       v::GroupChoice::VImage(image) => {
-        push_image_file_textboxes(image, inlines, base_style.clone(), styles, images);
+        push_image_file_textboxes(
+          image,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       v::GroupChoice::VRect(rectangle) => {
-        push_rectangle_textboxes(rectangle, inlines, base_style.clone(), styles, images);
+        push_rectangle_textboxes(
+          rectangle,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       v::GroupChoice::VShape(shape) => {
-        push_shape_textboxes(shape, inlines, base_style.clone(), styles, images);
+        push_shape_textboxes(
+          shape,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
       }
       _ => {}
     }
@@ -4542,6 +5732,7 @@ fn push_image_file_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   if vml_style_is_hidden(image.style.as_deref()) {
     return;
@@ -4549,7 +5740,20 @@ fn push_image_file_textboxes(
 
   for choice in &image.image_file_choice {
     if let v::ImageFileChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
+      if let Some(frame) =
+        vml_textbox_frame(image.style.as_deref(), textbox, styles, images, hyperlinks)
+      {
+        inlines.push(InlineItem::Shape(frame));
+      } else {
+        push_vml_textbox(
+          textbox,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
     }
   }
 }
@@ -4579,6 +5783,7 @@ fn push_rectangle_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   if vml_style_is_hidden(rectangle.style.as_deref()) {
     return;
@@ -4586,7 +5791,24 @@ fn push_rectangle_textboxes(
 
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
+      if let Some(frame) = vml_textbox_frame(
+        rectangle.style.as_deref(),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
+        inlines.push(InlineItem::Shape(frame));
+      } else {
+        push_vml_textbox(
+          textbox,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
     }
   }
 }
@@ -4613,6 +5835,7 @@ fn push_shape_textboxes(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   if vml_style_is_hidden(shape.style.as_deref()) {
     return;
@@ -4620,7 +5843,20 @@ fn push_shape_textboxes(
 
   for choice in &shape.shape_choice {
     if let v::ShapeChoice::VTextbox(textbox) = choice {
-      push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
+      if let Some(frame) =
+        vml_textbox_frame(shape.style.as_deref(), textbox, styles, images, hyperlinks)
+      {
+        inlines.push(InlineItem::Shape(frame));
+      } else {
+        push_vml_textbox(
+          textbox,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
     }
   }
 }
@@ -4642,11 +5878,12 @@ fn push_vml_textbox(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
   let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
     return;
   };
-  push_textbox_content(content, inlines, base_style, styles, images);
+  push_textbox_content(content, inlines, base_style, styles, images, hyperlinks);
 }
 
 fn push_textbox_content(
@@ -4655,21 +5892,12 @@ fn push_textbox_content(
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
 ) {
-  let mut numbering = NumberingCatalog::default();
-  let mut form_widget_ids = FormWidgetIdAllocator::default();
-  let hyperlinks = HyperlinkCatalog::default();
-  for choice in &content.text_box_content_choice {
-    match choice {
-      w::TextBoxContentChoice::WP(paragraph) => {
-        let paragraph = paragraph_model(
-          paragraph,
-          styles,
-          &mut numbering,
-          images,
-          &hyperlinks,
-          &mut form_widget_ids,
-        );
+  let blocks = textbox_blocks(content, styles, images, hyperlinks);
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
         inlines.extend(paragraph.inlines);
         inlines.push(InlineItem::Text(TextRun {
           text: "\n".into(),
@@ -4678,20 +5906,57 @@ fn push_textbox_content(
           dynamic_field: None,
         }));
       }
+      Block::Table(table) => push_table_text(&table, inlines, base_style.clone()),
+      Block::Frame(frame) => {
+        for block in frame.blocks {
+          match block {
+            Block::Paragraph(paragraph) => inlines.extend(paragraph.inlines),
+            Block::Table(table) => push_table_text(&table, inlines, base_style.clone()),
+            Block::Frame(_) => {}
+          }
+        }
+      }
+    }
+  }
+}
+
+fn textbox_blocks(
+  content: &w::TextBoxContent,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Vec<Block> {
+  let mut blocks = Vec::new();
+  let mut numbering = NumberingCatalog::default();
+  let mut form_widget_ids = FormWidgetIdAllocator::default();
+  for choice in &content.text_box_content_choice {
+    match choice {
+      w::TextBoxContentChoice::WP(paragraph) => {
+        let paragraph = paragraph_model(
+          paragraph,
+          styles,
+          &mut numbering,
+          images,
+          hyperlinks,
+          &mut form_widget_ids,
+        );
+        blocks.push(Block::Paragraph(paragraph));
+      }
       w::TextBoxContentChoice::WTbl(table) => {
         let table = table_model(
           table,
           styles,
           &mut numbering,
           images,
-          &hyperlinks,
+          hyperlinks,
           &mut form_widget_ids,
         );
-        push_table_text(&table, inlines, base_style.clone());
+        blocks.push(Block::Table(table));
       }
       _ => {}
     }
   }
+  blocks
 }
 
 fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyle) {
@@ -4711,6 +5976,15 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
             inlines.extend(paragraph.inlines.clone());
           }
           Block::Table(table) => push_table_text(table, inlines, style.clone()),
+          Block::Frame(frame) => {
+            for block in &frame.blocks {
+              match block {
+                Block::Paragraph(paragraph) => inlines.extend(paragraph.inlines.clone()),
+                Block::Table(table) => push_table_text(table, inlines, style.clone()),
+                Block::Frame(_) => {}
+              }
+            }
+          }
         }
       }
     }
@@ -4807,6 +6081,13 @@ impl VmlImageStyle {
         wrap: self.wrap,
         wrap_side: ImageWrapSide::BothSides,
         behind_text: self.behind_text,
+        layout_in_cell: true,
+        allow_overlap: true,
+        relative_height: 0,
+        relative_width_to: None,
+        relative_width_pct: None,
+        relative_height_to: None,
+        relative_height_pct: None,
         margin_top_pt: self.margin_top_pt,
         margin_right_pt: self.margin_right_pt,
         margin_bottom_pt: self.margin_bottom_pt,
@@ -4837,18 +6118,20 @@ fn vml_crop_fraction(value: Option<&str>) -> f32 {
       .trim()
       .parse::<f32>()
       .ok()
-      .map(|value| value / 100.0)
+      .map(|value| value / units::VML_PERCENT_SCALE)
   } else if let Some(fixed) = value.strip_suffix('f') {
     fixed
       .trim()
       .parse::<f32>()
       .ok()
-      .map(|value| value / 65536.0)
+      .map(|value| value / units::VML_FIXED_SCALE)
   } else {
     value.trim().parse::<f32>().ok()
   };
 
-  fraction.unwrap_or(0.0).clamp(0.0, 0.999)
+  fraction
+    .unwrap_or(0.0)
+    .clamp(0.0, units::DRAWINGML_MAX_FRACTION_BELOW_ONE)
 }
 
 fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
@@ -4938,7 +6221,8 @@ fn vml_vertical_reference(value: &str) -> VerticalImageReference {
 fn vml_wrap_mode(value: &str) -> ImageWrapMode {
   match value.trim().to_ascii_lowercase().as_str() {
     "topandbottom" | "top-bottom" | "top_bottom" => ImageWrapMode::TopBottom,
-    "none" | "through" => ImageWrapMode::Through,
+    "none" => ImageWrapMode::Through,
+    "through" | "tight" | "square" => ImageWrapMode::Square,
     "inline" => ImageWrapMode::Inline,
     _ => ImageWrapMode::Square,
   }
@@ -4951,7 +6235,7 @@ fn vml_rotation_degrees(value: &str) -> f32 {
       .trim()
       .parse::<f32>()
       .ok()
-      .map(|value| value / 65536.0)
+      .map(|value| value / units::VML_FIXED_SCALE)
   } else {
     value.parse::<f32>().ok()
   };
@@ -4971,13 +6255,13 @@ fn vml_measure_to_points(value: &str) -> Option<f32> {
   let (number, multiplier) = if let Some(number) = value.strip_suffix("pt") {
     (number, 1.0)
   } else if let Some(number) = value.strip_suffix("in") {
-    (number, 72.0)
+    (number, units::POINTS_PER_INCH)
   } else if let Some(number) = value.strip_suffix("cm") {
-    (number, 72.0 / 2.54)
+    (number, units::POINTS_PER_INCH / units::CENTIMETERS_PER_INCH)
   } else if let Some(number) = value.strip_suffix("mm") {
-    (number, 72.0 / 25.4)
+    (number, units::POINTS_PER_INCH / units::MILLIMETERS_PER_INCH)
   } else if let Some(number) = value.strip_suffix("px") {
-    (number, 0.75)
+    (number, units::POINTS_PER_CSS_PIXEL)
   } else {
     (value, 1.0)
   };
@@ -5002,6 +6286,9 @@ struct DrawingImageProperties {
 fn drawing_image_properties(
   graphic_data: &ooxmlsdk::schemas::a::GraphicData,
 ) -> Option<DrawingImageProperties> {
+  if graphic_data.uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
+    return None;
+  }
   graphic_data
     .xml_children
     .iter()
@@ -5087,7 +6374,7 @@ fn apply_image_transform_attrs(
         properties.rotation_deg = value
           .as_deref()
           .and_then(|value| value.parse::<i32>().ok())
-          .map(|value| value as f32 / 60000.0)
+          .map(|value| value as f32 / units::DRAWINGML_ANGLE_UNITS_PER_DEGREE)
           .unwrap_or(0.0);
       }
       b"flipH" => properties.flip_horizontal = value.as_deref().is_some_and(xml_bool),
@@ -5098,7 +6385,8 @@ fn apply_image_transform_attrs(
 }
 
 fn relative_rect_attr_to_fraction(value: i32) -> f32 {
-  (value as f32 / 100000.0).clamp(0.0, 0.999)
+  (value as f32 / units::DRAWINGML_PERCENT_SCALE)
+    .clamp(0.0, units::DRAWINGML_MAX_FRACTION_BELOW_ONE)
 }
 
 fn xml_bool(value: &str) -> bool {
@@ -5124,9 +6412,7 @@ fn drawing_textbox_content(xml: &str) -> Option<w::TextBoxContent> {
           let event = reader.read_event().ok()?;
           match &event {
             Event::Start(_) => depth += 1,
-            Event::End(end) if qname_ends_with(end.name().as_ref(), b"txbxContent") => {
-              depth = depth.saturating_sub(1);
-            }
+            Event::End(_) => depth = depth.saturating_sub(1),
             Event::Empty(_) => {}
             Event::Eof => return None,
             _ => {}
@@ -5236,6 +6522,7 @@ struct StylesCatalog {
   default_paragraph_style_id: Option<String>,
   theme_fonts: ThemeFonts,
   theme_colors: ThemeColors,
+  theme_lines: ThemeLineStyles,
   styles: HashMap<String, StyleEntry>,
 }
 
@@ -5243,6 +6530,7 @@ struct StylesCatalog {
 struct ThemeData {
   fonts: ThemeFonts,
   colors: ThemeColors,
+  lines: ThemeLineStyles,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5255,6 +6543,21 @@ struct ThemeFonts {
   minor_high_ansi: Option<Arc<str>>,
   minor_east_asia: Option<Arc<str>>,
   minor_bidi: Option<Arc<str>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct ThemeLineStyles {
+  widths_pt: Vec<f32>,
+}
+
+impl ThemeLineStyles {
+  fn width_pt(&self, index: usize) -> Option<f32> {
+    index
+      .checked_sub(1)
+      .and_then(|index| self.widths_pt.get(index))
+      .copied()
+      .filter(|width| *width > 0.0)
+  }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5352,6 +6655,7 @@ impl StylesCatalog {
       let mut catalog = Self {
         theme_fonts: theme.fonts,
         theme_colors: theme.colors,
+        theme_lines: theme.lines,
         ..Self::default()
       };
       if catalog.doc_default_run.font_family.is_none() {
@@ -5363,6 +6667,7 @@ impl StylesCatalog {
     let mut catalog = Self {
       theme_fonts: theme.fonts,
       theme_colors: theme.colors,
+      theme_lines: theme.lines,
       ..Self::default()
     };
 
@@ -5556,6 +6861,7 @@ impl ThemeData {
     Self {
       fonts: ThemeFonts::from_theme(theme),
       colors: ThemeColors::from_theme(theme),
+      lines: ThemeLineStyles::from_theme(theme),
     }
   }
 }
@@ -5585,6 +6891,21 @@ impl ThemeFonts {
       w::ThemeFontValues::MinorHighAnsi => self.minor_high_ansi.clone(),
       w::ThemeFontValues::MinorEastAsia => self.minor_east_asia.clone(),
       w::ThemeFontValues::MinorBidi => self.minor_bidi.clone(),
+    }
+  }
+}
+
+impl ThemeLineStyles {
+  fn from_theme(theme: &a::Theme) -> Self {
+    Self {
+      widths_pt: theme
+        .theme_elements
+        .format_scheme
+        .line_style_list
+        .a_ln
+        .iter()
+        .filter_map(|line| line.width.map(|width| units::emu_to_points(width as i64)))
+        .collect(),
     }
   }
 }
@@ -5832,7 +7153,7 @@ fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> 
 }
 
 fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
-  let transparency = alpha.unwrap_or(0) as f32 / 100_000.0;
+  let transparency = alpha.unwrap_or(0) as f32 / units::DRAWINGML_PERCENT_SCALE;
   (1.0 - transparency).clamp(0.0, 1.0)
 }
 
@@ -5841,16 +7162,16 @@ fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorCh
   for transform in transforms {
     match transform {
       w14::SchemeColorChoice::W14Tint(value) => {
-        hsl.apply_tint(value.val as f32 / 100_000.0);
+        hsl.apply_tint(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
       }
       w14::SchemeColorChoice::W14Shade(value) => {
-        hsl.apply_shade(value.val as f32 / 100_000.0);
+        hsl.apply_shade(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
       }
       w14::SchemeColorChoice::W14LumMod(value) => {
-        hsl.apply_luminance_mod(value.val as f32 / 100_000.0);
+        hsl.apply_luminance_mod(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
       }
       w14::SchemeColorChoice::W14LumOff(value) => {
-        hsl.apply_luminance_offset(value.val as f32 / 100_000.0);
+        hsl.apply_luminance_offset(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
       }
       _ => {}
     }
@@ -5863,7 +7184,7 @@ fn apply_word_tint(color: RgbColor, tint: &str) -> RgbColor {
     return color;
   };
   let mut hsl = HslColor::from_rgb(color);
-  hsl.apply_tint(1.0 - (tint as f32 / 255.0));
+  hsl.apply_tint(1.0 - (tint as f32 / units::BYTE_MAX_AS_FLOAT));
   hsl.to_rgb()
 }
 
@@ -5872,7 +7193,7 @@ fn apply_word_shade(color: RgbColor, shade: &str) -> RgbColor {
     return color;
   };
   let mut hsl = HslColor::from_rgb(color);
-  hsl.apply_shade(shade as f32 / 255.0);
+  hsl.apply_shade(shade as f32 / units::BYTE_MAX_AS_FLOAT);
   hsl.to_rgb()
 }
 
@@ -5885,9 +7206,9 @@ struct HslColor {
 
 impl HslColor {
   fn from_rgb(color: RgbColor) -> Self {
-    let red = color.r as f32 / 255.0;
-    let green = color.g as f32 / 255.0;
-    let blue = color.b as f32 / 255.0;
+    let red = color.r as f32 / units::BYTE_MAX_AS_FLOAT;
+    let green = color.g as f32 / units::BYTE_MAX_AS_FLOAT;
+    let blue = color.b as f32 / units::BYTE_MAX_AS_FLOAT;
     let max = red.max(green.max(blue));
     let min = red.min(green.min(blue));
     let luminance = (max + min) / 2.0;
@@ -5923,7 +7244,7 @@ impl HslColor {
 
   fn to_rgb(self) -> RgbColor {
     if self.saturation <= f32::EPSILON {
-      let value = (self.luminance * 255.0).round() as u8;
+      let value = (self.luminance * units::BYTE_MAX_AS_FLOAT).round() as u8;
       return RgbColor {
         r: value,
         g: value,
@@ -5979,7 +7300,7 @@ fn hue_to_rgb(p: f32, q: f32, mut hue: f32) -> u8 {
     p
   };
 
-  (value.clamp(0.0, 1.0) * 255.0).round() as u8
+  (value.clamp(0.0, 1.0) * units::BYTE_MAX_AS_FLOAT).round() as u8
 }
 
 fn table_style_model(
@@ -6380,11 +7701,13 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
 }
 
 fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
-  if values.spacing_before_pt != 0.0 {
+  if values.spacing_before_set || values.spacing_before_pt != 0.0 {
     target.spacing_before_pt = values.spacing_before_pt;
+    target.spacing_before_set = values.spacing_before_set;
   }
-  if values.spacing_after_pt != 0.0 {
+  if values.spacing_after_set || values.spacing_after_pt != 0.0 {
     target.spacing_after_pt = values.spacing_after_pt;
+    target.spacing_after_set = values.spacing_after_set;
   }
   if values.line_height_pt.is_some() {
     target.line_height_pt = values.line_height_pt;
@@ -6516,6 +7839,7 @@ struct NumberingLevel {
   text: String,
   is_legal: bool,
   format_properties: ParagraphFormat,
+  symbol_run_properties: Option<w::NumberingSymbolRunProperties>,
 }
 
 impl NumberingCatalog {
@@ -6571,7 +7895,9 @@ impl NumberingCatalog {
     &mut self,
     properties: &w::NumberingProperties,
     format: &mut ParagraphFormat,
-  ) -> Option<String> {
+    styles: &StylesCatalog,
+    base_style: TextStyle,
+  ) -> Option<(String, TextStyle)> {
     let num_id = properties.numbering_id.as_ref()?.val;
     let level_index = properties
       .numbering_level_reference
@@ -6601,14 +7927,25 @@ impl NumberingCatalog {
       self.counters.remove(&(num_id, key_level));
     }
 
-    Some(format_numbering_label(
+    let label = format_numbering_label(
       level,
       num_id,
       level_index,
       counter,
       abstract_num,
       &self.counters,
-    ))
+    );
+    let mut style = base_style;
+    properties::merge_run_style(
+      &mut style,
+      level
+        .symbol_run_properties
+        .as_ref()
+        .map(RunProps::Numbering),
+      &styles.theme_fonts,
+      &styles.theme_colors,
+    );
+    Some((label, style))
   }
 }
 
@@ -6641,6 +7978,7 @@ fn numbering_level_model(level: &w::Level) -> NumberingLevel {
       .unwrap_or_else(|| "%1.".to_string()),
     is_legal: level.is_legal_numbering_style.is_some(),
     format_properties,
+    symbol_run_properties: level.numbering_symbol_run_properties.as_deref().cloned(),
   }
 }
 
@@ -6861,12 +8199,22 @@ impl<'a> ParagraphProps<'a> {
       Self::Previous(properties) => properties.outline_level.as_ref(),
     }
   }
+
+  fn frame_properties(&self) -> Option<&'a w::FrameProperties> {
+    match self {
+      Self::Direct(properties) => properties.frame_properties.as_ref(),
+      Self::Style(properties) => properties.frame_properties.as_ref(),
+      Self::BaseStyle(properties) => properties.frame_properties.as_ref(),
+      Self::Previous(properties) => properties.frame_properties.as_ref(),
+    }
+  }
 }
 
 pub(super) enum RunProps<'a> {
   Direct(&'a w::RunProperties),
   Style(&'a w::StyleRunProperties),
   BaseStyle(&'a w::RunPropertiesBaseStyle),
+  Numbering(&'a w::NumberingSymbolRunProperties),
 }
 
 impl<'a> RunProps<'a> {
@@ -6875,6 +8223,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.run_fonts.as_ref(),
       Self::Style(properties) => properties.run_fonts.as_ref(),
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
+      Self::Numbering(properties) => properties.run_fonts.as_ref(),
     }
   }
 
@@ -6883,6 +8232,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.bold.as_ref(),
       Self::Style(properties) => properties.bold.as_ref(),
       Self::BaseStyle(properties) => properties.bold.as_ref(),
+      Self::Numbering(properties) => properties.bold.as_ref(),
     }
   }
 
@@ -6891,6 +8241,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.italic.as_ref(),
       Self::Style(properties) => properties.italic.as_ref(),
       Self::BaseStyle(properties) => properties.italic.as_ref(),
+      Self::Numbering(properties) => properties.italic.as_ref(),
     }
   }
 
@@ -6899,6 +8250,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.font_size.as_ref(),
       Self::Style(properties) => properties.font_size.as_ref(),
       Self::BaseStyle(properties) => properties.font_size.as_ref(),
+      Self::Numbering(properties) => properties.font_size.as_ref(),
     }
   }
 
@@ -6907,6 +8259,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.color.as_ref(),
       Self::Style(properties) => properties.color.as_ref(),
       Self::BaseStyle(properties) => properties.color.as_ref(),
+      Self::Numbering(properties) => properties.color.as_ref(),
     }
   }
 
@@ -6915,6 +8268,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.underline.as_ref(),
       Self::Style(properties) => properties.underline.as_ref(),
       Self::BaseStyle(properties) => properties.underline.as_ref(),
+      Self::Numbering(properties) => properties.underline.as_ref(),
     }
   }
 
@@ -6923,6 +8277,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.strike.as_ref(),
       Self::Style(properties) => properties.strike.as_ref(),
       Self::BaseStyle(properties) => properties.strike.as_ref(),
+      Self::Numbering(properties) => properties.strike.as_ref(),
     }
   }
 
@@ -6931,6 +8286,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.double_strike.as_ref(),
       Self::Style(properties) => properties.double_strike.as_ref(),
       Self::BaseStyle(properties) => properties.double_strike.as_ref(),
+      Self::Numbering(properties) => properties.double_strike.as_ref(),
     }
   }
 
@@ -6939,6 +8295,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.caps.as_ref(),
       Self::Style(properties) => properties.caps.as_ref(),
       Self::BaseStyle(properties) => properties.caps.as_ref(),
+      Self::Numbering(properties) => properties.caps.as_ref(),
     }
   }
 
@@ -6947,6 +8304,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.small_caps.as_ref(),
       Self::Style(properties) => properties.small_caps.as_ref(),
       Self::BaseStyle(properties) => properties.small_caps.as_ref(),
+      Self::Numbering(properties) => properties.small_caps.as_ref(),
     }
   }
 
@@ -6955,6 +8313,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.vanish.as_ref(),
       Self::Style(properties) => properties.vanish.as_ref(),
       Self::BaseStyle(properties) => properties.vanish.as_ref(),
+      Self::Numbering(properties) => properties.vanish.as_ref(),
     }
   }
 
@@ -6963,6 +8322,7 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.vertical_text_alignment.as_ref(),
       Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
       Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::Numbering(properties) => properties.vertical_text_alignment.as_ref(),
     }
   }
 
@@ -6971,27 +8331,28 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.spacing.as_ref(),
       Self::Style(properties) => properties.spacing.as_ref(),
       Self::BaseStyle(properties) => properties.spacing.as_ref(),
+      Self::Numbering(properties) => properties.spacing.as_ref(),
     }
   }
 
   fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
     match self {
       Self::Direct(properties) => properties.fill_text_effect.as_deref(),
-      Self::Style(_) | Self::BaseStyle(_) => None,
+      Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
 
   fn text_outline(&self) -> Option<&'a w14::TextOutlineEffect> {
     match self {
       Self::Direct(properties) => properties.text_outline_effect.as_deref(),
-      Self::Style(_) | Self::BaseStyle(_) => None,
+      Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
 
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
       Self::Direct(properties) => properties.highlight.as_ref(),
-      Self::Style(_) | Self::BaseStyle(_) => None,
+      Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
 }
@@ -7024,7 +8385,7 @@ fn twips_measure_to_twips(value: &TwipsMeasureValue) -> Option<f32> {
   match value {
     TwipsMeasureValue::UnsignedDecimalNumber(value) => Some(*value as f32),
     TwipsMeasureValue::PositiveUniversalMeasure(value) => {
-      universal_measure_to_points(value).map(|points| points * 20.0)
+      universal_measure_to_points(value).map(units::points_to_twips)
     }
   }
 }
@@ -7033,7 +8394,7 @@ fn signed_twips_measure_to_twips(value: &SignedTwipsMeasureValue) -> Option<f32>
   match value {
     SignedTwipsMeasureValue::Integer(value) => Some(*value as f32),
     SignedTwipsMeasureValue::UniversalMeasure(value) => {
-      universal_measure_to_points(value).map(|points| points * 20.0)
+      universal_measure_to_points(value).map(units::points_to_twips)
     }
   }
 }
@@ -7062,13 +8423,13 @@ fn measurement_or_percent_to_percent(value: &MeasurementOrPercentValue) -> Optio
   match value {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-    ) => Some(*value as f32 / 5000.0),
+    ) => Some(*value as f32 / units::WORD_PERCENT_MEASURE_SCALE),
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(value),
     ) => value
       .strip_suffix('%')
       .and_then(|value| value.parse::<f32>().ok())
-      .map(|value| value / 100.0),
+      .map(|value| value / units::VML_PERCENT_SCALE),
     MeasurementOrPercentValue::UniversalMeasure(_) => None,
   }
 }
@@ -7084,11 +8445,11 @@ fn universal_measure_to_points(value: &str) -> Option<f32> {
     .or_else(|| value.strip_suffix("pi").map(|number| (number, "pi")))?;
   let number = number.parse::<f32>().ok()?;
   Some(match unit {
-    "mm" => number * 72.0 / 25.4,
-    "cm" => number * 72.0 / 2.54,
-    "in" => number * 72.0,
+    "mm" => units::millimeters_to_points(number),
+    "cm" => units::centimeters_to_points(number),
+    "in" => units::inches_to_points(number),
     "pt" => number,
-    "pc" | "pi" => number * 12.0,
+    "pc" | "pi" => number * units::POINTS_PER_PICA,
     _ => return None,
   })
 }
@@ -7169,6 +8530,31 @@ mod tests {
     assert!((properties.rotation_deg - 90.0).abs() < 0.001);
     assert!(properties.flip_horizontal);
     assert!(properties.flip_vertical);
+  }
+
+  #[test]
+  fn wps_textbox_fragment_imports_as_positioned_shape_text() {
+    // Source: LibreOffice imports <wps:txbx> through WpsContext as text on the
+    // drawing shape, not as fallback body text.
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="857250" cy="742950"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:txbx><w:txbxContent><w:p><w:r><w:t>inside shape</w:t></w:r></w:p></w:txbxContent></wps:txbx><wps:bodyPr lIns="91440" tIns="45720" rIns="91440" bIns="45720" anchor="t"/></wps:wsp>"#;
+    assert!(drawing_textbox_content(xml).is_some());
+    assert!(drawingml_shape_geometry(xml).is_some());
+
+    let frame = drawingml_textbox_frame_from_fragment(
+      xml,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+    )
+    .expect("wps textbox frame");
+
+    assert!((frame.offset_x_pt - 7.2).abs() < 0.001);
+    assert!((frame.offset_y_pt - 3.6).abs() < 0.001);
+    assert!((frame.width_pt - 53.1).abs() < 0.001);
+    assert!((frame.height_pt - 51.3).abs() < 0.001);
+    assert_eq!(frame.text_box_blocks.len(), 1);
   }
 
   #[test]
@@ -7672,6 +9058,29 @@ mod tests {
     assert_eq!(style.alignment, Some(TableAlignment::Center));
     assert_eq!(style.indent_left_pt, Some(36.0));
     assert_eq!(style.cell_spacing_pt, Some(6.0));
+  }
+
+  #[test]
+  fn explicit_zero_paragraph_spacing_overrides_doc_default_spacing() {
+    // Source: LibreOffice writerfilter/dmapper imports explicit paragraph
+    // spacing properties into the property map even when the value is zero.
+    let mut format = ParagraphFormat {
+      spacing_after_pt: 8.0,
+      spacing_after_set: true,
+      ..Default::default()
+    };
+
+    merge_format_values(
+      &mut format,
+      ParagraphFormat {
+        spacing_after_pt: 0.0,
+        spacing_after_set: true,
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(format.spacing_after_pt, 0.0);
+    assert!(format.spacing_after_set);
   }
 
   #[test]

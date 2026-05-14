@@ -55,21 +55,22 @@ pub(super) fn paragraph_model_with_base(
       .as_deref()
       .map(ParagraphProps::Direct),
   );
-  let direct_numbering = paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.numbering_properties.as_deref());
-  let style_numbering = styles.paragraph_numbering_properties(style_id);
-  let list_label = direct_numbering
-    .or(style_numbering.as_ref())
-    .and_then(|properties| numbering.next_label(properties, &mut format));
-
   let mut run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style, base.run_overrides);
   if paragraph_mark_is_deleted(paragraph) {
     run_style.color = redline_author_color();
     run_style.strikethrough = true;
   }
+  let direct_numbering = paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.numbering_properties.as_deref());
+  let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let (list_label, list_label_style) = direct_numbering
+    .or(style_numbering.as_ref())
+    .and_then(|properties| numbering.next_label(properties, &mut format, styles, run_style.clone()))
+    .map(|(text, style)| (Some(text), style))
+    .unwrap_or_else(|| (None, TextStyle::default()));
   let mut inlines = paragraph_inlines(
     paragraph,
     run_style.clone(),
@@ -81,7 +82,7 @@ pub(super) fn paragraph_model_with_base(
   if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
     inlines.push(super::InlineItem::Text(TextRun {
       text: String::new(),
-      style: run_style,
+      style: run_style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
     }));
@@ -107,6 +108,7 @@ pub(super) fn paragraph_model_with_base(
     runs,
     format,
     list_label,
+    list_label_style,
     list_label_hyperlink_url: None,
   }
 }

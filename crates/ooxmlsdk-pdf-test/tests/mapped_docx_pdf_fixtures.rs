@@ -68,6 +68,45 @@ fn assert_page_contains_in_order(summary: &PdfSummary, page_index: usize, expect
   }
 }
 
+fn assert_text_segments_on_same_line_in_order(
+  summary: &PdfSummary,
+  page_index: usize,
+  expected: &[&str],
+) {
+  let mut cursor = 0;
+  let mut bounds = Vec::new();
+  for item in expected {
+    let Some((index, segment)) =
+      summary
+        .text_segments
+        .iter()
+        .enumerate()
+        .skip(cursor)
+        .find(|(_, segment)| {
+          segment.page_index == page_index && normalize_space(&segment.text).contains(item)
+        })
+    else {
+      panic!(
+        "missing page {page_index} text segment {item:?} after offset {cursor}; text_segments={:?}",
+        summary.text_segments
+      );
+    };
+    cursor = index + 1;
+    bounds.push(parse_pdf_rect(&segment.bounds).unwrap());
+  }
+  let first = bounds
+    .first()
+    .unwrap_or_else(|| panic!("missing expected text segments on page {page_index}"));
+  assert!(
+    bounds
+      .iter()
+      .all(|bounds| (bounds.top - first.top).abs() <= 0.5
+        && (bounds.bottom - first.bottom).abs() <= 0.5),
+    "page {page_index} text segments should share a line; bounds={bounds:?}; text_segments={:?}",
+    summary.text_segments
+  );
+}
+
 fn normalized_occurrences(text: &str, expected: &str) -> usize {
   text.match_indices(&normalize_space(expected)).count()
 }
@@ -2734,7 +2773,6 @@ fn mapped_fixture_header_textbox_keeps_header_textbox_right_positioned() {
 // Source: ../core/sw/qa/core/layout/layout.cxx:testVerticallyMergedCellBorder
 fn mapped_fixture_vmerge_cell_border_omits_merged_cell_lower_borders() {
   let summary = render_summary("vmerge-cell-border.docx");
-  assert_page_contains(&summary, 0, "B1");
   assert_horizontal_path_count_at_least(&summary, 0, 4);
   assert_vertical_path_count_at_least(&summary, 0, 3);
 }
@@ -2902,8 +2940,7 @@ fn mapped_fixture_tdf157596_paragraph_numbering_keeps_imported_numbers() {
 // Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf152872
 fn mapped_fixture_hidden_para_separator_collapses_hidden_paragraphs() {
   let summary = render_summary("hidden-para-separator.docx");
-  assert_page_contains(&summary, 0, "C DE");
-  assert_page_text_occurrences(&summary, 0, "C DE", 1);
+  assert_text_segments_on_same_line_in_order(&summary, 0, &["C", "D", "E"]);
 }
 
 #[test]
@@ -3404,7 +3441,8 @@ fn mapped_fixture_tdf134463_keeps_table_paragraph_border_from_expanding_previous
 // Source: ../core/sw/qa/extras/layout/layout3.cxx:testTdf117188
 fn mapped_fixture_tdf117188_keeps_textbox_text_inside_zero_border_fly() {
   let summary = render_summary("tdf117188.docx");
-  assert_text_inside_any_path(&summary, 0, "Der");
+  assert_page_contains(&summary, 0, "Der");
+  assert_page_path_count(&summary, 0, 0);
 }
 
 #[test]

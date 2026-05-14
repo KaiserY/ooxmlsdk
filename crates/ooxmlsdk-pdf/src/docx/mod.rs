@@ -643,7 +643,7 @@ fn body_sections(
   for choice in &body.body_choice {
     match choice {
       w::BodyChoice::WP(paragraph) => {
-        let model = paragraph_model(
+        let mut model = paragraph_model(
           paragraph,
           styles,
           numbering,
@@ -651,6 +651,7 @@ fn body_sections(
           hyperlinks,
           form_widget_ids,
         );
+        model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
         if paragraph_is_effectively_empty(&model)
           && (current_blocks
             .last()
@@ -659,7 +660,7 @@ fn body_sections(
         {
           continue;
         }
-        current_blocks.push(Block::Paragraph(model));
+        push_body_paragraph(&mut current_blocks, model);
         if let Some(section_properties) = paragraph
           .paragraph_properties
           .as_deref()
@@ -706,6 +707,32 @@ fn body_sections(
   }
 
   sections
+}
+
+fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
+  if let Some(Block::Paragraph(previous)) = blocks.last_mut()
+    && previous.format.hidden_separator
+  {
+    previous.format.hidden_separator = paragraph.format.hidden_separator;
+    previous
+      .footnote_reference_ids
+      .append(&mut paragraph.footnote_reference_ids);
+    previous
+      .endnote_reference_ids
+      .append(&mut paragraph.endnote_reference_ids);
+    previous.inlines.append(&mut paragraph.inlines);
+    return;
+  }
+  blocks.push(Block::Paragraph(paragraph));
+}
+
+fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
+  paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+    .and_then(|properties| properties.w_vanish.as_ref())
+    .is_some_and(|vanish| vanish.val.is_none_or(|value| value.as_bool()))
 }
 
 fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
@@ -2602,6 +2629,9 @@ fn push_run(
   hyperlink_url: Option<&str>,
 ) {
   let style = properties::run_style(run.run_properties.as_deref(), base_style.clone(), styles);
+  if style.hidden {
+    return;
+  }
   let mut text = String::new();
 
   for choice in &run.run_choice {
@@ -3178,6 +3208,10 @@ fn inline_image_impl(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
+  if drawing_is_hidden(drawing) {
+    return None;
+  }
+
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => {
       let properties = drawing_image_properties(&inline.graphic.graphic_data)?;
@@ -3493,6 +3527,10 @@ fn push_drawing_textboxes_impl(
   styles: &StylesCatalog,
   images: &ImageCatalog,
 ) {
+  if drawing_is_hidden(drawing) {
+    return;
+  }
+
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
@@ -3730,6 +3768,10 @@ fn push_drawing_shapes_impl(
   inlines: &mut Vec<InlineItem>,
   styles: &StylesCatalog,
 ) {
+  if drawing_is_hidden(drawing) {
+    return;
+  }
+
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
@@ -3791,6 +3833,28 @@ fn drawingml_shapes_from_xml(
   }
 
   shapes
+}
+
+fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
+  match drawing.drawing_choice.as_ref() {
+    Some(w::DrawingChoice::WpInline(inline)) => inline
+      .doc_properties
+      .hidden
+      .as_ref()
+      .is_some_and(|hidden| hidden.as_bool()),
+    Some(w::DrawingChoice::WpAnchor(anchor)) => {
+      anchor
+        .hidden
+        .as_ref()
+        .is_some_and(|hidden| hidden.as_bool())
+        || anchor
+          .wp_doc_pr
+          .as_ref()
+          .and_then(|properties| properties.hidden.as_ref())
+          .is_some_and(|hidden| hidden.as_bool())
+    }
+    None => false,
+  }
 }
 
 fn drawingml_shape_from_fragment(
@@ -4045,6 +4109,10 @@ fn vml_inline_shape(
   stroke_color: Option<&str>,
   stroke_weight: Option<&str>,
 ) -> Option<InlineShape> {
+  if vml_style_is_hidden(style) {
+    return None;
+  }
+
   let style = vml_image_style(style);
   let (width_pt, height_pt) = style.size_pt?;
   let fill_color = fill_color.and_then(parse_vml_color);
@@ -4171,6 +4239,10 @@ fn push_group_textboxes(
 }
 
 fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<InlineImage> {
+  if vml_style_is_hidden(image.style.as_deref()) {
+    return None;
+  }
+
   image
     .image_file_choice
     .iter()
@@ -4192,6 +4264,10 @@ fn push_image_file_textboxes(
   styles: &StylesCatalog,
   images: &ImageCatalog,
 ) {
+  if vml_style_is_hidden(image.style.as_deref()) {
+    return;
+  }
+
   for choice in &image.image_file_choice {
     if let v::ImageFileChoice::VTextbox(textbox) = choice {
       push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
@@ -4200,6 +4276,10 @@ fn push_image_file_textboxes(
 }
 
 fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineImage> {
+  if vml_style_is_hidden(rectangle.style.as_deref()) {
+    return None;
+  }
+
   rectangle
     .rectangle_choice
     .iter()
@@ -4221,6 +4301,10 @@ fn push_rectangle_textboxes(
   styles: &StylesCatalog,
   images: &ImageCatalog,
 ) {
+  if vml_style_is_hidden(rectangle.style.as_deref()) {
+    return;
+  }
+
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
       push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
@@ -4229,6 +4313,10 @@ fn push_rectangle_textboxes(
 }
 
 fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
+  if vml_style_is_hidden(shape.style.as_deref()) {
+    return None;
+  }
+
   shape.shape_choice.iter().find_map(|choice| match choice {
     v::ShapeChoice::VImagedata(data) => vml_image_data(
       data,
@@ -4247,11 +4335,26 @@ fn push_shape_textboxes(
   styles: &StylesCatalog,
   images: &ImageCatalog,
 ) {
+  if vml_style_is_hidden(shape.style.as_deref()) {
+    return;
+  }
+
   for choice in &shape.shape_choice {
     if let v::ShapeChoice::VTextbox(textbox) = choice {
       push_vml_textbox(textbox, inlines, base_style.clone(), styles, images);
     }
   }
+}
+
+fn vml_style_is_hidden(style: Option<&str>) -> bool {
+  style.is_some_and(|style| {
+    style.split(';').any(|entry| {
+      let Some((name, value)) = entry.split_once(':') else {
+        return false;
+      };
+      name.trim().eq_ignore_ascii_case("visibility") && value.trim().eq_ignore_ascii_case("hidden")
+    })
+  })
 }
 
 fn push_vml_textbox(
@@ -4914,6 +5017,7 @@ struct RunStyleOverrides {
   underline: Option<bool>,
   strikethrough: Option<bool>,
   uppercase: Option<bool>,
+  hidden: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5881,6 +5985,9 @@ fn merge_run_style_overrides(
   if source.uppercase.is_some() {
     target.uppercase = source.uppercase;
   }
+  if source.hidden.is_some() {
+    target.hidden = source.hidden;
+  }
   target
 }
 
@@ -5942,13 +6049,11 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
           .and_then(|value| value.val.map(|value| value.as_bool()))
       }),
     uppercase: properties
-      .small_caps()
-      .and_then(|value| value.val.map(|value| value.as_bool()))
-      .or_else(|| {
-        properties
-          .caps()
-          .and_then(|value| value.val.map(|value| value.as_bool()))
-      }),
+      .caps()
+      .and_then(|value| value.val.map(|value| value.as_bool())),
+    hidden: properties
+      .vanish()
+      .and_then(|value| value.val.map(|value| value.as_bool())),
   }
 }
 
@@ -5967,6 +6072,9 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
   }
   if let Some(uppercase) = overrides.uppercase {
     style.uppercase = uppercase;
+  }
+  if let Some(hidden) = overrides.hidden {
+    style.hidden = hidden;
   }
 }
 
@@ -6046,6 +6154,9 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   }
   if values.uppercase {
     target.uppercase = true;
+  }
+  if values.hidden {
+    target.hidden = true;
   }
   if values.color != TextStyle::default().color {
     target.color = values.color;
@@ -6468,6 +6579,14 @@ impl<'a> RunProps<'a> {
       Self::Direct(properties) => properties.small_caps.as_ref(),
       Self::Style(properties) => properties.small_caps.as_ref(),
       Self::BaseStyle(properties) => properties.small_caps.as_ref(),
+    }
+  }
+
+  fn vanish(&self) -> Option<&'a w::Vanish> {
+    match self {
+      Self::Direct(properties) => properties.vanish.as_ref(),
+      Self::Style(properties) => properties.vanish.as_ref(),
+      Self::BaseStyle(properties) => properties.vanish.as_ref(),
     }
   }
 

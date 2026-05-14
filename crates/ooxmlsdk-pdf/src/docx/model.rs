@@ -219,6 +219,7 @@ pub(crate) struct ParagraphFormat {
   pub keep_with_next: bool,
   pub keep_lines: bool,
   pub contextual_spacing: bool,
+  pub hidden_separator: bool,
   pub outline_level: Option<u8>,
 }
 
@@ -416,6 +417,7 @@ pub(crate) struct TextStyle {
   pub underline: bool,
   pub strikethrough: bool,
   pub uppercase: bool,
+  pub hidden: bool,
   pub color: RgbColor,
   pub opacity: f32,
   pub outline_color: Option<RgbColor>,
@@ -436,6 +438,7 @@ impl Default for TextStyle {
       underline: false,
       strikethrough: false,
       uppercase: false,
+      hidden: false,
       color: RgbColor { r: 0, g: 0, b: 0 },
       opacity: 1.0,
       outline_color: None,

@@ -128,8 +128,10 @@ pub(super) fn merge_run_style(
   if let Some(small_caps) = properties.small_caps()
     && small_caps.val.is_none_or(|value| value.as_bool())
   {
-    style.uppercase = true;
     style.font_size_pt = (style.font_size_pt * 0.85).max(1.0);
+  }
+  if let Some(vanish) = properties.vanish() {
+    style.hidden = vanish.val.is_none_or(|value| value.as_bool());
   }
   if let Some(vertical_alignment) = properties.vertical_text_alignment() {
     match vertical_alignment.val {

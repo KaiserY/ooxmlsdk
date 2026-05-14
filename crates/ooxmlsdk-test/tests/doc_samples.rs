@@ -1,5 +1,4 @@
 #![cfg(feature = "parts")]
-#![allow(dead_code)]
 
 use std::{
   collections::BTreeMap,
@@ -1350,72 +1349,6 @@ fn xml_declaration_from_event(event: &quick_xml::events::BytesDecl<'_>) -> XmlDe
   }
 }
 
-fn render_xml_nodes_for_entry(
-  nodes: &[XmlNode],
-  options: CanonicalOptions,
-  entry_name: &str,
-) -> String {
-  let mut out = String::new();
-  for node in nodes {
-    out.push_str(&render_xml_node_to_string(node, options, entry_name));
-  }
-  out
-}
-
-fn render_xml_node_to_string(
-  node: &XmlNode,
-  options: CanonicalOptions,
-  entry_name: &str,
-) -> String {
-  let mut out = String::new();
-  match node {
-    XmlNode::Declaration(XmlDeclaration::Plain) => out.push_str("<?xml?>"),
-    XmlNode::Declaration(XmlDeclaration::Standalone) => out.push_str("<?xml standalone=\"yes\"?>"),
-    XmlNode::Text(text) => out.push_str(text),
-    XmlNode::Element(element) => {
-      out.push('<');
-      out.push_str(&element.name);
-
-      for (key, value) in &element.attrs {
-        out.push(' ');
-        out.push_str(key);
-        out.push_str("=\"");
-        out.push_str(&escape_xml_text(value));
-        out.push('"');
-      }
-
-      if element.children.is_empty() {
-        out.push_str("/>");
-      } else {
-        out.push('>');
-        if options.sort_package_properties
-          && is_package_properties_sort_root(entry_name, &element.name)
-          || options.sort_all_particle_children && is_all_particle_sort_root(&element.name)
-        {
-          let mut children = element
-            .children
-            .iter()
-            .map(|child| render_xml_node_to_string(child, options, entry_name))
-            .collect::<Vec<_>>();
-          children.sort();
-          for child in children {
-            out.push_str(&child);
-          }
-        } else {
-          for child in &element.children {
-            out.push_str(&render_xml_node_to_string(child, options, entry_name));
-          }
-        }
-        out.push_str("</");
-        out.push_str(&element.name);
-        out.push('>');
-      }
-    }
-  }
-
-  out
-}
-
 fn is_extended_properties_root(name: &str) -> bool {
   name == "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Properties"
     || name == "{http://purl.oclc.org/ooxml/officeDocument/extendedProperties}Properties"
@@ -1437,19 +1370,6 @@ fn is_package_properties_sort_root(entry_name: &str, name: &str) -> bool {
 
 fn is_all_particle_sort_root(name: &str) -> bool {
   name == "{urn:schemas-microsoft-com:office:office}shapelayout"
-}
-
-fn escape_xml_text(value: &str) -> String {
-  let mut out = String::with_capacity(value.len());
-  for ch in value.chars() {
-    match ch {
-      '&' => out.push_str("&amp;"),
-      '<' => out.push_str("&lt;"),
-      '>' => out.push_str("&gt;"),
-      _ => out.push(ch),
-    }
-  }
-  out
 }
 
 fn escape_xml_attr(value: &str) -> String {

@@ -38,6 +38,7 @@ Until the implementation reaches a higher maturity level:
 - Keep summaries diff-based rather than conversation-based.
 - Do not paste broad search output or large generated snippets unless asked.
 - Run commands from the repository root.
+- Do not fix clippy or compiler warnings by adding `#[allow(...)]` or `#![allow(...)]`; remove dead code, tighten cfgs, or improve the implementation instead.
 - Cargo generation, format, test, clippy, and bench commands must run sequentially in the default `target/` directory; do not set `CARGO_TARGET_DIR`.
 - This repository has long Cargo build/test times. After starting any Cargo command, let it run to completion and wait for the final result.
 - Never start a second Cargo command while another Cargo command is still running, even for a quick verification, retry, status check, or no-op probe.

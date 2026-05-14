@@ -1,25 +1,15 @@
 use ooxmlsdk::common::XmlHeaderType;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
-  Body, BodyChoice, CommentChoice, Comments, DeletedRun, DeletedRunChoice, DeletedRunChoice2,
-  Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice, ParagraphChoice2, Run,
-  RunChoice, Text,
+  Body, BodyChoice, Columns, CommentChoice, Comments, DeletedRun, DeletedRunChoice,
+  DeletedRunChoice2, Document, Hyperlink, HyperlinkChoice, Paragraph, ParagraphChoice,
+  ParagraphChoice2, Run, RunChoice, Text,
 };
 #[cfg(not(feature = "mce"))]
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   BodyChoice2, SdtBlock, SdtPropertiesChoice,
 };
+use ooxmlsdk::simple_type::TwipsMeasureValue;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
-
-#[allow(dead_code)]
-fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
-where
-  N: AsRef<str>,
-  V: AsRef<str>,
-{
-  attrs
-    .iter()
-    .find_map(|(attr_name, value)| (attr_name.as_ref() == name).then_some(value.as_ref()))
-}
 
 fn first_body(document: &Document) -> &Body {
   document.body.as_ref().expect("expected document body")
@@ -97,6 +87,26 @@ fn append_run_text(run: &Run, out: &mut String) {
       out.push_str(value);
     }
   }
+}
+
+#[test]
+fn twips_measure_attr_preserves_universal_measure_variant() {
+  let columns = Columns::from_str(r#"<w:cols w:space="1.5in"></w:cols>"#).unwrap();
+  assert_eq!(
+    columns.space,
+    Some(TwipsMeasureValue::PositiveUniversalMeasure(
+      "1.5in".to_string()
+    ))
+  );
+
+  let xml = columns.to_xml().unwrap();
+  assert!(xml.contains(r#"w:space="1.5in""#));
+
+  let numeric = Columns::from_str(r#"<w:cols w:space="720"></w:cols>"#).unwrap();
+  assert_eq!(
+    numeric.space,
+    Some(TwipsMeasureValue::UnsignedDecimalNumber(720))
+  );
 }
 
 #[cfg(not(feature = "mce"))]

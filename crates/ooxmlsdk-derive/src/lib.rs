@@ -1773,6 +1773,8 @@ fn is_string_like_type(ty: &Type) -> bool {
         | "DecimalValue"
         | "HexBinaryValue"
         | "Base64BinaryValue"
+        | "UniversalMeasureValue"
+        | "PositiveUniversalMeasureValue"
     )
   }))
 }
@@ -1784,6 +1786,28 @@ fn is_sdk_enum_type(ty: &Type) -> bool {
       "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
     ) || segment.ident.to_string().ends_with("Values")
   }))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SimpleUnionTypeKind {
+  TwipsMeasure,
+  SignedTwipsMeasure,
+  DecimalNumberOrPercent,
+  MeasurementOrPercent,
+}
+
+fn simple_union_type_kind(ty: &Type) -> Option<SimpleUnionTypeKind> {
+  let Type::Path(TypePath { path, .. }) = ty else {
+    return None;
+  };
+  let ident = path.segments.last()?.ident.to_string();
+  Some(match ident.as_str() {
+    "TwipsMeasureValue" => SimpleUnionTypeKind::TwipsMeasure,
+    "SignedTwipsMeasureValue" => SimpleUnionTypeKind::SignedTwipsMeasure,
+    "DecimalNumberOrPercentValue" => SimpleUnionTypeKind::DecimalNumberOrPercent,
+    "MeasurementOrPercentValue" => SimpleUnionTypeKind::MeasurementOrPercent,
+    _ => return None,
+  })
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

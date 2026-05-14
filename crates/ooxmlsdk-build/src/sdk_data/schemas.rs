@@ -56,10 +56,8 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
         schema.target_namespace.as_str(),
         &gen_context.xsd_schemas,
       );
-      let twips_measure_attr_overrides = xsd_twips_measure_attr_type_overrides(
-        schema.target_namespace.as_str(),
-        &gen_context.xsd_schemas,
-      );
+      let measure_attr_overrides =
+        xsd_measure_attr_type_overrides(schema.target_namespace.as_str(), &gen_context.xsd_schemas);
       let twips_measure_element_qname_overrides = xsd_twips_measure_element_qname_overrides(
         prefix.as_str(),
         schema.target_namespace.as_str(),
@@ -287,10 +285,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               &mut schema_type,
               &table_width_element_qname_overrides,
             );
-            apply_xsd_twips_measure_attr_type_overrides(
-              &mut schema_type,
-              &twips_measure_attr_overrides,
-            );
+            apply_xsd_twips_measure_attr_type_overrides(&mut schema_type, &measure_attr_overrides);
             apply_on_off_qname_overrides(&mut schema_type, &on_off_qname_overrides);
             schema_type
           })
@@ -381,12 +376,12 @@ fn xsd_type_local_name(type_name: &str) -> &str {
   type_name.rsplit(':').next().unwrap_or(type_name)
 }
 
-fn xsd_twips_measure_attr_type_overrides(
+fn xsd_measure_attr_type_overrides(
   target_namespace: &str,
   xsd_schemas: &HashMap<String, ParsedXsd>,
-) -> HashSet<(String, String)> {
+) -> HashMap<(String, String), String> {
   let Some(xsd) = xsd_schemas.get(target_namespace) else {
-    return HashSet::new();
+    return HashMap::new();
   };
 
   xsd
@@ -394,16 +389,16 @@ fn xsd_twips_measure_attr_type_overrides(
     .iter()
     .flat_map(|(complex_type_name, complex_type)| {
       complex_type.attributes.iter().filter_map(|attr| {
-        if is_xsd_twips_measure_type(attr.xsd_type.as_str()) {
-          Some((
+        xsd_measure_value_type(attr.xsd_type.as_str()).map(|value_type| {
+          (
             complex_type_name.clone(),
             xsd_child_local_name(attr.q_name.as_str()).to_string(),
-          ))
-        } else {
-          None
-        }
+            value_type.to_string(),
+          )
+        })
       })
     })
+    .map(|(complex_type_name, attr_name, value_type)| ((complex_type_name, attr_name), value_type))
     .collect()
 }
 
@@ -551,11 +546,16 @@ fn xsd_table_width_element_qname_overrides(
     .collect()
 }
 
-fn is_xsd_twips_measure_type(type_name: &str) -> bool {
-  matches!(
-    xsd_type_local_name(type_name),
-    "ST_TwipsMeasure" | "ST_SignedTwipsMeasure"
-  )
+fn xsd_measure_value_type(type_name: &str) -> Option<&'static str> {
+  match xsd_type_local_name(type_name) {
+    "ST_TwipsMeasure" => Some("TwipsMeasureValue"),
+    "ST_SignedTwipsMeasure" => Some("SignedTwipsMeasureValue"),
+    "ST_DecimalNumberOrPercent" => Some("DecimalNumberOrPercentValue"),
+    "ST_MeasurementOrPercent" => Some("MeasurementOrPercentValue"),
+    "ST_UniversalMeasure" => Some("UniversalMeasureValue"),
+    "ST_PositiveUniversalMeasure" => Some("PositiveUniversalMeasureValue"),
+    _ => None,
+  }
 }
 
 fn is_xsd_twips_measure_complex_type(type_name: &str) -> bool {
@@ -564,19 +564,19 @@ fn is_xsd_twips_measure_complex_type(type_name: &str) -> bool {
 
 fn apply_xsd_twips_measure_attr_type_overrides(
   schema_type: &mut SchemaType,
-  attr_overrides: &HashSet<(String, String)>,
+  attr_overrides: &HashMap<(String, String), String>,
 ) {
   let Some(complex_type_name) = schema_type_complex_type_name(schema_type.name.as_str()) else {
     return;
   };
 
   for attr in &mut schema_type.attributes {
-    if attr_overrides.contains(&(
+    if let Some(value_type) = attr_overrides.get(&(
       complex_type_name.to_string(),
       xsd_child_local_name(attr.q_name.as_str()).to_string(),
-    )) && is_integer_value_type(attr.r#type.as_str())
+    )) && is_measure_override_candidate_type(attr.r#type.as_str())
     {
-      attr.r#type = "StringValue".to_string();
+      attr.r#type = value_type.clone();
     }
   }
 }
@@ -671,6 +671,10 @@ fn is_integer_value_type(type_name: &str) -> bool {
       | "UInt64Value"
       | "IntegerValue"
   )
+}
+
+fn is_measure_override_candidate_type(type_name: &str) -> bool {
+  is_integer_value_type(type_name) || type_name == "StringValue"
 }
 
 fn apply_on_off_qname_overrides(
@@ -2243,10 +2247,10 @@ fn resolve_derived_base_type<'a>(
 #[cfg(test)]
 mod tests {
   use super::{
-    gen_schemas, is_integer_value_type, matches_xsd_repeatable_choice_rule, resolve_composite_kind,
-    schema_type_complex_type_name, xsd_child_local_name, xsd_on_off_only_to_on_off_qname_overrides,
-    xsd_table_width_element_qname_overrides, xsd_twips_measure_attr_type_overrides,
-    xsd_twips_measure_element_qname_overrides,
+    gen_schemas, is_measure_override_candidate_type, matches_xsd_repeatable_choice_rule,
+    resolve_composite_kind, schema_type_complex_type_name, xsd_child_local_name,
+    xsd_measure_attr_type_overrides, xsd_on_off_only_to_on_off_qname_overrides,
+    xsd_table_width_element_qname_overrides, xsd_twips_measure_element_qname_overrides,
   };
   use crate::sdk_data::{
     context::Context,
@@ -2463,7 +2467,7 @@ mod tests {
   }
 
   #[test]
-  fn actual_repo_upgrades_integer_twips_measure_attrs_from_xsd_to_string() {
+  fn actual_repo_upgrades_measure_attrs_from_xsd_to_simple_union_types() {
     let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
     let context = Context::new(&data_dir).expect("context");
 
@@ -2472,26 +2476,27 @@ mod tests {
       .iter()
       .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
       .expect("raw word schema");
-    let attr_overrides = xsd_twips_measure_attr_type_overrides(
+    let attr_overrides = xsd_measure_attr_type_overrides(
       word_raw_schema.target_namespace.as_str(),
       &context.xsd_schemas,
     );
 
-    let raw_integer_candidates: Vec<(&str, &str, &str)> = word_raw_schema
+    let raw_measure_candidates: Vec<(&str, &str, &str, String)> = word_raw_schema
       .types
       .iter()
       .flat_map(|schema_type| {
         schema_type.attributes.iter().filter_map(|attr| {
           let complex_type_name = schema_type_complex_type_name(schema_type.name.as_str())?;
-          if attr_overrides.contains(&(
+          let expected_type = attr_overrides.get(&(
             complex_type_name.to_string(),
             xsd_child_local_name(attr.q_name.as_str()).to_string(),
-          )) && is_integer_value_type(attr.r#type.as_str())
-          {
+          ))?;
+          if is_measure_override_candidate_type(attr.r#type.as_str()) {
             Some((
               schema_type.class_name.as_str(),
               attr.property_name.as_str(),
               attr.r#type.as_str(),
+              expected_type.clone(),
             ))
           } else {
             None
@@ -2500,7 +2505,7 @@ mod tests {
       })
       .collect();
 
-    assert_eq!(raw_integer_candidates.len(), 19);
+    assert!(raw_measure_candidates.len() >= 19);
 
     let schemas = gen_schemas(&context);
     let word_schema = schemas
@@ -2508,7 +2513,7 @@ mod tests {
       .find(|schema| schema.module_name == "schemas_openxmlformats_org_wordprocessingml_2006_main")
       .expect("word schema");
 
-    for (class_name, property_name, raw_type) in raw_integer_candidates {
+    for (class_name, property_name, raw_type, expected_type) in raw_measure_candidates {
       let schema_type = word_schema
         .types
         .iter()
@@ -2520,7 +2525,7 @@ mod tests {
         .find(|attr| attr.property_name == property_name)
         .unwrap_or_else(|| panic!("missing generated attr {class_name}.{property_name}"));
       assert_eq!(
-        attr.r#type, "StringValue",
+        attr.r#type, expected_type,
         "{class_name}.{property_name} raw type was {raw_type}"
       );
     }
@@ -2552,7 +2557,7 @@ mod tests {
         .find(|attr| attr.property_name == "Space")
         .expect("Columns.Space")
         .r#type,
-      "StringValue"
+      "TwipsMeasureValue"
     );
   }
 

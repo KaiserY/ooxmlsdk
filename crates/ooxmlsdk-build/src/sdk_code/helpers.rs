@@ -450,9 +450,17 @@ fn structure_sequence_variant_child<'a>(
 
 pub fn classify_simple_type(simple_type: &str) -> Option<SimpleValueKind> {
   match simple_type {
-    "Base64BinaryValue" | "DateTimeValue" | "DecimalValue" | "HexBinaryValue" | "StringValue" => {
-      Some(SimpleValueKind::StringLike)
-    }
+    "Base64BinaryValue"
+    | "DateTimeValue"
+    | "DecimalValue"
+    | "HexBinaryValue"
+    | "StringValue"
+    | "UniversalMeasureValue"
+    | "PositiveUniversalMeasureValue"
+    | "TwipsMeasureValue"
+    | "SignedTwipsMeasureValue"
+    | "DecimalNumberOrPercentValue"
+    | "MeasurementOrPercentValue" => Some(SimpleValueKind::StringLike),
     "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue" => {
       Some(SimpleValueKind::BoolLike)
     }

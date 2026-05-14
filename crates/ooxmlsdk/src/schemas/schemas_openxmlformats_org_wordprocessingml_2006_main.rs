@@ -4473,11 +4473,11 @@ pub struct FrameProperties {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::TwipsMeasureValue>,
   /// Frame Height
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub height: Option<crate::simple_type::StringValue>,
+  pub height: Option<crate::simple_type::TwipsMeasureValue>,
   /// Vertical Frame Padding
   #[sdk(attr(qname = "w:vSpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -4487,7 +4487,7 @@ pub struct FrameProperties {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub vertical_space: Option<crate::simple_type::StringValue>,
+  pub vertical_space: Option<crate::simple_type::TwipsMeasureValue>,
   /// Horizontal Frame Padding
   #[sdk(attr(qname = "w:hSpace"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -4497,7 +4497,7 @@ pub struct FrameProperties {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub horizontal_space: Option<crate::simple_type::StringValue>,
+  pub horizontal_space: Option<crate::simple_type::TwipsMeasureValue>,
   /// Text Wrapping Around Frame
   #[sdk(attr(qname = "w:wrap"))]
   pub wrap: Option<TextWrappingValues>,
@@ -4516,7 +4516,7 @@ pub struct FrameProperties {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub x: Option<crate::simple_type::StringValue>,
+  pub x: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Relative Horizontal Position
   #[sdk(attr(qname = "w:xAlign"))]
   pub x_align: Option<HorizontalAlignmentValues>,
@@ -4529,7 +4529,7 @@ pub struct FrameProperties {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub y: Option<crate::simple_type::StringValue>,
+  pub y: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Relative Vertical Position
   #[sdk(attr(qname = "w:yAlign"))]
   pub y_align: Option<VerticalAlignmentValues>,
@@ -4661,7 +4661,7 @@ pub struct SpacingBetweenLines {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub before: Option<crate::simple_type::StringValue>,
+  pub before: Option<crate::simple_type::TwipsMeasureValue>,
   /// Spacing Above Paragraph IN Line Units
   #[sdk(attr(qname = "w:beforeLines"))]
   pub before_lines: Option<crate::simple_type::Int32Value>,
@@ -4677,7 +4677,7 @@ pub struct SpacingBetweenLines {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub after: Option<crate::simple_type::StringValue>,
+  pub after: Option<crate::simple_type::TwipsMeasureValue>,
   /// Spacing Below Paragraph in Line Units
   #[sdk(attr(qname = "w:afterLines"))]
   pub after_lines: Option<crate::simple_type::Int32Value>,
@@ -4693,7 +4693,7 @@ pub struct SpacingBetweenLines {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub line: Option<crate::simple_type::StringValue>,
+  pub line: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Type of Spacing Between Lines
   #[sdk(attr(qname = "w:lineRule"))]
   pub line_rule: Option<LineSpacingRuleValues>,
@@ -4712,7 +4712,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub left: Option<crate::simple_type::StringValue>,
+  pub left: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// start
   #[sdk(attr(office2010, qname = "w:start"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
@@ -4722,7 +4722,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub start: Option<crate::simple_type::StringValue>,
+  pub start: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Left Indentation in Character Units
   #[sdk(attr(qname = "w:leftChars"))]
   pub left_chars: Option<crate::simple_type::Int32Value>,
@@ -4738,7 +4738,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub right: Option<crate::simple_type::StringValue>,
+  pub right: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// end
   #[sdk(attr(office2010, qname = "w:end"))]
   #[sdk(number_type(source = 1u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
@@ -4748,7 +4748,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub end: Option<crate::simple_type::StringValue>,
+  pub end: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Right Indentation in Character Units
   #[sdk(attr(qname = "w:rightChars"))]
   pub right_chars: Option<crate::simple_type::Int32Value>,
@@ -4764,7 +4764,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub hanging: Option<crate::simple_type::StringValue>,
+  pub hanging: Option<crate::simple_type::TwipsMeasureValue>,
   /// Indentation Removed From First Line in Character Units
   #[sdk(attr(qname = "w:hangingChars"))]
   pub hanging_chars: Option<crate::simple_type::Int32Value>,
@@ -4777,7 +4777,7 @@ pub struct Indentation {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub first_line: Option<crate::simple_type::StringValue>,
+  pub first_line: Option<crate::simple_type::TwipsMeasureValue>,
   /// Additional First Line Indentation in Character Units
   #[sdk(attr(qname = "w:firstLineChars"))]
   pub first_line_chars: Option<crate::simple_type::Int32Value>,
@@ -5051,10 +5051,10 @@ pub struct EmbeddedObject {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// dxaOrig
   #[sdk(attr(qname = "w:dxaOrig"))]
-  pub dxa_original: Option<crate::simple_type::StringValue>,
+  pub dxa_original: Option<crate::simple_type::TwipsMeasureValue>,
   /// dyaOrig
   #[sdk(attr(qname = "w:dyaOrig"))]
-  pub dya_original: Option<crate::simple_type::StringValue>,
+  pub dya_original: Option<crate::simple_type::TwipsMeasureValue>,
   /// anchorId
   #[sdk(attr(office2010, qname = "w14:anchorId"))]
   #[sdk(string_length(source = 1u32, union = 0u64, min = 4u32, max = 4u32))]
@@ -6163,7 +6163,7 @@ pub struct FitText {
   /// Value
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
   /// Fit Text Run ID
   #[sdk(attr(qname = "w:id"))]
   pub id: Option<crate::simple_type::Int32Value>,
@@ -8458,7 +8458,7 @@ pub struct TableCellWidth {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8474,7 +8474,7 @@ pub struct WidthBeforeTableRow {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8490,7 +8490,7 @@ pub struct WidthAfterTableRow {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8506,7 +8506,7 @@ pub struct TableCellSpacing {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8522,7 +8522,7 @@ pub struct TableWidth {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8538,7 +8538,7 @@ pub struct TopMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8554,7 +8554,7 @@ pub struct StartMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8570,7 +8570,7 @@ pub struct BottomMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8586,7 +8586,7 @@ pub struct EndMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8602,7 +8602,7 @@ pub struct LeftMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8618,7 +8618,7 @@ pub struct RightMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -8890,7 +8890,7 @@ pub struct TableRowHeight {
   /// Table Row Height
   #[sdk(attr(qname = "w:val"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub val: Option<crate::simple_type::StringValue>,
+  pub val: Option<crate::simple_type::TwipsMeasureValue>,
   /// Table Row Height Type
   #[sdk(attr(qname = "w:hRule"))]
   pub height_type: Option<HeightRuleValues>,
@@ -8910,19 +8910,19 @@ pub struct TablePositionProperties {
   /// Distance From Left of Table to Text
   #[sdk(attr(qname = "w:leftFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub left_from_text: Option<crate::simple_type::StringValue>,
+  pub left_from_text: Option<crate::simple_type::TwipsMeasureValue>,
   /// (Distance From Right of Table to Text
   #[sdk(attr(qname = "w:rightFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub right_from_text: Option<crate::simple_type::StringValue>,
+  pub right_from_text: Option<crate::simple_type::TwipsMeasureValue>,
   /// Distance From Top of Table to Text
   #[sdk(attr(qname = "w:topFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub top_from_text: Option<crate::simple_type::StringValue>,
+  pub top_from_text: Option<crate::simple_type::TwipsMeasureValue>,
   /// Distance From Bottom of Table to Text
   #[sdk(attr(qname = "w:bottomFromText"))]
   #[sdk(number_range(range = 0..))]
-  pub bottom_from_text: Option<crate::simple_type::StringValue>,
+  pub bottom_from_text: Option<crate::simple_type::TwipsMeasureValue>,
   /// Table Vertical Anchor
   #[sdk(attr(qname = "w:vertAnchor"))]
   pub vertical_anchor: Option<VerticalAnchorValues>,
@@ -8935,14 +8935,14 @@ pub struct TablePositionProperties {
   /// Absolute Horizontal Distance From Anchor
   #[sdk(attr(qname = "w:tblpX"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub table_position_x: Option<crate::simple_type::StringValue>,
+  pub table_position_x: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Relative Vertical Alignment from Anchor
   #[sdk(attr(qname = "w:tblpYSpec"))]
   pub table_position_y_alignment: Option<VerticalAlignmentValues>,
   /// Absolute Vertical Distance From Anchor
   #[sdk(attr(qname = "w:tblpY"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub table_position_y: Option<crate::simple_type::StringValue>,
+  pub table_position_y: Option<crate::simple_type::SignedTwipsMeasureValue>,
 }
 /// Defines the TableOverlap Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8981,7 +8981,7 @@ pub struct TableIndentation {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -9158,11 +9158,11 @@ pub struct PageSize {
   /// Page Width
   #[sdk(attr(qname = "w:w"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::TwipsMeasureValue>,
   /// Page Height
   #[sdk(attr(qname = "w:h"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub height: Option<crate::simple_type::StringValue>,
+  pub height: Option<crate::simple_type::TwipsMeasureValue>,
   /// Page Orientation
   #[sdk(attr(qname = "w:orient"))]
   pub orient: Option<PageOrientationValues>,
@@ -9177,31 +9177,31 @@ pub struct PageMargin {
   /// Top Margin Spacing
   #[sdk(attr(qname = "w:top"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub top: Option<crate::simple_type::StringValue>,
+  pub top: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Right Margin Spacing
   #[sdk(attr(qname = "w:right"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub right: Option<crate::simple_type::StringValue>,
+  pub right: Option<crate::simple_type::TwipsMeasureValue>,
   /// Page Bottom Spacing
   #[sdk(attr(qname = "w:bottom"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub bottom: Option<crate::simple_type::StringValue>,
+  pub bottom: Option<crate::simple_type::SignedTwipsMeasureValue>,
   /// Left Margin Spacing
   #[sdk(attr(qname = "w:left"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub left: Option<crate::simple_type::StringValue>,
+  pub left: Option<crate::simple_type::TwipsMeasureValue>,
   /// Spacing to Top of Header
   #[sdk(attr(qname = "w:header"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub header: Option<crate::simple_type::StringValue>,
+  pub header: Option<crate::simple_type::TwipsMeasureValue>,
   /// Spacing to Bottom of Footer
   #[sdk(attr(qname = "w:footer"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub footer: Option<crate::simple_type::StringValue>,
+  pub footer: Option<crate::simple_type::TwipsMeasureValue>,
   /// Page Gutter Spacing
   #[sdk(attr(qname = "w:gutter"))]
   #[sdk(number_range(max = 31680, min_inclusive = false))]
-  pub gutter: Option<crate::simple_type::StringValue>,
+  pub gutter: Option<crate::simple_type::TwipsMeasureValue>,
 }
 /// Defines the PaperSource Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -9261,7 +9261,7 @@ pub struct LineNumberType {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub distance: Option<crate::simple_type::StringValue>,
+  pub distance: Option<crate::simple_type::TwipsMeasureValue>,
   /// Line Numbering Restart Setting
   #[sdk(attr(qname = "w:restart"))]
   pub restart: Option<LineNumberRestartValues>,
@@ -9300,7 +9300,7 @@ pub struct Columns {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub space: Option<crate::simple_type::StringValue>,
+  pub space: Option<crate::simple_type::TwipsMeasureValue>,
   /// Number of Equal Width Columns
   #[sdk(attr(qname = "w:num"))]
   #[sdk(number_range(range = 1..= 45))]
@@ -10724,7 +10724,7 @@ pub struct TabStop {
   /// Tab Stop Position
   #[sdk(attr(qname = "w:pos"))]
   #[sdk(number_range(range = -31680..= 31680))]
-  pub position: crate::simple_type::StringValue,
+  pub position: crate::simple_type::SignedTwipsMeasureValue,
 }
 /// Run Properties for the Paragraph Mark.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11189,7 +11189,7 @@ pub struct Column {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::TwipsMeasureValue>,
   /// Space Before Following Column
   #[sdk(attr(qname = "w:space"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_TwipsMeasure_O12"))]
@@ -11199,7 +11199,7 @@ pub struct Column {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub space: Option<crate::simple_type::StringValue>,
+  pub space: Option<crate::simple_type::TwipsMeasureValue>,
 }
 /// Revision Information for Section Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11846,7 +11846,7 @@ pub struct GridColumn {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::TwipsMeasureValue>,
 }
 /// Revision Information for Table Grid Column Definitions.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12588,7 +12588,7 @@ pub struct Width {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Hyphenation Zone.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12603,7 +12603,7 @@ pub struct HyphenationZone {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Drawing Grid Horizontal Grid Unit Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12618,7 +12618,7 @@ pub struct DrawingGridHorizontalSpacing {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Drawing Grid Vertical Grid Unit Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12633,7 +12633,7 @@ pub struct DrawingGridVerticalSpacing {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Drawing Grid Horizontal Origin Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12648,7 +12648,7 @@ pub struct DrawingGridHorizontalOrigin {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Drawing Grid Vertical Origin Point.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12663,7 +12663,7 @@ pub struct DrawingGridVerticalOrigin {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Frameset Splitter Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -12770,7 +12770,7 @@ pub struct LegacyNumbering {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub legacy_space: Option<crate::simple_type::StringValue>,
+  pub legacy_space: Option<crate::simple_type::TwipsMeasureValue>,
   /// Legacy Indent
   #[sdk(attr(qname = "w:legacyIndent"))]
   #[sdk(number_type(source = 0u32, union = 0u64, type_name = "w:ST_SignedTwipsMeasure_O12"))]
@@ -12780,7 +12780,7 @@ pub struct LegacyNumbering {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub legacy_indent: Option<crate::simple_type::StringValue>,
+  pub legacy_indent: Option<crate::simple_type::SignedTwipsMeasureValue>,
 }
 /// Justification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13691,7 +13691,7 @@ pub struct LeftMarginDiv {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::SignedTwipsMeasureValue,
 }
 /// Right Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13706,7 +13706,7 @@ pub struct RightMarginDiv {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::SignedTwipsMeasureValue,
 }
 /// Top Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13721,7 +13721,7 @@ pub struct TopMarginDiv {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::SignedTwipsMeasureValue,
 }
 /// Bottom Margin for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -13736,7 +13736,7 @@ pub struct BottomMarginDiv {
     union = 0u64,
     regex = "-?[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::SignedTwipsMeasureValue,
 }
 /// Set of Borders for HTML div.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -14296,7 +14296,7 @@ pub struct TableCellLeftMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -14312,7 +14312,7 @@ pub struct TableCellRightMargin {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub width: Option<crate::simple_type::StringValue>,
+  pub width: Option<crate::simple_type::MeasurementOrPercentValue>,
   /// Table Width Type
   #[sdk(attr(qname = "w:type"))]
   pub r#type: Option<TableWidthUnitValues>,
@@ -14801,7 +14801,7 @@ pub struct Zoom {
   #[sdk(number_type(source = 2u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 3u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 4u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub percent: Option<crate::simple_type::StringValue>,
+  pub percent: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Grammar Checking Settings.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15087,7 +15087,7 @@ pub struct DefaultTabStop {
     union = 0u64,
     regex = "[0-9]+(\\.[0-9]+)?(mm|cm|in|pt|pc|pi)"
   ))]
-  pub val: crate::simple_type::StringValue,
+  pub val: crate::simple_type::TwipsMeasureValue,
 }
 /// Number of Pages Per Booklet.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -15536,7 +15536,7 @@ pub struct ReadModeInkLockDown {
   #[sdk(number_type(source = 3u32, union = 0u64, type_name = "w:ST_DecimalNumber"))]
   #[sdk(pattern(source = 4u32, union = 1u64, regex = "-?[0-9]+(\\.[0-9]+)?%"))]
   #[sdk(number_type(source = 5u32, union = 1u64, type_name = "w:ST_DecimalNumber"))]
-  pub font_size: crate::simple_type::StringValue,
+  pub font_size: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the TargetScreenSize Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

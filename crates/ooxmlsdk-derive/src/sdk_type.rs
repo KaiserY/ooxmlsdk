@@ -714,6 +714,84 @@ struct TextChildParseArmOptions {
   list: bool,
 }
 
+fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::parse_twips_measure_attr(&attr, decoder)? }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::parse_signed_twips_measure_attr(&attr, decoder)? }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::parse_decimal_number_or_percent_attr(&attr, decoder)? }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::parse_measurement_or_percent_attr(&attr, decoder)? }
+    }
+  }
+}
+
+fn parse_simple_union_value_tokens(
+  kind: SimpleUnionTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::parse_twips_measure_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::parse_signed_twips_measure_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::parse_decimal_number_or_percent_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::parse_measurement_or_percent_value(#value_expr) }
+    }
+  }
+}
+
+fn write_simple_union_attr_tokens(
+  kind: SimpleUnionTypeKind,
+  attr_name: &LitStr,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::write_twips_measure_attr(writer, #attr_name, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::write_signed_twips_measure_attr(writer, #attr_name, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::write_decimal_number_or_percent_attr(writer, #attr_name, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::write_measurement_or_percent_attr(writer, #attr_name, #value_expr)?; }
+    }
+  }
+}
+
+fn write_simple_union_value_tokens(
+  kind: SimpleUnionTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::write_twips_measure_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::write_signed_twips_measure_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::write_decimal_number_or_percent_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::write_measurement_or_percent_value(writer, #value_expr)?; }
+    }
+  }
+}
+
 fn build_text_child_parse_arm(
   owner_ident: &Ident,
   field_ident: &Ident,
@@ -745,6 +823,7 @@ fn build_text_child_parse_arm(
   } else {
     unwrap_option_vec_type(field_ty)
   };
+  let simple_union_kind = simple_union_type_kind(&value_ty);
   let parse_from_text_tokens = if options.list {
     quote! {{
       let value = text.unwrap_or_default();
@@ -753,6 +832,12 @@ fn build_text_child_parse_arm(
         stringify!(#owner_ident),
         stringify!(#field_ident),
       )?
+    }}
+  } else if let Some(kind) = simple_union_kind {
+    let parse_tokens = parse_simple_union_value_tokens(kind, quote! { value });
+    quote! {{
+      let value = text.unwrap_or_default();
+      #parse_tokens
     }}
   } else if is_string_like_type(&value_ty) {
     quote! { text.unwrap_or_default() }
@@ -774,6 +859,8 @@ fn build_text_child_parse_arm(
         stringify!(#field_ident),
       )?
     }
+  } else if let Some(kind) = simple_union_kind {
+    parse_simple_union_value_tokens(kind, quote! { String::new() })
   } else if is_string_like_type(&value_ty) {
     quote! { Default::default() }
   } else {
@@ -857,6 +944,8 @@ fn build_text_child_write_tokens(
       quote! {
         crate::common::write_list_value(writer, #value_expr.as_slice())?;
       }
+    } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
+      write_simple_union_value_tokens(kind, value_expr.clone())
     } else if is_xml_schema_float_type(&inner_ty) {
       write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
     } else if is_string_like_type(&inner_ty) {
@@ -3349,6 +3438,7 @@ fn expand_named_struct(
     } else {
       unwrap_wrapped_type(&field.ty)
     };
+    let simple_union_kind = simple_union_type_kind(&value_ty);
     let parser = if field.list {
       quote! {
         crate::common::parse_list_attr::<#value_ty>(
@@ -3358,6 +3448,8 @@ fn expand_named_struct(
           #name_lit,
         )?
       }
+    } else if let Some(kind) = simple_union_kind {
+      parse_simple_union_attr_tokens(kind)
     } else if integer_type_kind(&value_ty).is_some() {
       parse_integer_attr_tokens(
         quote! { &attr },
@@ -3399,6 +3491,8 @@ fn expand_named_struct(
       quote! {
         crate::common::write_list_attr_value(writer, #name_lit, value.as_slice())?;
       }
+    } else if let Some(kind) = simple_union_kind {
+      write_simple_union_attr_tokens(kind, &name_lit, quote! { value })
     } else if is_xml_schema_float_type(&value_ty) {
       let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &value_ty);
       quote! {
@@ -3430,7 +3524,9 @@ fn expand_named_struct(
       });
     }
 
-    let mut direct_validator_tokens = if is_hex_binary_type(&value_ty) {
+    let mut direct_validator_tokens = if simple_union_kind.is_some() {
+      Vec::new()
+    } else if is_hex_binary_type(&value_ty) {
       vec![quote! {
         crate::validator::validate_binary_format(
           stringify!(#ident),
@@ -3469,16 +3565,18 @@ fn expand_named_struct(
     };
     let mut union_validator_tokens: std::collections::BTreeMap<u32, Vec<proc_macro2::TokenStream>> =
       std::collections::BTreeMap::new();
-    for validator in &field.validators {
-      let token = validator_token(ident, field_ident, &value_ty, validator);
-      let (source_id, union_id) = validator_source_union(validator);
-      if union_id.is_some() {
-        union_validator_tokens
-          .entry(source_id)
-          .or_default()
-          .push(token);
-      } else {
-        direct_validator_tokens.push(token);
+    if simple_union_kind.is_none() {
+      for validator in &field.validators {
+        let token = validator_token(ident, field_ident, &value_ty, validator);
+        let (source_id, union_id) = validator_source_union(validator);
+        if union_id.is_some() {
+          union_validator_tokens
+            .entry(source_id)
+            .or_default()
+            .push(token);
+        } else {
+          direct_validator_tokens.push(token);
+        }
       }
     }
     let union_validator_tokens: Vec<_> = if union_validator_tokens.is_empty() {
@@ -5764,6 +5862,8 @@ fn expand_named_struct(
           quote! {
             crate::common::write_list_value(writer, value.as_slice())?;
           }
+        } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
+          write_simple_union_value_tokens(kind, quote! { value })
         } else if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
@@ -5779,6 +5879,8 @@ fn expand_named_struct(
           quote! {
             crate::common::write_list_value(writer, self.#field_ident.as_slice())?;
           }
+        } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
+          write_simple_union_value_tokens(kind, quote! { &self.#field_ident })
         } else if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
@@ -5823,6 +5925,26 @@ fn expand_named_struct(
       let parse_value_tokens = quote! {
         crate::common::parse_list_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
       };
+      if text_field.optional {
+        quote! {
+          #field_ident: match #field_ident {
+            Some(value) => Some(#parse_value_tokens),
+            None => None,
+          },
+        }
+      } else {
+        quote! {
+          #field_ident: {
+            let value = #field_ident.ok_or_else(|| crate::common::missing_field(
+              stringify!(#ident),
+              #field_name_lit,
+            ))?;
+            #parse_value_tokens
+          },
+        }
+      }
+    } else if let Some(kind) = simple_union_type_kind(&inner_ty) {
+      let parse_value_tokens = parse_simple_union_value_tokens(kind, quote! { value });
       if text_field.optional {
         quote! {
           #field_ident: match #field_ident {

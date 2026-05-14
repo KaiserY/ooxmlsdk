@@ -28,8 +28,7 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
 
   let mut families = Vec::new();
   if let Some(family) = family.filter(|family| !family.trim().is_empty()) {
-    families.push(fontdb::Family::Name(family));
-    push_font_aliases(&mut families, family);
+    push_requested_font_families(&mut families, family);
   } else {
     push_generic_font_families(&mut families);
   }
@@ -37,21 +36,6 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
   if let Some(face) = query_font_face(&families, family, bold, italic) {
     cache.insert(key, Some(face.clone()));
     return Some(face);
-  }
-
-  // Source: LibreOffice vcl/unx/generic/fontmanager/fontconfig.cxx
-  // PrintFontManager::Substitute asks fontconfig for a replacement when the
-  // requested family is unavailable. Typst's text shaping follows the same
-  // broad model by selecting a fallback font after the requested families are
-  // exhausted. Keep named-family fallback explicit so exact installed fonts and
-  // source-backed aliases remain preferred.
-  if family.is_some_and(|family| !family.trim().is_empty()) {
-    let mut fallback_families = Vec::new();
-    push_generic_font_families(&mut fallback_families);
-    if let Some(face) = query_font_face(&fallback_families, family, bold, italic) {
-      cache.insert(key, Some(face.clone()));
-      return Some(face);
-    }
   }
 
   let fallback_paths = family
@@ -67,6 +51,21 @@ fn load_face(family: Option<&str>, bold: bool, italic: bool) -> Option<FontFaceD
       let face = Some(FontFaceData { data, index: 0 });
       cache.insert(key, face.clone());
       return face;
+    }
+  }
+
+  // Source: LibreOffice vcl/unx/generic/fontmanager/fontconfig.cxx
+  // PrintFontManager::Substitute asks fontconfig for a replacement when the
+  // requested family is unavailable. Typst's text shaping follows the same
+  // broad model by selecting a fallback font after the requested families are
+  // exhausted. Keep named-family fallback explicit so exact installed fonts and
+  // source-backed aliases remain preferred.
+  if family.is_some_and(|family| !family.trim().is_empty()) {
+    let mut fallback_families = Vec::new();
+    push_generic_font_families(&mut fallback_families);
+    if let Some(face) = query_font_face(&fallback_families, family, bold, italic) {
+      cache.insert(key, Some(face.clone()));
+      return Some(face);
     }
   }
 
@@ -143,6 +142,17 @@ fn query_weight(family: Option<&str>, bold: bool) -> fontdb::Weight {
     fontdb::Weight::BOLD
   } else {
     fontdb::Weight::NORMAL
+  }
+}
+
+fn push_requested_font_families<'a>(families: &mut Vec<fontdb::Family<'a>>, family: &'a str) {
+  for family in family
+    .split(';')
+    .map(str::trim)
+    .filter(|family| !family.is_empty())
+  {
+    families.push(fontdb::Family::Name(family));
+    push_font_aliases(families, family);
   }
 }
 

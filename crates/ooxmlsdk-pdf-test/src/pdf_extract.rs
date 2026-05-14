@@ -1158,105 +1158,6 @@ fn format_rect_with_precision(rect: pdfium_render::prelude::PdfRect, precision: 
   )
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn parse_pdf_rect_reads_four_point_coordinates() {
-    let rect = parse_pdf_rect("[1.5 2.0 30.25 40.75]").unwrap();
-    assert_eq!(
-      rect,
-      PdfBounds {
-        left: 1.5,
-        bottom: 2.0,
-        right: 30.25,
-        top: 40.75,
-      }
-    );
-    assert_eq!(rect.width(), 28.75);
-    assert_eq!(rect.height(), 38.75);
-    assert_eq!(rect.center(), (15.875, 21.375));
-  }
-
-  #[test]
-  #[should_panic(expected = "PDF rect right mismatch")]
-  fn assert_pdf_rect_close_reports_coordinate_mismatch() {
-    assert_pdf_rect_close(
-      "[0.0 0.0 12.0 10.0]",
-      PdfBounds {
-        left: 0.0,
-        bottom: 0.0,
-        right: 10.0,
-        top: 10.0,
-      },
-      0.1,
-    );
-  }
-
-  #[test]
-  fn rendered_page_image_maps_pdf_coordinates_to_pixels() {
-    let image = RenderedPageImage {
-      page_index: 0,
-      width_px: 200,
-      height_px: 100,
-      page_width_pt: 400.0,
-      page_height_pt: 200.0,
-      rgba_crc32: String::new(),
-      rgba: vec![0; 200 * 100 * 4],
-    };
-
-    assert_eq!(image.pdf_point_to_pixel(0.0, 200.0), Some((0, 0)));
-    assert_eq!(image.pdf_point_to_pixel(400.0, 0.0), Some((199, 99)));
-    assert_eq!(image.pdf_point_to_pixel(200.0, 100.0), Some((100, 50)));
-    assert_eq!(
-      image.pdf_rect_to_pixel_rect(PdfBounds {
-        left: 100.0,
-        bottom: 50.0,
-        right: 300.0,
-        top: 150.0,
-      }),
-      Some(PixelRect {
-        left: 50,
-        top: 25,
-        width: 100,
-        height: 50,
-      })
-    );
-  }
-
-  #[test]
-  fn rendered_page_image_samples_pixels_and_hashes_regions() {
-    let mut rgba = vec![0; 4 * 4 * 4];
-    rgba[(2 * 4 + 1) * 4..(2 * 4 + 2) * 4].copy_from_slice(&[10, 20, 30, 255]);
-    let image = RenderedPageImage {
-      page_index: 0,
-      width_px: 4,
-      height_px: 4,
-      page_width_pt: 4.0,
-      page_height_pt: 4.0,
-      rgba_crc32: String::new(),
-      rgba,
-    };
-
-    assert_eq!(image.pixel_rgba(1, 2), Some([10, 20, 30, 255]));
-    assert_eq!(
-      image.sample_pdf_point_rgba(1.0, 2.0),
-      Some([10, 20, 30, 255])
-    );
-    assert!(
-      image
-        .pixel_region_crc32(PixelRect {
-          left: 1,
-          top: 2,
-          width: 1,
-          height: 1,
-        })
-        .is_some()
-    );
-  }
-}
-
 struct PdfStream {
   dictionary: String,
   decoded: Option<Vec<u8>>,
@@ -1409,5 +1310,104 @@ impl PdfBytesExt for [u8] {
       end -= 1;
     }
     &self[..end]
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn parse_pdf_rect_reads_four_point_coordinates() {
+    let rect = parse_pdf_rect("[1.5 2.0 30.25 40.75]").unwrap();
+    assert_eq!(
+      rect,
+      PdfBounds {
+        left: 1.5,
+        bottom: 2.0,
+        right: 30.25,
+        top: 40.75,
+      }
+    );
+    assert_eq!(rect.width(), 28.75);
+    assert_eq!(rect.height(), 38.75);
+    assert_eq!(rect.center(), (15.875, 21.375));
+  }
+
+  #[test]
+  #[should_panic(expected = "PDF rect right mismatch")]
+  fn assert_pdf_rect_close_reports_coordinate_mismatch() {
+    assert_pdf_rect_close(
+      "[0.0 0.0 12.0 10.0]",
+      PdfBounds {
+        left: 0.0,
+        bottom: 0.0,
+        right: 10.0,
+        top: 10.0,
+      },
+      0.1,
+    );
+  }
+
+  #[test]
+  fn rendered_page_image_maps_pdf_coordinates_to_pixels() {
+    let image = RenderedPageImage {
+      page_index: 0,
+      width_px: 200,
+      height_px: 100,
+      page_width_pt: 400.0,
+      page_height_pt: 200.0,
+      rgba_crc32: String::new(),
+      rgba: vec![0; 200 * 100 * 4],
+    };
+
+    assert_eq!(image.pdf_point_to_pixel(0.0, 200.0), Some((0, 0)));
+    assert_eq!(image.pdf_point_to_pixel(400.0, 0.0), Some((199, 99)));
+    assert_eq!(image.pdf_point_to_pixel(200.0, 100.0), Some((100, 50)));
+    assert_eq!(
+      image.pdf_rect_to_pixel_rect(PdfBounds {
+        left: 100.0,
+        bottom: 50.0,
+        right: 300.0,
+        top: 150.0,
+      }),
+      Some(PixelRect {
+        left: 50,
+        top: 25,
+        width: 100,
+        height: 50,
+      })
+    );
+  }
+
+  #[test]
+  fn rendered_page_image_samples_pixels_and_hashes_regions() {
+    let mut rgba = vec![0; 4 * 4 * 4];
+    rgba[(2 * 4 + 1) * 4..(2 * 4 + 2) * 4].copy_from_slice(&[10, 20, 30, 255]);
+    let image = RenderedPageImage {
+      page_index: 0,
+      width_px: 4,
+      height_px: 4,
+      page_width_pt: 4.0,
+      page_height_pt: 4.0,
+      rgba_crc32: String::new(),
+      rgba,
+    };
+
+    assert_eq!(image.pixel_rgba(1, 2), Some([10, 20, 30, 255]));
+    assert_eq!(
+      image.sample_pdf_point_rgba(1.0, 2.0),
+      Some([10, 20, 30, 255])
+    );
+    assert!(
+      image
+        .pixel_region_crc32(PixelRect {
+          left: 1,
+          top: 2,
+          width: 1,
+          height: 1,
+        })
+        .is_some()
+    );
   }
 }

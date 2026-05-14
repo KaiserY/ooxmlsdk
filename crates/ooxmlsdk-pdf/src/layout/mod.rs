@@ -50,13 +50,17 @@ fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &T
     LineHeightRule::Auto => paragraph
       .format
       .line_height_pt
-      .map(|multiple| inline_text_height(base_line_style) * multiple)
+      .map(|multiple| word_auto_line_height(base_line_style) * multiple)
       .unwrap_or_else(|| inline_text_height(base_line_style)),
     LineHeightRule::AtLeast | LineHeightRule::Exact => paragraph
       .format
       .line_height_pt
       .unwrap_or_else(|| inline_text_height(base_line_style)),
   }
+}
+
+fn word_auto_line_height(style: &TextStyle) -> f32 {
+  style.font_size_pt * 1.15
 }
 
 fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyle) -> f32 {
@@ -3813,7 +3817,15 @@ impl RowFrame<'_, '_> {
         && let Some(border) =
           cell_horizontal_border(self.table, self.row_index, grid_index, cell, false)
       {
-        push_styled_line(current, left_pt, row_bottom, right_pt, row_bottom, border);
+        let (border_left, border_right) = self.inset_inside_horizontal_border(left_pt, right_pt);
+        push_styled_line(
+          current,
+          border_left,
+          row_bottom,
+          border_right,
+          row_bottom,
+          border,
+        );
       }
 
       left_pt = right_pt + cell_spacing_pt;
@@ -3851,6 +3863,28 @@ impl RowFrame<'_, '_> {
 
   fn cell_spacing_pt(&self) -> f32 {
     row_cell_spacing_pt(self.table, self.row)
+  }
+
+  fn inset_inside_horizontal_border(&self, left_pt: f32, right_pt: f32) -> (f32, f32) {
+    if self.row_index + 1 == self.table.rows.len() {
+      return (left_pt, right_pt);
+    }
+    let Some(borders) = self.table.borders else {
+      return (left_pt, right_pt);
+    };
+    let mut left_pt = left_pt;
+    let mut right_pt = right_pt;
+    if (left_pt - self.table_frame.left_pt).abs() < 0.1
+      && let Some(border) = borders.left
+    {
+      left_pt += border.width_pt;
+    }
+    if (right_pt - self.table_frame.right_pt).abs() < 0.1
+      && let Some(border) = borders.right
+    {
+      right_pt -= border.width_pt;
+    }
+    (left_pt.min(right_pt), right_pt)
   }
 }
 
@@ -4510,15 +4544,12 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
       Block::Paragraph(paragraph) => {
         let estimated = estimated_paragraph_height(paragraph, flow);
         let min_height = paragraph_line_height(paragraph, &paragraph_base_line_style(paragraph));
-        let trailing_spacing = if index + 1 == cell.blocks.len() {
-          paragraph
-            .format
-            .spacing_after_pt
-            .max(PARAGRAPH_SPACING_AFTER_PT)
+        let cell_border_spacing = if index + 1 == cell.blocks.len() {
+          table_cell_line_spacing_before_border(paragraph)
         } else {
           0.0
         };
-        (estimated - trailing_spacing).max(min_height)
+        estimated.max(min_height) + cell_border_spacing
       }
       Block::Table(table) => table
         .rows
@@ -4530,6 +4561,22 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     .sum::<f32>()
     .max(inline_text_height(&table_cell_first_line_style(cell)));
   cell.margins.top_pt + content + cell.margins.bottom_pt
+}
+
+fn table_cell_line_spacing_before_border(paragraph: &crate::docx::Paragraph) -> f32 {
+  if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto) {
+    return 0.0;
+  }
+  let Some(multiple) = paragraph.format.line_height_pt else {
+    return 0.0;
+  };
+  if multiple <= 1.0 {
+    return 0.0;
+  }
+  // Source: LibreOffice sw/source/core/layout/frmtool.cxx
+  // SwBorderAttrs::CalcLineSpacing_ adds 115% of the proportional line spacing
+  // excess before a table cell border for Word-compatible DOCX layout.
+  word_auto_line_height(&paragraph_base_line_style(paragraph)) * (multiple - 1.0)
 }
 
 fn floating_image_position(
@@ -6140,13 +6187,69 @@ fn flush_text(
 }
 
 fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border: BorderStyle) {
+  if border.compound {
+    let stroke_width = (border.width_pt / 3.0).max(0.25);
+    let offset = stroke_width;
+    if f32::abs(y2 - y1) < f32::abs(x2 - x1) {
+      push_line_item(
+        page,
+        x1,
+        y1 - offset,
+        x2,
+        y2 - offset,
+        stroke_width,
+        border.color,
+      );
+      push_line_item(
+        page,
+        x1,
+        y1 + offset,
+        x2,
+        y2 + offset,
+        stroke_width,
+        border.color,
+      );
+    } else {
+      push_line_item(
+        page,
+        x1 - offset,
+        y1,
+        x2 - offset,
+        y2,
+        stroke_width,
+        border.color,
+      );
+      push_line_item(
+        page,
+        x1 + offset,
+        y1,
+        x2 + offset,
+        y2,
+        stroke_width,
+        border.color,
+      );
+    }
+    return;
+  }
+  push_line_item(page, x1, y1, x2, y2, border.width_pt, border.color);
+}
+
+fn push_line_item(
+  page: &mut Page,
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+  width: f32,
+  color: RgbColor,
+) {
   page.items.push(PageItem::Line(LineItem {
     x1_pt: x1,
     y1_pt: y1,
     x2_pt: x2,
     y2_pt: y2,
-    width_pt: border.width_pt,
-    color: border.color,
+    width_pt: width,
+    color,
     kind: LineItemKind::Stroke,
   }));
 }
@@ -6155,6 +6258,97 @@ fn push_styled_line(page: &mut Page, x1: f32, y1: f32, x2: f32, y2: f32, border:
 mod tests {
   use super::*;
   use crate::docx::{CellBordersModel, CellMargins, Paragraph, ParagraphFormat, TextRun};
+
+  #[test]
+  fn compound_horizontal_border_paints_two_parallel_strokes() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    push_styled_line(
+      &mut page,
+      10.0,
+      20.0,
+      50.0,
+      20.0,
+      BorderStyle {
+        width_pt: 6.0,
+        spacing_pt: 0.0,
+        color: RgbColor::default(),
+        compound: true,
+      },
+    );
+
+    let lines: Vec<_> = page
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Line(line) => Some(line),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].width_pt, 2.0);
+    assert_eq!(lines[1].width_pt, 2.0);
+    assert_eq!(lines[0].y1_pt, 18.0);
+    assert_eq!(lines[1].y1_pt, 22.0);
+  }
+
+  #[test]
+  fn compound_vertical_border_paints_two_parallel_strokes() {
+    let mut page = empty_page(PageSetup::default(), 0);
+    push_styled_line(
+      &mut page,
+      10.0,
+      20.0,
+      10.0,
+      60.0,
+      BorderStyle {
+        width_pt: 6.0,
+        spacing_pt: 0.0,
+        color: RgbColor::default(),
+        compound: true,
+      },
+    );
+
+    let lines: Vec<_> = page
+      .items
+      .iter()
+      .filter_map(|item| match item {
+        PageItem::Line(line) => Some(line),
+        _ => None,
+      })
+      .collect();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0].width_pt, 2.0);
+    assert_eq!(lines[1].width_pt, 2.0);
+    assert_eq!(lines[0].x1_pt, 8.0);
+    assert_eq!(lines[1].x1_pt, 12.0);
+  }
+
+  #[test]
+  fn table_cell_line_spacing_before_border_matches_writer_compat_extra() {
+    let mut paragraph = Paragraph {
+      inlines: vec![InlineItem::Text(TextRun {
+        text: "double spaced".into(),
+        style: TextStyle::default(),
+        hyperlink_url: None,
+        dynamic_field: None,
+      })],
+      footnote_reference_ids: Vec::new(),
+      endnote_reference_ids: Vec::new(),
+      #[cfg(test)]
+      runs: Vec::new(),
+      format: ParagraphFormat {
+        line_height_rule: LineHeightRule::Auto,
+        line_height_pt: Some(2.0),
+        ..Default::default()
+      },
+      list_label: None,
+      list_label_hyperlink_url: None,
+    };
+
+    assert!((table_cell_line_spacing_before_border(&paragraph) - 12.65).abs() < 0.01);
+    paragraph.format.line_height_pt = Some(1.0);
+    assert_eq!(table_cell_line_spacing_before_border(&paragraph), 0.0);
+  }
 
   #[test]
   fn repeating_areas_follow_word_margin_distances() {

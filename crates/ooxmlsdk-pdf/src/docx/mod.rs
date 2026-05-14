@@ -18,6 +18,9 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
+use ooxmlsdk::simple_type::{
+  MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
+};
 use quick_xml::Reader;
 use quick_xml::Writer;
 use quick_xml::events::Event;
@@ -134,7 +137,7 @@ fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocument
       settings
         .w_default_tab_stop
         .as_ref()
-        .map(|stop| stop.val as f32 / 20.0)
+        .and_then(|stop| twips_measure_to_points(&stop.val))
     })
     .filter(|value| value.is_finite() && *value > 0.0)
     .unwrap_or(DEFAULT_TAB_STOP_PT)
@@ -841,11 +844,23 @@ fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValu
     .and_then(|size| size.orient)
     .or_else(|| {
       let size = section.w_pg_sz.as_ref()?;
-      Some(if size.width.unwrap_or(0) > size.height.unwrap_or(0) {
-        w::PageOrientationValues::Landscape
-      } else {
-        w::PageOrientationValues::Portrait
-      })
+      Some(
+        if size
+          .width
+          .as_ref()
+          .and_then(twips_measure_to_twips)
+          .unwrap_or(0.0)
+          > size
+            .height
+            .as_ref()
+            .and_then(twips_measure_to_twips)
+            .unwrap_or(0.0)
+        {
+          w::PageOrientationValues::Landscape
+        } else {
+          w::PageOrientationValues::Portrait
+        },
+      )
     })
     .unwrap_or_default()
 }
@@ -867,8 +882,8 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
   let equal_width = columns.equal_width.is_none_or(|value| value.as_bool());
   let gap_pt = columns
     .space
-    .as_deref()
-    .and_then(twips_attr_to_points)
+    .as_ref()
+    .and_then(twips_measure_to_points)
     .filter(|gap| gap.is_finite() && *gap >= 0.0)
     .unwrap_or(36.0);
   if !equal_width && !columns.w_col.is_empty() {
@@ -878,8 +893,8 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
       .filter_map(|column| {
         column
           .width
-          .as_deref()
-          .and_then(twips_attr_to_points)
+          .as_ref()
+          .and_then(twips_measure_to_points)
           .filter(|width| width.is_finite() && *width > 0.0)
       })
       .collect::<Vec<_>>();
@@ -891,8 +906,8 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
         .map(|column| {
           column
             .space
-            .as_deref()
-            .and_then(twips_attr_to_points)
+            .as_ref()
+            .and_then(twips_measure_to_points)
             .filter(|gap| gap.is_finite() && *gap >= 0.0)
             .unwrap_or(gap_pt)
         })
@@ -1366,7 +1381,7 @@ fn table_model(
         grid
           .w_grid_col
           .iter()
-          .filter_map(|column| column.width.as_deref().and_then(twips_attr_to_points))
+          .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
           .collect()
       })
       .unwrap_or_default(),
@@ -1388,7 +1403,7 @@ fn table_model(
       .unwrap_or_default(),
     borders: properties
       .and_then(|properties| properties.table_borders.as_deref())
-      .map(table_borders_model)
+      .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
       .or(table_style.table_borders),
     cell_spacing_pt: properties
       .and_then(|properties| properties.table_cell_spacing.as_ref())
@@ -1674,32 +1689,32 @@ fn table_cell_conditional_style(
 fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
   let mut model = CellMargins::default();
   if let Some(top) = &margins.top_margin
-    && let Some(value) = margin_width_to_points(top.width.as_deref(), top.r#type)
+    && let Some(value) = margin_width_to_points(top.width.as_ref(), top.r#type)
   {
     model.top_pt = value;
   }
   if let Some(bottom) = &margins.bottom_margin
-    && let Some(value) = margin_width_to_points(bottom.width.as_deref(), bottom.r#type)
+    && let Some(value) = margin_width_to_points(bottom.width.as_ref(), bottom.r#type)
   {
     model.bottom_pt = value;
   }
   if let Some(left) = &margins.table_cell_left_margin
-    && matches!(left.r#type, w::TableWidthValues::Dxa)
+    && let Some(value) = margin_width_to_points(left.width.as_ref(), left.r#type)
   {
-    model.left_pt = units::twips_to_points(left.width as f32);
+    model.left_pt = value;
   }
   if let Some(start) = &margins.start_margin
-    && let Some(value) = margin_width_to_points(start.width.as_deref(), start.r#type)
+    && let Some(value) = margin_width_to_points(start.width.as_ref(), start.r#type)
   {
     model.left_pt = value;
   }
   if let Some(right) = &margins.table_cell_right_margin
-    && matches!(right.r#type, w::TableWidthValues::Dxa)
+    && let Some(value) = margin_width_to_points(right.width.as_ref(), right.r#type)
   {
-    model.right_pt = units::twips_to_points(right.width as f32);
+    model.right_pt = value;
   }
   if let Some(end) = &margins.end_margin
-    && let Some(value) = margin_width_to_points(end.width.as_deref(), end.r#type)
+    && let Some(value) = margin_width_to_points(end.width.as_ref(), end.r#type)
   {
     model.right_pt = value;
   }
@@ -1708,32 +1723,32 @@ fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins
 
 fn table_cell_margin(margins: &w::TableCellMargin, mut model: CellMargins) -> CellMargins {
   if let Some(top) = &margins.top_margin
-    && let Some(value) = margin_width_to_points(top.width.as_deref(), top.r#type)
+    && let Some(value) = margin_width_to_points(top.width.as_ref(), top.r#type)
   {
     model.top_pt = value;
   }
   if let Some(bottom) = &margins.bottom_margin
-    && let Some(value) = margin_width_to_points(bottom.width.as_deref(), bottom.r#type)
+    && let Some(value) = margin_width_to_points(bottom.width.as_ref(), bottom.r#type)
   {
     model.bottom_pt = value;
   }
   if let Some(left) = &margins.left_margin
-    && let Some(value) = margin_width_to_points(left.width.as_deref(), left.r#type)
+    && let Some(value) = margin_width_to_points(left.width.as_ref(), left.r#type)
   {
     model.left_pt = value;
   }
   if let Some(start) = &margins.start_margin
-    && let Some(value) = margin_width_to_points(start.width.as_deref(), start.r#type)
+    && let Some(value) = margin_width_to_points(start.width.as_ref(), start.r#type)
   {
     model.left_pt = value;
   }
   if let Some(right) = &margins.right_margin
-    && let Some(value) = margin_width_to_points(right.width.as_deref(), right.r#type)
+    && let Some(value) = margin_width_to_points(right.width.as_ref(), right.r#type)
   {
     model.right_pt = value;
   }
   if let Some(end) = &margins.end_margin
-    && let Some(value) = margin_width_to_points(end.width.as_deref(), end.r#type)
+    && let Some(value) = margin_width_to_points(end.width.as_ref(), end.r#type)
   {
     model.right_pt = value;
   }
@@ -1741,20 +1756,21 @@ fn table_cell_margin(margins: &w::TableCellMargin, mut model: CellMargins) -> Ce
 }
 
 fn margin_width_to_points(
-  width: Option<&str>,
+  width: Option<&MeasurementOrPercentValue>,
   width_type: Option<w::TableWidthUnitValues>,
 ) -> Option<f32> {
   if !matches!(width_type, None | Some(w::TableWidthUnitValues::Dxa)) {
     return None;
   }
-  width.and_then(twips_attr_to_points)
+  width.and_then(measurement_or_percent_to_points)
 }
 
 fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
   match width.r#type {
-    Some(w::TableWidthUnitValues::Dxa) | None => {
-      width.width.as_deref().and_then(twips_attr_to_points)
-    }
+    Some(w::TableWidthUnitValues::Dxa) | None => width
+      .width
+      .as_ref()
+      .and_then(measurement_or_percent_to_points),
     _ => None,
   }
 }
@@ -1763,25 +1779,28 @@ fn table_cell_spacing_to_points(spacing: &w::TableCellSpacing) -> Option<f32> {
   if !matches!(spacing.r#type, None | Some(w::TableWidthUnitValues::Dxa)) {
     return None;
   }
-  spacing.width.as_deref().and_then(twips_attr_to_points)
+  spacing
+    .width
+    .as_ref()
+    .and_then(measurement_or_percent_to_points)
 }
 
 fn table_width_to_percent(width: &w::TableWidth) -> Option<f32> {
   if !matches!(width.r#type, Some(w::TableWidthUnitValues::Pct)) {
     return None;
   }
-  let value = width.width.as_deref()?;
-  if let Some(percent) = value.strip_suffix('%') {
-    return percent.parse::<f32>().ok().map(|value| value / 100.0);
-  }
-  value.parse::<f32>().ok().map(|value| value / 5000.0)
+  width
+    .width
+    .as_ref()
+    .and_then(measurement_or_percent_to_percent)
 }
 
 fn table_cell_width_to_points(width: &w::TableCellWidth) -> Option<f32> {
   match width.r#type {
-    Some(w::TableWidthUnitValues::Dxa) | None => {
-      width.width.as_deref().and_then(twips_attr_to_points)
-    }
+    Some(w::TableWidthUnitValues::Dxa) | None => width
+      .width
+      .as_ref()
+      .and_then(measurement_or_percent_to_points),
     _ => None,
   }
 }
@@ -1790,11 +1809,10 @@ fn table_cell_width_to_percent(width: &w::TableCellWidth) -> Option<f32> {
   if !matches!(width.r#type, Some(w::TableWidthUnitValues::Pct)) {
     return None;
   }
-  let value = width.width.as_deref()?;
-  if let Some(percent) = value.strip_suffix('%') {
-    return percent.parse::<f32>().ok().map(|value| value / 100.0);
-  }
-  value.parse::<f32>().ok().map(|value| value / 5000.0)
+  width
+    .width
+    .as_ref()
+    .and_then(measurement_or_percent_to_percent)
 }
 
 fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32> {
@@ -1806,14 +1824,15 @@ fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32>
   }
   indentation
     .width
-    .map(|width| units::twips_to_points(width as f32))
+    .as_ref()
+    .and_then(measurement_or_percent_to_points)
 }
 
 fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
   match justification.val {
     w::TableRowAlignmentValues::Center => TableAlignment::Center,
-    w::TableRowAlignmentValues::Right => TableAlignment::Right,
-    w::TableRowAlignmentValues::Left => TableAlignment::Left,
+    w::TableRowAlignmentValues::Right | w::TableRowAlignmentValues::End => TableAlignment::Right,
+    w::TableRowAlignmentValues::Left | w::TableRowAlignmentValues::Start => TableAlignment::Left,
   }
 }
 
@@ -1854,6 +1873,50 @@ fn table_borders_model(borders: &w::TableBorders) -> TableBordersModel {
       .as_ref()
       .and_then(inside_vertical_border_style),
   }
+}
+
+fn direct_table_borders_model(
+  base: Option<TableBordersModel>,
+  borders: &w::TableBorders,
+) -> TableBordersModel {
+  let mut base = base.unwrap_or_default();
+  if let Some(top) = borders.top_border.as_ref().map(top_border_override) {
+    base.top = top;
+  }
+  if let Some(right) = borders
+    .end_border
+    .as_ref()
+    .map(end_border_override)
+    .or_else(|| borders.right_border.as_ref().map(right_border_override))
+  {
+    base.right = right;
+  }
+  if let Some(bottom) = borders.bottom_border.as_ref().map(bottom_border_override) {
+    base.bottom = bottom;
+  }
+  if let Some(left) = borders
+    .start_border
+    .as_ref()
+    .map(start_border_override)
+    .or_else(|| borders.left_border.as_ref().map(left_border_override))
+  {
+    base.left = left;
+  }
+  if let Some(inside_horizontal) = borders
+    .inside_horizontal_border
+    .as_ref()
+    .map(inside_horizontal_border_override)
+  {
+    base.inside_horizontal = inside_horizontal;
+  }
+  if let Some(inside_vertical) = borders
+    .inside_vertical_border
+    .as_ref()
+    .map(inside_vertical_border_override)
+  {
+    base.inside_vertical = inside_vertical;
+  }
+  base
 }
 
 fn cell_borders_model(borders: &w::TableCellBorders) -> CellBordersModel {
@@ -1960,6 +2023,8 @@ border_override_fn!(bottom_border_override, w::BottomBorder);
 border_override_fn!(left_border_override, w::LeftBorder);
 border_override_fn!(start_border_override, w::StartBorder);
 border_override_fn!(end_border_override, w::EndBorder);
+border_override_fn!(inside_horizontal_border_override, w::InsideHorizontalBorder);
+border_override_fn!(inside_vertical_border_override, w::InsideVerticalBorder);
 
 fn border_style(
   value: w::BorderValues,
@@ -2025,29 +2090,29 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(spacing) = properties.spacing_between_lines() {
     format.spacing_before_pt = spacing
       .before
-      .as_deref()
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .and_then(twips_measure_to_points)
       .unwrap_or(0.0);
     format.spacing_after_pt = spacing
       .after
-      .as_deref()
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .and_then(twips_measure_to_points)
       .unwrap_or(0.0);
-    if let Some(line) = spacing.line.as_deref() {
+    if let Some(line) = spacing.line.as_ref() {
       match spacing.line_rule {
         None | Some(w::LineSpacingRuleValues::Auto) => {
           format.line_height_rule = LineHeightRule::Auto;
-          if let Ok(value) = line.parse::<f32>() {
+          if let Some(value) = signed_twips_measure_to_twips(line) {
             format.line_height_pt = Some((value / 240.0).max(0.1));
           }
         }
         Some(w::LineSpacingRuleValues::AtLeast) => {
           format.line_height_rule = LineHeightRule::AtLeast;
-          format.line_height_pt = twips_attr_to_points(line);
+          format.line_height_pt = signed_twips_measure_to_points(line);
         }
         Some(w::LineSpacingRuleValues::Exact) => {
           format.line_height_rule = LineHeightRule::Exact;
-          format.line_height_pt = twips_attr_to_points(line);
+          format.line_height_pt = signed_twips_measure_to_points(line);
         }
       }
     }
@@ -2056,25 +2121,25 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(indentation) = properties.indentation() {
     format.indent_left_pt = indentation
       .start
-      .as_deref()
-      .or(indentation.left.as_deref())
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .or(indentation.left.as_ref())
+      .and_then(signed_twips_measure_to_points)
       .unwrap_or(0.0);
     format.indent_right_pt = indentation
       .end
-      .as_deref()
-      .or(indentation.right.as_deref())
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .or(indentation.right.as_ref())
+      .and_then(signed_twips_measure_to_points)
       .unwrap_or(0.0);
     let first_line = indentation
       .first_line
-      .as_deref()
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .and_then(twips_measure_to_points)
       .unwrap_or(0.0);
     let hanging = indentation
       .hanging
-      .as_deref()
-      .and_then(twips_attr_to_points)
+      .as_ref()
+      .and_then(twips_measure_to_points)
       .unwrap_or(0.0);
     format.first_line_indent_pt = first_line - hanging;
   }
@@ -2134,7 +2199,7 @@ fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
         w::TabStopValues::Clear | w::TabStopValues::Bar => return None,
       };
       Some(TabStop {
-        position_pt: tab.position as f32 / 20.0,
+        position_pt: signed_twips_measure_to_points(&tab.position)?,
         alignment,
       })
     })
@@ -5747,15 +5812,15 @@ fn style_table_row_style(
 }
 
 fn apply_table_row_height(style: &mut TableRowStyle, height: &w::TableRowHeight) {
-  style.height_pt = height.val.map(|value| units::twips_to_points(value as f32));
+  style.height_pt = height.val.as_ref().and_then(twips_measure_to_points);
   style.exact_height = Some(matches!(
     height.height_type,
     Some(w::HeightRuleValues::Exact)
   ));
 }
 
-fn on_off_only_value(value: Option<w::OnOffOnlyValues>) -> bool {
-  !matches!(value, Some(w::OnOffOnlyValues::Off))
+fn on_off_only_value(value: Option<ooxmlsdk::simple_type::OnOffValue>) -> bool {
+  value.is_none_or(|value| value.as_bool())
 }
 
 fn merge_table_row_style(target: &mut TableRowStyle, source: &TableRowStyle) {
@@ -6468,42 +6533,115 @@ fn parse_hex_color(value: &str) -> Option<RgbColor> {
   })
 }
 
-fn twips_attr_to_points(value: &str) -> Option<f32> {
-  value.parse::<f32>().ok().map(units::twips_to_points)
+fn twips_measure_to_twips(value: &TwipsMeasureValue) -> Option<f32> {
+  match value {
+    TwipsMeasureValue::UnsignedDecimalNumber(value) => Some(*value as f32),
+    TwipsMeasureValue::PositiveUniversalMeasure(value) => {
+      universal_measure_to_points(value).map(|points| points * 20.0)
+    }
+  }
+}
+
+fn signed_twips_measure_to_twips(value: &SignedTwipsMeasureValue) -> Option<f32> {
+  match value {
+    SignedTwipsMeasureValue::Integer(value) => Some(*value as f32),
+    SignedTwipsMeasureValue::UniversalMeasure(value) => {
+      universal_measure_to_points(value).map(|points| points * 20.0)
+    }
+  }
+}
+
+fn twips_measure_to_points(value: &TwipsMeasureValue) -> Option<f32> {
+  twips_measure_to_twips(value).map(units::twips_to_points)
+}
+
+fn signed_twips_measure_to_points(value: &SignedTwipsMeasureValue) -> Option<f32> {
+  signed_twips_measure_to_twips(value).map(units::twips_to_points)
+}
+
+fn measurement_or_percent_to_points(value: &MeasurementOrPercentValue) -> Option<f32> {
+  match value {
+    MeasurementOrPercentValue::DecimalNumberOrPercent(
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
+    ) => Some(units::twips_to_points(*value as f32)),
+    MeasurementOrPercentValue::DecimalNumberOrPercent(
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(_),
+    ) => None,
+    MeasurementOrPercentValue::UniversalMeasure(value) => universal_measure_to_points(value),
+  }
+}
+
+fn measurement_or_percent_to_percent(value: &MeasurementOrPercentValue) -> Option<f32> {
+  match value {
+    MeasurementOrPercentValue::DecimalNumberOrPercent(
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
+    ) => Some(*value as f32 / 5000.0),
+    MeasurementOrPercentValue::DecimalNumberOrPercent(
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(value),
+    ) => value
+      .strip_suffix('%')
+      .and_then(|value| value.parse::<f32>().ok())
+      .map(|value| value / 100.0),
+    MeasurementOrPercentValue::UniversalMeasure(_) => None,
+  }
+}
+
+fn universal_measure_to_points(value: &str) -> Option<f32> {
+  let (number, unit) = value
+    .strip_suffix("mm")
+    .map(|number| (number, "mm"))
+    .or_else(|| value.strip_suffix("cm").map(|number| (number, "cm")))
+    .or_else(|| value.strip_suffix("in").map(|number| (number, "in")))
+    .or_else(|| value.strip_suffix("pt").map(|number| (number, "pt")))
+    .or_else(|| value.strip_suffix("pc").map(|number| (number, "pc")))
+    .or_else(|| value.strip_suffix("pi").map(|number| (number, "pi")))?;
+  let number = number.parse::<f32>().ok()?;
+  Some(match unit {
+    "mm" => number * 72.0 / 25.4,
+    "cm" => number * 72.0 / 2.54,
+    "in" => number * 72.0,
+    "pt" => number,
+    "pc" | "pi" => number * 12.0,
+    _ => return None,
+  })
 }
 
 fn page_setup(section: &w::SectionProperties) -> PageSetup {
   let mut setup = PageSetup::default();
 
   if let Some(size) = &section.w_pg_sz {
-    if let Some(width) = size.width {
-      setup.width_pt = units::twips_to_points(width as f32);
+    if let Some(width) = size.width.as_ref().and_then(twips_measure_to_points) {
+      setup.width_pt = width;
     }
-    if let Some(height) = size.height {
-      setup.height_pt = units::twips_to_points(height as f32);
+    if let Some(height) = size.height.as_ref().and_then(twips_measure_to_points) {
+      setup.height_pt = height;
     }
   }
 
   if let Some(margin) = &section.w_pg_mar {
-    if let Some(top) = margin.top {
-      setup.top_margin_was_negative = top < 0;
-      setup.margin_top_pt = units::twips_to_points(top.max(0) as f32);
+    if let Some(top) = margin.top.as_ref().and_then(signed_twips_measure_to_twips) {
+      setup.top_margin_was_negative = top < 0.0;
+      setup.margin_top_pt = units::twips_to_points(top.max(0.0));
     }
-    if let Some(right) = margin.right {
-      setup.margin_right_pt = units::twips_to_points(right as f32);
+    if let Some(right) = margin.right.as_ref().and_then(twips_measure_to_points) {
+      setup.margin_right_pt = right;
     }
-    if let Some(bottom) = margin.bottom {
-      setup.bottom_margin_was_negative = bottom < 0;
-      setup.margin_bottom_pt = units::twips_to_points(bottom.max(0) as f32);
+    if let Some(bottom) = margin
+      .bottom
+      .as_ref()
+      .and_then(signed_twips_measure_to_twips)
+    {
+      setup.bottom_margin_was_negative = bottom < 0.0;
+      setup.margin_bottom_pt = units::twips_to_points(bottom.max(0.0));
     }
-    if let Some(left) = margin.left {
-      setup.margin_left_pt = units::twips_to_points(left as f32);
+    if let Some(left) = margin.left.as_ref().and_then(twips_measure_to_points) {
+      setup.margin_left_pt = left;
     }
-    if let Some(header) = margin.header {
-      setup.header_distance_pt = units::twips_to_points(header as f32);
+    if let Some(header) = margin.header.as_ref().and_then(twips_measure_to_points) {
+      setup.header_distance_pt = header;
     }
-    if let Some(footer) = margin.footer {
-      setup.footer_distance_pt = units::twips_to_points(footer as f32);
+    if let Some(footer) = margin.footer.as_ref().and_then(twips_measure_to_points) {
+      setup.footer_distance_pt = footer;
     }
   }
 
@@ -6519,6 +6657,16 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  fn twips(value: u32) -> TwipsMeasureValue {
+    TwipsMeasureValue::UnsignedDecimalNumber(value)
+  }
+
+  fn measurement(value: i32) -> MeasurementOrPercentValue {
+    MeasurementOrPercentValue::DecimalNumberOrPercent(
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
+    )
+  }
 
   #[test]
   fn drawing_image_properties_preserve_crop_and_transform() {
@@ -6584,8 +6732,8 @@ mod tests {
   fn table_cell_margin_overrides_inherit_unspecified_defaults() {
     let margins = table_cell_margin(
       &w::TableCellMargin {
-        left_margin: Some(w::LeftMargin {
-          width: Some("240".into()),
+        left_margin: Some(w::TableCellLeftMargin {
+          width: Some(measurement(240)),
           r#type: Some(w::TableWidthUnitValues::Dxa),
         }),
         ..Default::default()
@@ -6602,7 +6750,7 @@ mod tests {
   #[test]
   fn table_cell_spacing_uses_dxa_widths() {
     let spacing = w::TableCellSpacing {
-      width: Some("240".into()),
+      width: Some(measurement(240)),
       r#type: Some(w::TableWidthUnitValues::Dxa),
     };
 
@@ -6834,6 +6982,47 @@ mod tests {
   }
 
   #[test]
+  fn direct_table_borders_overlay_style_borders_per_side() {
+    fn border(width_pt: f32) -> BorderStyle {
+      BorderStyle {
+        width_pt,
+        ..Default::default()
+      }
+    }
+
+    let base = TableBordersModel {
+      top: Some(border(1.0)),
+      right: Some(border(1.5)),
+      bottom: Some(border(2.0)),
+      left: Some(border(2.5)),
+      inside_horizontal: Some(border(3.0)),
+      inside_vertical: Some(border(3.5)),
+    };
+    let merged = direct_table_borders_model(
+      Some(base),
+      &w::TableBorders {
+        left_border: Some(w::LeftBorder {
+          val: w::BorderValues::Double,
+          size: Some(24),
+          ..Default::default()
+        }),
+        right_border: Some(w::RightBorder {
+          val: w::BorderValues::None,
+          ..Default::default()
+        }),
+        ..Default::default()
+      },
+    );
+
+    assert_eq!(merged.top, Some(border(1.0)));
+    assert_eq!(merged.right, None);
+    assert_eq!(merged.bottom, Some(border(2.0)));
+    assert_eq!(merged.left.unwrap().width_pt, 3.0);
+    assert_eq!(merged.inside_horizontal, Some(border(3.0)));
+    assert_eq!(merged.inside_vertical, Some(border(3.5)));
+  }
+
+  #[test]
   fn table_cell_cnf_style_masks_apply_writer_corner_conditions() {
     fn style(fill: &str) -> TableCellStyle {
       TableCellStyle {
@@ -6909,7 +7098,7 @@ mod tests {
                 )),
                 w::TableStyleConditionalFormattingTableRowPropertiesChoice::WTblCellSpacing(
                   Box::new(w::TableCellSpacing {
-                    width: Some("240".into()),
+                    width: Some(measurement(240)),
                     r#type: Some(w::TableWidthUnitValues::Dxa),
                   }),
                 ),
@@ -6943,10 +7132,10 @@ mod tests {
       &direct_table_row_style(Some(&w::TableRowProperties {
         table_row_properties_choice1: vec![
           w::TableRowPropertiesChoice::WTblHeader(Box::new(w::TableHeader {
-            val: Some(w::OnOffOnlyValues::Off),
+            val: Some(ooxmlsdk::simple_type::OnOffValue::Off),
           })),
           w::TableRowPropertiesChoice::WTblCellSpacing(Box::new(w::TableCellSpacing {
-            width: Some("120".into()),
+            width: Some(measurement(120)),
             r#type: Some(w::TableWidthUnitValues::Dxa),
           })),
         ],
@@ -6975,11 +7164,11 @@ mod tests {
                 val: w::TableRowAlignmentValues::Center,
               }),
               table_indentation: Some(w::TableIndentation {
-                width: Some(720),
+                width: Some(measurement(720)),
                 r#type: Some(w::TableWidthUnitValues::Dxa),
               }),
               table_cell_spacing: Some(w::TableCellSpacing {
-                width: Some("120".into()),
+                width: Some(measurement(120)),
                 r#type: Some(w::TableWidthUnitValues::Dxa),
               }),
               ..Default::default()
@@ -7556,8 +7745,8 @@ mod tests {
     w::SectionProperties {
       w_type: break_type.map(|val| w::SectionType { val }),
       w_pg_sz: Some(w::PageSize {
-        width: Some(width),
-        height: Some(height),
+        width: Some(twips(width)),
+        height: Some(twips(height)),
         orient: Some(orient),
         ..Default::default()
       }),
@@ -7586,11 +7775,11 @@ mod tests {
         equal_width: Some(false.into()),
         w_col: vec![
           w::Column {
-            width: Some("1440".into()),
-            space: Some("720".into()),
+            width: Some(twips(1440)),
+            space: Some(twips(720)),
           },
           w::Column {
-            width: Some("2880".into()),
+            width: Some(twips(2880)),
             ..Default::default()
           },
         ],

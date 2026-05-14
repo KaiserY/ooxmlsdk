@@ -2312,9 +2312,39 @@ fn paragraph_inlines(
             None,
           );
         }
-        w::ParagraphChoice2::WDel(_)
-        | w::ParagraphChoice2::WMoveFrom(_)
-        | w::ParagraphChoice2::WMoveTo(_) => {}
+        w::ParagraphChoice2::WDel(deleted) => {
+          push_deleted_run(
+            deleted,
+            &mut inlines,
+            base_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            None,
+          );
+        }
+        w::ParagraphChoice2::WMoveFrom(moved) => {
+          push_move_from_run(
+            moved,
+            &mut inlines,
+            base_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            None,
+          );
+        }
+        w::ParagraphChoice2::WMoveTo(moved) => {
+          push_move_to_run(
+            moved,
+            &mut inlines,
+            base_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            None,
+          );
+        }
         _ => {}
       },
       w::ParagraphChoice::WSdt(sdt) => push_sdt_run(
@@ -2641,6 +2671,11 @@ fn push_run(
           text.push_str(content);
         }
       }
+      w::RunChoice::WDelText(text_node) => {
+        if let Some(content) = &text_node.xml_content {
+          text.push_str(content);
+        }
+      }
       w::RunChoice::WTab => text.push('\t'),
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
@@ -2908,12 +2943,14 @@ fn push_inserted_run(
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
+  let mut redline_style = base_style;
+  redline_style.color = redline_author_color();
   for choice in &inserted.inserted_run_choice {
     match choice {
       w::InsertedRunChoice::WR(run) => push_run(
         run,
         inlines,
-        base_style.clone(),
+        redline_style.clone(),
         styles,
         images,
         hyperlinks,
@@ -2924,20 +2961,262 @@ fn push_inserted_run(
           push_inserted_run(
             nested,
             inlines,
-            base_style.clone(),
+            redline_style.clone(),
             styles,
             images,
             hyperlinks,
             hyperlink_url,
           );
         }
-        w::InsertedRunChoice2::WDel(_)
-        | w::InsertedRunChoice2::WMoveFrom(_)
-        | w::InsertedRunChoice2::WMoveTo(_) => {}
+        w::InsertedRunChoice2::WDel(deleted) => {
+          push_deleted_run(
+            deleted,
+            inlines,
+            redline_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url,
+          );
+        }
+        w::InsertedRunChoice2::WMoveFrom(moved) => {
+          push_move_from_run(
+            moved,
+            inlines,
+            redline_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url,
+          );
+        }
+        w::InsertedRunChoice2::WMoveTo(moved) => {
+          push_move_to_run(
+            moved,
+            inlines,
+            redline_style.clone(),
+            styles,
+            images,
+            hyperlinks,
+            hyperlink_url,
+          );
+        }
         _ => {}
       },
       _ => {}
     }
+  }
+}
+
+fn push_deleted_run(
+  deleted: &w::DeletedRun,
+  inlines: &mut Vec<InlineItem>,
+  mut base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  hyperlink_url: Option<&str>,
+) {
+  base_style.color = redline_author_color();
+  for choice in &deleted.deleted_run_choice {
+    match choice {
+      w::DeletedRunChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::DeletedRunChoice::Choice(choice) => match choice.as_ref() {
+        w::DeletedRunChoice2::WIns(inserted) => push_inserted_run(
+          inserted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::DeletedRunChoice2::WDel(deleted) => push_deleted_run(
+          deleted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::DeletedRunChoice2::WMoveFrom(moved) => push_move_from_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::DeletedRunChoice2::WMoveTo(moved) => push_move_to_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn push_move_from_run(
+  moved: &w::MoveFromRun,
+  inlines: &mut Vec<InlineItem>,
+  mut base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  hyperlink_url: Option<&str>,
+) {
+  base_style.color = redline_author_color();
+  base_style.strikethrough = true;
+  for choice in &moved.move_from_run_choice {
+    match choice {
+      w::MoveFromRunChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveFromRunChoice::Choice(choice) => match choice.as_ref() {
+        w::MoveFromRunChoice2::WIns(inserted) => push_inserted_run(
+          inserted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveFromRunChoice2::WDel(deleted) => push_deleted_run(
+          deleted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveFromRunChoice2::WMoveFrom(moved) => push_move_from_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveFromRunChoice2::WMoveTo(moved) => push_move_to_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+fn push_move_to_run(
+  moved: &w::MoveToRun,
+  inlines: &mut Vec<InlineItem>,
+  mut base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  hyperlink_url: Option<&str>,
+) {
+  base_style.color = moved_redline_color();
+  for choice in &moved.move_to_run_choice {
+    match choice {
+      w::MoveToRunChoice::WR(run) => push_run(
+        run,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveToRunChoice::Choice(choice) => match choice.as_ref() {
+        w::MoveToRunChoice2::WIns(inserted) => push_inserted_run(
+          inserted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveToRunChoice2::WDel(deleted) => push_deleted_run(
+          deleted,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveToRunChoice2::WMoveFrom(moved) => push_move_from_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        w::MoveToRunChoice2::WMoveTo(moved) => push_move_to_run(
+          moved,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        ),
+        _ => {}
+      },
+      _ => {}
+    }
+  }
+}
+
+pub(super) fn redline_author_color() -> RgbColor {
+  RgbColor {
+    r: 0xff,
+    g: 0x00,
+    b: 0x00,
+  }
+}
+
+fn moved_redline_color() -> RgbColor {
+  RgbColor {
+    r: 0x00,
+    g: 0x80,
+    b: 0x00,
   }
 }
 
@@ -5005,6 +5284,7 @@ struct StyleEntry {
   style_type: Option<w::StyleValues>,
   based_on: Option<String>,
   paragraph_format: ParagraphFormat,
+  paragraph_numbering: Option<Box<w::NumberingProperties>>,
   run_style: TextStyle,
   run_overrides: RunStyleOverrides,
   table_style: TableStyleModel,
@@ -5123,6 +5403,7 @@ impl StylesCatalog {
           .as_ref()
           .map(|based_on| based_on.val.to_string()),
         paragraph_format: ParagraphFormat::default(),
+        paragraph_numbering: None,
         run_style: TextStyle::default(),
         run_overrides: RunStyleOverrides::default(),
         table_style: TableStyleModel::default(),
@@ -5134,6 +5415,10 @@ impl StylesCatalog {
           .as_deref()
           .map(ParagraphProps::Style),
       );
+      entry.paragraph_numbering = style
+        .style_paragraph_properties
+        .as_ref()
+        .and_then(|properties| properties.numbering_properties.clone());
       properties::merge_run_style(
         &mut entry.run_style,
         style.style_run_properties.as_deref().map(RunProps::Style),
@@ -5172,6 +5457,22 @@ impl StylesCatalog {
       merge_format_values(&mut format, entry.paragraph_format.clone());
     }
     format
+  }
+
+  fn paragraph_numbering_properties(
+    &self,
+    style_id: Option<&str>,
+  ) -> Option<w::NumberingProperties> {
+    let mut merged = None;
+    for properties in self
+      .style_chain(style_id)
+      .into_iter()
+      .filter_map(|entry| entry.paragraph_numbering.as_deref())
+    {
+      let target = merged.get_or_insert_with(w::NumberingProperties::default);
+      merge_numbering_properties(target, properties);
+    }
+    merged
   }
 
   fn run_style_with_base(
@@ -6127,6 +6428,24 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
 }
 
+fn merge_numbering_properties(
+  target: &mut w::NumberingProperties,
+  source: &w::NumberingProperties,
+) {
+  if source.numbering_level_reference.is_some() {
+    target.numbering_level_reference = source.numbering_level_reference.clone();
+  }
+  if source.numbering_id.is_some() {
+    target.numbering_id = source.numbering_id.clone();
+  }
+  if source.numbering_change.is_some() {
+    target.numbering_change = source.numbering_change.clone();
+  }
+  if source.inserted.is_some() {
+    target.inserted = source.inserted.clone();
+  }
+}
+
 fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   if values.font_family.is_some() {
     target.font_family = values.font_family.clone();
@@ -6195,6 +6514,7 @@ struct NumberingLevel {
   start: i32,
   format: w::NumberFormatValues,
   text: String,
+  is_legal: bool,
   format_properties: ParagraphFormat,
 }
 
@@ -6281,7 +6601,14 @@ impl NumberingCatalog {
       self.counters.remove(&(num_id, key_level));
     }
 
-    Some(format_numbering_label(level, counter))
+    Some(format_numbering_label(
+      level,
+      num_id,
+      level_index,
+      counter,
+      abstract_num,
+      &self.counters,
+    ))
   }
 }
 
@@ -6312,28 +6639,69 @@ fn numbering_level_model(level: &w::Level) -> NumberingLevel {
       .and_then(|text| text.val.as_ref())
       .map(ToString::to_string)
       .unwrap_or_else(|| "%1.".to_string()),
+    is_legal: level.is_legal_numbering_style.is_some(),
     format_properties,
   }
 }
 
-fn format_numbering_label(level: &NumberingLevel, value: i32) -> String {
+fn format_numbering_label(
+  level: &NumberingLevel,
+  num_id: i32,
+  level_index: i32,
+  value: i32,
+  abstract_num: &AbstractNumbering,
+  counters: &HashMap<(i32, i32), i32>,
+) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
     return format!("{} ", level.text);
   }
 
-  let value = match level.format {
+  let mut text = level.text.clone();
+  for index in 0..=8 {
+    let placeholder = format!("%{}", index + 1);
+    if !text.contains(&placeholder) {
+      continue;
+    }
+    let value = if index == level_index {
+      value
+    } else {
+      counters.get(&(num_id, index)).copied().unwrap_or_else(|| {
+        abstract_num
+          .levels
+          .get(&index)
+          .map(|level| level.start)
+          .unwrap_or(1)
+      })
+    };
+    let format = abstract_num
+      .levels
+      .get(&index)
+      .map(|level| level.format)
+      .unwrap_or_default();
+    text = text.replace(
+      &placeholder,
+      &format_numbering_value(value, format, level.is_legal && index < level_index),
+    );
+  }
+  format!("{text} ")
+}
+
+fn format_numbering_value(
+  value: i32,
+  format: w::NumberFormatValues,
+  force_decimal: bool,
+) -> String {
+  if force_decimal {
+    return value.to_string();
+  }
+  match format {
     w::NumberFormatValues::LowerLetter => alpha_number(value, false),
     w::NumberFormatValues::UpperLetter => alpha_number(value, true),
     w::NumberFormatValues::LowerRoman => roman_number(value).to_lowercase(),
     w::NumberFormatValues::UpperRoman => roman_number(value),
+    w::NumberFormatValues::DecimalZero => format!("{value:02}"),
     _ => value.to_string(),
-  };
-  let text = level
-    .text
-    .replace("%1", &value)
-    .replace("%2", &value)
-    .replace("%3", &value);
-  format!("{text} ")
+  }
 }
 
 fn alpha_number(mut value: i32, upper: bool) -> String {

@@ -680,7 +680,10 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
-    if section_index > 0 && starts_new_page(section.break_kind) && !self.current.items.is_empty() {
+    if section_index > 0
+      && starts_new_page(section.break_kind)
+      && self.current_page_has_body_progress()
+    {
       self.push_current_page(empty_page(section.page, section_index));
       let mut section_page_index = 0;
       if needs_section_parity_blank(section.break_kind, self.pages.len() + 1) {
@@ -707,6 +710,20 @@ impl<'a> RootFrameLayout<'a> {
       )
       .0;
     }
+  }
+
+  fn current_page_has_body_progress(&self) -> bool {
+    if !self.current.items.is_empty() {
+      return true;
+    }
+    let body_top = body_content_limits_for_page(
+      self.current.setup,
+      repeating_slot_state(self.document, self.current.section_index),
+      self.pages.len() + 1,
+      self.current.section_page_index,
+    )
+    .0;
+    self.y > body_top + 0.1
   }
 
   fn format_block_sequence(&mut self, blocks: &[Block], mut flow: FlowContext) {

@@ -3,7 +3,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as 
 use super::{
   FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog, Paragraph,
   ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
-  paragraph_inlines, paragraph_note_reference_ids, properties,
+  paragraph_inlines, paragraph_note_reference_ids, properties, redline_author_color,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -55,14 +55,21 @@ pub(super) fn paragraph_model_with_base(
       .as_deref()
       .map(ParagraphProps::Direct),
   );
-  let list_label = paragraph
+  let direct_numbering = paragraph
     .paragraph_properties
     .as_deref()
-    .and_then(|properties| properties.numbering_properties.as_deref())
+    .and_then(|properties| properties.numbering_properties.as_deref());
+  let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let list_label = direct_numbering
+    .or(style_numbering.as_ref())
     .and_then(|properties| numbering.next_label(properties, &mut format));
 
-  let run_style =
+  let mut run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style, base.run_overrides);
+  if paragraph_mark_is_deleted(paragraph) {
+    run_style.color = redline_author_color();
+    run_style.strikethrough = true;
+  }
   let mut inlines = paragraph_inlines(
     paragraph,
     run_style.clone(),
@@ -102,6 +109,14 @@ pub(super) fn paragraph_model_with_base(
     list_label,
     list_label_hyperlink_url: None,
   }
+}
+
+fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
+  paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+    .is_some_and(|properties| properties.deleted.is_some() || properties.move_from.is_some())
 }
 
 fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {

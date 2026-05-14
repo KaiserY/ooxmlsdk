@@ -36,8 +36,8 @@ pub use xml::resolve_zip_file_path;
 pub(crate) use xml::{
   IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
   from_reader_inner, from_str_inner, read_outer_xml_borrowed, read_outer_xml_io, write_attr_value,
-  write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text, write_start_tag_open,
-  write_xmlns_attr,
+  write_attr_value_str, write_end_tag, write_escaped_str, write_escaped_text,
+  write_list_attr_value, write_list_value, write_start_tag_open, write_xmlns_attr,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -96,6 +96,31 @@ where
   T: std::str::FromStr,
 {
   xml::parse_attr_value(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub(crate) fn parse_list_attr<T>(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<Vec<T>, SdkError>
+where
+  T: std::str::FromStr,
+{
+  xml::parse_list_attr(attr, decoder, ty, field)
+}
+
+#[inline(always)]
+pub(crate) fn parse_list_value<T>(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<Vec<T>, SdkError>
+where
+  T: std::str::FromStr,
+{
+  xml::parse_list_value(value, ty, field)
 }
 
 macro_rules! define_attr_parser_forwarders {

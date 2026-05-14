@@ -137,9 +137,9 @@ pub struct ContextNode {
   ))]
   pub r#type: crate::simple_type::StringValue,
   /// rotatedBoundingBox
-  #[sdk(attr(qname = ":rotatedBoundingBox"))]
+  #[sdk(attr(list, qname = ":rotatedBoundingBox"))]
   #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
-  pub rotated_bounding_box: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  pub rotated_bounding_box: Option<Vec<crate::simple_type::StringValue>>,
   /// alignmentLevel
   #[sdk(attr(qname = ":alignmentLevel"))]
   pub alignment_level: Option<crate::simple_type::Int32Value>,
@@ -190,9 +190,9 @@ pub struct ContextNode {
   #[sdk(attr(qname = ":rotationAngle"))]
   pub rotation_angle: Option<crate::simple_type::Int32Value>,
   /// hotPoints
-  #[sdk(attr(qname = ":hotPoints"))]
+  #[sdk(attr(list, qname = ":hotPoints"))]
   #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
-  pub hot_points: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  pub hot_points: Option<Vec<crate::simple_type::StringValue>>,
   /// centroid
   #[sdk(attr(qname = ":centroid"))]
   #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
@@ -222,9 +222,9 @@ pub struct ContextNode {
   #[sdk(attr(qname = ":shapeName"))]
   pub shape_name: Option<crate::simple_type::StringValue>,
   /// shapeGeometry
-  #[sdk(attr(qname = ":shapeGeometry"))]
+  #[sdk(attr(list, qname = ":shapeGeometry"))]
   #[sdk(pattern(regex = "-?[0-9]+,-?[0-9]+"))]
-  pub shape_geometry: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  pub shape_geometry: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ContextNodeProperty Class.
   #[sdk(child(qname = "msink:CT_Property/msink:property"))]
   pub msink_property: Vec<ContextNodeProperty>,

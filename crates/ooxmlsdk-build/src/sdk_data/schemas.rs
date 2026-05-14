@@ -235,7 +235,7 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               have_xml_other_children,
               have_direct_xml_other_children,
               parent_choice_has_any_in: Vec::new(),
-              text_value_type: String::new(),
+              text_value_type: text_value_type_from_type_validators(ty),
               api_kind: resolve_api_kind(ty, &type_map),
               attributes: ty
                 .attributes
@@ -320,6 +320,16 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
     .collect();
 
   schemas
+}
+
+fn text_value_type_from_type_validators(
+  ty: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+) -> String {
+  ty.validators
+    .iter()
+    .find(|validator| validator.is_list && !validator.r#type.is_empty())
+    .map(|validator| format!("ListValue<{}>", validator.r#type))
+    .unwrap_or_default()
 }
 
 fn xsd_on_off_only_to_on_off_qname_overrides(

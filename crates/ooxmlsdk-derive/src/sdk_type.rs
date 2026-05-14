@@ -711,6 +711,7 @@ struct TextChildParseArmOptions {
   repeated: bool,
   as_result: bool,
   use_local_name_dispatch: bool,
+  list: bool,
 }
 
 fn build_text_child_parse_arm(
@@ -738,8 +739,22 @@ fn build_text_child_parse_arm(
     } else {
       quote! { end.name().as_ref() == #tag_qname_lit || end.name().as_ref() == #local_name_lit }
     };
-  let value_ty = unwrap_option_vec_type(field_ty);
-  let parse_from_text_tokens = if is_string_like_type(&value_ty) {
+  let value_ty = if options.list {
+    vec_inner_type(&unwrap_option_type(field_ty))
+      .unwrap_or_else(|| unwrap_option_vec_type(field_ty))
+  } else {
+    unwrap_option_vec_type(field_ty)
+  };
+  let parse_from_text_tokens = if options.list {
+    quote! {{
+      let value = text.unwrap_or_default();
+      crate::common::parse_list_value::<#value_ty>(
+        &value,
+        stringify!(#owner_ident),
+        stringify!(#field_ident),
+      )?
+    }}
+  } else if is_string_like_type(&value_ty) {
     quote! { text.unwrap_or_default() }
   } else {
     quote! {{
@@ -751,7 +766,15 @@ fn build_text_child_parse_arm(
       )?
     }}
   };
-  let empty_value_tokens = if is_string_like_type(&value_ty) {
+  let empty_value_tokens = if options.list {
+    quote! {
+      crate::common::parse_list_value::<#value_ty>(
+        "",
+        stringify!(#owner_ident),
+        stringify!(#field_ident),
+      )?
+    }
+  } else if is_string_like_type(&value_ty) {
     quote! { Default::default() }
   } else {
     quote! {
@@ -818,14 +841,23 @@ fn build_text_child_write_tokens(
   field_ty: &Type,
   repeated: bool,
   optional: bool,
+  list: bool,
 ) -> proc_macro2::TokenStream {
   let QNameInfo {
     tag_prefix,
     local_name,
   } = parse_qname_info(qname);
-  let inner_ty = unwrap_wrapped_type(field_ty);
+  let inner_ty = if list {
+    vec_inner_type(&unwrap_option_type(field_ty)).unwrap_or_else(|| unwrap_wrapped_type(field_ty))
+  } else {
+    unwrap_wrapped_type(field_ty)
+  };
   let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-    let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+    let value_write_tokens = if list {
+      quote! {
+        crate::common::write_list_value(writer, #value_expr.as_slice())?;
+      }
+    } else if is_xml_schema_float_type(&inner_ty) {
       write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
     } else if is_string_like_type(&inner_ty) {
       quote! {
@@ -1411,8 +1443,9 @@ fn expand_sequence_helper_struct(
           }
         });
       }
-      Some(SdkTypeFieldKind::TextChild { qname }) => {
-        if contains_vec_type(&field.ty) {
+      Some(SdkTypeFieldKind::TextChild { qname, list }) => {
+        let repeated = !list && contains_vec_type(&field.ty);
+        if repeated {
           child_decl_tokens.push(quote! { let mut #field_ident = Vec::new(); });
           child_init_tokens.push(quote! { #field_ident });
         } else {
@@ -1432,8 +1465,9 @@ fn expand_sequence_helper_struct(
           field_ident,
           &qname,
           &field.ty,
-          contains_vec_type(&field.ty),
+          repeated,
           is_option_type(&field.ty),
+          list,
         ));
         let match_target = text_child_match_target(&qname);
         matcher_checks.push(quote! {
@@ -1448,9 +1482,10 @@ fn expand_sequence_helper_struct(
           &field.ty,
           quote! {},
           TextChildParseArmOptions {
-            repeated: contains_vec_type(&field.ty),
+            repeated,
             as_result: false,
             use_local_name_dispatch: false,
+            list,
           },
         );
         let text_child_dispatch = quote! {
@@ -1680,13 +1715,16 @@ fn expand_helper_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      Some(SdkTypeFieldKind::TextChild { qname }) => text_child_fields.push(SdkTextChildField {
-        ident: field_ident.clone(),
-        qname,
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
-      }),
+      Some(SdkTypeFieldKind::TextChild { qname, list }) => {
+        text_child_fields.push(SdkTextChildField {
+          ident: field_ident.clone(),
+          qname,
+          ty: field.ty.clone(),
+          optional: is_option_type(&field.ty),
+          repeated: !list && contains_vec_type(&field.ty),
+          list,
+        })
+      }
       Some(SdkTypeFieldKind::AnyChild { qname }) => any_child_fields.push(SdkAnyChildField {
         ident: field_ident.clone(),
         qname,
@@ -1702,7 +1740,7 @@ fn expand_helper_struct(
         accepts_any: parsed_attrs.choice_accepts_any,
         specific_qnames: parsed_attrs.choice_qnames,
       }),
-      Some(SdkTypeFieldKind::Text) => {
+      Some(SdkTypeFieldKind::Text { .. }) => {
         return Err(syn::Error::new_spanned(
           field,
           "helper structs do not support #[sdk(text)]",
@@ -2605,6 +2643,7 @@ fn expand_helper_struct(
       &field.ty,
       field.repeated,
       field.optional,
+      field.list,
     ));
     let parse_arm = build_text_child_parse_arm(
       ident,
@@ -2616,6 +2655,7 @@ fn expand_helper_struct(
         repeated: field.repeated,
         as_result: false,
         use_local_name_dispatch: false,
+        list: field.list,
       },
     );
     child_parse_tokens_borrowed.push(parse_arm.clone());
@@ -2630,6 +2670,7 @@ fn expand_helper_struct(
         repeated: field.repeated,
         as_result: true,
         use_local_name_dispatch: false,
+        list: field.list,
       },
     );
     child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
@@ -3176,11 +3217,12 @@ fn expand_named_struct(
     ordered_field_specs.push((field_ident.clone(), field.ty.clone(), field_kind.clone()));
 
     match field_kind {
-      SdkTypeFieldKind::Attr { name } => attr_fields.push(SdkAttrField {
+      SdkTypeFieldKind::Attr { name, list } => attr_fields.push(SdkAttrField {
         ident: field_ident.clone(),
         name,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
+        list,
         validators: parsed_attrs.validators,
       }),
       SdkTypeFieldKind::Child { qname } => child_fields.push(SdkChildField {
@@ -3196,12 +3238,13 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      SdkTypeFieldKind::TextChild { qname } => text_child_fields.push(SdkTextChildField {
+      SdkTypeFieldKind::TextChild { qname, list } => text_child_fields.push(SdkTextChildField {
         ident: field_ident.clone(),
         qname,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
+        repeated: !list && contains_vec_type(&field.ty),
+        list,
       }),
       SdkTypeFieldKind::AnyChild { qname } => any_child_fields.push(SdkAnyChildField {
         ident: field_ident.clone(),
@@ -3224,11 +3267,12 @@ fn expand_named_struct(
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
       }),
-      SdkTypeFieldKind::Text => {
+      SdkTypeFieldKind::Text { list } => {
         text_field = Some(SdkTextField {
           ident: field_ident.clone(),
           ty: field.ty.clone(),
           optional: is_option_type(&field.ty),
+          list,
         });
       }
     }
@@ -3298,21 +3342,36 @@ fn expand_named_struct(
     let field_ident = &field.ident;
     let name_lit = LitStr::new(&field.name, Span::call_site());
     let name_bytes_lit = LitByteStr::new(field.name.as_bytes(), Span::call_site());
-    let parse_ty = unwrap_wrapped_type(&field.ty);
-    let parser = if integer_type_kind(&parse_ty).is_some() {
+    let value_ty = if field.list {
+      vec_inner_type(&unwrap_option_type(&field.ty)).ok_or_else(|| {
+        syn::Error::new_spanned(&field.ty, "#[sdk(attr(..., list))] requires Vec<T>")
+      })?
+    } else {
+      unwrap_wrapped_type(&field.ty)
+    };
+    let parser = if field.list {
+      quote! {
+        crate::common::parse_list_attr::<#value_ty>(
+          &attr,
+          decoder,
+          stringify!(#ident),
+          #name_lit,
+        )?
+      }
+    } else if integer_type_kind(&value_ty).is_some() {
       parse_integer_attr_tokens(
         quote! { &attr },
         quote! { decoder },
-        &parse_ty,
+        &value_ty,
         quote! { stringify!(#ident) },
         quote! { #name_lit },
       )
-    } else if is_sdk_enum_type(&parse_ty) {
-      quote! { crate::common::parse_enum_attr::<#parse_ty>(&attr, decoder, stringify!(#ident))? }
-    } else if is_string_like_type(&parse_ty) {
+    } else if is_sdk_enum_type(&value_ty) {
+      quote! { crate::common::parse_enum_attr::<#value_ty>(&attr, decoder, stringify!(#ident))? }
+    } else if is_string_like_type(&value_ty) {
       quote! { crate::common::decode_attr_value(&attr, decoder)? }
     } else {
-      quote! { crate::common::parse_attr_value::<#parse_ty>(&attr, decoder, stringify!(#ident), #name_lit)? }
+      quote! { crate::common::parse_attr_value::<#value_ty>(&attr, decoder, stringify!(#ident), #name_lit)? }
     };
     if field.optional {
       attr_decl_tokens.push(quote! { let mut #field_ident = None; });
@@ -3336,8 +3395,12 @@ fn expand_named_struct(
         ))?
       });
     }
-    let attr_write_value_tokens = if is_xml_schema_float_type(&parse_ty) {
-      let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &parse_ty);
+    let attr_write_value_tokens = if field.list {
+      quote! {
+        crate::common::write_list_attr_value(writer, #name_lit, value.as_slice())?;
+      }
+    } else if is_xml_schema_float_type(&value_ty) {
+      let write_value_tokens = write_xml_schema_float_tokens(quote! { value }, &value_ty);
       quote! {
         writer.write_all(b" ")?;
         writer.write_all(#name_lit.as_bytes())?;
@@ -3345,7 +3408,7 @@ fn expand_named_struct(
         #write_value_tokens
         writer.write_all(b"\"")?;
       }
-    } else if is_string_like_type(&parse_ty) {
+    } else if is_string_like_type(&value_ty) {
       quote! {
         crate::common::write_attr_value_str(writer, #name_lit, value.as_ref())?;
       }
@@ -3367,7 +3430,7 @@ fn expand_named_struct(
       });
     }
 
-    let mut direct_validator_tokens = if is_hex_binary_type(&parse_ty) {
+    let mut direct_validator_tokens = if is_hex_binary_type(&value_ty) {
       vec![quote! {
         crate::validator::validate_binary_format(
           stringify!(#ident),
@@ -3376,7 +3439,7 @@ fn expand_named_struct(
           crate::validator::BinaryFormatKind::Hex,
         )?;
       }]
-    } else if is_base64_binary_type(&parse_ty) {
+    } else if is_base64_binary_type(&value_ty) {
       vec![quote! {
         crate::validator::validate_binary_format(
           stringify!(#ident),
@@ -3385,7 +3448,7 @@ fn expand_named_struct(
           crate::validator::BinaryFormatKind::Base64,
         )?;
       }]
-    } else if is_decimal_value_type(&parse_ty) {
+    } else if is_decimal_value_type(&value_ty) {
       vec![quote! {
         crate::validator::validate_decimal_format(
           stringify!(#ident),
@@ -3393,7 +3456,7 @@ fn expand_named_struct(
           value,
         )?;
       }]
-    } else if is_datetime_value_type(&parse_ty) {
+    } else if is_datetime_value_type(&value_ty) {
       vec![quote! {
         crate::validator::validate_datetime_format(
           stringify!(#ident),
@@ -3407,7 +3470,7 @@ fn expand_named_struct(
     let mut union_validator_tokens: std::collections::BTreeMap<u32, Vec<proc_macro2::TokenStream>> =
       std::collections::BTreeMap::new();
     for validator in &field.validators {
-      let token = validator_token(ident, field_ident, &parse_ty, validator);
+      let token = validator_token(ident, field_ident, &value_ty, validator);
       let (source_id, union_id) = validator_source_union(validator);
       if union_id.is_some() {
         union_validator_tokens
@@ -3464,7 +3527,30 @@ fn expand_named_struct(
     let mut validator_tokens = direct_validator_tokens;
     validator_tokens.extend(union_validator_tokens);
     if !validator_tokens.is_empty() {
-      if field.optional {
+      if field.list && field.optional {
+        attr_validate_tokens.push(quote! {
+          if let Some(values) = &self.#field_ident {
+            context.check(|| -> Result<(), crate::common::SdkError> {
+              for value in values {
+                #( #validator_tokens )*
+              }
+              Ok(())
+            });
+          }
+        });
+      } else if field.list {
+        attr_validate_tokens.push(quote! {
+          {
+            let values = &self.#field_ident;
+            context.check(|| -> Result<(), crate::common::SdkError> {
+              for value in values {
+                #( #validator_tokens )*
+              }
+              Ok(())
+            });
+          }
+        });
+      } else if field.optional {
         attr_validate_tokens.push(quote! {
           if let Some(value) = &self.#field_ident {
             context.check(|| -> Result<(), crate::common::SdkError> {
@@ -4097,6 +4183,7 @@ fn expand_named_struct(
       &field.ty,
       field.repeated,
       field.optional,
+      field.list,
     ));
     let parse_arm = build_text_child_parse_arm(
       ident,
@@ -4108,6 +4195,7 @@ fn expand_named_struct(
         repeated: field.repeated,
         as_result: false,
         use_local_name_dispatch: use_local_name_child_dispatch,
+        list: field.list,
       },
     );
     child_parse_tokens_borrowed.push(parse_arm.clone());
@@ -4122,6 +4210,7 @@ fn expand_named_struct(
         repeated: field.repeated,
         as_result: true,
         use_local_name_dispatch: use_local_name_child_dispatch,
+        list: field.list,
       },
     );
     child_visit_parse_tokens_borrowed.push(visit_parse_arm.clone());
@@ -5594,13 +5683,15 @@ fn expand_named_struct(
           });
         }
       }
-      SdkTypeFieldKind::TextChild { qname } => {
+      SdkTypeFieldKind::TextChild { qname, list } => {
+        let repeated = !list && contains_vec_type(field_ty);
         ordered_write_tokens.push(build_text_child_write_tokens(
           field_ident,
           qname,
           field_ty,
-          contains_vec_type(field_ty),
+          repeated,
           is_option_type(field_ty),
+          *list,
         ));
       }
       SdkTypeFieldKind::AnyChild { qname } => {
@@ -5662,9 +5753,18 @@ fn expand_named_struct(
           });
         }
       }
-      SdkTypeFieldKind::Text => {
-        let inner_ty = unwrap_wrapped_type(field_ty);
-        let optional_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+      SdkTypeFieldKind::Text { list } => {
+        let inner_ty = if *list {
+          vec_inner_type(&unwrap_option_type(field_ty))
+            .unwrap_or_else(|| unwrap_wrapped_type(field_ty))
+        } else {
+          unwrap_wrapped_type(field_ty)
+        };
+        let optional_text_write_tokens = if *list {
+          quote! {
+            crate::common::write_list_value(writer, value.as_slice())?;
+          }
+        } else if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { value }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
@@ -5675,7 +5775,11 @@ fn expand_named_struct(
             crate::common::write_escaped_text(writer, value)?;
           }
         };
-        let required_text_write_tokens = if is_xml_schema_float_type(&inner_ty) {
+        let required_text_write_tokens = if *list {
+          quote! {
+            crate::common::write_list_value(writer, self.#field_ident.as_slice())?;
+          }
+        } else if is_xml_schema_float_type(&inner_ty) {
           write_xml_schema_float_tokens(quote! { &self.#field_ident }, &inner_ty)
         } else if is_string_like_type(&inner_ty) {
           quote! {
@@ -5708,9 +5812,36 @@ fn expand_named_struct(
   }
   let text_finish_tokens = if let Some(text_field) = &text_field {
     let field_ident = &text_field.ident;
-    let inner_ty = unwrap_wrapped_type(&text_field.ty);
+    let inner_ty = if text_field.list {
+      vec_inner_type(&unwrap_option_type(&text_field.ty))
+        .unwrap_or_else(|| unwrap_wrapped_type(&text_field.ty))
+    } else {
+      unwrap_wrapped_type(&text_field.ty)
+    };
     let field_name_lit = LitStr::new(&field_ident.to_string(), Span::call_site());
-    if is_string_like_type(&inner_ty) {
+    if text_field.list {
+      let parse_value_tokens = quote! {
+        crate::common::parse_list_value::<#inner_ty>(&value, stringify!(#ident), #field_name_lit)?
+      };
+      if text_field.optional {
+        quote! {
+          #field_ident: match #field_ident {
+            Some(value) => Some(#parse_value_tokens),
+            None => None,
+          },
+        }
+      } else {
+        quote! {
+          #field_ident: {
+            let value = #field_ident.ok_or_else(|| crate::common::missing_field(
+              stringify!(#ident),
+              #field_name_lit,
+            ))?;
+            #parse_value_tokens
+          },
+        }
+      }
+    } else if is_string_like_type(&inner_ty) {
       quote! {
         #field_ident,
       }

@@ -542,9 +542,9 @@ pub struct SectionOld {
   #[sdk(attr(office2010, qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// slideIdLst
-  #[sdk(attr(office2010, qname = ":slideIdLst"))]
+  #[sdk(attr(office2010, list, qname = ":slideIdLst"))]
   #[sdk(number_range(range = 256..2147483648))]
-  pub slide_id_list: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
+  pub slide_id_list: Option<Vec<crate::simple_type::UInt32Value>>,
   /// id
   #[sdk(attr(office2010, qname = ":id"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]

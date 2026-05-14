@@ -381,8 +381,8 @@ pub struct LineReference {
   #[sdk(attr(office2013, qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -404,8 +404,8 @@ pub struct FillReference {
   #[sdk(attr(office2013, qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -427,8 +427,8 @@ pub struct EffectReference {
   #[sdk(attr(office2013, qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -453,8 +453,8 @@ pub struct FontReference {
   #[sdk(string_format(kind = "token"))]
   pub index: crate::schemas::a::FontCollectionIndexValues,
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -985,8 +985,8 @@ pub struct View3DProperties {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:axisTitle")]
 pub struct AxisTitle {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1020,8 +1020,8 @@ pub struct AxisTitle {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:categoryAxis")]
 pub struct CategoryAxis {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1055,8 +1055,8 @@ pub struct CategoryAxis {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:chartArea")]
 pub struct ChartArea {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1090,8 +1090,8 @@ pub struct ChartArea {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataLabel")]
 pub struct DataLabel {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1125,8 +1125,8 @@ pub struct DataLabel {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataLabelCallout")]
 pub struct DataLabelCallout {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1160,8 +1160,8 @@ pub struct DataLabelCallout {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataPoint")]
 pub struct DataPoint {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1195,8 +1195,8 @@ pub struct DataPoint {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataPoint3D")]
 pub struct DataPoint3D {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1230,8 +1230,8 @@ pub struct DataPoint3D {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataPointLine")]
 pub struct DataPointLine {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1265,8 +1265,8 @@ pub struct DataPointLine {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataPointMarker")]
 pub struct DataPointMarker {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1300,8 +1300,8 @@ pub struct DataPointMarker {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataPointWireframe")]
 pub struct DataPointWireframe {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1335,8 +1335,8 @@ pub struct DataPointWireframe {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dataTable")]
 pub struct DataTableStyle {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1370,8 +1370,8 @@ pub struct DataTableStyle {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:downBar")]
 pub struct DownBar {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1405,8 +1405,8 @@ pub struct DownBar {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:dropLine")]
 pub struct DropLine {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1440,8 +1440,8 @@ pub struct DropLine {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:errorBar")]
 pub struct ErrorBar {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1475,8 +1475,8 @@ pub struct ErrorBar {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:floor")]
 pub struct Floor {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1510,8 +1510,8 @@ pub struct Floor {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:gridlineMajor")]
 pub struct GridlineMajor {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1545,8 +1545,8 @@ pub struct GridlineMajor {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:gridlineMinor")]
 pub struct GridlineMinor {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1580,8 +1580,8 @@ pub struct GridlineMinor {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:hiLoLine")]
 pub struct HiLoLine {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1615,8 +1615,8 @@ pub struct HiLoLine {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:leaderLine")]
 pub struct LeaderLine {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1650,8 +1650,8 @@ pub struct LeaderLine {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:legend")]
 pub struct LegendStyle {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1685,8 +1685,8 @@ pub struct LegendStyle {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:plotArea")]
 pub struct PlotArea {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1720,8 +1720,8 @@ pub struct PlotArea {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:plotArea3D")]
 pub struct PlotArea3D {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1755,8 +1755,8 @@ pub struct PlotArea3D {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:seriesAxis")]
 pub struct SeriesAxis {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1790,8 +1790,8 @@ pub struct SeriesAxis {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:seriesLine")]
 pub struct SeriesLine {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1825,8 +1825,8 @@ pub struct SeriesLine {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:title")]
 pub struct TitleStyle {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1860,8 +1860,8 @@ pub struct TitleStyle {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:trendline")]
 pub struct TrendlineStyle {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1895,8 +1895,8 @@ pub struct TrendlineStyle {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:trendlineLabel")]
 pub struct TrendlineLabel {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1930,8 +1930,8 @@ pub struct TrendlineLabel {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:upBar")]
 pub struct UpBar {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -1965,8 +1965,8 @@ pub struct UpBar {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:valueAxis")]
 pub struct ValueAxis {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
@@ -2000,8 +2000,8 @@ pub struct ValueAxis {
 #[sdk(office2013, qname = "cs:CT_StyleEntry/cs:wall")]
 pub struct Wall {
   /// mods
-  #[sdk(attr(office2013, qname = ":mods"))]
-  pub modifiers: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2013, list, qname = ":mods"))]
+  pub modifiers: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the LineReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,

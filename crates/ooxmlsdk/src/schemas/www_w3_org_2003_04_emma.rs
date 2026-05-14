@@ -80,8 +80,8 @@ pub struct Lattice {
   #[sdk(number_sign(kind = "non_negative"))]
   pub initial: crate::simple_type::IntegerValue,
   /// final
-  #[sdk(attr(qname = ":final"))]
-  pub r#final: crate::simple_type::ListValue<crate::simple_type::DecimalValue>,
+  #[sdk(attr(list, qname = ":final"))]
+  pub r#final: Vec<crate::simple_type::DecimalValue>,
   /// time-ref-uri
   #[sdk(attr(qname = "emma:time-ref-uri"))]
   pub time_reference: Option<crate::simple_type::StringValue>,
@@ -147,11 +147,11 @@ pub struct Interpretation {
   #[sdk(attr(qname = "emma:duration"))]
   pub duration: Option<crate::simple_type::IntegerValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   /// function
   #[sdk(attr(qname = "emma:function"))]
   pub function: Option<crate::simple_type::StringValue>,
@@ -246,11 +246,11 @@ pub struct OneOf {
   #[sdk(attr(qname = "emma:duration"))]
   pub duration: Option<crate::simple_type::IntegerValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   /// function
   #[sdk(attr(qname = "emma:function"))]
   pub function: Option<crate::simple_type::StringValue>,
@@ -337,11 +337,11 @@ pub struct Group {
   #[sdk(attr(qname = "emma:duration"))]
   pub duration: Option<crate::simple_type::IntegerValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   /// function
   #[sdk(attr(qname = "emma:function"))]
   pub function: Option<crate::simple_type::StringValue>,
@@ -429,11 +429,11 @@ pub struct Sequence {
   #[sdk(attr(qname = "emma:duration"))]
   pub duration: Option<crate::simple_type::IntegerValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   /// function
   #[sdk(attr(qname = "emma:function"))]
   pub function: Option<crate::simple_type::StringValue>,
@@ -570,11 +570,11 @@ pub struct EndPoint {
   #[sdk(attr(qname = "emma:media-type"))]
   pub media_type: Option<crate::simple_type::StringValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   #[sdk(any)]
   pub xml_children: Vec<std::boxed::Box<str>>,
 }
@@ -634,11 +634,11 @@ pub struct Arc {
   #[sdk(attr(qname = "emma:lang"))]
   pub language: Option<crate::simple_type::StringValue>,
   /// medium
-  #[sdk(attr(qname = "emma:medium"))]
-  pub medium: Option<crate::simple_type::ListValue<MediumValues>>,
+  #[sdk(attr(list, qname = "emma:medium"))]
+  pub medium: Option<Vec<MediumValues>>,
   /// mode
-  #[sdk(attr(qname = "emma:mode"))]
-  pub mode: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = "emma:mode"))]
+  pub mode: Option<Vec<crate::simple_type::StringValue>>,
   /// source
   #[sdk(attr(qname = "emma:source"))]
   pub source: Option<crate::simple_type::StringValue>,

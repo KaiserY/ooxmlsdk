@@ -469,6 +469,35 @@ where
     .map_err(|_| invalid_field_value(ty, field, value))
 }
 
+#[inline]
+pub(crate) fn parse_list_attr<T>(
+  attr: &Attribute<'_>,
+  decoder: Decoder,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<Vec<T>, SdkError>
+where
+  T: std::str::FromStr,
+{
+  let value = decode_attr_value(attr, decoder)?;
+  parse_list_value(value.as_ref(), ty, field)
+}
+
+#[inline]
+pub(crate) fn parse_list_value<T>(
+  value: &str,
+  ty: &'static str,
+  field: &'static str,
+) -> Result<Vec<T>, SdkError>
+where
+  T: std::str::FromStr,
+{
+  value
+    .split_whitespace()
+    .map(|item| parse_value::<T>(item, ty, field))
+    .collect()
+}
+
 #[inline(always)]
 fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]) -> SdkError {
   invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
@@ -972,6 +1001,40 @@ pub(crate) fn write_attr_value_str<W: std::io::Write>(
   writer.write_all(b"=\"")?;
   write_escaped_str(writer, value)?;
   writer.write_all(b"\"")
+}
+
+#[inline]
+pub(crate) fn write_list_attr_value<W, T>(
+  writer: &mut W,
+  attr_name: &str,
+  values: &[T],
+) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  T: std::fmt::Display,
+{
+  writer.write_all(b" ")?;
+  writer.write_all(attr_name.as_bytes())?;
+  writer.write_all(b"=\"")?;
+  write_list_value(writer, values)?;
+  writer.write_all(b"\"")
+}
+
+#[inline]
+pub(crate) fn write_list_value<W, T>(writer: &mut W, values: &[T]) -> std::io::Result<()>
+where
+  W: std::io::Write,
+  T: std::fmt::Display,
+{
+  let mut iter = values.iter();
+  if let Some(first) = iter.next() {
+    write_escaped_text(writer, first)?;
+    for value in iter {
+      writer.write_all(b" ")?;
+      write_escaped_text(writer, value)?;
+    }
+  }
+  Ok(())
 }
 
 #[inline]

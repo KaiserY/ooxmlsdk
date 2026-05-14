@@ -81,6 +81,7 @@ fn gen_alternate_content_type(
     is_abstract: false,
     has_xmlns_fields: true,
     additional_elements: vec![],
+    validators: vec![],
     attributes: vec![],
     children: vec![
       OpenXmlSchemaTypeChild {
@@ -114,6 +115,7 @@ fn gen_choice_type(_attributes: &[crate::sdk_data::xsd::ParsedAttribute]) -> Ope
     is_abstract: false,
     has_xmlns_fields: true,
     additional_elements: vec![],
+    validators: vec![],
     attributes: vec![],
     children: vec![],
     particle: any_particle(),
@@ -136,6 +138,7 @@ fn gen_fallback_type(_attributes: &[crate::sdk_data::xsd::ParsedAttribute]) -> O
     is_abstract: false,
     has_xmlns_fields: true,
     additional_elements: vec![],
+    validators: vec![],
     attributes: vec![],
     children: vec![],
     particle: any_particle(),

@@ -1894,6 +1894,8 @@ fn build_attr_member_decl(
   schema: &Schema,
   context: &CodegenContext<'_>,
 ) -> Result<MemberDecl> {
+  let attr_type_kind =
+    classify_attr_type(attr.r#type.as_str()).ok_or_else(|| attr.r#type.clone())?;
   Ok(MemberDecl::Field(FieldDecl {
     rust_name: if attr.property_name.is_empty() {
       escape_snake_case(attr.q_name.to_snake_case())
@@ -1905,6 +1907,7 @@ fn build_attr_member_decl(
     wire: FieldWireDecl::Attribute {
       qname: attr.q_name.clone(),
       bit: attr.bit,
+      list: matches!(attr_type_kind, AttrTypeKind::List),
     },
     cardinality: if attr.required {
       Cardinality::One
@@ -1954,13 +1957,48 @@ fn build_list_attr_type_ref(
     .and_then(|value| value.strip_suffix('>'))
     .ok_or_else(|| attr_type.to_string())?;
 
+  build_list_type_ref_from_inner_type(inner_type, schema, context)
+}
+
+fn build_list_type_ref_from_inner_type(
+  inner_type: &str,
+  schema: &Schema,
+  context: &CodegenContext<'_>,
+) -> Result<TypeRefDecl> {
+  if let Some(schema_enum) = context.enum_by_type(inner_type) {
+    let enum_module = context
+      .enum_module_by_type(inner_type)
+      .ok_or_else(|| format!("{inner_type:?}"))?;
+    let inner_rust_type = if enum_module == schema.module_name {
+      schema_enum.name.to_upper_camel_case()
+    } else {
+      format!(
+        "crate::schemas::{enum_module}::{}",
+        schema_enum.name.to_upper_camel_case()
+      )
+    };
+
+    return Ok(TypeRefDecl {
+      rust_type: format!("Vec<{inner_rust_type}>"),
+      module_path: None,
+    });
+  }
+
+  let mapped_inner_type = simple_type_mapping(inner_type);
+  let classified_inner_type = if mapped_inner_type == inner_type {
+    inner_type
+  } else {
+    mapped_inner_type
+  };
+
   let inner_rust_type =
-    match classify_attr_type(inner_type).ok_or_else(|| inner_type.to_string())? {
+    match classify_attr_type(classified_inner_type).ok_or_else(|| inner_type.to_string())? {
       AttrTypeKind::List => {
-        return Err(format!("nested ListValue is unsupported: {attr_type}").into());
+        return Err(format!("nested ListValue is unsupported: {inner_type}").into());
       }
       AttrTypeKind::Enum { .. } => {
-        let (enum_module_name, enum_name) = context.resolve_attr_enum_module(inner_type)?;
+        let (enum_module_name, enum_name) =
+          context.resolve_attr_enum_module(classified_inner_type)?;
         if enum_module_name == schema.module_name {
           enum_name.to_upper_camel_case()
         } else {
@@ -1976,8 +2014,8 @@ fn build_list_attr_type_ref(
     };
 
   Ok(TypeRefDecl {
-    rust_type: format!("ListValue<{inner_rust_type}>"),
-    module_path: Some("crate::simple_type".to_string()),
+    rust_type: format!("Vec<{inner_rust_type}>"),
+    module_path: None,
   })
 }
 
@@ -1987,6 +2025,16 @@ fn build_xml_content_type_ref(
   context: &CodegenContext<'_>,
 ) -> Result<Option<TypeRefDecl>> {
   if !schema_type.text_value_type.is_empty() {
+    if let Some(inner_type) = schema_type
+      .text_value_type
+      .strip_prefix("ListValue<")
+      .and_then(|value| value.strip_suffix('>'))
+    {
+      return Ok(Some(build_list_type_ref_from_inner_type(
+        inner_type, schema, context,
+      )?));
+    }
+
     return Ok(Some(TypeRefDecl {
       rust_type: schema_type.text_value_type.clone(),
       module_path: Some("crate::simple_type".to_string()),
@@ -4318,6 +4366,7 @@ mod tests {
       FieldWireDecl::Attribute {
         qname: ":val".to_string(),
         bit: Some(7),
+        list: false,
       }
     );
     assert_eq!(field.cardinality, Cardinality::Optional);

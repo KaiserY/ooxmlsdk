@@ -6,10 +6,9 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_office_document_2006_doc_props
 };
 use ooxmlsdk::simple_type::{
   Base64BinaryValue, BooleanValue, ByteValue, DateTimeValue, DecimalValue, DoubleValue,
-  HexBinaryValue, HexBinaryValueExt, Int16Value, Int32Value, Int64Value, IntegerValue, ListValue,
-  OnOffValue, SByteValue, SingleValue, StringValue, TrueFalseBlankValue, TrueFalseValue,
-  UInt16Value, UInt32Value, UInt64Value, hex_binary_from_bytes, hex_binary_to_bytes,
-  is_valid_hex_binary,
+  HexBinaryValue, HexBinaryValueExt, Int16Value, Int32Value, Int64Value, IntegerValue, OnOffValue,
+  SByteValue, SingleValue, StringValue, TrueFalseBlankValue, TrueFalseValue, UInt16Value,
+  UInt32Value, UInt64Value, hex_binary_from_bytes, hex_binary_to_bytes, is_valid_hex_binary,
 };
 use ooxmlsdk_test::trim_xml_declaration;
 use std::collections::hash_map::DefaultHasher;
@@ -208,23 +207,6 @@ fn integer_value_round_trip_test() {
   assert_round_trip::<IntegerValue>("0");
   assert_round_trip::<IntegerValue>("123456789");
   assert_canonical::<IntegerValue>("+10", "10");
-}
-
-#[test]
-fn list_value_string_round_trip_test() {
-  assert_round_trip::<ListValue<StringValue>>("1:22");
-  assert_round_trip::<ListValue<StringValue>>("alpha beta gamma");
-}
-
-#[test]
-fn list_value_normalizes_xml_whitespace() {
-  assert_canonical::<ListValue<StringValue>>("  alpha\tbeta\r\n gamma  ", "alpha beta gamma");
-  assert_canonical::<ListValue<Int32Value>>(" +1\t-2\r\n3 ", "1 -2 3");
-}
-
-#[test]
-fn list_value_int32_round_trip_test() {
-  assert_round_trip::<ListValue<Int32Value>>("-1 0 42");
 }
 
 #[test]

@@ -5351,8 +5351,8 @@ pub struct RevisionFormat {
   #[sdk(attr(qname = ":s"))]
   pub style_affected: Option<crate::simple_type::BooleanValue>,
   /// Sequence Of References
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Start index
   #[sdk(attr(qname = ":start"))]
   pub start: Option<crate::simple_type::UInt32Value>,
@@ -5895,8 +5895,8 @@ pub struct Row {
   #[sdk(attr(qname = ":r"))]
   pub row_index: Option<crate::simple_type::UInt32Value>,
   /// Spans
-  #[sdk(attr(qname = ":spans"))]
-  pub spans: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = ":spans"))]
+  pub spans: Option<Vec<crate::simple_type::StringValue>>,
   /// Style Index
   #[sdk(attr(qname = ":s"))]
   pub style_index: Option<crate::simple_type::UInt32Value>,
@@ -6034,9 +6034,8 @@ pub struct Selection {
   #[sdk(attr(qname = ":activeCellId"))]
   pub active_cell_id: Option<crate::simple_type::UInt32Value>,
   /// Sequence of References
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references:
-    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Option<Vec<crate::simple_type::StringValue>>,
 }
 /// PivotTable Selection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6464,8 +6463,8 @@ pub struct ProtectedRange {
   #[sdk(attr(qname = ":spinCount"))]
   pub spin_count: Option<crate::simple_type::UInt32Value>,
   /// sqref
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// name
   #[sdk(attr(qname = ":name"))]
   pub name: crate::simple_type::StringValue,
@@ -6663,8 +6662,8 @@ pub struct Control {
 #[sdk(qname = "x:CT_IgnoredError/x:ignoredError")]
 pub struct IgnoredError {
   /// Sequence of References
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Evaluation Error
   #[sdk(attr(qname = ":evalError"))]
   pub eval_error: Option<crate::simple_type::BooleanValue>,
@@ -6744,8 +6743,8 @@ pub struct DataValidation {
   #[sdk(attr(qname = ":prompt"))]
   pub prompt: Option<crate::simple_type::StringValue>,
   /// sqref
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
   #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
   pub list: Option<crate::simple_type::StringValue>,
@@ -9063,9 +9062,8 @@ pub struct ConditionalFormatting {
   #[sdk(attr(qname = ":pivot"))]
   pub pivot: Option<crate::simple_type::BooleanValue>,
   /// Sequence of References
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references:
-    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Option<Vec<crate::simple_type::StringValue>>,
   /// Conditional Formatting Rule.
   #[sdk(child(qname = "x:CT_CfRule/x:cfRule"))]
   pub x_cf_rule: Vec<ConditionalFormattingRule>,
@@ -9920,9 +9918,8 @@ pub struct Scenarios {
   #[sdk(attr(qname = ":show"))]
   pub show: Option<crate::simple_type::UInt32Value>,
   /// Sequence of References
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references:
-    Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Option<Vec<crate::simple_type::StringValue>>,
   /// Scenario.
   #[sdk(child(qname = "x:CT_Scenario/x:scenario"))]
   pub x_scenario: Vec<Scenario>,

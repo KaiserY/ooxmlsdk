@@ -108,7 +108,7 @@ pub struct WorksheetSortMap {
   pub column_sort_map: Option<ColumnSortMap>,
 }
 /// Defines the ReferenceSequence Class.
-pub type ReferenceSequence = crate::simple_type::StringValue;
+pub type ReferenceSequence = Vec<crate::simple_type::StringValue>;
 /// Defines the Formula Class.
 pub type Formula = crate::simple_type::StringValue;
 /// Row Sort Map.

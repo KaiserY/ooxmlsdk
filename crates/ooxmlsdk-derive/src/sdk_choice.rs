@@ -265,7 +265,9 @@ fn parse_named_sequence_variant_fields(
     let kind = match field_kind {
       SdkTypeFieldKind::Child { qname, .. } => NamedSequenceVariantFieldKind::Child { qname },
       SdkTypeFieldKind::EmptyChild { qname } => NamedSequenceVariantFieldKind::EmptyChild { qname },
-      SdkTypeFieldKind::TextChild { qname } => NamedSequenceVariantFieldKind::TextChild { qname },
+      SdkTypeFieldKind::TextChild { qname, .. } => {
+        NamedSequenceVariantFieldKind::TextChild { qname }
+      }
       _ => {
         return Err(syn::Error::new_spanned(
           field,

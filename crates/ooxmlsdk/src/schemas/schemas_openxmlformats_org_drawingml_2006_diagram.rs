@@ -1939,23 +1939,23 @@ pub struct Shape {
 #[sdk(qname = "dgm:CT_PresentationOf/dgm:presOf")]
 pub struct PresentationOf {
   /// Axis
-  #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
+  #[sdk(attr(list, qname = ":axis"))]
+  pub axis: Option<Vec<AxisValues>>,
   /// Data Point Type
-  #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
+  #[sdk(attr(list, qname = ":ptType"))]
+  pub point_type: Option<Vec<ElementValues>>,
   /// Hide Last Transition
-  #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
+  #[sdk(attr(list, qname = ":hideLastTrans"))]
+  pub hide_last_trans: Option<Vec<crate::simple_type::BooleanValue>>,
   /// Start
-  #[sdk(attr(qname = ":st"))]
-  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":st"))]
+  pub start: Option<Vec<crate::simple_type::Int32Value>>,
   /// Count
-  #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
+  #[sdk(attr(list, qname = ":cnt"))]
+  pub count: Option<Vec<crate::simple_type::UInt32Value>>,
   /// Step
-  #[sdk(attr(qname = ":step"))]
-  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":step"))]
+  pub step: Option<Vec<crate::simple_type::Int32Value>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/dgm:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -2051,23 +2051,23 @@ pub struct ForEach {
   #[sdk(attr(qname = ":ref"))]
   pub reference: Option<crate::simple_type::StringValue>,
   /// Axis
-  #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
+  #[sdk(attr(list, qname = ":axis"))]
+  pub axis: Option<Vec<AxisValues>>,
   /// Data Point Type
-  #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
+  #[sdk(attr(list, qname = ":ptType"))]
+  pub point_type: Option<Vec<ElementValues>>,
   /// Hide Last Transition
-  #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
+  #[sdk(attr(list, qname = ":hideLastTrans"))]
+  pub hide_last_trans: Option<Vec<crate::simple_type::BooleanValue>>,
   /// Start
-  #[sdk(attr(qname = ":st"))]
-  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":st"))]
+  pub start: Option<Vec<crate::simple_type::Int32Value>>,
   /// Count
-  #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
+  #[sdk(attr(list, qname = ":cnt"))]
+  pub count: Option<Vec<crate::simple_type::UInt32Value>>,
   /// Step
-  #[sdk(attr(qname = ":step"))]
-  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":step"))]
+  pub step: Option<Vec<crate::simple_type::Int32Value>>,
   #[sdk(choice(
     qname = "dgm:CT_Algorithm/dgm:alg",
     qname = "dgm:CT_Shape/dgm:shape",
@@ -2134,23 +2134,23 @@ pub struct DiagramChooseIf {
   #[sdk(attr(qname = ":name"))]
   pub name: Option<crate::simple_type::StringValue>,
   /// Axis
-  #[sdk(attr(qname = ":axis"))]
-  pub axis: Option<crate::simple_type::ListValue<AxisValues>>,
+  #[sdk(attr(list, qname = ":axis"))]
+  pub axis: Option<Vec<AxisValues>>,
   /// Data Point Type
-  #[sdk(attr(qname = ":ptType"))]
-  pub point_type: Option<crate::simple_type::ListValue<ElementValues>>,
+  #[sdk(attr(list, qname = ":ptType"))]
+  pub point_type: Option<Vec<ElementValues>>,
   /// Hide Last Transition
-  #[sdk(attr(qname = ":hideLastTrans"))]
-  pub hide_last_trans: Option<crate::simple_type::ListValue<crate::simple_type::BooleanValue>>,
+  #[sdk(attr(list, qname = ":hideLastTrans"))]
+  pub hide_last_trans: Option<Vec<crate::simple_type::BooleanValue>>,
   /// Start
-  #[sdk(attr(qname = ":st"))]
-  pub start: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":st"))]
+  pub start: Option<Vec<crate::simple_type::Int32Value>>,
   /// Count
-  #[sdk(attr(qname = ":cnt"))]
-  pub count: Option<crate::simple_type::ListValue<crate::simple_type::UInt32Value>>,
+  #[sdk(attr(list, qname = ":cnt"))]
+  pub count: Option<Vec<crate::simple_type::UInt32Value>>,
   /// Step
-  #[sdk(attr(qname = ":step"))]
-  pub step: Option<crate::simple_type::ListValue<crate::simple_type::Int32Value>>,
+  #[sdk(attr(list, qname = ":step"))]
+  pub step: Option<Vec<crate::simple_type::Int32Value>>,
   /// Function
   #[sdk(attr(qname = ":func"))]
   #[sdk(string_format(kind = "token"))]

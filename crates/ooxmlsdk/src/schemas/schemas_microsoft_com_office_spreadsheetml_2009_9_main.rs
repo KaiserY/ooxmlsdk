@@ -885,8 +885,8 @@ pub struct ConditionalFormatting {
   #[sdk(child(office2010, qname = "x14:CT_CfRule/x14:cfRule"))]
   pub x14_cf_rule: Vec<ConditionalFormattingRule>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-  pub xne_sqref: Option<crate::simple_type::StringValue>,
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub xne_sqref: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
   pub x14_ext_lst: Option<ExtensionList>,
@@ -1014,8 +1014,8 @@ pub struct DataValidation {
   #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
   pub data_validation_forumla2: Option<DataValidationForumla2>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-  pub reference_sequence: crate::simple_type::StringValue,
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the DataValidationForumla1 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1429,8 +1429,8 @@ pub struct Sparkline {
   #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::simple_type::StringValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-  pub reference_sequence: crate::simple_type::StringValue,
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the SlicerRef Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1986,8 +1986,8 @@ pub struct IgnoredError {
   #[sdk(attr(office2010, qname = ":calculatedColumn"))]
   pub calculated_column: Option<crate::simple_type::BooleanValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-  pub reference_sequence: crate::simple_type::StringValue,
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the ProtectedRange Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2016,8 +2016,8 @@ pub struct ProtectedRange {
   #[sdk(attr(office2010, qname = ":securityDescriptor"))]
   pub security_descriptor: Option<crate::simple_type::StringValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(office2010, qname = "xne:ST_Sqref/xne:sqref"))]
-  pub reference_sequence: crate::simple_type::StringValue,
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
+  pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the CustomFilter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

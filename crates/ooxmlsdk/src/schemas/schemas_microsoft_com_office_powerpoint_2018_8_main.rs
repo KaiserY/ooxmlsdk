@@ -124,11 +124,11 @@ pub struct CommentReply {
   #[sdk(attr(office2021, qname = ":created"))]
   pub created: crate::simple_type::DateTimeValue,
   /// tags
-  #[sdk(attr(office2021, qname = ":tags"))]
-  pub tags: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2021, list, qname = ":tags"))]
+  pub tags: Option<Vec<crate::simple_type::StringValue>>,
   /// likes
-  #[sdk(attr(office2021, qname = ":likes"))]
-  pub likes: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2021, list, qname = ":likes"))]
+  pub likes: Option<Vec<crate::simple_type::StringValue>>,
   /// Defines the TextBodyType Class.
   #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
   pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
@@ -180,11 +180,11 @@ pub struct Comment {
   #[sdk(attr(office2021, qname = ":created"))]
   pub created: crate::simple_type::DateTimeValue,
   /// tags
-  #[sdk(attr(office2021, qname = ":tags"))]
-  pub tags: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2021, list, qname = ":tags"))]
+  pub tags: Option<Vec<crate::simple_type::StringValue>>,
   /// likes
-  #[sdk(attr(office2021, qname = ":likes"))]
-  pub likes: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2021, list, qname = ":likes"))]
+  pub likes: Option<Vec<crate::simple_type::StringValue>>,
   /// startDate
   #[sdk(attr(office2021, qname = ":startDate"))]
   pub start_date: Option<crate::simple_type::DateTimeValue>,
@@ -192,8 +192,8 @@ pub struct Comment {
   #[sdk(attr(office2021, qname = ":dueDate"))]
   pub due_date: Option<crate::simple_type::DateTimeValue>,
   /// assignedTo
-  #[sdk(attr(office2021, qname = ":assignedTo"))]
-  pub assigned_to: Option<crate::simple_type::ListValue<crate::simple_type::StringValue>>,
+  #[sdk(attr(office2021, list, qname = ":assignedTo"))]
+  pub assigned_to: Option<Vec<crate::simple_type::StringValue>>,
   /// complete
   #[sdk(attr(office2021, qname = ":complete"))]
   #[sdk(number_range(range = 0..= 100000))]

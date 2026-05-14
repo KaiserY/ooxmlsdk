@@ -506,8 +506,8 @@ pub struct RevExFormatting {
   #[sdk(attr(office2016, qname = ":style"))]
   pub style: Option<crate::simple_type::BooleanValue>,
   /// sqref
-  #[sdk(attr(office2016, qname = ":sqref"))]
-  pub sqref: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(office2016, list, qname = ":sqref"))]
+  pub sqref: Vec<crate::simple_type::StringValue>,
   /// start
   #[sdk(attr(office2016, qname = ":start"))]
   pub start: Option<crate::simple_type::UInt32Value>,
@@ -1064,8 +1064,8 @@ pub struct RefCell {
   #[sdk(attr(office2016, qname = ":homeRef"))]
   pub home_ref: Option<crate::simple_type::BooleanValue>,
   /// r
-  #[sdk(attr(office2016, qname = ":r"))]
-  pub r: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(office2016, list, qname = ":r"))]
+  pub r: Vec<crate::simple_type::StringValue>,
   /// uid
   #[sdk(attr(office2016, qname = ":uid"))]
   #[sdk(pattern(regex = "\\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\\}"))]
@@ -1212,8 +1212,8 @@ pub struct DataValidation {
   #[sdk(attr(qname = ":prompt"))]
   pub prompt: Option<crate::simple_type::StringValue>,
   /// sqref
-  #[sdk(attr(qname = ":sqref"))]
-  pub sequence_of_references: crate::simple_type::ListValue<crate::simple_type::StringValue>,
+  #[sdk(attr(list, qname = ":sqref"))]
+  pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
   #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
   pub list: Option<crate::simple_type::StringValue>,

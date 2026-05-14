@@ -125,6 +125,7 @@ struct SdkAttrField {
   name: String,
   ty: Type,
   optional: bool,
+  list: bool,
   validators: Vec<SdkFieldValidator>,
 }
 
@@ -152,6 +153,7 @@ struct SdkTextChildField {
   ty: Type,
   optional: bool,
   repeated: bool,
+  list: bool,
 }
 
 #[derive(Clone)]
@@ -186,18 +188,19 @@ struct SdkTextField {
   ident: Ident,
   ty: Type,
   optional: bool,
+  list: bool,
 }
 
 #[derive(Clone)]
 enum SdkTypeFieldKind {
-  Attr { name: String },
+  Attr { name: String, list: bool },
   Child { qname: String },
   EmptyChild { qname: String },
-  TextChild { qname: String },
+  TextChild { qname: String, list: bool },
   AnyChild { qname: String },
   Choice,
   Any,
-  Text,
+  Text { list: bool },
 }
 
 #[derive(Clone)]
@@ -990,6 +993,7 @@ fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
 
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
+  let mut attr_list = false;
   let mut kind = None;
   let mut choice_accepts_text = None;
   let mut choice_accepts_any = None;
@@ -1010,6 +1014,9 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               attr_name = Some(normalize_attr_qname(&value.value()));
+              Ok(())
+            } else if nested.path.is_ident("list") {
+              attr_list = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -1059,10 +1066,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
+          let mut list = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("list") {
+              list = true;
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -1072,6 +1083,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::TextChild {
             qname: qname.unwrap_or_default(),
+            list,
           });
         }
         Meta::List(meta) if meta.path.is_ident("any_child") => {
@@ -1092,7 +1104,19 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           });
         }
         Meta::Path(path) if path.is_ident("text") => {
-          kind = Some(SdkTypeFieldKind::Text);
+          kind = Some(SdkTypeFieldKind::Text { list: false });
+        }
+        Meta::List(meta) if meta.path.is_ident("text") => {
+          let mut list = false;
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("list") {
+              list = true;
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk text attribute"))
+            }
+          })?;
+          kind = Some(SdkTypeFieldKind::Text { list });
         }
         Meta::List(meta) if meta.path.is_ident("choice") => {
           let mut accepts_text = false;
@@ -1409,6 +1433,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   if kind.is_none() && attr_name.is_some() {
     kind = Some(SdkTypeFieldKind::Attr {
       name: attr_name.unwrap_or_default(),
+      list: attr_list,
     });
   }
 
@@ -1471,7 +1496,7 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
               Ok(())
-            } else if is_sdk_version_marker_path(&nested.path) {
+            } else if nested.path.is_ident("list") || is_sdk_version_marker_path(&nested.path) {
               Ok(())
             } else {
               Err(nested.error("unsupported sdk choice text_child attribute"))
@@ -1502,6 +1527,16 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
         }
         Meta::Path(path) if path.is_ident("any") => return Ok(Some(SdkChoiceVariantKind::Any)),
         Meta::Path(path) if path.is_ident("text") => return Ok(Some(SdkChoiceVariantKind::Text)),
+        Meta::List(meta) if meta.path.is_ident("text") => {
+          meta.parse_nested_meta(|nested| {
+            if nested.path.is_ident("list") {
+              Ok(())
+            } else {
+              Err(nested.error("unsupported sdk choice text attribute"))
+            }
+          })?;
+          return Ok(Some(SdkChoiceVariantKind::Text));
+        }
         other => {
           let _ = other;
         }
@@ -1662,6 +1697,30 @@ fn contains_vec_type(ty: &Type) -> bool {
     return contains_vec_type(inner_ty);
   }
   false
+}
+
+fn unwrap_option_type(ty: &Type) -> Type {
+  if let Type::Path(TypePath { path, .. }) = ty
+    && let Some(segment) = path.segments.last()
+    && segment.ident == "Option"
+    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+  {
+    return inner_ty.clone();
+  }
+  ty.clone()
+}
+
+fn vec_inner_type(ty: &Type) -> Option<Type> {
+  if let Type::Path(TypePath { path, .. }) = ty
+    && let Some(segment) = path.segments.last()
+    && segment.ident == "Vec"
+    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+  {
+    return Some(inner_ty.clone());
+  }
+  None
 }
 
 fn box_inner_type(ty: &Type) -> Option<Type> {

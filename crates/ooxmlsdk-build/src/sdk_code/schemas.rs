@@ -1102,8 +1102,18 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         );
       }
 
+      let sdk_text_attr = if is_list_type_ref(
+        type_decl
+          .xml_content
+          .as_ref()
+          .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+      ) {
+        quote! { #[sdk(text(list))] }
+      } else {
+        quote! { #[sdk(text)] }
+      };
       fields.push(quote! {
-        #[sdk(text)]
+        #sdk_text_attr
         pub xml_content: Option<#xml_content_type>,
       });
 
@@ -1155,8 +1165,18 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         type_graph,
       )
       .map_err(|err| format!("type {} xml content: {err}", type_decl.rust_name))?;
+      let sdk_text_attr = if is_list_type_ref(
+        type_decl
+          .xml_content
+          .as_ref()
+          .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+      ) {
+        quote! { #[sdk(text(list))] }
+      } else {
+        quote! { #[sdk(text)] }
+      };
       fields.push(quote! {
-        #[sdk(text)]
+        #sdk_text_attr
         pub xml_content: Option<#simple_type_name>,
       });
     } else if type_decl.element_kind == Some(ElementKind::Leaf) {
@@ -1171,8 +1191,13 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       if let Some(xml_content) = type_decl.xml_content.as_ref() {
         let simple_type_name = type_from_decl_ref(xml_content, type_graph)
           .map_err(|err| format!("type {} xml content: {err}", type_decl.rust_name))?;
+        let sdk_text_attr = if is_list_type_ref(xml_content) {
+          quote! { #[sdk(text(list))] }
+        } else {
+          quote! { #[sdk(text)] }
+        };
         fields.push(quote! {
-          #[sdk(text)]
+          #sdk_text_attr
           pub xml_content: Option<#simple_type_name>,
         });
       }
@@ -1630,8 +1655,18 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
           type_graph,
         )?;
+        let sdk_text_attr = if is_list_type_ref(
+          type_decl
+            .xml_content
+            .as_ref()
+            .ok_or_else(|| format!("type {} missing IR xml content", type_decl.rust_name))?,
+        ) {
+          quote! { #[sdk(text(list))] }
+        } else {
+          quote! { #[sdk(text)] }
+        };
         fields.push(quote! {
-          #[sdk(text)]
+          #sdk_text_attr
           pub xml_content: Option<#simple_type_name>,
         });
       }
@@ -2028,11 +2063,14 @@ fn inline_single_field_sequence_variant_tokens(
         }))
       }
     }
-    FieldWireDecl::TextChild { qname } => Ok(Some(quote! {
-      #( #variant_attrs )*
-      #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))]
-      #variant_ident(#payload_type),
-    })),
+    FieldWireDecl::TextChild { qname } => {
+      let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
+      Ok(Some(quote! {
+        #( #variant_attrs )*
+        #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))]
+        #variant_ident(#payload_type),
+      }))
+    }
     _ => Ok(None),
   }
 }
@@ -2153,10 +2191,11 @@ fn gen_choice_variant_tokens(
       if qnames.is_empty() {
         return Err(variant.rust_name.clone().into());
       }
+      let list_attr = is_list_type_ref(&variant.payload).then_some(quote! { list, });
       let qname_attrs = qnames
         .iter()
         .map(
-          |qname| quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* qname = #qname))] },
+          |qname| quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* #list_attr qname = #qname))] },
         )
         .collect::<Vec<_>>();
       Ok(vec![quote! {
@@ -2235,11 +2274,16 @@ fn gen_choice_variant_tokens(
     }
     crate::sdk_code::codegen_ir::VariantWireDecl::Text => {
       let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
+      let sdk_text_attr = if is_list_type_ref(&variant.payload) {
+        quote! { #[sdk(text(list))] }
+      } else {
+        quote! { #[sdk(text)] }
+      };
       Ok(vec![quote! {
         #prefix_attrs
         #( #variant_attrs )*
         #variant_doc_attrs
-        #[sdk(text)]
+        #sdk_text_attr
         #variant_ident(#payload_type),
       }])
     }
@@ -2751,7 +2795,7 @@ fn gen_attr_from_decl(
   version_cfg: VersionCfgContext,
   type_graph: &TypeContainmentGraph,
 ) -> Result<TokenStream> {
-  let FieldWireDecl::Attribute { qname, bit } = &attr.wire else {
+  let FieldWireDecl::Attribute { qname, bit, list } = &attr.wire else {
     return Err(format!("expected attribute field, got {:?}", attr.wire).into());
   };
   let attr_name_ident: Ident = parse_str(&attr.rust_name)?;
@@ -2765,8 +2809,9 @@ fn gen_attr_from_decl(
   };
   let attr_attrs = module_version_cfg_attrs(&attr.version, version_cfg);
   let attr_sdk_version_markers = sdk_version_markers(&attr.version);
+  let list_attr = list.then_some(quote! { list, });
   let sdk_attr_attrs = quote! {
-    #[sdk(attr(#(#attr_sdk_version_markers,)* qname = #qname))]
+    #[sdk(attr(#(#attr_sdk_version_markers,)* #list_attr qname = #qname))]
   };
   let validator_attrs: Vec<TokenStream> = attr
     .validators
@@ -2955,6 +3000,10 @@ fn is_value_like_type_ref(module: &SchemaModuleDecl, type_ref: &TypeRefDecl) -> 
   module.types.iter().any(|type_decl| {
     type_decl.rust_name == type_ref.rust_type && type_decl.kind == TypeKind::LeafTextAlias
   })
+}
+
+fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
+  type_ref.module_path.is_none() && type_ref.rust_type.starts_with("Vec<")
 }
 
 fn module_type_namespace(module_name: &str) -> String {
@@ -3248,7 +3297,8 @@ fn gen_direct_child_fields_from_decl_with_context(
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+        let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))] }
       }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
@@ -3260,6 +3310,7 @@ fn gen_direct_child_fields_from_decl_with_context(
     };
     let wrap_box = empty_leaf_marker_doc.is_none()
       && !is_any_children_alias
+      && !is_list_type_ref(&field.type_ref)
       && direct_child_field_needs_box(
         owner_rust_name,
         field,
@@ -3346,7 +3397,8 @@ fn gen_inline_sequence_variant_fields_from_decl(
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* qname = #qname))] }
+        let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))] }
       }
       _ => {
         return Err(
@@ -5886,6 +5938,7 @@ mod tests {
             wire: FieldWireDecl::Attribute {
               qname: ":val".to_string(),
               bit: None,
+              list: false,
             },
             type_ref: TypeRefDecl {
               rust_type: "StringValue".to_string(),
@@ -6393,6 +6446,7 @@ mod tests {
       wire: FieldWireDecl::Attribute {
         qname: ":creationId".to_string(),
         bit: None,
+        list: false,
       },
       cardinality: Cardinality::Optional,
       type_ref: TypeRefDecl {

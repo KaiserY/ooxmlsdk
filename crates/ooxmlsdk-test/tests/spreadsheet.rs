@@ -11,7 +11,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::Workb
 use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
   CellValue, ColorScale, ConditionalFormatValueObjectValues, SharedStringTable, Workbook, Worksheet,
 };
-use ooxmlsdk::simple_type::{BooleanValue, ListValue, StringValue};
+use ooxmlsdk::simple_type::BooleanValue;
 use ooxmlsdk_test::{assert_stable_roundtrip, fixtures, trim_xml_declaration};
 
 fn xml_other_attr<'a, N, V>(attrs: &'a [(N, V)], name: &str) -> Option<&'a str>
@@ -204,7 +204,7 @@ fn worksheet_round_trip_from_complex01_part_test() {
   assert_eq!(parsed.x_sheet_data.x_row.len(), 13);
   assert_eq!(
     parsed.x_sheet_data.x_row[0].spans,
-    Some(ListValue::<StringValue>(vec!["1:22".to_string()]))
+    Some(vec!["1:22".to_string()])
   );
   assert_eq!(
     parsed
@@ -233,7 +233,7 @@ fn worksheet_round_trip_from_complex01_part_test() {
   assert_eq!(reparsed.x_sheet_data.x_row.len(), 13);
   assert_eq!(
     reparsed.x_sheet_data.x_row[0].spans,
-    Some(ListValue::<StringValue>(vec!["1:22".to_string()]))
+    Some(vec!["1:22".to_string()])
   );
 }
 

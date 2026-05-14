@@ -187,6 +187,8 @@ pub enum FieldWireDecl {
     #[serde(rename = "QName")]
     qname: String,
     bit: Option<u32>,
+    #[serde(default)]
+    list: bool,
   },
   Child {
     #[serde(rename = "QName")]
@@ -370,6 +372,7 @@ mod tests {
             wire: FieldWireDecl::Attribute {
               qname: "ex:id".to_string(),
               bit: Some(1),
+              list: false,
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {

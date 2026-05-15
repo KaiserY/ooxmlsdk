@@ -1014,7 +1014,7 @@ pub struct DataValidation {
   #[sdk(child(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2"))]
   pub data_validation_forumla2: Option<DataValidationForumla2>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the DataValidationForumla1 Class.
@@ -1022,7 +1022,7 @@ pub struct DataValidation {
 #[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula1")]
 pub struct DataValidationForumla1 {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the DataValidationForumla2 Class.
@@ -1030,7 +1030,7 @@ pub struct DataValidationForumla1 {
 #[sdk(office2010, qname = "x14:CT_DataValidationFormula/x14:formula2")]
 pub struct DataValidationForumla2 {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the SparklineGroup Class.
@@ -1113,7 +1113,7 @@ pub struct SparklineGroup {
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
   pub low_marker_color: Option<LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
@@ -1426,10 +1426,10 @@ pub struct Sparklines {
 #[sdk(office2010, qname = "x14:CT_Sparkline/x14:sparkline")]
 pub struct Sparkline {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the SlicerRef Class.
@@ -1667,7 +1667,7 @@ pub struct IconSet {
 pub struct DifferentialType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
+  pub font: Option<crate::schemas::x::Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
@@ -1699,7 +1699,7 @@ pub struct ConditionalFormattingValueObject {
   #[sdk(attr(office2010, qname = ":gte"))]
   pub greater_than_or_equal: Option<crate::simple_type::BooleanValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2010, qname = "x:CT_ExtensionList/x14:extLst"))]
@@ -1986,7 +1986,7 @@ pub struct IgnoredError {
   #[sdk(attr(office2010, qname = ":calculatedColumn"))]
   pub calculated_column: Option<crate::simple_type::BooleanValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the ProtectedRange Class.
@@ -2016,7 +2016,7 @@ pub struct ProtectedRange {
   #[sdk(attr(office2010, qname = ":securityDescriptor"))]
   pub security_descriptor: Option<crate::simple_type::StringValue>,
   /// Defines the ReferenceSequence Class.
-  #[sdk(text_child(list, qname = "xne:ST_Sqref/xne:sqref"))]
+  #[sdk(text_child(office2010, list, qname = "xne:ST_Sqref/xne:sqref"))]
   pub reference_sequence: Vec<crate::simple_type::StringValue>,
 }
 /// Defines the CustomFilter Class.

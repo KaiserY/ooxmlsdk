@@ -79,7 +79,7 @@ pub struct TaskHistoryEvent {
   pub id: crate::simple_type::StringValue,
   /// Defines the AttributionTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Attribution"))]
-  pub attribution_task_user: std::boxed::Box<AttributionTaskUser>,
+  pub attribution_task_user: Option<AttributionTaskUser>,
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
@@ -96,7 +96,7 @@ pub struct TaskHistoryEvent {
     qname = "t:CT_TaskUnassignAll/t:UnassignAll",
     qname = "t:CT_TaskUndo/t:Undo"
   ))]
-  pub choice: Option<TaskHistoryEventChoice>,
+  pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2021, qname = "oel:CT_ExtensionList/t:extLst"))]
   pub t_ext_lst: Option<ExtensionList>,
@@ -202,35 +202,35 @@ pub struct CommentAnchor {
 pub enum TaskHistoryEventChoice {
   /// Defines the AssignTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Assign"))]
-  Assign(std::boxed::Box<AssignTaskUser>),
+  TAssign(std::boxed::Box<AssignTaskUser>),
   /// Defines the UnassignTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Unassign"))]
-  Unassign(std::boxed::Box<UnassignTaskUser>),
+  TUnassign(std::boxed::Box<UnassignTaskUser>),
   /// Defines the TaskCreateEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskCreateEventInfo/t:Create"))]
-  Create,
+  TCreate,
   /// Defines the TaskTitleEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskTitleEventInfo/t:SetTitle"))]
-  SetTitle(std::boxed::Box<TaskTitleEventInfo>),
+  TSetTitle(std::boxed::Box<TaskTitleEventInfo>),
   /// Defines the TaskScheduleEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskScheduleEventInfo/t:Schedule"))]
-  Schedule(std::boxed::Box<TaskScheduleEventInfo>),
+  TSchedule(std::boxed::Box<TaskScheduleEventInfo>),
   /// Defines the TaskProgressEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskProgressEventInfo/t:Progress"))]
-  Progress(std::boxed::Box<TaskProgressEventInfo>),
+  TProgress(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the TaskPriorityEventInfo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskPriorityEventInfo/t:Priority"))]
-  Priority(std::boxed::Box<TaskPriorityEventInfo>),
+  TPriority(std::boxed::Box<TaskPriorityEventInfo>),
   /// Defines the TaskDeleteEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskDeleteEventInfo/t:Delete"))]
-  Delete,
+  TDelete,
   /// Defines the TaskUndeleteEventInfo Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskUndeleteEventInfo/t:Undelete"))]
-  Undelete,
+  TUndelete,
   /// Defines the TaskUnassignAll Class.
   #[sdk(empty_child(office2021, qname = "t:CT_TaskUnassignAll/t:UnassignAll"))]
-  UnassignAll,
+  TUnassignAll,
   /// Defines the TaskUndo Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUndo/t:Undo"))]
-  Undo(std::boxed::Box<TaskUndo>),
+  TUndo(std::boxed::Box<TaskUndo>),
 }

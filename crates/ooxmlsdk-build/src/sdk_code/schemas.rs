@@ -194,7 +194,7 @@ impl TypeContainmentGraph {
         let owner_key = local_type_key(module, &type_decl.rust_name);
         let mut owner_edges = Vec::new();
 
-        for member in type_decl.effective_members() {
+        for member in &type_decl.members {
           match member {
             MemberDecl::Field(field) => {
               let referenced_target = match &field.wire {
@@ -232,7 +232,6 @@ impl TypeContainmentGraph {
                   }
                 }
                 crate::sdk_code::codegen_ir::VariantWireDecl::Child { .. }
-                | crate::sdk_code::codegen_ir::VariantWireDecl::Choice { .. }
                 | crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => None,
               };
 
@@ -402,29 +401,6 @@ impl<'a> CodegenContext<'a> {
             .iter()
             .any(|class_name| class_name == parent_class_name)
           && seen.insert(schema_type.name.as_str())
-      })
-      .collect()
-  }
-
-  pub fn parent_choice_any_targets(
-    &self,
-    parent_class_name: &str,
-  ) -> Vec<(&'a SchemaType, Option<&'a str>)> {
-    let mut seen = HashSet::new();
-    self
-      .type_map
-      .values()
-      .copied()
-      .filter_map(|schema_type| {
-        for target in &schema_type.parent_choice_has_any_in {
-          let mut parts = target.splitn(2, '.');
-          let parent = parts.next().unwrap_or_default();
-          let field = parts.next();
-          if parent == parent_class_name && seen.insert((schema_type.name.as_str(), field)) {
-            return Some((schema_type, field));
-          }
-        }
-        None
       })
       .collect()
   }
@@ -1049,9 +1025,8 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
     .filter(|ty| !ty.is_abstract)
   {
-    let effective_members = type_decl.effective_members();
     let attr_fields: Vec<&FieldDecl> = type_decl
-      .effective_members()
+      .members
       .iter()
       .filter_map(|member| match member {
         MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Attribute { .. }) => {
@@ -1061,7 +1036,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       })
       .collect();
     let direct_child_fields: Vec<&FieldDecl> = type_decl
-      .effective_members()
+      .members
       .iter()
       .filter_map(|member| match member {
         MemberDecl::Field(field)
@@ -1076,7 +1051,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       })
       .collect();
     let choice_fields: Vec<&FieldDecl> = type_decl
-      .effective_members()
+      .members
       .iter()
       .filter_map(|member| match member {
         MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
@@ -1237,38 +1212,70 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         });
       }
 
-      if !type_decl.particle_members.is_empty() {
-        let particle_fields: Vec<&FieldDecl> = effective_members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Field(field)
-              if matches!(
-                field.wire,
-                FieldWireDecl::Child { .. }
-                  | FieldWireDecl::TextChild { .. }
-                  | FieldWireDecl::Any
-                  | FieldWireDecl::Choice
-              ) =>
-            {
-              Some(field)
-            }
-            _ => None,
-          })
-          .collect();
-        if !choice_fields.is_empty()
-          && direct_child_fields.is_empty()
-          && particle_fields.len() == choice_fields.len()
-        {
-          fields.extend(gen_choice_fields_from_decl(
-            &choice_fields,
+      match type_decl.content_model.unwrap_or(ContentModelDecl::None) {
+        ContentModelDecl::OneAllDirectChildren => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            &direct_child_fields,
+            &type_decl.rust_name,
             ir,
             type_graph,
             field_version_cfg,
-            &HashSet::new(),
+            true,
           )?);
-        } else {
+        }
+        ContentModelDecl::DirectChildrenOnly => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            &direct_child_fields,
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            false,
+          )?);
+        }
+        ContentModelDecl::ChoiceOnly
+        | ContentModelDecl::OneChoiceSingle
+        | ContentModelDecl::SequenceSingleChoice => {
+          if !direct_child_fields.is_empty() {
+            fields.extend(gen_direct_child_fields_from_decl(
+              &direct_child_fields,
+              &type_decl.rust_name,
+              ir,
+              type_graph,
+              field_version_cfg,
+              false,
+            )?);
+          } else {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
+              ir,
+              type_graph,
+              field_version_cfg,
+              &HashSet::new(),
+            )?);
+          }
+        }
+        ContentModelDecl::MixedChoiceChildren => {
+          let mixed_fields: Vec<&FieldDecl> = type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field)
+                if matches!(
+                  field.wire,
+                  FieldWireDecl::Child { .. }
+                    | FieldWireDecl::TextChild { .. }
+                    | FieldWireDecl::Any
+                    | FieldWireDecl::Choice
+                ) =>
+              {
+                Some(field)
+              }
+              _ => None,
+            })
+            .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
-            &particle_fields,
+            &mixed_fields,
             &type_decl.rust_name,
             ir,
             type_graph,
@@ -1276,19 +1283,71 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             &HashSet::new(),
           )?);
         }
-      } else {
-        match type_decl.content_model.unwrap_or(ContentModelDecl::None) {
-          ContentModelDecl::OneAllDirectChildren => {
-            fields.extend(gen_direct_child_fields_from_decl(
-              &direct_child_fields,
-              &type_decl.rust_name,
+        ContentModelDecl::SequenceAnyOnly => {
+          let any_field = type_decl.members.iter().find_map(|member| match member {
+            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
+            _ => None,
+          });
+          let field_type: Type =
+            parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
+          let field_attrs = module_version_cfg_attrs(
+            any_field.map(|field| field.version.as_str()).unwrap_or(""),
+            field_version_cfg,
+          );
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[sdk(any)]
+            pub xml_children: Vec<#field_type>,
+          });
+        }
+        ContentModelDecl::SequenceDirectChildren => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            &direct_child_fields,
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            false,
+          )?);
+        }
+        ContentModelDecl::OneSequenceFlatten | ContentModelDecl::OneSequenceStructured => {
+          let flatten_fields: Vec<&FieldDecl> = type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field)
+                if matches!(
+                  field.wire,
+                  FieldWireDecl::Child { .. }
+                    | FieldWireDecl::TextChild { .. }
+                    | FieldWireDecl::Any
+                    | FieldWireDecl::Choice
+                ) =>
+              {
+                Some(field)
+              }
+              _ => None,
+            })
+            .collect();
+          fields.extend(gen_flatten_one_sequence_fields_from_decl(
+            &flatten_fields,
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            &HashSet::new(),
+          )?);
+        }
+        ContentModelDecl::GenericChildrenFallback => {
+          if !choice_fields.is_empty() {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
               ir,
               type_graph,
               field_version_cfg,
-              true,
+              &HashSet::new(),
             )?);
-          }
-          ContentModelDecl::DirectChildrenOnly => {
+          } else if !direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
               &direct_child_fields,
               &type_decl.rust_name,
@@ -1298,144 +1357,16 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               false,
             )?);
           }
-          ContentModelDecl::ChoiceOnly
-          | ContentModelDecl::OneChoiceSingle
-          | ContentModelDecl::SequenceSingleChoice => {
-            if !direct_child_fields.is_empty() {
-              fields.extend(gen_direct_child_fields_from_decl(
-                &direct_child_fields,
-                &type_decl.rust_name,
-                ir,
-                type_graph,
-                field_version_cfg,
-                false,
-              )?);
-            } else {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            }
-          }
-          ContentModelDecl::MixedChoiceChildren => {
-            let mixed_fields: Vec<&FieldDecl> = type_decl
-              .members
-              .iter()
-              .filter_map(|member| match member {
-                MemberDecl::Field(field)
-                  if matches!(
-                    field.wire,
-                    FieldWireDecl::Child { .. }
-                      | FieldWireDecl::TextChild { .. }
-                      | FieldWireDecl::Any
-                      | FieldWireDecl::Choice
-                  ) =>
-                {
-                  Some(field)
-                }
-                _ => None,
-              })
-              .collect();
-            fields.extend(gen_flatten_one_sequence_fields_from_decl(
-              &mixed_fields,
-              &type_decl.rust_name,
+        }
+        ContentModelDecl::None => {
+          if !choice_fields.is_empty() {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
               ir,
               type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
-          }
-          ContentModelDecl::SequenceAnyOnly => {
-            let any_field = type_decl
-              .effective_members()
-              .iter()
-              .find_map(|member| match member {
-                MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
-                _ => None,
-              });
-            let field_type: Type =
-              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
-            let field_attrs = module_version_cfg_attrs(
-              any_field.map(|field| field.version.as_str()).unwrap_or(""),
-              field_version_cfg,
-            );
-            fields.push(quote! {
-              #( #field_attrs )*
-              #[sdk(any)]
-              pub xml_children: Vec<#field_type>,
-            });
-          }
-          ContentModelDecl::SequenceDirectChildren => {
-            fields.extend(gen_direct_child_fields_from_decl(
-              &direct_child_fields,
-              &type_decl.rust_name,
-              ir,
-              type_graph,
-              field_version_cfg,
-              false,
-            )?);
-          }
-          ContentModelDecl::OneSequenceFlatten | ContentModelDecl::OneSequenceStructured => {
-            let flatten_fields: Vec<&FieldDecl> = type_decl
-              .members
-              .iter()
-              .filter_map(|member| match member {
-                MemberDecl::Field(field)
-                  if matches!(
-                    field.wire,
-                    FieldWireDecl::Child { .. }
-                      | FieldWireDecl::TextChild { .. }
-                      | FieldWireDecl::Any
-                      | FieldWireDecl::Choice
-                  ) =>
-                {
-                  Some(field)
-                }
-                _ => None,
-              })
-              .collect();
-            fields.extend(gen_flatten_one_sequence_fields_from_decl(
-              &flatten_fields,
-              &type_decl.rust_name,
-              ir,
-              type_graph,
-              field_version_cfg,
-              &HashSet::new(),
-            )?);
-          }
-          ContentModelDecl::GenericChildrenFallback => {
-            if !choice_fields.is_empty() {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            } else if !direct_child_fields.is_empty() {
-              fields.extend(gen_direct_child_fields_from_decl(
-                &direct_child_fields,
-                &type_decl.rust_name,
-                ir,
-                type_graph,
-                field_version_cfg,
-                false,
-              )?);
-            }
-          }
-          ContentModelDecl::None => {
-            if !choice_fields.is_empty() {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            }
           }
         }
       }
@@ -1449,7 +1380,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         .copied()
         .ok_or_else(|| format!("missing IR type for {:?}", base_class_name))?;
       let base_direct_child_fields: Vec<&FieldDecl> = base_type_decl
-        .effective_members()
+        .members
         .iter()
         .filter_map(|member| match member {
           MemberDecl::Field(field)
@@ -1485,7 +1416,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       }
 
       for attr in base_type_decl
-        .effective_members()
+        .members
         .iter()
         .filter_map(|member| match member {
           MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Attribute { .. }) => {
@@ -1514,38 +1445,84 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         }
       }
 
-      if !type_decl.particle_members.is_empty() {
-        let particle_fields: Vec<&FieldDecl> = effective_members
-          .iter()
-          .filter_map(|member| match member {
-            MemberDecl::Field(field)
-              if matches!(
-                field.wire,
-                FieldWireDecl::Child { .. }
-                  | FieldWireDecl::TextChild { .. }
-                  | FieldWireDecl::Any
-                  | FieldWireDecl::Choice
-              ) =>
-            {
-              Some(field)
-            }
-            _ => None,
-          })
-          .collect();
-        if !choice_fields.is_empty()
-          && direct_child_fields.is_empty()
-          && particle_fields.len() == choice_fields.len()
-        {
-          fields.extend(gen_choice_fields_from_decl(
-            &choice_fields,
+      match type_decl.content_model.unwrap_or(ContentModelDecl::None) {
+        ContentModelDecl::OneAllDirectChildren => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            if direct_child_fields.is_empty() {
+              &base_direct_child_fields
+            } else {
+              &direct_child_fields
+            },
+            &type_decl.rust_name,
             ir,
             type_graph,
             field_version_cfg,
-            &HashSet::new(),
+            true,
           )?);
-        } else {
+        }
+        ContentModelDecl::DirectChildrenOnly => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            if direct_child_fields.is_empty() {
+              &base_direct_child_fields
+            } else {
+              &direct_child_fields
+            },
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            false,
+          )?);
+        }
+        ContentModelDecl::ChoiceOnly
+        | ContentModelDecl::OneChoiceSingle
+        | ContentModelDecl::SequenceSingleChoice => {
+          if !direct_child_fields.is_empty()
+            || (choice_fields.is_empty() && !base_direct_child_fields.is_empty())
+          {
+            fields.extend(gen_direct_child_fields_from_decl(
+              if direct_child_fields.is_empty() {
+                &base_direct_child_fields
+              } else {
+                &direct_child_fields
+              },
+              &type_decl.rust_name,
+              ir,
+              type_graph,
+              field_version_cfg,
+              false,
+            )?);
+          } else {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
+              ir,
+              type_graph,
+              field_version_cfg,
+              &HashSet::new(),
+            )?);
+          }
+        }
+        ContentModelDecl::OneSequenceFlatten => {
+          let flatten_fields: Vec<&FieldDecl> = type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field)
+                if matches!(
+                  field.wire,
+                  FieldWireDecl::Child { .. }
+                    | FieldWireDecl::TextChild { .. }
+                    | FieldWireDecl::Any
+                    | FieldWireDecl::Choice
+                ) =>
+              {
+                Some(field)
+              }
+              _ => None,
+            })
+            .collect();
           fields.extend(gen_flatten_one_sequence_fields_from_decl(
-            &particle_fields,
+            &flatten_fields,
             &type_decl.rust_name,
             ir,
             type_graph,
@@ -1553,23 +1530,72 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
             &HashSet::new(),
           )?);
         }
-      } else {
-        match type_decl.content_model.unwrap_or(ContentModelDecl::None) {
-          ContentModelDecl::OneAllDirectChildren => {
-            fields.extend(gen_direct_child_fields_from_decl(
-              if direct_child_fields.is_empty() {
-                &base_direct_child_fields
-              } else {
-                &direct_child_fields
-              },
-              &type_decl.rust_name,
+        ContentModelDecl::MixedChoiceChildren => {
+          let mixed_fields: Vec<&FieldDecl> = type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field)
+                if matches!(
+                  field.wire,
+                  FieldWireDecl::Child { .. }
+                    | FieldWireDecl::TextChild { .. }
+                    | FieldWireDecl::Any
+                    | FieldWireDecl::Choice
+                ) =>
+              {
+                Some(field)
+              }
+              _ => None,
+            })
+            .collect();
+          fields.extend(gen_flatten_one_sequence_fields_from_decl(
+            &mixed_fields,
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            &HashSet::new(),
+          )?);
+        }
+        ContentModelDecl::OneSequenceStructured => {
+          let structured_fields: Vec<&FieldDecl> = type_decl
+            .members
+            .iter()
+            .filter_map(|member| match member {
+              MemberDecl::Field(field)
+                if matches!(
+                  field.wire,
+                  FieldWireDecl::Child { .. }
+                    | FieldWireDecl::TextChild { .. }
+                    | FieldWireDecl::Any
+                    | FieldWireDecl::Choice
+                ) =>
+              {
+                Some(field)
+              }
+              _ => None,
+            })
+            .collect();
+          fields.extend(gen_flatten_one_sequence_fields_from_decl(
+            &structured_fields,
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            &HashSet::new(),
+          )?);
+        }
+        ContentModelDecl::GenericChildrenFallback => {
+          if !choice_fields.is_empty() {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
               ir,
               type_graph,
               field_version_cfg,
-              true,
+              &HashSet::new(),
             )?);
-          }
-          ContentModelDecl::DirectChildrenOnly => {
+          } else if !direct_child_fields.is_empty() || !base_direct_child_fields.is_empty() {
             fields.extend(gen_direct_child_fields_from_decl(
               if direct_child_fields.is_empty() {
                 &base_direct_child_fields
@@ -1583,186 +1609,47 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
               false,
             )?);
           }
-          ContentModelDecl::ChoiceOnly
-          | ContentModelDecl::OneChoiceSingle
-          | ContentModelDecl::SequenceSingleChoice => {
-            if !direct_child_fields.is_empty()
-              || (choice_fields.is_empty() && !base_direct_child_fields.is_empty())
-            {
-              fields.extend(gen_direct_child_fields_from_decl(
-                if direct_child_fields.is_empty() {
-                  &base_direct_child_fields
-                } else {
-                  &direct_child_fields
-                },
-                &type_decl.rust_name,
-                ir,
-                type_graph,
-                field_version_cfg,
-                false,
-              )?);
+        }
+        ContentModelDecl::SequenceDirectChildren => {
+          fields.extend(gen_direct_child_fields_from_decl(
+            if direct_child_fields.is_empty() {
+              &base_direct_child_fields
             } else {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            }
-          }
-          ContentModelDecl::OneSequenceFlatten => {
-            let flatten_fields: Vec<&FieldDecl> = type_decl
-              .members
-              .iter()
-              .filter_map(|member| match member {
-                MemberDecl::Field(field)
-                  if matches!(
-                    field.wire,
-                    FieldWireDecl::Child { .. }
-                      | FieldWireDecl::TextChild { .. }
-                      | FieldWireDecl::Any
-                      | FieldWireDecl::Choice
-                  ) =>
-                {
-                  Some(field)
-                }
-                _ => None,
-              })
-              .collect();
-            fields.extend(gen_flatten_one_sequence_fields_from_decl(
-              &flatten_fields,
-              &type_decl.rust_name,
+              &direct_child_fields
+            },
+            &type_decl.rust_name,
+            ir,
+            type_graph,
+            field_version_cfg,
+            false,
+          )?);
+        }
+        ContentModelDecl::SequenceAnyOnly => {
+          let any_field = type_decl.members.iter().find_map(|member| match member {
+            MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
+            _ => None,
+          });
+          let field_type: Type =
+            parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
+          let field_attrs = module_version_cfg_attrs(
+            any_field.map(|field| field.version.as_str()).unwrap_or(""),
+            field_version_cfg,
+          );
+          fields.push(quote! {
+            #( #field_attrs )*
+            #[sdk(any)]
+            pub xml_children: Vec<#field_type>,
+          });
+        }
+        ContentModelDecl::None => {
+          if !choice_fields.is_empty() {
+            fields.extend(gen_choice_fields_from_decl(
+              &choice_fields,
               ir,
               type_graph,
               field_version_cfg,
               &HashSet::new(),
             )?);
-          }
-          ContentModelDecl::MixedChoiceChildren => {
-            let mixed_fields: Vec<&FieldDecl> = type_decl
-              .members
-              .iter()
-              .filter_map(|member| match member {
-                MemberDecl::Field(field)
-                  if matches!(
-                    field.wire,
-                    FieldWireDecl::Child { .. }
-                      | FieldWireDecl::TextChild { .. }
-                      | FieldWireDecl::Any
-                      | FieldWireDecl::Choice
-                  ) =>
-                {
-                  Some(field)
-                }
-                _ => None,
-              })
-              .collect();
-            fields.extend(gen_flatten_one_sequence_fields_from_decl(
-              &mixed_fields,
-              &type_decl.rust_name,
-              ir,
-              type_graph,
-              field_version_cfg,
-              &HashSet::new(),
-            )?);
-          }
-          ContentModelDecl::OneSequenceStructured => {
-            let structured_fields: Vec<&FieldDecl> = type_decl
-              .members
-              .iter()
-              .filter_map(|member| match member {
-                MemberDecl::Field(field)
-                  if matches!(
-                    field.wire,
-                    FieldWireDecl::Child { .. }
-                      | FieldWireDecl::TextChild { .. }
-                      | FieldWireDecl::Any
-                      | FieldWireDecl::Choice
-                  ) =>
-                {
-                  Some(field)
-                }
-                _ => None,
-              })
-              .collect();
-            fields.extend(gen_flatten_one_sequence_fields_from_decl(
-              &structured_fields,
-              &type_decl.rust_name,
-              ir,
-              type_graph,
-              field_version_cfg,
-              &HashSet::new(),
-            )?);
-          }
-          ContentModelDecl::GenericChildrenFallback => {
-            if !choice_fields.is_empty() {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            } else if !direct_child_fields.is_empty() || !base_direct_child_fields.is_empty() {
-              fields.extend(gen_direct_child_fields_from_decl(
-                if direct_child_fields.is_empty() {
-                  &base_direct_child_fields
-                } else {
-                  &direct_child_fields
-                },
-                &type_decl.rust_name,
-                ir,
-                type_graph,
-                field_version_cfg,
-                false,
-              )?);
-            }
-          }
-          ContentModelDecl::SequenceDirectChildren => {
-            fields.extend(gen_direct_child_fields_from_decl(
-              if direct_child_fields.is_empty() {
-                &base_direct_child_fields
-              } else {
-                &direct_child_fields
-              },
-              &type_decl.rust_name,
-              ir,
-              type_graph,
-              field_version_cfg,
-              false,
-            )?);
-          }
-          ContentModelDecl::SequenceAnyOnly => {
-            let any_field = type_decl
-              .effective_members()
-              .iter()
-              .find_map(|member| match member {
-                MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Any) => Some(field),
-                _ => None,
-              });
-            let field_type: Type =
-              parse_str("std::boxed::Box<str>").expect("std::boxed::Box<str> type");
-            let field_attrs = module_version_cfg_attrs(
-              any_field.map(|field| field.version.as_str()).unwrap_or(""),
-              field_version_cfg,
-            );
-            fields.push(quote! {
-              #( #field_attrs )*
-              #[sdk(any)]
-              pub xml_children: Vec<#field_type>,
-            });
-          }
-          ContentModelDecl::None => {
-            if !choice_fields.is_empty() {
-              fields.extend(gen_choice_fields_from_decl(
-                &choice_fields,
-                ir,
-                type_graph,
-                field_version_cfg,
-                &HashSet::new(),
-              )?);
-            }
           }
         }
       }
@@ -1952,7 +1839,7 @@ fn gen_choice_type_decl(
   };
   let mut variants = Vec::new();
 
-  for member in type_decl.effective_members() {
+  for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
@@ -1974,8 +1861,8 @@ fn gen_choice_type_decl(
 
 fn helper_struct_is_inline_sequence_candidate(type_decl: &TypeDecl) -> bool {
   type_decl.kind == TypeKind::HelperStruct
-    && matches!(type_decl.effective_members().len(), 1 | 2)
-    && type_decl.effective_members().iter().all(|member| {
+    && matches!(type_decl.members.len(), 1 | 2)
+    && type_decl.members.iter().all(|member| {
       matches!(
         member,
         MemberDecl::Field(FieldDecl {
@@ -2033,7 +1920,7 @@ fn is_empty_leaf_marker_type(type_decl: &TypeDecl) -> bool {
     && (is_leaf_element_marker || is_empty_element_marker)
     && !type_decl.is_abstract
     && type_decl.xml_content.is_none()
-    && type_decl.effective_members().is_empty()
+    && type_decl.members.is_empty()
     && !type_decl.support.have_xmlns_fields
     && type_decl.support.xml_header == XmlHeaderMode::None
     && !type_decl.support.has_extra_support_fields()
@@ -2047,7 +1934,7 @@ fn is_abstract_empty_base_type(type_decl: &TypeDecl) -> bool {
       .as_deref()
       .is_some_and(|qname| qname.ends_with('/'))
     && type_decl.xml_content.is_none()
-    && type_decl.effective_members().is_empty()
+    && type_decl.members.is_empty()
     && !type_decl.support.have_xmlns_fields
     && type_decl.support.xml_header == XmlHeaderMode::None
     && !type_decl.support.has_extra_support_fields()
@@ -2127,7 +2014,7 @@ fn helper_struct_is_inline_sequence_clippy_safe(
   module: &SchemaModuleDecl,
   type_graph: &TypeContainmentGraph,
 ) -> bool {
-  type_decl.effective_members().iter().all(|member| {
+  type_decl.members.iter().all(|member| {
     let MemberDecl::Field(field) = member else {
       return false;
     };
@@ -2170,7 +2057,7 @@ fn inline_single_field_sequence_variant_tokens(
   let field_sdk_version_markers = sdk_version_markers(&field.version);
 
   match &field.wire {
-    FieldWireDecl::Child { qname, .. } => {
+    FieldWireDecl::Child { qname } => {
       if empty_leaf_marker_doc.is_some() {
         Ok(Some(quote! {
           #( #variant_attrs )*
@@ -2242,32 +2129,12 @@ fn gen_choice_variant_tokens(
         #variant_ident(#payload_type),
       }])
     }
-    crate::sdk_code::codegen_ir::VariantWireDecl::Choice { .. } => {
-      let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-      Ok(vec![quote! {
-        #prefix_attrs
-        #( #variant_attrs )*
-        #variant_doc_attrs
-        #[sdk(choice)]
-        #variant_ident(std::boxed::Box<#payload_type>),
-      }])
-    }
     crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. } => {
       if let Some(helper_type_decl) =
         inline_sequence_helper_type_decl(variant, render_context.module)
       {
-        if !helper_type_decl.particle_members.is_empty() {
-          let payload_type = type_from_decl_ref(&variant.payload, render_context.type_graph)?;
-          return Ok(vec![quote! {
-            #prefix_attrs
-            #( #variant_attrs )*
-            #variant_doc_attrs
-            #[sdk(sequence)]
-            #variant_ident(std::boxed::Box<#payload_type>),
-          }]);
-        }
         let helper_fields: Vec<&FieldDecl> = helper_type_decl
-          .effective_members()
+          .members
           .iter()
           .filter_map(|member| match member {
             MemberDecl::Field(field) => Some(field),
@@ -2461,7 +2328,6 @@ fn choice_variant_rendered_names(
 ) -> Option<Vec<String>> {
   match &variant.wire {
     crate::sdk_code::codegen_ir::VariantWireDecl::Any
-    | crate::sdk_code::codegen_ir::VariantWireDecl::Choice { .. }
     | crate::sdk_code::codegen_ir::VariantWireDecl::Sequence { .. }
     | crate::sdk_code::codegen_ir::VariantWireDecl::Text
     | crate::sdk_code::codegen_ir::VariantWireDecl::TextChild { .. }
@@ -2544,7 +2410,7 @@ fn choice_enum_rendered_variant_names(
       return None;
     }
 
-    for member in type_decl.effective_members() {
+    for member in &type_decl.members {
       let MemberDecl::Variant(variant) = member else {
         visiting.remove(&type_decl.rust_name);
         return None;
@@ -2761,16 +2627,13 @@ fn gen_helper_struct_type_decl(
     VersionCfgContext::new(true)
   };
   let helper_fields: Vec<&FieldDecl> = type_decl
-    .effective_members()
+    .members
     .iter()
     .filter_map(|member| match member {
       MemberDecl::Field(field)
         if matches!(
           field.wire,
-          FieldWireDecl::Child { .. }
-            | FieldWireDecl::TextChild { .. }
-            | FieldWireDecl::Any
-            | FieldWireDecl::Choice
+          FieldWireDecl::Child { .. } | FieldWireDecl::TextChild { .. } | FieldWireDecl::Any
         ) =>
       {
         Some(field)
@@ -3278,7 +3141,7 @@ fn choice_type_accepts_text(module: &SchemaModuleDecl, rust_type: &str) -> bool 
     .iter()
     .find(|type_decl| type_decl.rust_name == rust_type && type_decl.kind == TypeKind::ChoiceEnum)
     .map(|type_decl| {
-      type_decl.effective_members().iter().any(|member| {
+      type_decl.members.iter().any(|member| {
         matches!(
           member,
           MemberDecl::Variant(VariantDecl {
@@ -3306,46 +3169,40 @@ fn choice_type_accepts_any(module: &SchemaModuleDecl, rust_type: &str) -> bool {
       .iter()
       .find(|type_decl| type_decl.rust_name == rust_type)
       .map(|type_decl| match type_decl.kind {
-        TypeKind::ChoiceEnum => type_decl
-          .effective_members()
-          .iter()
-          .any(|member| match member {
-            MemberDecl::Variant(VariantDecl {
-              wire: VariantWireDecl::Any,
-              ..
-            }) => true,
-            MemberDecl::Variant(VariantDecl {
-              wire: VariantWireDecl::Child { .. },
-              payload,
-              ..
-            })
-            | MemberDecl::Variant(VariantDecl {
-              wire: VariantWireDecl::Sequence { .. },
-              payload,
-              ..
-            })
-            | MemberDecl::Variant(VariantDecl {
-              wire: VariantWireDecl::TextChild { .. },
-              payload,
-              ..
-            }) => type_accepts_any_recursive(module, &payload.rust_type, visited),
-            _ => false,
-          }),
-        TypeKind::HelperStruct => type_decl
-          .effective_members()
-          .iter()
-          .any(|member| match member {
-            MemberDecl::Field(FieldDecl {
-              wire: FieldWireDecl::Any,
-              ..
-            }) => true,
-            MemberDecl::Field(FieldDecl {
-              wire: FieldWireDecl::Choice,
-              type_ref,
-              ..
-            }) => type_accepts_any_recursive(module, &type_ref.rust_type, visited),
-            _ => false,
-          }),
+        TypeKind::ChoiceEnum => type_decl.members.iter().any(|member| match member {
+          MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Any,
+            ..
+          }) => true,
+          MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Child { .. },
+            payload,
+            ..
+          })
+          | MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::Sequence { .. },
+            payload,
+            ..
+          })
+          | MemberDecl::Variant(VariantDecl {
+            wire: VariantWireDecl::TextChild { .. },
+            payload,
+            ..
+          }) => type_accepts_any_recursive(module, &payload.rust_type, visited),
+          _ => false,
+        }),
+        TypeKind::HelperStruct => type_decl.members.iter().any(|member| match member {
+          MemberDecl::Field(FieldDecl {
+            wire: FieldWireDecl::Any,
+            ..
+          }) => true,
+          MemberDecl::Field(FieldDecl {
+            wire: FieldWireDecl::Choice,
+            type_ref,
+            ..
+          }) => type_accepts_any_recursive(module, &type_ref.rust_type, visited),
+          _ => false,
+        }),
         _ => false,
       })
       .unwrap_or(false);
@@ -3372,7 +3229,7 @@ fn choice_type_specific_start_qname_groups(
 
   let mut unconditional_qnames = Vec::new();
   let feature_gated_qnames = Vec::new();
-  for member in type_decl.effective_members() {
+  for member in &type_decl.members {
     let MemberDecl::Variant(variant) = member else {
       continue;
     };
@@ -3381,9 +3238,6 @@ fn choice_type_specific_start_qname_groups(
 
     match &variant.wire {
       VariantWireDecl::Child {
-        qnames: variant_qnames,
-      }
-      | VariantWireDecl::Choice {
         qnames: variant_qnames,
       }
       | VariantWireDecl::Sequence {
@@ -3446,20 +3300,13 @@ fn gen_direct_child_fields_from_decl_with_context(
     let field_sdk_version_markers = sdk_version_markers(&field.version);
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
-      FieldWireDecl::Child { qname, .. } if empty_leaf_marker_doc.is_some() => {
+      FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname, .. } if is_any_children_alias => {
+      FieldWireDecl::Child { qname } if is_any_children_alias => {
         quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname, qnames } if qname.is_empty() => {
-        if qnames.is_empty() {
-          quote! { #[sdk(child)] }
-        } else {
-          quote! { #[sdk(sequence(#(#field_sdk_version_markers,)* #(qname = #qnames),*))] }
-        }
-      }
-      FieldWireDecl::Child { qname, .. } => {
+      FieldWireDecl::Child { qname } => {
         quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
@@ -3553,18 +3400,14 @@ fn gen_inline_sequence_variant_fields_from_decl(
     let field_sdk_version_markers = sdk_version_markers(&field.version);
     let is_any_children_alias = is_any_children_alias_type_ref(module, &field.type_ref, type_graph);
     let sdk_field_attrs = match &field.wire {
-      FieldWireDecl::Child { qname, .. } if empty_leaf_marker_doc.is_some() => {
+      FieldWireDecl::Child { qname } if empty_leaf_marker_doc.is_some() => {
         quote! { #[sdk(empty_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname, .. } if is_any_children_alias => {
+      FieldWireDecl::Child { qname } if is_any_children_alias => {
         quote! { #[sdk(any_child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
-      FieldWireDecl::Child { qname, qnames } => {
-        if qname.is_empty() && !qnames.is_empty() {
-          quote! { #[sdk(sequence(#(#field_sdk_version_markers,)* #(qname = #qnames),*))] }
-        } else {
-          quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
-        }
+      FieldWireDecl::Child { qname } => {
+        quote! { #[sdk(child(#(#field_sdk_version_markers,)* qname = #qname))] }
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
@@ -3794,7 +3637,7 @@ fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&Fie
     return false;
   }
 
-  let [MemberDecl::Field(field)] = type_decl.effective_members() else {
+  let [MemberDecl::Field(field)] = type_decl.members.as_slice() else {
     return false;
   };
 
@@ -3830,7 +3673,7 @@ fn omitted_abstract_helper_type_names(ir: &SchemaModuleDecl) -> HashSet<&str> {
   ir.types
     .iter()
     .filter(|type_decl| type_decl.is_abstract)
-    .flat_map(|type_decl| type_decl.effective_members())
+    .flat_map(|type_decl| &type_decl.members)
     .filter_map(|member| match member {
       MemberDecl::Field(field) if field.type_ref.module_path.is_none() => {
         Some(field.type_ref.rust_type.as_str())
@@ -4100,7 +3943,6 @@ mod tests {
               version: "Office2013".to_string(),
               wire: FieldWireDecl::Child {
                 qname: "pc:cSldMk".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::Optional,
               type_ref: TypeRefDecl {
@@ -4115,7 +3957,6 @@ mod tests {
               version: "Office2013".to_string(),
               wire: FieldWireDecl::Child {
                 qname: "pc:sldMk".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::Optional,
               type_ref: TypeRefDecl {
@@ -4227,7 +4068,6 @@ mod tests {
               version: String::new(),
               wire: FieldWireDecl::Child {
                 qname: "t:CT_First/t:first".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::Optional,
               type_ref: TypeRefDecl {
@@ -4242,7 +4082,6 @@ mod tests {
               version: String::new(),
               wire: FieldWireDecl::Child {
                 qname: "t:CT_Second/t:second".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::Optional,
               type_ref: TypeRefDecl {
@@ -4308,7 +4147,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_First/t:first".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::Optional,
             type_ref: TypeRefDecl {
@@ -4375,7 +4213,6 @@ mod tests {
               version: String::new(),
               wire: FieldWireDecl::Child {
                 qname: "t:CT_Formula/t:f".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::One,
               type_ref: TypeRefDecl {
@@ -4717,7 +4554,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_Second/t:second".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {
@@ -5585,7 +5421,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_Second/t:second".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {
@@ -5670,7 +5505,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_First/t:first".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {
@@ -5690,7 +5524,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_Second/t:second".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {
@@ -5779,7 +5612,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:CT_Second/t:second".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::One,
             type_ref: TypeRefDecl {
@@ -5872,7 +5704,6 @@ mod tests {
               version: String::new(),
               wire: FieldWireDecl::Child {
                 qname: "t:CT_TblPr/t:tblPr".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::One,
               type_ref: TypeRefDecl {
@@ -5887,7 +5718,6 @@ mod tests {
               version: String::new(),
               wire: FieldWireDecl::Child {
                 qname: "t:CT_TblGrid/t:tblGrid".to_string(),
-                qnames: Vec::new(),
               },
               cardinality: Cardinality::One,
               type_ref: TypeRefDecl {
@@ -6327,7 +6157,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:node".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::Optional,
             type_ref: TypeRefDecl {
@@ -6350,7 +6179,6 @@ mod tests {
             version: String::new(),
             wire: FieldWireDecl::Child {
               qname: "t:node".to_string(),
-              qnames: Vec::new(),
             },
             cardinality: Cardinality::Optional,
             type_ref: TypeRefDecl {

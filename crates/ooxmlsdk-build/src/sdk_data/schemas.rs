@@ -235,7 +235,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               parent_choice_has_any_in: Vec::new(),
               text_value_type: text_value_type_from_type_validators(ty),
               api_kind: resolve_api_kind(ty, &type_map),
-              additional_elements: ty.additional_elements.clone(),
               attributes: ty
                 .attributes
                 .iter()
@@ -277,7 +276,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
                 })
                 .collect(),
               children,
-              particle: ty.particle.clone(),
             };
             apply_xsd_twips_measure_element_qname_overrides(
               &mut schema_type,

@@ -513,38 +513,6 @@ pub trait SdkType: Sized {
   }
 }
 
-impl<T> SdkType for std::boxed::Box<T>
-where
-  T: SdkType,
-{
-  fn deserialize_type_borrowed_inner<'de>(
-    xml_reader: &mut crate::common::SliceReader<'de>,
-    xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-  ) -> Result<Self, crate::common::SdkError> {
-    T::deserialize_type_borrowed_inner(xml_reader, xml_event).map(std::boxed::Box::new)
-  }
-
-  fn deserialize_type_io_inner<R: std::io::BufRead>(
-    xml_reader: &mut crate::common::IoReader<R>,
-    xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
-  ) -> Result<Self, crate::common::SdkError> {
-    T::deserialize_type_io_inner(xml_reader, xml_event).map(std::boxed::Box::new)
-  }
-
-  fn write_type_xml<W: std::io::Write>(
-    &self,
-    writer: &mut W,
-    xmlns_prefix: &str,
-  ) -> Result<(), std::io::Error> {
-    self.as_ref().write_type_xml(writer, xmlns_prefix)
-  }
-
-  #[inline]
-  fn matches_type_start_qname(name: &[u8]) -> bool {
-    T::matches_type_start_qname(name)
-  }
-}
-
 pub trait SdkChoice: Sized {
   fn deserialize_borrowed_inner<'de>(
     xml_reader: &mut crate::common::SliceReader<'de>,

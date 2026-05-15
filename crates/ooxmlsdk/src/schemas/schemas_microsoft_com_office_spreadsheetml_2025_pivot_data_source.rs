@@ -15,6 +15,6 @@ pub struct PivotCacheDataSource {
   #[sdk(attr(microsoft365, qname = ":ref"))]
   pub r#ref: Option<crate::simple_type::StringValue>,
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
 }

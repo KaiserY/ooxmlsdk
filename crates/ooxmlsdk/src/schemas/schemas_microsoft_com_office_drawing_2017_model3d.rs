@@ -16,13 +16,13 @@ pub struct Model3D {
   pub link: Option<crate::simple_type::StringValue>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2019, qname = "a:CT_ShapeProperties/am3d:spPr"))]
-  pub shape_properties: std::boxed::Box<ShapeProperties>,
+  pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the Model3DCamera Class.
   #[sdk(child(office2019, qname = "am3d:CT_Model3DCamera/am3d:camera"))]
-  pub model3_d_camera: std::boxed::Box<Model3DCamera>,
+  pub model3_d_camera: Option<std::boxed::Box<Model3DCamera>>,
   /// Defines the Model3DTransform Class.
   #[sdk(child(office2019, qname = "am3d:CT_Model3DTransform/am3d:trans"))]
-  pub model3_d_transform: std::boxed::Box<Model3DTransform>,
+  pub model3_d_transform: Option<std::boxed::Box<Model3DTransform>>,
   /// Optional source attribution URL describes from whence the 3D model came.
   #[sdk(child(
     office2019,
@@ -39,7 +39,7 @@ pub struct Model3D {
     qname = "am3d:CT_ObjectViewport/am3d:objViewport",
     qname = "am3d:CT_WindowViewport/am3d:winViewport"
   ))]
-  pub choice1: Model3DChoice,
+  pub model3_d_choice1: Option<Model3DChoice>,
   /// Ambient light in a scene.
   #[sdk(child(office2019, qname = "am3d:CT_AmbientLight/am3d:ambientLight"))]
   pub am3d_ambient_light: Option<std::boxed::Box<AmbientLight>>,
@@ -49,7 +49,7 @@ pub struct Model3D {
     qname = "am3d:CT_DirectionalLight/am3d:dirLight",
     qname = "am3d:CT_UnknownLight/am3d:unkLight"
   ))]
-  pub choice2: Vec<Model3DChoice2>,
+  pub model3_d_choice2: Vec<Model3DChoice2>,
 }
 /// Defines the SxRatio Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -358,7 +358,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub choice1: Option<ShapePropertiesChoice>,
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -367,7 +367,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice2: Option<ShapePropertiesChoice2>,
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -375,7 +375,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice3: Option<ShapePropertiesChoice3>,
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -392,18 +392,18 @@ pub struct ShapeProperties {
 pub struct Model3DCamera {
   /// Defines the PosPoint3D Class.
   #[sdk(child(office2019, qname = "a:CT_Point3D/am3d:pos"))]
-  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
+  pub pos_point3_d: Option<PosPoint3D>,
   /// Defines the UpVector3D Class.
   #[sdk(child(office2019, qname = "a:CT_Vector3D/am3d:up"))]
-  pub up_vector3_d: std::boxed::Box<UpVector3D>,
+  pub up_vector3_d: Option<UpVector3D>,
   /// Defines the LookAtPoint3D Class.
   #[sdk(child(office2019, qname = "a:CT_Point3D/am3d:lookAt"))]
-  pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
+  pub look_at_point3_d: Option<LookAtPoint3D>,
   #[sdk(choice(
     qname = "am3d:CT_OrthographicProjection/am3d:orthographic",
     qname = "am3d:CT_PerspectiveProjection/am3d:perspective"
   ))]
-  pub choice: Model3DCameraChoice,
+  pub model3_d_camera_choice: Option<Model3DCameraChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2019, qname = "a:CT_OfficeArtExtensionList/am3d:extLst"))]
   pub am3d_ext_lst: Option<OfficeArtExtensionList>,
@@ -588,25 +588,25 @@ pub struct DirectionalLight {
 pub enum Model3DChoice {
   /// Defines the ObjectViewport Class.
   #[sdk(child(office2019, qname = "am3d:CT_ObjectViewport/am3d:objViewport"))]
-  ObjViewport(std::boxed::Box<ObjectViewport>),
+  Am3dObjViewport(std::boxed::Box<ObjectViewport>),
   /// Defines the WindowViewport Class.
   #[sdk(child(office2019, qname = "am3d:CT_WindowViewport/am3d:winViewport"))]
-  WinViewport(std::boxed::Box<WindowViewport>),
+  Am3dWinViewport(std::boxed::Box<WindowViewport>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DChoice2 {
   /// Defines the PointLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_PointLight/am3d:ptLight"))]
-  PtLight(std::boxed::Box<PointLight>),
+  Am3dPtLight(std::boxed::Box<PointLight>),
   /// Defines the SpotLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_SpotLight/am3d:spotLight"))]
-  SpotLight(std::boxed::Box<SpotLight>),
+  Am3dSpotLight(std::boxed::Box<SpotLight>),
   /// Defines the DirectionalLight Class.
   #[sdk(child(office2019, qname = "am3d:CT_DirectionalLight/am3d:dirLight"))]
-  DirLight(std::boxed::Box<DirectionalLight>),
+  Am3dDirLight(std::boxed::Box<DirectionalLight>),
   /// Defines the UnknownLight Class.
   #[sdk(empty_child(office2019, qname = "am3d:CT_UnknownLight/am3d:unkLight"))]
-  UnkLight,
+  Am3dUnkLight,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipChoice {
@@ -684,47 +684,47 @@ pub enum Model3DExtensionChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum Model3DCameraChoice {
   /// Defines the OrthographicProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_OrthographicProjection/am3d:orthographic"))]
-  Orthographic(std::boxed::Box<OrthographicProjection>),
+  Am3dOrthographic(std::boxed::Box<OrthographicProjection>),
   /// Defines the PerspectiveProjection Class.
   #[sdk(child(office2019, qname = "am3d:CT_PerspectiveProjection/am3d:perspective"))]
-  Perspective(std::boxed::Box<PerspectiveProjection>),
+  Am3dPerspective(std::boxed::Box<PerspectiveProjection>),
 }

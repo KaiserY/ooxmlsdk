@@ -287,6 +287,72 @@ pub(crate) fn expand_sdk_type(input: &DeriveInput) -> syn::Result<proc_macro2::T
   }
 }
 
+fn sdk_type_impl_tokens(
+  ident: &Ident,
+  generics: &syn::Generics,
+  impl_items: proc_macro2::TokenStream,
+  validate_items: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  let deserialize_borrowed_inner_ident = deserialize_type_inner_ident(DeserializeMode::Borrowed);
+  let deserialize_io_inner_ident = deserialize_type_inner_ident(DeserializeMode::Io);
+  let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+  quote! {
+    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
+      fn deserialize_type_borrowed_inner<'de>(
+        xml_reader: &mut crate::common::SliceReader<'de>,
+        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::#deserialize_borrowed_inner_ident(xml_reader, xml_event)
+      }
+
+      fn deserialize_type_io_inner<R: std::io::BufRead>(
+        xml_reader: &mut crate::common::IoReader<R>,
+        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+      ) -> Result<Self, crate::common::SdkError> {
+        Self::#deserialize_io_inner_ident(xml_reader, xml_event)
+      }
+    }
+    #[cfg(feature = "mce")]
+    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
+    #[cfg(feature = "validators")]
+    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
+      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
+        #validate_items
+      }
+    }
+
+    impl #impl_generics std::str::FromStr for #ident #type_generics #where_clause {
+      type Err = crate::common::SdkError;
+
+      fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut xml_reader = crate::common::from_str_inner(s)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+    }
+
+    impl #impl_generics #ident #type_generics #where_clause {
+      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+
+      pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_str_inner(s)?;
+        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
+      }
+
+      pub fn from_reader<R: std::io::BufRead>(
+        reader: R,
+      ) -> Result<Self, crate::common::SdkError> {
+        let mut xml_reader = crate::common::from_reader_inner(reader)?;
+        Self::#deserialize_io_inner_ident(&mut xml_reader, None)
+      }
+
+      #impl_items
+    }
+  }
+}
+
 fn mce_process_child_field_tokens(field: &SdkChildField) -> proc_macro2::TokenStream {
   let ident = &field.ident;
   if field.repeated {
@@ -1226,13 +1292,8 @@ fn expand_sequence_helper_struct(
       .as_ref()
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
-    match parsed_attrs.kind.clone() {
-      Some(kind @ (SdkTypeFieldKind::Child { .. } | SdkTypeFieldKind::Sequence { .. })) => {
-        let (qname, qnames) = match kind {
-          SdkTypeFieldKind::Child { qname, qnames } => (qname, qnames),
-          SdkTypeFieldKind::Sequence { qnames } => (String::new(), qnames),
-          _ => unreachable!(),
-        };
+    match parsed_attrs.kind {
+      Some(SdkTypeFieldKind::Child { qname, .. }) => {
         let QNameInfo {
           tag_prefix,
           local_name,
@@ -1260,14 +1321,7 @@ fn expand_sequence_helper_struct(
           quote! { parsed_child }
         };
         let is_generic_child = qname.is_empty();
-        let explicit_targets = if is_generic_child && !qnames.is_empty() {
-          Some(qname_match_targets(&qnames))
-        } else {
-          None
-        };
-        let match_target = if let Some(targets) = &explicit_targets {
-          quote! { #( #targets )|* }
-        } else if is_generic_child {
+        let match_target = if is_generic_child {
           quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
         } else if tag_prefix.is_empty() {
           quote! { #local_name_lit }
@@ -1278,13 +1332,7 @@ fn expand_sequence_helper_struct(
           );
           quote! { #tag_qname_lit | #local_name_lit }
         };
-        if let Some(targets) = &explicit_targets {
-          matcher_checks.push(quote! {
-            if matches!(name, #( #targets )|*) {
-              return true;
-            }
-          });
-        } else if is_generic_child {
+        if is_generic_child {
           matcher_checks.push(quote! {
             if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(name) {
               return true;
@@ -1298,20 +1346,12 @@ fn expand_sequence_helper_struct(
           });
         }
         let child_write_call = if is_generic_child {
-          if box_inner_type(&payload_ty).is_some() {
-            quote! { crate::sdk::SdkType::write_type_xml(child.as_ref(), writer, xmlns_prefix)?; }
-          } else {
-            quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }
-          }
+          quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }
         } else {
           quote! { child.write_xml(writer, xmlns_prefix)?; }
         };
         let self_write_call = if is_generic_child {
-          if box_inner_type(&payload_ty).is_some() {
-            quote! { crate::sdk::SdkType::write_type_xml(self.#field_ident.as_ref(), writer, xmlns_prefix)?; }
-          } else {
-            quote! { crate::sdk::SdkType::write_type_xml(&self.#field_ident, writer, xmlns_prefix)?; }
-          }
+          quote! { crate::sdk::SdkType::write_type_xml(&self.#field_ident, writer, xmlns_prefix)?; }
         } else {
           quote! { self.#field_ident.write_xml(writer, xmlns_prefix)?; }
         };
@@ -1618,60 +1658,15 @@ fn expand_sequence_helper_struct(
       _ => {
         return Err(syn::Error::new_spanned(
           field,
-          "sequence helper structs require only #[sdk(child(...))], #[sdk(sequence(...))], #[sdk(text_child(...))] or #[sdk(any_child(...))] fields",
+          "sequence helper structs require only #[sdk(child(...))], #[sdk(text_child(...))] or #[sdk(any_child(...))] fields",
         ));
       }
     }
   }
-  let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-  Ok(quote! {
-    impl #impl_generics crate::sdk::SdkType for #ident #type_generics #where_clause {
-      fn deserialize_type_borrowed_inner<'de>(
-        xml_reader: &mut crate::common::SliceReader<'de>,
-        xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::#deserialize_borrowed_inner_ident(xml_reader, xml_event)
-      }
-
-      fn deserialize_type_io_inner<R: std::io::BufRead>(
-        xml_reader: &mut crate::common::IoReader<R>,
-        xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
-      ) -> Result<Self, crate::common::SdkError> {
-        Self::#deserialize_io_inner_ident(xml_reader, xml_event)
-      }
-
-      fn write_type_xml<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-        xmlns_prefix: &str,
-      ) -> Result<(), std::io::Error> {
-        self.write_xml(writer, xmlns_prefix)
-      }
-
-      #[inline]
-      fn matches_type_start_qname(name: &[u8]) -> bool {
-        Self::matches_specific_start_qname(name)
-      }
-    }
-    #[cfg(feature = "mce")]
-    impl #impl_generics crate::sdk::SdkMce for #ident #type_generics #where_clause {}
-    #[cfg(feature = "validators")]
-    impl #impl_generics crate::validator::SdkValidator for #ident #type_generics #where_clause {
-      fn validate_into(&self, context: &mut crate::validator::ValidationContext) {
-        #( #child_validate_tokens )*
-      }
-    }
-
-    impl #impl_generics std::str::FromStr for #ident #type_generics #where_clause {
-      type Err = crate::common::SdkError;
-
-      fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
-      }
-    }
-
-    impl #impl_generics #ident #type_generics #where_clause {
+  Ok(sdk_type_impl_tokens(
+    ident,
+    &input.generics,
+    quote! {
       #[inline]
       pub(crate) fn matches_specific_start_qname(name: &[u8]) -> bool {
         #( #matcher_checks )*
@@ -1760,23 +1755,6 @@ fn expand_sequence_helper_struct(
         })
       }
 
-      pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_bytes_inner(bytes)?;
-        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
-      }
-
-      pub fn from_str(s: &str) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_str_inner(s)?;
-        Self::#deserialize_borrowed_inner_ident(&mut xml_reader, None)
-      }
-
-      pub fn from_reader<R: std::io::BufRead>(
-        reader: R,
-      ) -> Result<Self, crate::common::SdkError> {
-        let mut xml_reader = crate::common::from_reader_inner(reader)?;
-        Self::#deserialize_io_inner_ident(&mut xml_reader, None)
-      }
-
       pub(crate) fn write_xml<W: std::io::Write>(
         &self,
         writer: &mut W,
@@ -1785,8 +1763,11 @@ fn expand_sequence_helper_struct(
         #( #child_write_tokens )*
         Ok(())
       }
-    }
-  })
+    },
+    quote! {
+      #( #child_validate_tokens )*
+    },
+  ))
 }
 
 fn expand_helper_struct(
@@ -1810,18 +1791,9 @@ fn expand_helper_struct(
       .ok_or_else(|| syn::Error::new_spanned(field, "SdkType requires named fields"))?;
     let parsed_attrs = parse_sdk_type_field_attrs(&field.attrs)?;
     match parsed_attrs.kind {
-      Some(SdkTypeFieldKind::Child { qname, qnames }) => child_fields.push(SdkChildField {
+      Some(SdkTypeFieldKind::Child { qname, .. }) => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        qnames,
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
-      }),
-      Some(SdkTypeFieldKind::Sequence { qnames }) => child_fields.push(SdkChildField {
-        ident: field_ident.clone(),
-        qname: String::new(),
-        qnames,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
@@ -1939,14 +1911,7 @@ fn expand_helper_struct(
     };
     let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let is_generic_child = field.qname.is_empty();
-    let explicit_targets = if is_generic_child && !field.qnames.is_empty() {
-      Some(qname_match_targets(&field.qnames))
-    } else {
-      None
-    };
-    let target = if let Some(targets) = &explicit_targets {
-      quote! { #( #targets )|* }
-    } else if is_generic_child {
+    let target = if is_generic_child {
       quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
     } else if tag_prefix.is_empty() {
       quote! { #local_name_lit }
@@ -1971,7 +1936,7 @@ fn expand_helper_struct(
         if as_result {
           quote! {
               #case_index => {
-                return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
+                return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
                   Ok(parsed_child) => {
                     #field_ident.push(#parsed_child_expr);
                     Ok(true)
@@ -2002,7 +1967,6 @@ fn expand_helper_struct(
               return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
                 Ok(parsed_child) => {
                   #field_ident = Some(#parsed_child_expr);
-                  #xml_child_slot_assign
                   Ok(true)
                 },
                 Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -2069,10 +2033,9 @@ fn expand_helper_struct(
       } else if as_result {
         quote! {
           #target => {
-            return match #deserialize_call(#reader_ident, Some((e, next_empty))) {
+            return match <#child_ty>::#deserialize_ident(#reader_ident, Some((e, next_empty))) {
               Ok(parsed_child) => {
                 #field_ident = Some(#parsed_child_expr);
-                #xml_child_slot_assign
                 Ok(true)
               },
               Err(crate::common::SdkError::MissingField { .. }) => Ok(true),
@@ -2879,7 +2842,7 @@ fn expand_helper_struct(
     || !text_child_fields.is_empty()
     || !any_child_fields.is_empty();
   let has_choice_dispatch = !choice_fields.is_empty();
-  let _visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
+  let visit_foreign_child_tokens_borrowed = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
         _xml_reader: &mut crate::common::SliceReader<'de>,
@@ -2936,7 +2899,7 @@ fn expand_helper_struct(
       };
     }
   };
-  let _visit_foreign_child_tokens_io = if !has_child_dispatch && !has_choice_dispatch {
+  let visit_foreign_child_tokens_io = if !has_child_dispatch && !has_choice_dispatch {
     quote! {
       let mut visit_foreign_child = |
         _xml_reader: &mut crate::common::IoReader<R>,
@@ -3066,20 +3029,36 @@ fn expand_helper_struct(
     }
   };
   let unmatched_child_tokens_borrowed = quote! {
-    xml_reader.unread(if next_empty {
-      quick_xml::events::Event::Empty(e)
-    } else {
-      quick_xml::events::Event::Start(e)
-    })?;
-    break;
+    if crate::common::is_foreign_prefixed_child(event_name, "") {
+      #visit_foreign_child_tokens_borrowed
+      crate::common::process_foreign_element_children_borrowed(
+        xml_reader,
+        next_empty,
+        &mut visit_foreign_child,
+      )?;
+      continue;
+    }
+    return Err(crate::common::unexpected_tag(
+      stringify!(#ident),
+      "known child",
+      event_name,
+    ));
   };
   let unmatched_child_tokens_io = quote! {
-    xml_reader.unread(if next_empty {
-      quick_xml::events::Event::Empty(e)
-    } else {
-      quick_xml::events::Event::Start(e)
-    })?;
-    break;
+    if crate::common::is_foreign_prefixed_child(event_name, "") {
+      #visit_foreign_child_tokens_io
+      crate::common::process_foreign_element_children_io(
+        xml_reader,
+        next_empty,
+        &mut visit_foreign_child,
+      )?;
+      continue;
+    }
+    return Err(crate::common::unexpected_tag(
+      stringify!(#ident),
+      "known child",
+      event_name,
+    ));
   };
   let mce_child_process_tokens = child_fields
     .iter()
@@ -3104,16 +3083,6 @@ fn expand_helper_struct(
         xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
       ) -> Result<Self, crate::common::SdkError> {
         Self::#deserialize_io_inner_ident(xml_reader, xml_event)
-      }
-
-      fn write_type_xml<W: std::io::Write>(
-        &self,
-        writer: &mut W,
-        xmlns_prefix: &str,
-      ) -> Result<(), std::io::Error> {
-        #( #child_write_tokens )*
-        #( #choice_write_tokens )*
-        Ok(())
       }
     }
     #[cfg(feature = "validators")]
@@ -3204,8 +3173,7 @@ fn expand_helper_struct(
               #main_dispatch_tokens_borrowed
               #unmatched_child_tokens_borrowed
             }
-            quick_xml::events::Event::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
+            quick_xml::events::Event::End(_) => {
               break;
             }
             quick_xml::events::Event::Eof => {
@@ -3240,10 +3208,7 @@ fn expand_helper_struct(
 
           let next_event = match xml_reader.next_tag_event()? {
             crate::common::IoTagEvent::Start(e, next_empty) => Some((e, next_empty)),
-            crate::common::IoTagEvent::End(e) => {
-              xml_reader.unread(quick_xml::events::Event::End(e))?;
-              break;
-            }
+            crate::common::IoTagEvent::End(_) => break,
             crate::common::IoTagEvent::Eof => {
               return Err(crate::common::unexpected_eof(stringify!(#ident)));
             }
@@ -3349,18 +3314,9 @@ fn expand_named_struct(
         list,
         validators: parsed_attrs.validators,
       }),
-      SdkTypeFieldKind::Child { qname, qnames } => child_fields.push(SdkChildField {
+      SdkTypeFieldKind::Child { qname } => child_fields.push(SdkChildField {
         ident: field_ident.clone(),
         qname,
-        qnames,
-        ty: field.ty.clone(),
-        optional: is_option_type(&field.ty),
-        repeated: contains_vec_type(&field.ty),
-      }),
-      SdkTypeFieldKind::Sequence { qnames } => child_fields.push(SdkChildField {
-        ident: field_ident.clone(),
-        qname: String::new(),
-        qnames,
         ty: field.ty.clone(),
         optional: is_option_type(&field.ty),
         repeated: contains_vec_type(&field.ty),
@@ -3444,7 +3400,6 @@ fn expand_named_struct(
     if matches!(
       field_kind,
       SdkTypeFieldKind::Child { .. }
-        | SdkTypeFieldKind::Sequence { .. }
         | SdkTypeFieldKind::EmptyChild { .. }
         | SdkTypeFieldKind::TextChild { .. }
         | SdkTypeFieldKind::AnyChild { .. }
@@ -3865,14 +3820,7 @@ fn expand_named_struct(
     };
     let case_index = direct_child_dispatch_tokens_borrowed.len() + 1;
     let is_generic_child = field.qname.is_empty();
-    let explicit_targets = if is_generic_child && !field.qnames.is_empty() {
-      Some(qname_match_targets(&field.qnames))
-    } else {
-      None
-    };
-    let target = if let Some(targets) = &explicit_targets {
-      quote! { #( #targets )|* }
-    } else if is_generic_child {
+    let target = if is_generic_child {
       quote! { _ if <#child_ty as crate::sdk::SdkType>::matches_type_start_qname(event_name) }
     } else if use_local_name_child_dispatch || tag_prefix.is_empty() {
       quote! { #local_name_lit }
@@ -3884,20 +3832,12 @@ fn expand_named_struct(
       quote! { #tag_qname_lit | #local_name_lit }
     };
     let child_write_call = if is_generic_child {
-      if box_inner_type(&payload_ty).is_some() {
-        quote! { crate::sdk::SdkType::write_type_xml(child.as_ref(), writer, xmlns_prefix)?; }
-      } else {
-        quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }
-      }
+      quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }
     } else {
       quote! { child.write_xml(writer, xmlns_prefix)?; }
     };
     let self_write_call = if is_generic_child {
-      if box_inner_type(&payload_ty).is_some() {
-        quote! { crate::sdk::SdkType::write_type_xml(self.#field_ident.as_ref(), writer, xmlns_prefix)?; }
-      } else {
-        quote! { crate::sdk::SdkType::write_type_xml(&self.#field_ident, writer, xmlns_prefix)?; }
-      }
+      quote! { crate::sdk::SdkType::write_type_xml(&self.#field_ident, writer, xmlns_prefix)?; }
     } else {
       quote! { self.#field_ident.write_xml(writer, xmlns_prefix)?; }
     };
@@ -5786,7 +5726,6 @@ fn expand_named_struct(
       && matches!(
         field_kind,
         SdkTypeFieldKind::Child { .. }
-          | SdkTypeFieldKind::Sequence { .. }
           | SdkTypeFieldKind::EmptyChild { .. }
           | SdkTypeFieldKind::TextChild { .. }
           | SdkTypeFieldKind::AnyChild { .. }
@@ -5810,14 +5749,9 @@ fn expand_named_struct(
       });
     }
     match field_kind {
-      kind @ (SdkTypeFieldKind::Child { .. } | SdkTypeFieldKind::Sequence { .. }) => {
+      SdkTypeFieldKind::Child { qname, .. } => {
         let repeated = contains_vec_type(field_ty);
         let optional = is_option_type(field_ty);
-        let qname = match kind {
-          SdkTypeFieldKind::Child { qname, .. } => qname,
-          SdkTypeFieldKind::Sequence { .. } => "",
-          _ => unreachable!(),
-        };
         let is_generic_child = qname.is_empty();
         let child_write_call = if is_generic_child {
           quote! { crate::sdk::SdkType::write_type_xml(child, writer, xmlns_prefix)?; }

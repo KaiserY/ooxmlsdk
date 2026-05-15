@@ -249,37 +249,36 @@ pub struct Anchor {
   pub wp14_anchor_id: Option<crate::simple_type::HexBinaryValue>,
   /// Simple Positioning Coordinates
   #[sdk(child(qname = "a:CT_Point2D/wp:simplePos"))]
-  pub simple_position: std::boxed::Box<SimplePosition>,
+  pub simple_position: Option<SimplePosition>,
   /// Horizontal Positioning
   #[sdk(child(qname = "wp:CT_PosH/wp:positionH"))]
-  pub horizontal_position: std::boxed::Box<HorizontalPosition>,
+  pub horizontal_position: Option<std::boxed::Box<HorizontalPosition>>,
   /// Vertical Positioning
   #[sdk(child(qname = "wp:CT_PosV/wp:positionV"))]
-  pub vertical_position: std::boxed::Box<VerticalPosition>,
+  pub vertical_position: Option<std::boxed::Box<VerticalPosition>>,
   /// Inline Drawing Object Extents
   #[sdk(child(qname = "a:CT_PositiveSize2D/wp:extent"))]
-  pub extent: std::boxed::Box<Extent>,
+  pub extent: Option<Extent>,
   /// Object Extents Including Effects.
   #[sdk(child(qname = "wp:CT_EffectExtent/wp:effectExtent"))]
   pub effect_extent: Option<EffectExtent>,
-  /// _
-  #[sdk(sequence(
+  #[sdk(choice(
     qname = "wp:CT_WrapNone/wp:wrapNone",
     qname = "wp:CT_WrapSquare/wp:wrapSquare",
     qname = "wp:CT_WrapTight/wp:wrapTight",
     qname = "wp:CT_WrapThrough/wp:wrapThrough",
     qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"
   ))]
-  pub sequence: std::boxed::Box<AnchorSequence>,
+  pub anchor_choice: Option<AnchorChoice>,
   /// Drawing Object Non-Visual Properties.
   #[sdk(child(qname = "a:CT_NonVisualDrawingProps/wp:docPr"))]
-  pub wp_doc_pr: std::boxed::Box<DocProperties>,
+  pub wp_doc_pr: Option<std::boxed::Box<DocProperties>>,
   /// Defines the NonVisualGraphicFrameDrawingProperties Class.
   #[sdk(child(qname = "a:CT_NonVisualGraphicFrameProperties/wp:cNvGraphicFramePr"))]
   pub wp_c_nv_graphic_frame_pr: Option<std::boxed::Box<NonVisualGraphicFrameDrawingProperties>>,
   /// Graphic Object.
   #[sdk(child(qname = "a:CT_GraphicalObject/a:graphic"))]
-  pub a_graphic: std::boxed::Box<crate::schemas::a::Graphic>,
+  pub a_graphic: Option<std::boxed::Box<crate::schemas::a::Graphic>>,
   /// Defines the RelativeWidth Class.
   #[sdk(child(office2010, qname = "wp14:CT_SizeRelH/wp14:sizeRelH"))]
   pub wp14_size_rel_h: Option<crate::schemas::wp14::RelativeWidth>,
@@ -460,30 +459,19 @@ pub type HorizontalAlignment = HorizontalAlignmentValues;
 pub enum AnchorChoice {
   /// No Text Wrapping.
   #[sdk(empty_child(qname = "wp:CT_WrapNone/wp:wrapNone"))]
-  WrapNone,
+  WpWrapNone,
   /// Square Wrapping.
   #[sdk(child(qname = "wp:CT_WrapSquare/wp:wrapSquare"))]
-  WrapSquare(std::boxed::Box<WrapSquare>),
+  WpWrapSquare(std::boxed::Box<WrapSquare>),
   /// Tight Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTight/wp:wrapTight"))]
-  WrapTight(std::boxed::Box<WrapTight>),
+  WpWrapTight(std::boxed::Box<WrapTight>),
   /// Through Wrapping.
   #[sdk(child(qname = "wp:CT_WrapThrough/wp:wrapThrough"))]
-  WrapThrough(std::boxed::Box<WrapThrough>),
+  WpWrapThrough(std::boxed::Box<WrapThrough>),
   /// Top and Bottom Wrapping.
   #[sdk(child(qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"))]
-  WrapTopAndBottom(std::boxed::Box<WrapTopBottom>),
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct AnchorSequence {
-  #[sdk(choice(
-    qname = "wp:CT_WrapNone/wp:wrapNone",
-    qname = "wp:CT_WrapSquare/wp:wrapSquare",
-    qname = "wp:CT_WrapTight/wp:wrapTight",
-    qname = "wp:CT_WrapThrough/wp:wrapThrough",
-    qname = "wp:CT_WrapTopBottom/wp:wrapTopAndBottom"
-  ))]
-  pub choice: AnchorChoice,
+  WpWrapTopAndBottom(std::boxed::Box<WrapTopBottom>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum HorizontalPositionChoice {

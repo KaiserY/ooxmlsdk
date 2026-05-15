@@ -43,8 +43,6 @@ Until the implementation reaches a higher maturity level:
 - This repository has long Cargo build/test times. After starting any Cargo command, let it run to completion and wait for the final result.
 - Never start a second Cargo command while another Cargo command is still running, even for a quick verification, retry, status check, or no-op probe.
 - While a Cargo command is running, do not launch other repository commands just to inspect progress. Do not poll with extra Cargo invocations. If output is quiet for a while, keep waiting.
-- After starting a Cargo command, wait for the background command to return before doing any other repository work. Do not interrupt yourself to inspect files, diffs, or partial results while that Cargo command is still running; only look at the result after the command exits.
-- For long-running background Cargo commands, use long wait intervals when polling for completion so the terminal does not emit frequent intermediate wait messages. Do not send extra commentary while waiting; continue only after the command exits.
 - If Cargo reports a target lock or another Cargo process is already running, do not probe processes or start competing commands; just wait for the active Cargo command to finish and then continue.
 - If Cargo reports a target lock, wait for Cargo rather than probing processes.
 - Never create ad hoc Cargo projects, temporary manifests, or throwaway crates

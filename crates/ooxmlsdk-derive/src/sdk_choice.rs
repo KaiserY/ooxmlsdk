@@ -447,7 +447,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
   let mut validate_arms = Vec::new();
   let mut mce_choice_arms = Vec::new();
   let mut mce_any_arms = Vec::new();
-  let mut default_expr = None::<proc_macro2::TokenStream>;
   let mut has_any_variant = false;
   let mut helper_items = Vec::new();
   let deserialize_borrowed_inner_ident = deserialize_choice_inner_ident(DeserializeMode::Borrowed);
@@ -623,13 +622,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             crate::sdk::SdkMce::process_mce_with_context(value, settings, context)
           },
         });
-        if default_expr.is_none() {
-          default_expr = Some(if is_box_type(&payload_ty) {
-            quote! { Self::#variant_ident(std::boxed::Box::new(Default::default())) }
-          } else {
-            quote! { Self::#variant_ident(Default::default()) }
-          });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Choice) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
@@ -691,13 +683,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             )
           },
         });
-        if default_expr.is_none() {
-          default_expr = Some(if is_box_type(&payload_ty) {
-            quote! { Self::#variant_ident(std::boxed::Box::new(Default::default())) }
-          } else {
-            quote! { Self::#variant_ident(Default::default()) }
-          });
-        }
       }
       (Fields::Unit, SdkChoiceVariantKind::EmptyChild { qnames }) => {
         let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
@@ -754,9 +739,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident => Ok(()),
         });
-        if default_expr.is_none() {
-          default_expr = Some(quote! { Self::#variant_ident });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Sequence) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
@@ -809,13 +791,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             crate::sdk::SdkMce::process_mce_with_context(value, settings, context)
           },
         });
-        if default_expr.is_none() {
-          default_expr = Some(if is_box_type(&payload_ty) {
-            quote! { Self::#variant_ident(std::boxed::Box::new(Default::default())) }
-          } else {
-            quote! { Self::#variant_ident(Default::default()) }
-          });
-        }
       }
       (Fields::Named(fields), SdkChoiceVariantKind::Sequence) => {
         let helper_ident = named_sequence_helper_ident(ident, variant_ident)?;
@@ -931,10 +906,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             Ok(())
           },
         });
-        if default_expr.is_none() {
-          default_expr =
-            Some(quote! { Self::#variant_ident { #( #field_idents: Default::default() ),* } });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::TextChild { qnames })
         if fields.unnamed.len() == 1 =>
@@ -1078,9 +1049,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident(_) => {},
         });
-        if default_expr.is_none() {
-          default_expr = Some(quote! { Self::#variant_ident(Default::default()) });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::AnyChild { qnames })
         if fields.unnamed.len() == 1 =>
@@ -1178,9 +1146,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           Self::#variant_ident(_) => {},
         });
-        if default_expr.is_none() {
-          default_expr = Some(quote! { Self::#variant_ident(Default::default()) });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Any) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
@@ -1249,13 +1214,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           &cfg_attrs,
           &constructor,
         ));
-        if default_expr.is_none() {
-          default_expr = Some(if is_box_type(&payload_ty) {
-            quote! { Self::#variant_ident(std::boxed::Box::new(Default::default())) }
-          } else {
-            quote! { Self::#variant_ident(Default::default()) }
-          });
-        }
       }
       (Fields::Unnamed(fields), SdkChoiceVariantKind::Text) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
@@ -1286,9 +1244,6 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           #(#cfg_attrs)*
           parsed = Some(Self::#variant_ident(value.to_owned().into()));
         });
-        if default_expr.is_none() {
-          default_expr = Some(quote! { Self::#variant_ident(Default::default()) });
-        }
       }
       _ => {
         return Err(syn::Error::new_spanned(
@@ -1418,21 +1373,8 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
     }
   };
 
-  let default_impl_tokens = if let Some(default_expr) = default_expr {
-    quote! {
-      impl #impl_generics std::default::Default for #ident #type_generics #where_clause {
-        fn default() -> Self {
-          #default_expr
-        }
-      }
-    }
-  } else {
-    proc_macro2::TokenStream::new()
-  };
-
   Ok(quote! {
     #( #helper_items )*
-    #default_impl_tokens
 
     impl #impl_generics crate::sdk::SdkChoice for #ident #type_generics #where_clause {
       fn #deserialize_borrowed_inner_ident<'de>(

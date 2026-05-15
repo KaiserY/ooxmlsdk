@@ -1126,9 +1126,9 @@ pub struct Slide {
   /// Common slide data for slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub sequence: Option<std::boxed::Box<SlideSequence>>,
+  /// Color Scheme Map Override
+  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
+  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// Slide Transition
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -1169,9 +1169,9 @@ pub struct SlideLayout {
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub sequence: Option<std::boxed::Box<SlideLayoutSequence>>,
+  /// Color Scheme Map Override
+  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
+  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// Slide Transition.
   #[sdk(child(qname = "p:CT_SlideTransition/p:transition"))]
   pub transition: Option<std::boxed::Box<Transition>>,
@@ -1199,9 +1199,9 @@ pub struct SlideMaster {
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub sequence: std::boxed::Box<SlideMasterSequence>,
+  /// Color Scheme Map
+  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
+  pub color_map: std::boxed::Box<ColorMap>,
   /// Defines the SlideLayoutIdList Class.
   #[sdk(child(qname = "p:CT_SlideLayoutIdList/p:sldLayoutIdLst"))]
   pub slide_layout_id_list: Option<SlideLayoutIdList>,
@@ -1231,9 +1231,9 @@ pub struct HandoutMaster {
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub sequence: std::boxed::Box<HandoutMasterSequence>,
+  /// Color Scheme Map
+  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
+  pub color_map: std::boxed::Box<ColorMap>,
   /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
@@ -1251,9 +1251,9 @@ pub struct NotesMaster {
   /// Common slide data for notes slides.
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub sequence: std::boxed::Box<NotesMasterSequence>,
+  /// Color Scheme Map
+  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
+  pub color_map: std::boxed::Box<ColorMap>,
   /// Defines the HeaderFooter Class.
   #[sdk(child(qname = "p:CT_HeaderFooter/p:hf"))]
   pub header_footer: Option<std::boxed::Box<HeaderFooter>>,
@@ -1280,9 +1280,9 @@ pub struct NotesSlide {
   /// Common slide data for notes slides
   #[sdk(child(qname = "p:CT_CommonSlideData/p:cSld"))]
   pub common_slide_data: std::boxed::Box<CommonSlideData>,
-  /// _
-  #[sdk(sequence(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub sequence: Option<std::boxed::Box<NotesSlideSequence>>,
+  /// Color Scheme Map Override
+  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
+  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
   /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub extension_list_with_modification: Option<ExtensionListWithModification>,
@@ -2722,7 +2722,8 @@ pub struct ApplicationNonVisualDrawingProperties {
     qname = "a:CT_VideoFile/a:videoFile",
     qname = "a:CT_QuickTimeFile/a:quickTimeFile"
   ))]
-  pub choice: Option<ApplicationNonVisualDrawingPropertiesChoice>,
+  pub application_non_visual_drawing_properties_choice:
+    Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
   pub p_cust_data_lst: Option<std::boxed::Box<CustomerDataList>>,
@@ -2761,7 +2762,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub choice1: Option<ShapePropertiesChoice>,
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -2770,7 +2771,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice2: Option<ShapePropertiesChoice2>,
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -2778,7 +2779,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice3: Option<ShapePropertiesChoice3>,
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -2904,7 +2905,7 @@ pub struct BlipFill {
     qname = "a:CT_TileInfoProperties/a:tile",
     qname = "a:CT_StretchInfoProperties/a:stretch"
   ))]
-  pub choice: Option<BlipFillChoice>,
+  pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3720,10 +3721,10 @@ pub struct ShapeTree {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
+  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -3733,7 +3734,7 @@ pub struct ShapeTree {
     qname = "p:CT_ContentPart/p:contentPart",
     any
   ))]
-  pub choice: Vec<ShapeTreeChoice>,
+  pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
@@ -3746,10 +3747,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
+  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -3758,7 +3759,7 @@ pub struct GroupShape {
     qname = "p:CT_Picture/p:pic",
     qname = "p:CT_ContentPart/p:contentPart"
   ))]
-  pub choice: Vec<GroupShapeChoice>,
+  pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the ExtensionListWithModification Class.
   #[sdk(child(qname = "p:CT_ExtensionListModify/p:extLst"))]
   pub p_ext_lst: Option<ExtensionListWithModification>,
@@ -3825,12 +3826,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice1: Option<GroupShapePropertiesChoice>,
+  pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice2: Option<GroupShapePropertiesChoice2>,
+  pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -4882,42 +4883,6 @@ pub enum OleObjectChoice {
   #[sdk(child(qname = "p:CT_OleObjectLink/p:link"))]
   PLink(std::boxed::Box<OleObjectLink>),
 }
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct SlideSequence {
-  /// Color Scheme Map Override
-  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct SlideLayoutSequence {
-  /// Color Scheme Map Override
-  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct SlideMasterSequence {
-  /// Color Scheme Map
-  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub color_map: std::boxed::Box<ColorMap>,
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct HandoutMasterSequence {
-  /// Color Scheme Map
-  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub color_map: std::boxed::Box<ColorMap>,
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct NotesMasterSequence {
-  /// Color Scheme Map
-  #[sdk(child(qname = "a:CT_ColorMapping/p:clrMap"))]
-  pub color_map: std::boxed::Box<ColorMap>,
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct NotesSlideSequence {
-  /// Color Scheme Map Override
-  #[sdk(child(qname = "a:CT_ColorMappingOverride/p:clrMapOvr"))]
-  pub color_map_override: Option<std::boxed::Box<ColorMapOverride>>,
-}
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TargetElementChoice {
   /// Slide Target.
@@ -5124,69 +5089,62 @@ pub enum ToColorChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
-  /// Audio from CD.
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
-  AudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
-  /// Audio from WAV File.
+  AAudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
-  WavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
-  /// Audio from File.
+  AWavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
   #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
-  AudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
-  /// Video from File.
+  AAudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
-  VideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
-  /// QuickTime from File.
+  AVideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
-  QuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
+  AQuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
-  /// Tile.
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
-  Tile(std::boxed::Box<crate::schemas::a::Tile>),
-  /// Stretch.
+  ATile(std::boxed::Box<crate::schemas::a::Tile>),
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
-  Stretch(std::boxed::Box<crate::schemas::a::Stretch>),
+  AStretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SlideExtensionChoice {
@@ -5345,22 +5303,22 @@ pub enum BackgroundChoice {
 pub enum ShapeTreeChoice {
   /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  PSp(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  PGrpSp(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
+  PGraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
-  CxnSp(std::boxed::Box<ConnectionShape>),
+  PCxnSp(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
-  Pic(std::boxed::Box<Picture>),
+  PPic(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
-  ContentPart(std::boxed::Box<ContentPart>),
+  PContentPart(std::boxed::Box<ContentPart>),
   /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
@@ -5369,52 +5327,52 @@ pub enum ShapeTreeChoice {
 pub enum GroupShapeChoice {
   /// Shape.
   #[sdk(child(qname = "p:CT_Shape/p:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  PSp(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "p:CT_GroupShape/p:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  PGrpSp(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "p:CT_GraphicalObjectFrame/p:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
+  PGraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "p:CT_Connector/p:cxnSp"))]
-  CxnSp(std::boxed::Box<ConnectionShape>),
+  PCxnSp(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "p:CT_Picture/p:pic"))]
-  Pic(std::boxed::Box<Picture>),
+  PPic(std::boxed::Box<Picture>),
   /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "p:CT_ContentPart/p:contentPart"))]
-  ContentPart(std::boxed::Box<ContentPart>),
+  PContentPart(std::boxed::Box<ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTargetChoice {

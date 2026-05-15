@@ -133,7 +133,6 @@ struct SdkAttrField {
 struct SdkChildField {
   ident: Ident,
   qname: String,
-  qnames: Vec<String>,
   ty: Type,
   optional: bool,
   repeated: bool,
@@ -195,8 +194,7 @@ struct SdkTextField {
 #[derive(Clone)]
 enum SdkTypeFieldKind {
   Attr { name: String, list: bool },
-  Child { qname: String, qnames: Vec<String> },
-  Sequence { qnames: Vec<String> },
+  Child { qname: String },
   EmptyChild { qname: String },
   TextChild { qname: String, list: bool },
   AnyChild { qname: String },
@@ -1028,11 +1026,11 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
         }
         Meta::List(meta) if meta.path.is_ident("child") => {
-          let mut qnames = Vec::new();
+          let mut qname = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
-              qnames.push(value.value());
+              qname = Some(value.value());
               Ok(())
             } else if is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -1040,33 +1038,14 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
               Err(nested.error("unsupported sdk child attribute"))
             }
           })?;
-          let qname = if qnames.len() == 1 {
-            qnames[0].clone()
-          } else {
-            String::new()
-          };
-          kind = Some(SdkTypeFieldKind::Child { qname, qnames });
+          kind = Some(SdkTypeFieldKind::Child {
+            qname: qname.unwrap_or_default(),
+          });
         }
         Meta::Path(path) if path.is_ident("child") => {
           kind = Some(SdkTypeFieldKind::Child {
             qname: String::new(),
-            qnames: Vec::new(),
           });
-        }
-        Meta::List(meta) if meta.path.is_ident("sequence") => {
-          let mut qnames = Vec::new();
-          meta.parse_nested_meta(|nested| {
-            if nested.path.is_ident("qname") {
-              let value: LitStr = nested.value()?.parse()?;
-              qnames.push(value.value());
-              Ok(())
-            } else if is_sdk_version_marker_path(&nested.path) {
-              Ok(())
-            } else {
-              Err(nested.error("unsupported sdk sequence attribute"))
-            }
-          })?;
-          kind = Some(SdkTypeFieldKind::Sequence { qnames });
         }
         Meta::List(meta) if meta.path.is_ident("empty_child") => {
           let mut qname = None;

@@ -474,7 +474,8 @@ pub struct ApplicationNonVisualDrawingProperties {
     qname = "a:CT_VideoFile/a:videoFile",
     qname = "a:CT_QuickTimeFile/a:quickTimeFile"
   ))]
-  pub choice: Option<ApplicationNonVisualDrawingPropertiesChoice>,
+  pub application_non_visual_drawing_properties_choice:
+    Option<ApplicationNonVisualDrawingPropertiesChoice>,
   /// Customer Data List.
   #[sdk(child(qname = "p:CT_CustomerDataList/p:custDataLst"))]
   pub p_cust_data_lst: Option<std::boxed::Box<crate::schemas::p::CustomerDataList>>,
@@ -747,19 +748,14 @@ pub enum ShowEventRecordListChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ApplicationNonVisualDrawingPropertiesChoice {
-  /// Audio from CD.
   #[sdk(child(qname = "a:CT_AudioCD/a:audioCd"))]
-  AudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
-  /// Audio from WAV File.
+  AAudioCd(std::boxed::Box<crate::schemas::a::AudioFromCd>),
   #[sdk(child(qname = "a:CT_EmbeddedWAVAudioFile/a:wavAudioFile"))]
-  WavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
-  /// Audio from File.
+  AWavAudioFile(std::boxed::Box<crate::schemas::a::WaveAudioFile>),
   #[sdk(child(qname = "a:CT_AudioFile/a:audioFile"))]
-  AudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
-  /// Video from File.
+  AAudioFile(std::boxed::Box<crate::schemas::a::AudioFromFile>),
   #[sdk(child(qname = "a:CT_VideoFile/a:videoFile"))]
-  VideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
-  /// QuickTime from File.
+  AVideoFile(std::boxed::Box<crate::schemas::a::VideoFromFile>),
   #[sdk(child(qname = "a:CT_QuickTimeFile/a:quickTimeFile"))]
-  QuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
+  AQuickTimeFile(std::boxed::Box<crate::schemas::a::QuickTimeFromFile>),
 }

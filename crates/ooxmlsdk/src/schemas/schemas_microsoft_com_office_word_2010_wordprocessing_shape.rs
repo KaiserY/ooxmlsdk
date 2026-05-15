@@ -18,10 +18,10 @@ pub struct WordprocessingShape {
     qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr",
     qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"
   ))]
-  pub choice1: WordprocessingShapeChoice,
+  pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeProperties/wps:spPr"))]
-  pub wps_sp_pr: std::boxed::Box<ShapeProperties>,
+  pub wps_sp_pr: Option<std::boxed::Box<ShapeProperties>>,
   /// Defines the ShapeStyle Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeStyle/wps:style"))]
   pub wps_style: Option<std::boxed::Box<ShapeStyle>>,
@@ -32,10 +32,10 @@ pub struct WordprocessingShape {
     qname = "wps:CT_TextboxInfo/wps:txbx",
     qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"
   ))]
-  pub choice2: Option<WordprocessingShapeChoice2>,
+  pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
   #[sdk(child(office2010, qname = "a:CT_TextBodyProperties/wps:bodyPr"))]
-  pub wps_body_pr: std::boxed::Box<TextBodyProperties>,
+  pub wps_body_pr: Option<std::boxed::Box<TextBodyProperties>>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -125,7 +125,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub choice1: Option<ShapePropertiesChoice>,
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -134,7 +134,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice2: Option<ShapePropertiesChoice2>,
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -142,7 +142,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice3: Option<ShapePropertiesChoice3>,
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -275,12 +275,12 @@ pub struct TextBodyProperties {
     qname = "a:CT_TextNormalAutofit/a:normAutofit",
     qname = "a:CT_TextShapeAutofit/a:spAutoFit"
   ))]
-  pub choice1: Option<TextBodyPropertiesChoice>,
+  pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
-  pub choice2: Option<TextBodyPropertiesChoice2>,
+  pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
@@ -289,77 +289,77 @@ pub struct TextBodyProperties {
 pub enum WordprocessingShapeChoice {
   /// Defines the NonVisualDrawingShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualDrawingShapeProps/wps:cNvSpPr"))]
-  CNvSpPr(std::boxed::Box<NonVisualDrawingShapeProperties>),
+  WpsCNvSpPr(std::boxed::Box<NonVisualDrawingShapeProperties>),
   /// Defines the NonVisualConnectorProperties Class.
   #[sdk(child(office2010, qname = "a:CT_NonVisualConnectorProperties/wps:cNvCnPr"))]
-  CNvCnPr(std::boxed::Box<NonVisualConnectorProperties>),
+  WpsCNvCnPr(std::boxed::Box<NonVisualConnectorProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingShapeChoice2 {
   /// Defines the TextBoxInfo2 Class.
   #[sdk(child(office2010, qname = "wps:CT_TextboxInfo/wps:txbx"))]
-  Txbx(std::boxed::Box<TextBoxInfo2>),
+  WpsTxbx(std::boxed::Box<TextBoxInfo2>),
   /// Defines the LinkedTextBox Class.
   #[sdk(child(office2010, qname = "wps:CT_LinkedTextboxInformation/wps:linkedTxbx"))]
-  LinkedTxbx(std::boxed::Box<LinkedTextBox>),
+  WpsLinkedTxbx(std::boxed::Box<LinkedTextBox>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
   #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
-  NoAutofit,
+  ANoAutofit,
   /// Normal AutoFit.
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
-  NormAutofit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
+  ANormAutofit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
   #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
-  SpAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
+  ASpAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  Sp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
+  ASp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
-  FlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
+  AFlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
 }

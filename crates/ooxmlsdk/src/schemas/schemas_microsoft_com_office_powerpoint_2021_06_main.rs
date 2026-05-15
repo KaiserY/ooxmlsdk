@@ -141,7 +141,7 @@ pub struct TaskHistoryEvent {
   pub id: crate::simple_type::StringValue,
   /// Defines the AtrbtnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAssignUnassignUser/p216:atrbtn"))]
-  pub atrbtn_task_assign_unassign_user: std::boxed::Box<AtrbtnTaskAssignUnassignUser>,
+  pub atrbtn_task_assign_unassign_user: Option<AtrbtnTaskAssignUnassignUser>,
   /// Defines the TaskAnchor Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAnchor/p216:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,
@@ -157,7 +157,7 @@ pub struct TaskHistoryEvent {
     qname = "p216:CT_TaskUndo/p216:undo",
     qname = "p216:CT_TaskUnknownRecord/p216:unknown"
   ))]
-  pub choice: Option<TaskHistoryEventChoice>,
+  pub task_history_event_choice: Option<TaskHistoryEventChoice>,
   /// Defines the ExtensionList Class.
   #[sdk(child(microsoft365, qname = "p:CT_ExtensionList/p216:extLst"))]
   pub p216_ext_lst: Option<ExtensionList>,
@@ -174,32 +174,32 @@ pub struct TaskHistory {
 pub enum TaskHistoryEventChoice {
   /// Defines the AsgnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAssignUnassignUser/p216:asgn"))]
-  Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
+  P216Asgn(std::boxed::Box<AsgnTaskAssignUnassignUser>),
   /// Defines the UnAsgnTaskAssignUnassignUser Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskAssignUnassignUser/p216:unAsgn"))]
-  UnAsgn(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
+  P216UnAsgn(std::boxed::Box<UnAsgnTaskAssignUnassignUser>),
   /// Defines the AddEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p216:add"))]
-  Add,
+  P216Add,
   /// Defines the TaskTitleEventInfo Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskTitleEventInfo/p216:title"))]
-  Title(std::boxed::Box<TaskTitleEventInfo>),
+  P216Title(std::boxed::Box<TaskTitleEventInfo>),
   /// Defines the TaskScheduleEventInfo Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskScheduleEventInfo/p216:date"))]
-  Date(std::boxed::Box<TaskScheduleEventInfo>),
+  P216Date(std::boxed::Box<TaskScheduleEventInfo>),
   /// Defines the TaskProgressEventInfo Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskProgressEventInfo/p216:pcntCmplt"))]
-  PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
+  P216PcntCmplt(std::boxed::Box<TaskProgressEventInfo>),
   /// Defines the TaskPriorityRecord Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskPriorityRecord/p216:pri"))]
-  Pri(std::boxed::Box<TaskPriorityRecord>),
+  P216Pri(std::boxed::Box<TaskPriorityRecord>),
   /// Defines the UnasgnAllEmpty Class.
   #[sdk(empty_child(microsoft365, qname = "p:CT_Empty/p216:unasgnAll"))]
-  UnasgnAll,
+  P216UnasgnAll,
   /// Defines the TaskUndo Class.
   #[sdk(child(microsoft365, qname = "p216:CT_TaskUndo/p216:undo"))]
-  Undo(std::boxed::Box<TaskUndo>),
+  P216Undo(std::boxed::Box<TaskUndo>),
   /// Defines the TaskUnknownRecord Class.
   #[sdk(empty_child(microsoft365, qname = "p216:CT_TaskUnknownRecord/p216:unknown"))]
-  Unknown,
+  P216Unknown,
 }

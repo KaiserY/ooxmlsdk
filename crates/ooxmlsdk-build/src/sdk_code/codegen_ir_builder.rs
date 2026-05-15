@@ -10,7 +10,6 @@ use crate::sdk_code::helpers::{
   flatten_one_sequence_particles, is_any_only_composite_type, is_one_sequence_flatten,
   is_one_sequence_structurable, structure_one_sequence_particles,
 };
-use crate::sdk_code::particle_builder::{build_particle_type_output, is_particle_rollout_type};
 use crate::sdk_code::schemas::{
   CodegenContext, ResolvedCompositeChild, ResolvedOneSequenceChild,
   ResolvedOneSequenceChoiceVariant, ResolvedOneSequenceSequenceVariant,
@@ -27,7 +26,7 @@ use crate::simple_type::simple_type_mapping;
 use crate::utils::escape_snake_case;
 use heck::{ToSnakeCase, ToUpperCamelCase};
 
-pub(crate) fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
+fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
   let mut counts = std::collections::HashMap::<String, usize>::new();
   for member in members.iter() {
     let MemberDecl::Variant(variant) = member else {
@@ -73,7 +72,6 @@ pub(crate) fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
 fn variant_qname_prefix(variant: &VariantDecl) -> Option<&str> {
   let qname = match &variant.wire {
     VariantWireDecl::Child { qnames }
-    | VariantWireDecl::Choice { qnames }
     | VariantWireDecl::Sequence { qnames }
     | VariantWireDecl::TextChild { qnames } => qnames.first()?,
     VariantWireDecl::Any | VariantWireDecl::Text => return None,
@@ -82,7 +80,7 @@ fn variant_qname_prefix(variant: &VariantDecl) -> Option<&str> {
   element_qname.split(':').next()
 }
 
-pub(crate) fn child_variant_rust_name(qname: &str) -> String {
+fn child_variant_rust_name(qname: &str) -> String {
   let element_qname = qname.split('/').nth(1).unwrap_or(qname);
   let mut parts = element_qname.split(':');
   match (parts.next(), parts.next()) {
@@ -374,7 +372,7 @@ fn inlineable_choice_payload_variants<'a>(
       && choice_members_by_name.contains_key(&variant.payload.rust_type);
 
     match &variant.wire {
-      VariantWireDecl::Child { .. } | VariantWireDecl::Choice { .. } => {
+      VariantWireDecl::Child { .. } => {
         if is_nested_choice_payload {
           choice_count += 1;
         } else {
@@ -409,7 +407,7 @@ fn member_child_qnames(member: &MemberDecl) -> Option<&Vec<String>> {
 
 fn variant_child_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
   match &variant.wire {
-    VariantWireDecl::Child { qnames } | VariantWireDecl::Choice { qnames } => Some(qnames),
+    VariantWireDecl::Child { qnames } => Some(qnames),
     VariantWireDecl::Sequence { .. }
     | VariantWireDecl::TextChild { .. }
     | VariantWireDecl::Any
@@ -443,10 +441,6 @@ fn populate_content_structures(
     .collect();
 
   for type_decl in types.iter_mut() {
-    if !type_decl.particle_members.is_empty() {
-      type_decl.content_structure = None;
-      continue;
-    }
     type_decl.content_structure = if type_decl.kind != TypeKind::ElementStruct {
       None
     } else {
@@ -729,7 +723,7 @@ fn dedupe_helper_struct_types(types: &mut Vec<TypeDecl>) -> Result<()> {
   let mut deduped = Vec::with_capacity(types.len());
 
   for type_decl in types.drain(..) {
-    if type_decl.kind != TypeKind::HelperStruct || !type_decl.particle_members.is_empty() {
+    if type_decl.kind != TypeKind::HelperStruct {
       deduped.push(type_decl);
       continue;
     }
@@ -768,17 +762,6 @@ fn dedupe_helper_struct_types(types: &mut Vec<TypeDecl>) -> Result<()> {
         }
       }
     }
-
-    for member in &mut type_decl.particle_members {
-      match member {
-        MemberDecl::Field(field) => {
-          replace_type_ref_decl(&mut field.type_ref, &replacement_by_name)
-        }
-        MemberDecl::Variant(variant) => {
-          replace_type_ref_decl(&mut variant.payload, &replacement_by_name)
-        }
-      }
-    }
   }
 
   *types = deduped;
@@ -797,19 +780,6 @@ fn replace_type_ref_decl(
 }
 
 fn build_type_decl(
-  schema_type: &SchemaType,
-  schema: &Schema,
-  context: &CodegenContext<'_>,
-) -> Result<(TypeDecl, Vec<TypeDecl>)> {
-  if is_particle_rollout_type(schema_type) {
-    let output = build_particle_type_output(schema_type, schema, context)?;
-    Ok((output.primary_type, output.extra_types))
-  } else {
-    build_legacy_type_decl(schema_type, schema, context)
-  }
-}
-
-fn build_legacy_type_decl(
   schema_type: &SchemaType,
   schema: &Schema,
   context: &CodegenContext<'_>,
@@ -912,7 +882,6 @@ fn build_legacy_type_decl(
       },
       content_structure: None,
       members,
-      particle_members: Vec::new(),
     },
     extra_types,
   ))
@@ -930,6 +899,12 @@ fn apply_parent_choice_has_any_rewrites(
       continue;
     }
 
+    if !child_schema_types.iter().any(|child_schema_type| {
+      parent_choice_target_contains_child(parent_schema_type, child_schema_type.name.as_str())
+    }) {
+      continue;
+    }
+
     let Some(parent_index) = types
       .iter()
       .position(|type_decl| type_decl.rust_name == parent_schema_type.class_name)
@@ -937,21 +912,9 @@ fn apply_parent_choice_has_any_rewrites(
       continue;
     };
 
-    let use_particle_members = !types[parent_index].particle_members.is_empty();
-    if use_particle_members {
-      continue;
-    }
-
-    if !child_schema_types.iter().any(|child_schema_type| {
-      parent_choice_target_contains_child(parent_schema_type, child_schema_type.name.as_str())
-    }) {
-      continue;
-    }
-
-    let mut target_members = std::mem::take(&mut types[parent_index].members);
-    let rewrote_parent =
-      route_parent_choice_has_any(parent_schema_type, &mut target_members, types);
-    types[parent_index].members = target_members;
+    let mut members = std::mem::take(&mut types[parent_index].members);
+    let rewrote_parent = route_parent_choice_has_any(parent_schema_type, &mut members, types);
+    types[parent_index].members = members;
     if rewrote_parent {
       types[parent_index].content_model = refresh_type_content_model_after_parent_choice_rewrite(
         parent_schema_type,
@@ -999,16 +962,16 @@ fn schema_child_contains_name(child: &SchemaTypeChild, child_name: &str) -> bool
       .any(|nested_child| schema_child_contains_name(nested_child, child_name))
 }
 
-pub(crate) fn route_parent_choice_has_any(
+fn route_parent_choice_has_any(
   schema_type: &SchemaType,
   members: &mut Vec<MemberDecl>,
   all_types: &mut Vec<TypeDecl>,
 ) -> bool {
-  add_xml_other_variant_to_direct_choice_field(members, all_types.as_mut_slice())
+  add_xml_other_variant_to_single_choice(members, all_types.as_mut_slice())
     || promote_single_repeated_child_to_xml_other_choice(schema_type, members, all_types)
 }
 
-fn add_xml_other_variant_to_direct_choice_field(
+fn add_xml_other_variant_to_single_choice(
   members: &[MemberDecl],
   extra_types: &mut [TypeDecl],
 ) -> bool {
@@ -1058,7 +1021,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
     return false;
   }
 
-  let FieldWireDecl::Child { qname, .. } = &field.wire else {
+  let FieldWireDecl::Child { qname } = &field.wire else {
     return false;
   };
   let qname = qname.clone();
@@ -1115,7 +1078,6 @@ fn promote_single_repeated_child_to_xml_other_choice(
     support: SystemSupportDecl::default(),
     content_structure: None,
     members: choice_members,
-    particle_members: Vec::new(),
   });
 
   true
@@ -1392,7 +1354,6 @@ fn build_recursive_choice_enum_decl(
     support: SystemSupportDecl::default(),
     content_structure: None,
     members,
-    particle_members: Vec::new(),
   })
 }
 
@@ -1928,7 +1889,7 @@ fn has_choice_only_member_shape(members: &[MemberDecl]) -> bool {
   non_attr_fields.len() == 1 && matches!(non_attr_fields[0].wire, FieldWireDecl::Choice)
 }
 
-pub(crate) fn build_attr_member_decl(
+fn build_attr_member_decl(
   attr: &SchemaTypeAttribute,
   schema: &Schema,
   context: &CodegenContext<'_>,
@@ -2144,7 +2105,7 @@ fn build_simple_type_ref_from_name(name: &str) -> Option<TypeRefDecl> {
   }
 }
 
-pub(crate) fn build_child_type_ref_from_name(
+fn build_child_type_ref_from_name(
   child_name: &str,
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
   schema: &Schema,
@@ -2159,7 +2120,7 @@ pub(crate) fn build_child_type_ref_from_name(
   }
 }
 
-pub(crate) fn effective_child_kind_from_name(
+fn effective_child_kind_from_name(
   child_name: &str,
   child_kind: crate::sdk_data::sdk_data_model::SchemaTypeChildKind,
   context: &CodegenContext<'_>,
@@ -2246,7 +2207,6 @@ fn build_direct_child_member_decls(
       wire: match effective_kind {
         crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child => FieldWireDecl::Child {
           qname: child.name.clone(),
-          qnames: Vec::new(),
         },
         crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => {
           FieldWireDecl::TextChild {
@@ -2398,7 +2358,6 @@ fn build_single_nested_child_member_decl(
     wire: match effective_kind {
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child => FieldWireDecl::Child {
         qname: child.name.clone(),
-        qnames: Vec::new(),
       },
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => FieldWireDecl::TextChild {
         qname: child.name.clone(),
@@ -2535,7 +2494,6 @@ fn build_simple_one_choice_members(
           crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => FieldWireDecl::Any,
           _ => FieldWireDecl::Child {
             qname: variant.name.to_string(),
-            qnames: Vec::new(),
           },
         },
         cardinality: effective_choice_cardinality,
@@ -2584,7 +2542,6 @@ fn build_simple_one_choice_members(
     support: SystemSupportDecl::default(),
     content_structure: None,
     members: enum_members,
-    particle_members: Vec::new(),
   }])
 }
 
@@ -2681,7 +2638,6 @@ fn build_flatten_one_sequence_members(
             crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => FieldWireDecl::Any,
             _ => FieldWireDecl::Child {
               qname: child.name.to_string(),
-              qnames: Vec::new(),
             },
           },
           cardinality: if flat_particle.repeated {
@@ -2783,7 +2739,6 @@ fn build_flatten_one_sequence_members(
           support: SystemSupportDecl::default(),
           content_structure: None,
           members: enum_members,
-          particle_members: Vec::new(),
         });
       }
     }
@@ -2982,7 +2937,6 @@ fn build_structured_one_sequence_members(
           support: SystemSupportDecl::default(),
           content_structure: None,
           members: enum_members,
-          particle_members: Vec::new(),
         });
       }
     }
@@ -3102,7 +3056,6 @@ fn build_one_sequence_leaf_field_decl(
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any => FieldWireDecl::Any,
       _ => FieldWireDecl::Child {
         qname: child.name.to_string(),
-        qnames: Vec::new(),
       },
     },
     cardinality: if repeated {
@@ -3167,7 +3120,6 @@ fn build_structured_one_sequence_helper_struct_decl(
         .map(MemberDecl::Field)
       })
       .collect::<Result<Vec<_>>>()?,
-    particle_members: Vec::new(),
   })
 }
 
@@ -3325,7 +3277,6 @@ fn build_mixed_choice_children_members(
     support: SystemSupportDecl::default(),
     content_structure: None,
     members: enum_members,
-    particle_members: Vec::new(),
   });
 
   for child in &schema_type.children[choice_index + 1..] {
@@ -3382,7 +3333,6 @@ fn build_direct_child_member_decl_from_schema_child(
     wire: match effective_kind {
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Child => FieldWireDecl::Child {
         qname: child.name.clone(),
-        qnames: Vec::new(),
       },
       crate::sdk_data::sdk_data_model::SchemaTypeChildKind::TextChild => FieldWireDecl::TextChild {
         qname: child.name.clone(),
@@ -3783,7 +3733,6 @@ fn build_generic_children_members(
     support: SystemSupportDecl::default(),
     content_structure: None,
     members: enum_members,
-    particle_members: Vec::new(),
   });
 
   Ok(extra_types)
@@ -4660,7 +4609,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_Leaf/t:leaf".to_string(),
-        qnames: Vec::new(),
       }
     );
     assert_eq!(field.type_ref.rust_type, "Leaf");
@@ -5161,98 +5109,6 @@ mod tests {
       .types
       .iter()
       .find(|ty| ty.rust_name == field.type_ref.rust_type)
-      .unwrap();
-    assert!(choice.members.iter().any(|member| {
-      matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
-    }));
-  }
-
-  #[test]
-  fn parent_choice_has_any_in_adds_xml_any_to_direct_choice_with_leading_child() {
-    let schema = Schema {
-      module_name: "test_module".to_string(),
-      target_namespace: "urn:test".to_string(),
-      prefix: "t".to_string(),
-      typed_namespace: "Test.Namespace".to_string(),
-      types: vec![
-        SchemaType {
-          name: "t:CT_Leaf/t:leaf".to_string(),
-          class_name: "Leaf".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          parent_choice_has_any_in: vec!["Parent".to_string()],
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
-          class_name: "OtherLeaf".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_Props/t:props".to_string(),
-          class_name: "Props".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
-          ..Default::default()
-        },
-        SchemaType {
-          name: "t:CT_Parent/t:parent".to_string(),
-          class_name: "Parent".to_string(),
-          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
-          children: vec![
-            SchemaTypeChild {
-              particle_id: String::new(),
-              name: "t:CT_Props/t:props".to_string(),
-              kind: SchemaTypeChildKind::Child,
-              optional: true,
-              ..Default::default()
-            },
-            SchemaTypeChild {
-              particle_id: String::new(),
-              kind: SchemaTypeChildKind::Choice,
-              repeated: true,
-              children: vec![
-                SchemaTypeChild {
-                  particle_id: String::new(),
-                  name: "t:CT_Leaf/t:leaf".to_string(),
-                  kind: SchemaTypeChildKind::Child,
-                  ..Default::default()
-                },
-                SchemaTypeChild {
-                  particle_id: String::new(),
-                  name: "t:CT_OtherLeaf/t:otherLeaf".to_string(),
-                  kind: SchemaTypeChildKind::Child,
-                  ..Default::default()
-                },
-              ],
-              ..Default::default()
-            },
-          ],
-          ..Default::default()
-        },
-      ],
-      ..Default::default()
-    };
-    let context = CodegenContext::new(std::slice::from_ref(&schema));
-
-    let ir = build_codegen_ir(&schema, &context).unwrap();
-
-    let parent = ir.types.iter().find(|ty| ty.rust_name == "Parent").unwrap();
-    let choice_field = parent
-      .members
-      .iter()
-      .filter_map(|member| match member {
-        MemberDecl::Field(field) if matches!(field.wire, FieldWireDecl::Choice) => Some(field),
-        _ => None,
-      })
-      .collect::<Vec<_>>();
-    let [choice_field] = choice_field.as_slice() else {
-      panic!("expected exactly one direct choice field");
-    };
-
-    let choice = ir
-      .types
-      .iter()
-      .find(|ty| ty.rust_name == choice_field.type_ref.rust_type)
       .unwrap();
     assert!(choice.members.iter().any(|member| {
       matches!(member, MemberDecl::Variant(variant) if variant.rust_name == "XmlAny")
@@ -6287,7 +6143,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_RPr/t:rPr".to_string(),
-        qnames: Vec::new(),
       }
     );
     assert_eq!(
@@ -6360,7 +6215,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_Value/t:value".to_string(),
-        qnames: Vec::new(),
       }
     );
     assert_eq!(field.cardinality, Cardinality::Many);
@@ -6439,7 +6293,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_RPr/t:rPr".to_string(),
-        qnames: Vec::new(),
       }
     );
     assert_eq!(
@@ -6522,7 +6375,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_Color/t:color".to_string(),
-        qnames: Vec::new(),
       }
     );
     assert_eq!(
@@ -6694,7 +6546,6 @@ mod tests {
       field.wire,
       FieldWireDecl::Child {
         qname: "t:CT_Value/t:value".to_string(),
-        qnames: Vec::new(),
       }
     );
   }
@@ -8101,10 +7952,6 @@ mod tests {
 
     for schema in &schemas {
       for schema_type in &schema.types {
-        if is_particle_rollout_type(schema_type) {
-          continue;
-        }
-
         let Some(type_decl) = ir_by_type_name.get(schema_type.name.as_str()) else {
           failures.push(format!(
             "{} ({}) missing primary IR type",

@@ -28,8 +28,3 @@ sdk_data/package_schemas
 .codex
 tmp/
 
-crates/ooxmlsdk/src/schemas_bak
-
-__pycache__
-particle_alignment_report.md
-particle_alignment_report.json

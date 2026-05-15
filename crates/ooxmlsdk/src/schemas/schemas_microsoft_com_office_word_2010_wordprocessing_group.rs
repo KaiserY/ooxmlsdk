@@ -17,10 +17,10 @@ pub struct WordprocessingGroup {
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
+    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
@@ -28,7 +28,7 @@ pub struct WordprocessingGroup {
     qname = "pic:CT_Picture/pic:pic",
     qname = "w14:CT_WordContentPart/w14:contentPart"
   ))]
-  pub choice: Vec<WordprocessingGroupChoice>,
+  pub wordprocessing_group_choice: Vec<WordprocessingGroupChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
@@ -46,10 +46,10 @@ pub struct GroupShape {
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
+    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
@@ -57,7 +57,7 @@ pub struct GroupShape {
     qname = "pic:CT_Picture/pic:pic",
     qname = "w14:CT_WordContentPart/w14:contentPart"
   ))]
-  pub choice: Vec<GroupShapeChoice>,
+  pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpg:extLst"))]
   pub wpg_ext_lst: Option<OfficeArtExtensionList>,
@@ -168,12 +168,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice1: Option<GroupShapePropertiesChoice>,
+  pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice2: Option<GroupShapePropertiesChoice2>,
+  pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -203,67 +203,61 @@ pub struct GraphicFrame {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingGroupChoice {
-  /// Defines the WordprocessingShape Class.
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
-  Wsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  WpgGrpSp(std::boxed::Box<GroupShape>),
   /// Defines the GraphicFrame Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
-  /// Picture.
+  WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
-  Pic(std::boxed::Box<crate::schemas::pic::Picture>),
-  /// Defines the ContentPart Class.
+  PicPic(std::boxed::Box<crate::schemas::pic::Picture>),
   #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
-  ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
+  W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
-  /// Defines the WordprocessingShape Class.
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
-  Wsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
   /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  WpgGrpSp(std::boxed::Box<GroupShape>),
   /// Defines the GraphicFrame Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpg:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
-  /// Picture.
+  WpgGraphicFrame(std::boxed::Box<GraphicFrame>),
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
-  Pic(std::boxed::Box<crate::schemas::pic::Picture>),
-  /// Defines the ContentPart Class.
+  PicPic(std::boxed::Box<crate::schemas::pic::Picture>),
   #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
-  ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
+  W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }

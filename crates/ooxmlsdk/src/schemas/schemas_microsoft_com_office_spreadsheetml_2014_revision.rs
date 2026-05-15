@@ -204,7 +204,7 @@ pub struct RevExStream {
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
+  pub font: Option<crate::schemas::x::Font>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
@@ -668,12 +668,12 @@ pub struct RevExChgObj {
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
-  pub state_based_header: std::boxed::Box<StateBasedHeader>,
+  pub state_based_header: Option<std::boxed::Box<StateBasedHeader>>,
   #[sdk(choice(
     qname = "xr:CT_RevisionStateLink/xr:link",
     qname = "xr:CT_RevisionState/xr:body"
   ))]
-  pub choice: RevExChgObjChoice,
+  pub rev_ex_chg_obj_choice: Option<RevExChgObjChoice>,
 }
 /// Defines the RevExSheetOp Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1324,7 +1324,7 @@ pub struct SparklineGroup {
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
   pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]
@@ -1698,10 +1698,10 @@ pub enum StateBasedObjectChoice {
 pub enum RevExChgObjChoice {
   /// Defines the RevisionStateLink Class.
   #[sdk(child(office2016, qname = "xr:CT_RevisionStateLink/xr:link"))]
-  Link(std::boxed::Box<RevisionStateLink>),
+  XrLink(std::boxed::Box<RevisionStateLink>),
   /// Defines the RevisionState Class.
   #[sdk(child(office2016, qname = "xr:CT_RevisionState/xr:body"))]
-  Body(std::boxed::Box<RevisionState>),
+  XrBody(std::boxed::Box<RevisionState>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevGroupChoice {

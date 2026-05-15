@@ -12,12 +12,11 @@ pub struct RelativeAnchorSize {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
-  pub from_anchor: std::boxed::Box<FromAnchor>,
+  pub from_anchor: Option<FromAnchor>,
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:to"))]
-  pub to_anchor: std::boxed::Box<ToAnchor>,
-  /// _
-  #[sdk(sequence(
+  pub to_anchor: Option<ToAnchor>,
+  #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
@@ -25,7 +24,7 @@ pub struct RelativeAnchorSize {
     qname = "cdr:CT_Picture/cdr:pic",
     qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
-  pub sequence: std::boxed::Box<RelativeAnchorSizeSequence>,
+  pub relative_anchor_size_choice: Option<RelativeAnchorSizeChoice>,
 }
 /// Absolute Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -35,12 +34,11 @@ pub struct AbsoluteAnchorSize {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
-  pub from_anchor: std::boxed::Box<FromAnchor>,
+  pub from_anchor: Option<FromAnchor>,
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/cdr:ext"))]
-  pub extent: std::boxed::Box<Extent>,
-  /// _
-  #[sdk(sequence(
+  pub extent: Option<Extent>,
+  #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
     qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
@@ -48,7 +46,7 @@ pub struct AbsoluteAnchorSize {
     qname = "cdr:CT_Picture/cdr:pic",
     qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
-  pub sequence: std::boxed::Box<AbsoluteAnchorSizeSequence>,
+  pub absolute_anchor_size_choice: Option<AbsoluteAnchorSizeChoice>,
 }
 /// Shape Definition.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -88,10 +86,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
+  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/cdr:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
@@ -100,7 +98,7 @@ pub struct GroupShape {
     qname = "cdr:CT_Picture/cdr:pic",
     qname = "cdr14:CT_ContentPart/cdr14:contentPart"
   ))]
-  pub choice: Vec<GroupShapeChoice>,
+  pub group_shape_choice: Vec<GroupShapeChoice>,
 }
 /// Graphic Frame.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -240,7 +238,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub choice1: Option<ShapePropertiesChoice>,
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -249,7 +247,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice2: Option<ShapePropertiesChoice2>,
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -257,7 +255,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice3: Option<ShapePropertiesChoice3>,
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -374,7 +372,7 @@ pub struct BlipFill {
     qname = "a:CT_TileInfoProperties/a:tile",
     qname = "a:CT_StretchInfoProperties/a:stretch"
   ))]
-  pub choice: Option<BlipFillChoice>,
+  pub blip_fill_choice: Option<BlipFillChoice>,
 }
 /// Non-Visual Graphic Frame Drawing Properties.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -504,12 +502,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice1: Option<GroupShapePropertiesChoice>,
+  pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice2: Option<GroupShapePropertiesChoice2>,
+  pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -521,164 +519,135 @@ pub struct GroupShapeProperties {
 pub enum RelativeAnchorSizeChoice {
   /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  CdrSp(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  CdrGrpSp(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
+  CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
-  CxnSp(std::boxed::Box<ConnectionShape>),
+  CdrCxnSp(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
-  Pic(std::boxed::Box<Picture>),
-  /// Defines the ContentPart Class.
+  CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
-  ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct RelativeAnchorSizeSequence {
-  #[sdk(choice(
-    qname = "cdr:CT_Shape/cdr:sp",
-    qname = "cdr:CT_GroupShape/cdr:grpSp",
-    qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
-    qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
-  ))]
-  pub choice: RelativeAnchorSizeChoice,
+  Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AbsoluteAnchorSizeChoice {
   /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  CdrSp(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  CdrGrpSp(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
+  CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
-  CxnSp(std::boxed::Box<ConnectionShape>),
+  CdrCxnSp(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
-  Pic(std::boxed::Box<Picture>),
-  /// Defines the ContentPart Class.
+  CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
-  ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
-}
-#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct AbsoluteAnchorSizeSequence {
-  #[sdk(choice(
-    qname = "cdr:CT_Shape/cdr:sp",
-    qname = "cdr:CT_GroupShape/cdr:grpSp",
-    qname = "cdr:CT_GraphicFrame/cdr:graphicFrame",
-    qname = "cdr:CT_Connector/cdr:cxnSp",
-    qname = "cdr:CT_Picture/cdr:pic",
-    qname = "cdr14:CT_ContentPart/cdr14:contentPart"
-  ))]
-  pub choice: AbsoluteAnchorSizeChoice,
+  Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   /// Shape Definition.
   #[sdk(child(qname = "cdr:CT_Shape/cdr:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  CdrSp(std::boxed::Box<Shape>),
   /// Group Shape.
   #[sdk(child(qname = "cdr:CT_GroupShape/cdr:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  CdrGrpSp(std::boxed::Box<GroupShape>),
   /// Graphic Frame.
   #[sdk(child(qname = "cdr:CT_GraphicFrame/cdr:graphicFrame"))]
-  GraphicFrame(std::boxed::Box<GraphicFrame>),
+  CdrGraphicFrame(std::boxed::Box<GraphicFrame>),
   /// Connection Shape.
   #[sdk(child(qname = "cdr:CT_Connector/cdr:cxnSp"))]
-  CxnSp(std::boxed::Box<ConnectionShape>),
+  CdrCxnSp(std::boxed::Box<ConnectionShape>),
   /// Defines the Picture Class.
   #[sdk(child(qname = "cdr:CT_Picture/cdr:pic"))]
-  Pic(std::boxed::Box<Picture>),
-  /// Defines the ContentPart Class.
+  CdrPic(std::boxed::Box<Picture>),
   #[sdk(child(office2010, qname = "cdr14:CT_ContentPart/cdr14:contentPart"))]
-  ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
+  Cdr14ContentPart(std::boxed::Box<crate::schemas::cdr14::ContentPart>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BlipFillChoice {
-  /// Tile.
   #[sdk(child(qname = "a:CT_TileInfoProperties/a:tile"))]
-  Tile(std::boxed::Box<crate::schemas::a::Tile>),
-  /// Stretch.
+  ATile(std::boxed::Box<crate::schemas::a::Tile>),
   #[sdk(child(qname = "a:CT_StretchInfoProperties/a:stretch"))]
-  Stretch(std::boxed::Box<crate::schemas::a::Stretch>),
+  AStretch(std::boxed::Box<crate::schemas::a::Stretch>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }

@@ -102,7 +102,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub choice1: Option<ShapePropertiesChoice>,
+  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -111,7 +111,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice2: Option<ShapePropertiesChoice2>,
+  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -119,7 +119,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice3: Option<ShapePropertiesChoice3>,
+  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -241,12 +241,12 @@ pub struct GroupShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub choice1: Option<GroupShapePropertiesChoice>,
+  pub group_shape_properties_choice1: Option<GroupShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub choice2: Option<GroupShapePropertiesChoice2>,
+  pub group_shape_properties_choice2: Option<GroupShapePropertiesChoice2>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -293,12 +293,12 @@ pub struct Shape {
 pub struct GroupShape {
   /// Defines the GroupShapeNonVisualProperties Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
-  pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
+  pub group_shape_non_visual_properties: Option<std::boxed::Box<GroupShapeNonVisualProperties>>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
   #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
-  pub choice: Vec<GroupShapeChoice>,
+  pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub dsp_ext_lst: Option<OfficeArtExtensionList>,
@@ -309,16 +309,12 @@ pub struct GroupShape {
 pub struct ShapeTree {
   /// Defines the GroupShapeNonVisualProperties Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
-  pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
+  pub group_shape_non_visual_properties: Option<std::boxed::Box<GroupShapeNonVisualProperties>>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
-  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
-  #[sdk(choice(
-    qname = "dsp:CT_Shape/dsp:sp",
-    qname = "dsp:CT_GroupShape/dsp:grpSp",
-    any
-  ))]
-  pub choice: Vec<ShapeTreeChoice>,
+  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
+  pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/dsp:extLst"))]
   pub dsp_ext_lst: Option<OfficeArtExtensionList>,
@@ -327,89 +323,86 @@ pub struct ShapeTree {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  GrpFill,
+  AGrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapePropertiesChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GroupShapeChoice {
   /// Defines the Shape Class.
   #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  DspSp(std::boxed::Box<Shape>),
   /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
+  DspGrpSp(std::boxed::Box<GroupShape>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapeTreeChoice {
   /// Defines the Shape Class.
   #[sdk(child(office2010, qname = "dsp:CT_Shape/dsp:sp"))]
-  Sp(std::boxed::Box<Shape>),
+  DspSp(std::boxed::Box<Shape>),
   /// Defines the GroupShape Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShape/dsp:grpSp"))]
-  GrpSp(std::boxed::Box<GroupShape>),
-  /// Unknown XML child.
-  #[sdk(any)]
-  XmlAny(std::boxed::Box<str>),
+  DspGrpSp(std::boxed::Box<GroupShape>),
 }

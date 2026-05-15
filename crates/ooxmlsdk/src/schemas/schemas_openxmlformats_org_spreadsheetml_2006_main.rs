@@ -5043,24 +5043,51 @@ pub struct FontScheme {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_RPrElt/x:rPr")]
 pub struct RunProperties {
-  #[sdk(choice(
-    qname = "x:CT_BooleanProperty/x:b",
-    qname = "x:CT_BooleanProperty/x:i",
-    qname = "x:CT_BooleanProperty/x:strike",
-    qname = "x:CT_BooleanProperty/x:condense",
-    qname = "x:CT_BooleanProperty/x:extend",
-    qname = "x:CT_BooleanProperty/x:outline",
-    qname = "x:CT_BooleanProperty/x:shadow",
-    qname = "x:CT_UnderlineProperty/x:u",
-    qname = "x:CT_VerticalAlignFontProperty/x:vertAlign",
-    qname = "x:CT_FontSize/x:sz",
-    qname = "x:CT_Color/x:color",
-    qname = "x:CT_FontName/x:rFont",
-    qname = "x:CT_IntProperty/x:family",
-    qname = "x:CT_IntProperty/x:charset",
-    qname = "x:CT_FontScheme/x:scheme"
-  ))]
-  pub run_properties_choice: Vec<RunPropertiesChoice>,
+  /// Bold.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
+  pub x_b: Option<Bold>,
+  /// Italic.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
+  pub x_i: Option<Italic>,
+  /// Strike Through.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
+  pub x_strike: Option<Strike>,
+  /// Condense.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
+  pub x_condense: Option<Condense>,
+  /// Extend.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
+  pub x_extend: Option<Extend>,
+  /// Outline.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
+  pub x_outline: Option<Outline>,
+  /// Shadow.
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
+  pub x_shadow: Option<Shadow>,
+  /// Underline.
+  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
+  pub x_u: Option<Underline>,
+  /// Vertical Alignment.
+  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
+  pub x_vert_align: Option<VerticalTextAlignment>,
+  /// Font Size.
+  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
+  pub x_sz: Option<FontSize>,
+  /// Text Color.
+  #[sdk(child(qname = "x:CT_Color/x:color"))]
+  pub x_color: Option<Color>,
+  /// Font.
+  #[sdk(child(qname = "x:CT_FontName/x:rFont"))]
+  pub x_r_font: Option<RunFont>,
+  /// Font Family.
+  #[sdk(child(qname = "x:CT_IntProperty/x:family"))]
+  pub x_family: Option<FontFamily>,
+  /// Character Set.
+  #[sdk(child(qname = "x:CT_IntProperty/x:charset"))]
+  pub x_charset: Option<RunPropertyCharSet>,
+  /// Font Scheme.
+  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
+  pub x_scheme: Option<FontScheme>,
 }
 /// Rich Text Run.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5068,7 +5095,7 @@ pub struct RunProperties {
 pub struct Run {
   /// Run Properties
   #[sdk(child(qname = "x:CT_RPrElt/x:rPr"))]
-  pub run_properties: Option<RunProperties>,
+  pub run_properties: Option<std::boxed::Box<RunProperties>>,
   /// Text
   #[sdk(child(qname = "x:CT_Xstring/x:t"))]
   pub text: std::boxed::Box<Text>,
@@ -5736,7 +5763,7 @@ pub struct NewCell {
 pub struct OldDifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<Font>,
+  pub font: Option<std::boxed::Box<Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -5762,7 +5789,7 @@ pub struct OldDifferentialFormat {
 pub struct NewDifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<Font>,
+  pub font: Option<std::boxed::Box<Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -5788,7 +5815,7 @@ pub struct NewDifferentialFormat {
 pub struct DifferentialFormat {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<Font>,
+  pub font: Option<std::boxed::Box<Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<NumberingFormat>,
@@ -7430,24 +7457,51 @@ pub struct Protection {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Font/x:font")]
 pub struct Font {
-  #[sdk(choice(
-    qname = "x:CT_BooleanProperty/x:b",
-    qname = "x:CT_BooleanProperty/x:i",
-    qname = "x:CT_BooleanProperty/x:strike",
-    qname = "x:CT_BooleanProperty/x:condense",
-    qname = "x:CT_BooleanProperty/x:extend",
-    qname = "x:CT_BooleanProperty/x:outline",
-    qname = "x:CT_BooleanProperty/x:shadow",
-    qname = "x:CT_UnderlineProperty/x:u",
-    qname = "x:CT_VerticalAlignFontProperty/x:vertAlign",
-    qname = "x:CT_FontSize/x:sz",
-    qname = "x:CT_Color/x:color",
-    qname = "x:CT_FontNameNonEmpty/x:name",
-    qname = "x:CT_FontFamilyNum/x:family",
-    qname = "x:CT_ByteProperty/x:charset",
-    qname = "x:CT_FontScheme/x:scheme"
-  ))]
-  pub font_choice: Vec<FontChoice>,
+  /// Bold
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
+  pub bold: Option<Bold>,
+  /// Italic
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
+  pub italic: Option<Italic>,
+  /// Strike Through
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
+  pub strike: Option<Strike>,
+  /// Condense
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
+  pub condense: Option<Condense>,
+  /// Extend
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
+  pub extend: Option<Extend>,
+  /// Outline
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
+  pub outline: Option<Outline>,
+  /// Shadow
+  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
+  pub shadow: Option<Shadow>,
+  /// Underline
+  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
+  pub underline: Option<Underline>,
+  /// Text Vertical Alignment
+  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
+  pub vertical_text_alignment: Option<VerticalTextAlignment>,
+  /// Font Size
+  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
+  pub font_size: Option<FontSize>,
+  /// Text Color
+  #[sdk(child(qname = "x:CT_Color/x:color"))]
+  pub color: Option<Color>,
+  /// Font Name
+  #[sdk(child(qname = "x:CT_FontNameNonEmpty/x:name"))]
+  pub font_name: Option<FontName>,
+  /// Font Family
+  #[sdk(child(qname = "x:CT_FontFamilyNum/x:family"))]
+  pub font_family_numbering: Option<FontFamilyNumbering>,
+  /// Character Set
+  #[sdk(child(qname = "x:CT_ByteProperty/x:charset"))]
+  pub font_char_set: Option<FontCharSet>,
+  /// Scheme
+  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
+  pub font_scheme: Option<FontScheme>,
 }
 /// Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -11172,54 +11226,6 @@ pub enum GroupItemsChoice {
   XD(std::boxed::Box<DateTimeItem>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum RunPropertiesChoice {
-  /// Bold.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
-  XB(std::boxed::Box<Bold>),
-  /// Italic.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
-  XI(std::boxed::Box<Italic>),
-  /// Strike Through.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
-  XStrike(std::boxed::Box<Strike>),
-  /// Condense.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
-  XCondense(std::boxed::Box<Condense>),
-  /// Extend.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
-  XExtend(std::boxed::Box<Extend>),
-  /// Outline.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
-  XOutline(std::boxed::Box<Outline>),
-  /// Shadow.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
-  XShadow(std::boxed::Box<Shadow>),
-  /// Underline.
-  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
-  XU(std::boxed::Box<Underline>),
-  /// Vertical Alignment.
-  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
-  XVertAlign(std::boxed::Box<VerticalTextAlignment>),
-  /// Font Size.
-  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
-  XSz(std::boxed::Box<FontSize>),
-  /// Text Color.
-  #[sdk(child(qname = "x:CT_Color/x:color"))]
-  XColor(std::boxed::Box<Color>),
-  /// Font.
-  #[sdk(child(qname = "x:CT_FontName/x:rFont"))]
-  XRFont(std::boxed::Box<RunFont>),
-  /// Font Family.
-  #[sdk(child(qname = "x:CT_IntProperty/x:family"))]
-  XFamily(std::boxed::Box<FontFamily>),
-  /// Character Set.
-  #[sdk(child(qname = "x:CT_IntProperty/x:charset"))]
-  XCharset(std::boxed::Box<RunPropertyCharSet>),
-  /// Font Scheme.
-  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
-  XScheme(std::boxed::Box<FontScheme>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum RevisionRowColumnChoice {
   /// Undo.
   #[sdk(child(qname = "x:CT_UndoInfo/x:undo"))]
@@ -11257,54 +11263,6 @@ pub enum MdxChoice {
   /// KPI MDX Metadata.
   #[sdk(child(qname = "x:CT_MdxKPI/x:k"))]
   XK(std::boxed::Box<MdxKpi>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FontChoice {
-  /// Bold.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:b"))]
-  XB(std::boxed::Box<Bold>),
-  /// Italic.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:i"))]
-  XI(std::boxed::Box<Italic>),
-  /// Strike Through.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:strike"))]
-  XStrike(std::boxed::Box<Strike>),
-  /// Condense.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:condense"))]
-  XCondense(std::boxed::Box<Condense>),
-  /// Extend.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:extend"))]
-  XExtend(std::boxed::Box<Extend>),
-  /// Outline.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:outline"))]
-  XOutline(std::boxed::Box<Outline>),
-  /// Shadow.
-  #[sdk(child(qname = "x:CT_BooleanProperty/x:shadow"))]
-  XShadow(std::boxed::Box<Shadow>),
-  /// Underline.
-  #[sdk(child(qname = "x:CT_UnderlineProperty/x:u"))]
-  XU(std::boxed::Box<Underline>),
-  /// Vertical Alignment.
-  #[sdk(child(qname = "x:CT_VerticalAlignFontProperty/x:vertAlign"))]
-  XVertAlign(std::boxed::Box<VerticalTextAlignment>),
-  /// Font Size.
-  #[sdk(child(qname = "x:CT_FontSize/x:sz"))]
-  XSz(std::boxed::Box<FontSize>),
-  /// Text Color.
-  #[sdk(child(qname = "x:CT_Color/x:color"))]
-  XColor(std::boxed::Box<Color>),
-  /// Font Name.
-  #[sdk(child(qname = "x:CT_FontNameNonEmpty/x:name"))]
-  XName(std::boxed::Box<FontName>),
-  /// Font Family.
-  #[sdk(child(qname = "x:CT_FontFamilyNum/x:family"))]
-  XFamily(std::boxed::Box<FontFamilyNumbering>),
-  /// Character Set.
-  #[sdk(child(qname = "x:CT_ByteProperty/x:charset"))]
-  XCharset(std::boxed::Box<FontCharSet>),
-  /// Font Scheme.
-  #[sdk(child(qname = "x:CT_FontScheme/x:scheme"))]
-  XScheme(std::boxed::Box<FontScheme>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FillChoice {

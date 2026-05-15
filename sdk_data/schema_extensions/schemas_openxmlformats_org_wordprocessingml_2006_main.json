@@ -49,11 +49,11 @@
     },
     {
       "ClassName": "Run",
-      "ParentChoiceHasAnyIn": ["Paragraph"]
+      "ParentChoiceHasAnyIn": ["Paragraph.choice"]
     },
     {
       "ClassName": "Drawing",
-      "ParentChoiceHasAnyIn": ["Run"]
+      "ParentChoiceHasAnyIn": ["Run.choice"]
     },
     {
       "ClassName": "SpacingBetweenLines",

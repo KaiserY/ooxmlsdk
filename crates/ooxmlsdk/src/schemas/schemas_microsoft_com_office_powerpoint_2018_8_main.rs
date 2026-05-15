@@ -129,15 +129,13 @@ pub struct CommentReply {
   /// likes
   #[sdk(attr(office2021, list, qname = ":likes"))]
   pub likes: Option<Vec<crate::simple_type::StringValue>>,
-  /// Defines the TextBodyType Class.
-  #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
-  pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
-  /// Defines the CommentPropertiesExtensionList Class.
-  #[sdk(child(
+  /// _
+  #[sdk(sequence(
     office2021,
+    qname = "a:CT_TextBody/p188:txBody",
     qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
   ))]
-  pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
+  pub sequence: Option<std::boxed::Box<CommentReplySequence>>,
 }
 /// Defines the Point2DType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -233,6 +231,18 @@ pub struct Comment {
     qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
   ))]
   pub p188_ext_lst: Option<CommentPropertiesExtensionList>,
+}
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+pub struct CommentReplySequence {
+  /// Defines the TextBodyType Class.
+  #[sdk(child(office2021, qname = "a:CT_TextBody/p188:txBody"))]
+  pub text_body_type: Option<std::boxed::Box<TextBodyType>>,
+  /// Defines the CommentPropertiesExtensionList Class.
+  #[sdk(child(
+    office2021,
+    qname = "p188:CT_CommentPropertiesExtensionList/p188:extLst"
+  ))]
+  pub comment_properties_extension_list: Option<CommentPropertiesExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CommentChoice {

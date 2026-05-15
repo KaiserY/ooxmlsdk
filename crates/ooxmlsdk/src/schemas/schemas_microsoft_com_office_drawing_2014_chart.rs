@@ -20,7 +20,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
+  pub choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -29,7 +29,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
+  pub choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -37,7 +37,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
+  pub choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -96,7 +96,7 @@ pub struct Marker {
 pub struct DLbl {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: Option<crate::schemas::c::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",
@@ -113,7 +113,7 @@ pub struct DLbl {
     qname = "c:CT_Boolean/c:showBubbleSize",
     qname = "xsd:string/c:separator"
   ))]
-  pub d_lbl_choice: Option<DLblChoice>,
+  pub choice: DLblChoice,
   /// Defines the DLblExtensionList Class.
   #[sdk(child(qname = "c:CT_DLblExtensionList/c:extLst"))]
   pub c_ext_lst: Option<crate::schemas::c::DLblExtensionList>,
@@ -319,88 +319,106 @@ pub struct ChartDataPointUniqueIdMapEntry {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
-pub struct DLblChoiceSequence {
-  /// Layout.
-  #[sdk(child(qname = "c:CT_Layout/c:layout"))]
-  pub layout: Option<std::boxed::Box<crate::schemas::c::Layout>>,
-  /// Defines the ChartText Class.
-  #[sdk(child(qname = "c:CT_Tx/c:tx"))]
-  pub chart_text: Option<std::boxed::Box<crate::schemas::c::ChartText>>,
+pub struct DLblSequence {
   /// Number Format.
   #[sdk(child(qname = "c:CT_NumFmt/c:numFmt"))]
-  pub numbering_format: Option<crate::schemas::c::NumberingFormat>,
+  pub c_num_fmt: Option<crate::schemas::c::NumberingFormat>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
-  pub chart_shape_properties: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
+  pub c_sp_pr: Option<std::boxed::Box<crate::schemas::c::ChartShapeProperties>>,
   /// Defines the TextProperties Class.
   #[sdk(child(qname = "a:CT_TextBody/c:txPr"))]
-  pub text_properties: Option<std::boxed::Box<crate::schemas::c::TextProperties>>,
+  pub c_tx_pr: Option<std::boxed::Box<crate::schemas::c::TextProperties>>,
   /// Data Label Position.
   #[sdk(child(qname = "c:CT_DLblPos/c:dLblPos"))]
-  pub data_label_position: Option<crate::schemas::c::DataLabelPosition>,
+  pub c_d_lbl_pos: Option<crate::schemas::c::DataLabelPosition>,
   /// Show Legend Key.
   #[sdk(child(qname = "c:CT_Boolean/c:showLegendKey"))]
-  pub show_legend_key: Option<crate::schemas::c::ShowLegendKey>,
+  pub c_show_legend_key: Option<crate::schemas::c::ShowLegendKey>,
   /// Show Value.
   #[sdk(child(qname = "c:CT_Boolean/c:showVal"))]
-  pub show_value: Option<crate::schemas::c::ShowValue>,
+  pub c_show_val: Option<crate::schemas::c::ShowValue>,
   /// Show Category Name.
   #[sdk(child(qname = "c:CT_Boolean/c:showCatName"))]
-  pub show_category_name: Option<crate::schemas::c::ShowCategoryName>,
+  pub c_show_cat_name: Option<crate::schemas::c::ShowCategoryName>,
   /// Show Series Name.
   #[sdk(child(qname = "c:CT_Boolean/c:showSerName"))]
-  pub show_series_name: Option<crate::schemas::c::ShowSeriesName>,
+  pub c_show_ser_name: Option<crate::schemas::c::ShowSeriesName>,
   /// Show Percent.
   #[sdk(child(qname = "c:CT_Boolean/c:showPercent"))]
-  pub show_percent: Option<crate::schemas::c::ShowPercent>,
+  pub c_show_percent: Option<crate::schemas::c::ShowPercent>,
   /// Show Bubble Size.
   #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
-  pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
+  pub c_show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
   #[sdk(text_child(qname = "xsd:string/c:separator"))]
-  pub separator: Option<crate::schemas::c::Separator>,
+  pub c_separator: Option<crate::schemas::c::Separator>,
+}
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+pub struct DLblSequence2 {
+  /// Layout.
+  #[sdk(child(qname = "c:CT_Layout/c:layout"))]
+  pub c_layout: Option<std::boxed::Box<crate::schemas::c::Layout>>,
+  /// Defines the ChartText Class.
+  #[sdk(child(qname = "c:CT_Tx/c:tx"))]
+  pub c_tx: Option<std::boxed::Box<crate::schemas::c::ChartText>>,
+  /// _
+  #[sdk(sequence(
+    qname = "c:CT_NumFmt/c:numFmt",
+    qname = "a:CT_ChartShapeProperties/c:spPr",
+    qname = "a:CT_TextBody/c:txPr",
+    qname = "c:CT_DLblPos/c:dLblPos",
+    qname = "c:CT_Boolean/c:showLegendKey",
+    qname = "c:CT_Boolean/c:showVal",
+    qname = "c:CT_Boolean/c:showCatName",
+    qname = "c:CT_Boolean/c:showSerName",
+    qname = "c:CT_Boolean/c:showPercent",
+    qname = "c:CT_Boolean/c:showBubbleSize",
+    qname = "xsd:string/c:separator"
+  ))]
+  pub sequence: Option<std::boxed::Box<DLblSequence>>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DLblChoice {
+  /// Delete.
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
-  CDelete(std::boxed::Box<crate::schemas::c::Delete>),
-  /// Sequence of c:layout, c:tx, c:numFmt, c:spPr, c:txPr, c:dLblPos, c:showLegendKey, c:showVal, c:showCatName, c:showSerName, c:showPercent, c:showBubbleSize, c:separator
+  Delete(std::boxed::Box<crate::schemas::c::Delete>),
   #[sdk(sequence)]
-  Sequence(std::boxed::Box<DLblChoiceSequence>),
+  Sequence(std::boxed::Box<DLblSequence2>),
 }

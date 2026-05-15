@@ -116,7 +116,7 @@ pub struct SortRules {
 pub struct DifferentialFormatType {
   /// Font Properties
   #[sdk(child(qname = "x:CT_Font/x:font"))]
-  pub font: Option<crate::schemas::x::Font>,
+  pub font: Option<std::boxed::Box<crate::schemas::x::Font>>,
   /// Number Format
   #[sdk(child(qname = "x:CT_NumFmt/x:numFmt"))]
   pub numbering_format: Option<crate::schemas::x::NumberingFormat>,
@@ -181,7 +181,7 @@ pub struct SortRule {
     qname = "x14:CT_SortCondition/xnsv:sortCondition",
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
   ))]
-  pub sort_rule_choice: Option<SortRuleChoice>,
+  pub choice: Option<SortRuleChoice>,
 }
 /// Defines the SortCondition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -275,11 +275,11 @@ pub enum FilterColumnChoice {
 pub enum SortRuleChoice {
   /// Defines the SortCondition Class.
   #[sdk(child(office2021, qname = "x14:CT_SortCondition/xnsv:sortCondition"))]
-  XnsvSortCondition(std::boxed::Box<SortCondition>),
+  SortCondition(std::boxed::Box<SortCondition>),
   /// Defines the RichSortCondition Class.
   #[sdk(child(
     office2021,
     qname = "xlrd2:CT_RichSortCondition/xnsv:richSortCondition"
   ))]
-  XnsvRichSortCondition(std::boxed::Box<RichSortCondition>),
+  RichSortCondition(std::boxed::Box<RichSortCondition>),
 }

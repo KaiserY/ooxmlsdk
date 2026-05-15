@@ -993,7 +993,7 @@ pub struct GradientFillProperties {
     qname = "w14:CT_LinearShadeProperties/w14:lin",
     qname = "w14:CT_PathShadeProperties/w14:path"
   ))]
-  pub gradient_fill_properties_choice: Option<GradientFillPropertiesChoice>,
+  pub choice: Option<GradientFillPropertiesChoice>,
 }
 /// Defines the PresetLineDashProperties Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2281,10 +2281,10 @@ pub enum SolidColorFillPropertiesChoice {
 pub enum GradientFillPropertiesChoice {
   /// Defines the LinearShadeProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_LinearShadeProperties/w14:lin"))]
-  W14Lin(std::boxed::Box<LinearShadeProperties>),
+  Lin(std::boxed::Box<LinearShadeProperties>),
   /// Defines the PathShadeProperties Class.
   #[sdk(child(office2010, qname = "w14:CT_PathShadeProperties/w14:path"))]
-  W14Path(std::boxed::Box<PathShadeProperties>),
+  Path(std::boxed::Box<PathShadeProperties>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GlowChoice {

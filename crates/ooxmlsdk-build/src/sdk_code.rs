@@ -25,6 +25,7 @@ pub mod codegen_ir;
 pub mod codegen_ir_builder;
 pub mod helpers;
 pub mod part_codegen_ir;
+pub mod particle_builder;
 pub mod parts;
 pub mod schemas;
 pub mod versioning;

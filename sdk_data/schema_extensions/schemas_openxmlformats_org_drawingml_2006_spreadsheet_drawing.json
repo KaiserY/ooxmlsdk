@@ -3,10 +3,6 @@
     {
       "ClassName": "TwoCellAnchor",
       "ParentChoiceHasAnyIn": ["WorksheetDrawing"]
-    },
-    {
-      "ClassName": "GraphicFrame",
-      "ParentChoiceHasAnyIn": ["TwoCellAnchor"]
     }
   ]
 }

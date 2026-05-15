@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "Shape",
-      "ParentChoiceHasAnyIn": ["ShapeTree"]
+      "ParentChoiceHasAnyIn": ["ShapeTree.choice"]
     },
     {
       "ClassName": "Control",

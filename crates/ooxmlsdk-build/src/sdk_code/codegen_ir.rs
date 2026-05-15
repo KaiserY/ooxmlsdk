@@ -71,6 +71,18 @@ pub struct TypeDecl {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content_structure: Option<ContentParticleDecl>,
   pub members: Vec<MemberDecl>,
+  #[serde(skip_serializing_if = "Vec::is_empty")]
+  pub particle_members: Vec<MemberDecl>,
+}
+
+impl TypeDecl {
+  pub fn effective_members(&self) -> &[MemberDecl] {
+    if self.particle_members.is_empty() {
+      &self.members
+    } else {
+      &self.particle_members
+    }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -193,6 +205,8 @@ pub enum FieldWireDecl {
   Child {
     #[serde(rename = "QName")]
     qname: String,
+    #[serde(default, rename = "QNames")]
+    qnames: Vec<String>,
   },
   TextChild {
     #[serde(rename = "QName")]
@@ -218,6 +232,10 @@ pub struct VariantDecl {
 #[serde(rename_all = "PascalCase", rename_all_fields = "PascalCase")]
 pub enum VariantWireDecl {
   Child {
+    #[serde(rename = "QNames")]
+    qnames: Vec<String>,
+  },
+  Choice {
     #[serde(rename = "QNames")]
     qnames: Vec<String>,
   },
@@ -399,6 +417,7 @@ mod tests {
             },
           }),
         ],
+        particle_members: vec![],
       }],
     };
 
@@ -485,6 +504,7 @@ mod tests {
             module_path: Some("crate::simple_type".to_string()),
           },
         })],
+        particle_members: vec![],
       }],
     };
 

@@ -2,7 +2,7 @@
   "Types": [
     {
       "ClassName": "Style",
-      "ParentChoiceHasAnyIn": ["ChartSpace"]
+      "ParentChoiceHasAnyIn": ["ChartSpace.choice"]
     }
   ]
 }

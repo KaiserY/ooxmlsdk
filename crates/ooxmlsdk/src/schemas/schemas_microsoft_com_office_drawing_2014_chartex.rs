@@ -271,7 +271,7 @@ pub struct ChartSpace {
   pub fallback_img: Option<crate::simple_type::StringValue>,
   /// Defines the ChartData Class.
   #[sdk(child(office2016, qname = "cx:CT_ChartData/cx:chartData"))]
-  pub chart_data: Option<std::boxed::Box<ChartData>>,
+  pub chart_data: std::boxed::Box<ChartData>,
   /// Defines the Chart Class.
   #[sdk(child(office2016, qname = "cx:CT_Chart/cx:chart"))]
   pub chart: std::boxed::Box<Chart>,
@@ -573,7 +573,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
+  pub choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -582,7 +582,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
+  pub choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -590,7 +590,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
+  pub choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -1529,7 +1529,7 @@ pub struct SeriesLayoutProperties {
     qname = "cx:CT_Aggregation/cx:aggregation",
     qname = "cx:CT_Binning/cx:binning"
   ))]
-  pub series_layout_properties_choice: Option<SeriesLayoutPropertiesChoice>,
+  pub choice: Option<SeriesLayoutPropertiesChoice>,
   /// Defines the Geography Class.
   #[sdk(child(office2016, qname = "cx:CT_Geography/cx:geography"))]
   pub cx_geography: Option<std::boxed::Box<Geography>>,
@@ -2102,40 +2102,40 @@ pub enum TextChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GeoCacheChoice {
@@ -2192,10 +2192,10 @@ pub enum ValueColorMiddlePositionChoice {
 pub enum SeriesLayoutPropertiesChoice {
   /// Defines the Aggregation Class.
   #[sdk(empty_child(office2016, qname = "cx:CT_Aggregation/cx:aggregation"))]
-  CxAggregation,
+  Aggregation,
   /// Defines the Binning Class.
   #[sdk(child(office2016, qname = "cx:CT_Binning/cx:binning"))]
-  CxBinning(std::boxed::Box<Binning>),
+  Binning(std::boxed::Box<Binning>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum AxisChoice {

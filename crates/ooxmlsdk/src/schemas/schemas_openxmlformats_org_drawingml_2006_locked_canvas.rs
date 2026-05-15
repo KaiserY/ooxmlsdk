@@ -13,11 +13,10 @@ pub struct LockedCanvas {
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties:
-    Option<std::boxed::Box<crate::schemas::a::NonVisualGroupShapeProperties>>,
+    std::boxed::Box<crate::schemas::a::NonVisualGroupShapeProperties>,
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
-  pub visual_group_shape_properties:
-    Option<std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>>,
+  pub visual_group_shape_properties: std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>,
   #[sdk(choice(
     qname = "a:CT_GvmlTextShape/a:txSp",
     qname = "a:CT_GvmlShape/a:sp",
@@ -27,25 +26,32 @@ pub struct LockedCanvas {
     qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame",
     qname = "a:CT_GvmlGroupShape/a:grpSp"
   ))]
-  pub locked_canvas_choice: Vec<LockedCanvasChoice>,
+  pub choice: Vec<LockedCanvasChoice>,
   /// Defines the GvmlGroupShapeExtensionList Class.
   #[sdk(child(qname = "a:CT_GvmlGroupShapeExtensionList/a:extLst"))]
   pub a_ext_lst: Option<crate::schemas::a::GvmlGroupShapeExtensionList>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LockedCanvasChoice {
+  /// Text Shape.
   #[sdk(child(qname = "a:CT_GvmlTextShape/a:txSp"))]
-  ATxSp(std::boxed::Box<crate::schemas::a::TextShape>),
+  TxSp(std::boxed::Box<crate::schemas::a::TextShape>),
+  /// Shape.
   #[sdk(child(qname = "a:CT_GvmlShape/a:sp"))]
-  ASp(std::boxed::Box<crate::schemas::a::Shape>),
+  Sp(std::boxed::Box<crate::schemas::a::Shape>),
+  /// Connection Shape.
   #[sdk(child(qname = "a:CT_GvmlConnector/a:cxnSp"))]
-  ACxnSp(std::boxed::Box<crate::schemas::a::ConnectionShape>),
+  CxnSp(std::boxed::Box<crate::schemas::a::ConnectionShape>),
+  /// Picture.
   #[sdk(child(qname = "a:CT_GvmlPicture/a:pic"))]
-  APic(std::boxed::Box<crate::schemas::a::Picture>),
+  Pic(std::boxed::Box<crate::schemas::a::Picture>),
+  /// Defines the GvmlContentPart Class.
   #[sdk(child(office2010, qname = "a14:CT_GvmlContentPart/a14:contentPart"))]
-  A14ContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
+  ContentPart(std::boxed::Box<crate::schemas::a14::GvmlContentPart>),
+  /// Graphic Frame.
   #[sdk(child(qname = "a:CT_GvmlGraphicalObjectFrame/a:graphicFrame"))]
-  AGraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
+  GraphicFrame(std::boxed::Box<crate::schemas::a::GraphicFrame>),
+  /// Group shape.
   #[sdk(child(qname = "a:CT_GvmlGroupShape/a:grpSp"))]
-  AGrpSp(std::boxed::Box<crate::schemas::a::GroupShape>),
+  GrpSp(std::boxed::Box<crate::schemas::a::GroupShape>),
 }

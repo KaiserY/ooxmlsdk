@@ -561,7 +561,7 @@ pub struct WebExtension {
   #[sdk(attr(office2013, qname = ":appRef"))]
   pub application_reference: crate::simple_type::StringValue,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the TimelineCacheReference Class.

@@ -21,7 +21,7 @@ pub struct WordprocessingCanvas {
     qname = "wpg:CT_WordprocessingGroup/wpg:wgp",
     qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"
   ))]
-  pub wordprocessing_canvas_choice: Vec<WordprocessingCanvasChoice>,
+  pub choice: Vec<WordprocessingCanvasChoice>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2010, qname = "a:CT_OfficeArtExtensionList/wpc:extLst"))]
   pub wpc_ext_lst: Option<OfficeArtExtensionList>,
@@ -56,7 +56,7 @@ pub struct WholeFormatting {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub whole_formatting_choice: Option<WholeFormattingChoice>,
+  pub choice: Option<WholeFormattingChoice>,
 }
 /// Defines the GraphicFrameType Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -91,17 +91,21 @@ pub struct OfficeArtExtensionList {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WordprocessingCanvasChoice {
+  /// Defines the WordprocessingShape Class.
   #[sdk(child(office2010, qname = "wps:CT_WordprocessingShape/wps:wsp"))]
-  WpsWsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  Wsp(std::boxed::Box<crate::schemas::wps::WordprocessingShape>),
+  /// Picture.
   #[sdk(child(qname = "pic:CT_Picture/pic:pic"))]
-  PicPic(std::boxed::Box<crate::schemas::pic::Picture>),
+  Pic(std::boxed::Box<crate::schemas::pic::Picture>),
+  /// Defines the ContentPart Class.
   #[sdk(child(office2010, qname = "w14:CT_WordContentPart/w14:contentPart"))]
-  W14ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
+  ContentPart(std::boxed::Box<crate::schemas::w14::ContentPart>),
+  /// Defines the WordprocessingGroup Class.
   #[sdk(child(office2010, qname = "wpg:CT_WordprocessingGroup/wpg:wgp"))]
-  WpgWgp(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
+  Wgp(std::boxed::Box<crate::schemas::wpg::WordprocessingGroup>),
   /// Defines the GraphicFrameType Class.
   #[sdk(child(office2010, qname = "wpg:CT_GraphicFrame/wpc:graphicFrame"))]
-  WpcGraphicFrame(std::boxed::Box<GraphicFrameType>),
+  GraphicFrame(std::boxed::Box<GraphicFrameType>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BackgroundFormattingChoice {
@@ -135,8 +139,10 @@ pub enum BackgroundFormattingChoice2 {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum WholeFormattingChoice {
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }

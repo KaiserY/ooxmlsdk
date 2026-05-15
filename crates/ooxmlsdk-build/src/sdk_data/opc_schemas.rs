@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::Result;
+use crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle;
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaEnumFacet, SchemaType, SchemaTypeApiKind, SchemaTypeAttribute,
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind,
@@ -88,6 +89,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
         parent_choice_has_any_in: Vec::new(),
         text_value_type: String::new(),
         api_kind: SchemaTypeApiKind::Struct,
+        additional_elements: Vec::new(),
         attributes: Vec::new(),
         children: vec![SchemaTypeChild {
           particle_id: String::new(),
@@ -100,6 +102,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           initial_version: String::new(),
           children: Vec::new(),
         }],
+        particle: empty_particle(),
       },
       SchemaType {
         name: "CT_Relationship/Relationship".to_string(),
@@ -119,6 +122,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
         parent_choice_has_any_in: Vec::new(),
         text_value_type: String::new(),
         api_kind: SchemaTypeApiKind::Struct,
+        additional_elements: Vec::new(),
         attributes: relationship
           .attributes
           .iter()
@@ -137,6 +141,7 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
           })
           .collect(),
         children: Vec::new(),
+        particle: empty_particle(),
       },
     ],
     enums: vec![SchemaEnum {
@@ -155,6 +160,10 @@ fn parse_opc_relationships_xsd(source: &str) -> Result<Schema> {
       other_variant: None,
     }],
   })
+}
+
+fn empty_particle() -> OpenXmlSchemaTypeParticle {
+  OpenXmlSchemaTypeParticle::default()
 }
 
 fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
@@ -200,6 +209,7 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
         parent_choice_has_any_in: Vec::new(),
         text_value_type: String::new(),
         api_kind: SchemaTypeApiKind::Struct,
+        additional_elements: Vec::new(),
         attributes: Vec::new(),
         children: vec![SchemaTypeChild {
           particle_id: String::new(),
@@ -226,6 +236,7 @@ fn parse_opc_content_types_xsd(source: &str) -> Result<Schema> {
             })
             .collect(),
         }],
+        particle: empty_particle(),
       },
       simple_leaf_type(
         "CT_Default/Default",
@@ -289,6 +300,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     parent_choice_has_any_in: Vec::new(),
     text_value_type: String::new(),
     api_kind: SchemaTypeApiKind::Struct,
+    additional_elements: Vec::new(),
     attributes: Vec::new(),
     children: core_properties
       .children
@@ -305,6 +317,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         children: Vec::new(),
       })
       .collect(),
+    particle: empty_particle(),
   }];
 
   for child in &core_properties.children {
@@ -332,6 +345,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     parent_choice_has_any_in: Vec::new(),
     text_value_type: "StringValue".to_string(),
     api_kind: SchemaTypeApiKind::Struct,
+    additional_elements: Vec::new(),
     attributes: keyword_attributes(&keywords.attributes),
     children: keywords
       .children
@@ -348,6 +362,7 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
         children: Vec::new(),
       })
       .collect(),
+    particle: empty_particle(),
   });
 
   types.push(SchemaType {
@@ -368,8 +383,10 @@ fn parse_opc_core_properties_xsd(source: &str) -> Result<Schema> {
     parent_choice_has_any_in: Vec::new(),
     text_value_type: "StringValue".to_string(),
     api_kind: SchemaTypeApiKind::Struct,
+    additional_elements: Vec::new(),
     attributes: keyword_attributes(&keyword.attributes),
     children: Vec::new(),
+    particle: empty_particle(),
   });
 
   Ok(Schema {
@@ -417,8 +434,10 @@ fn simple_leaf_type(
     parent_choice_has_any_in: Vec::new(),
     text_value_type: String::new(),
     api_kind: SchemaTypeApiKind::Struct,
+    additional_elements: Vec::new(),
     attributes: attributes_to_schema(attributes),
     children: Vec::new(),
+    particle: empty_particle(),
   }
 }
 
@@ -458,8 +477,10 @@ fn core_property_text_type(child: &ParsedChildElement) -> SchemaType {
     parent_choice_has_any_in: Vec::new(),
     text_value_type: "StringValue".to_string(),
     api_kind: SchemaTypeApiKind::LeafTextWrapper,
+    additional_elements: Vec::new(),
     attributes,
     children: Vec::new(),
+    particle: empty_particle(),
   }
 }
 

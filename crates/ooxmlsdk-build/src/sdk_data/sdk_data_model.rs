@@ -104,8 +104,10 @@ pub struct SchemaType {
   pub parent_choice_has_any_in: Vec<String>,
   pub text_value_type: String,
   pub api_kind: SchemaTypeApiKind,
+  pub additional_elements: Vec<String>,
   pub attributes: Vec<SchemaTypeAttribute>,
   pub children: Vec<SchemaTypeChild>,
+  pub particle: crate::sdk_data::open_xml::OpenXmlSchemaTypeParticle,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]

@@ -484,7 +484,7 @@ pub struct ShapeProperties {
     qname = "a:CT_CustomGeometry2D/a:custGeom",
     qname = "a:CT_PresetGeometry2D/a:prstGeom"
   ))]
-  pub shape_properties_choice1: Option<ShapePropertiesChoice>,
+  pub choice1: Option<ShapePropertiesChoice>,
   #[sdk(choice(
     qname = "a:CT_NoFillProperties/a:noFill",
     qname = "a:CT_SolidColorFillProperties/a:solidFill",
@@ -493,7 +493,7 @@ pub struct ShapeProperties {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub shape_properties_choice2: Option<ShapePropertiesChoice2>,
+  pub choice2: Option<ShapePropertiesChoice2>,
   /// Defines the Outline Class.
   #[sdk(child(qname = "a:CT_LineProperties/a:ln"))]
   pub a_ln: Option<std::boxed::Box<crate::schemas::a::Outline>>,
@@ -501,7 +501,7 @@ pub struct ShapeProperties {
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub shape_properties_choice3: Option<ShapePropertiesChoice3>,
+  pub choice3: Option<ShapePropertiesChoice3>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
@@ -591,12 +591,12 @@ pub struct TextCharacterPropertiesType {
     qname = "a:CT_PatternFillProperties/a:pattFill",
     qname = "a:CT_GroupFillProperties/a:grpFill"
   ))]
-  pub text_character_properties_type_choice1: Option<TextCharacterPropertiesTypeChoice>,
+  pub choice1: Option<TextCharacterPropertiesTypeChoice>,
   #[sdk(choice(
     qname = "a:CT_EffectList/a:effectLst",
     qname = "a:CT_EffectContainer/a:effectDag"
   ))]
-  pub text_character_properties_type_choice2: Option<TextCharacterPropertiesTypeChoice2>,
+  pub choice2: Option<TextCharacterPropertiesTypeChoice2>,
   /// Defines the Highlight Class.
   #[sdk(child(qname = "a:CT_Color/a:highlight"))]
   pub a_highlight: Option<std::boxed::Box<crate::schemas::a::Highlight>>,
@@ -604,12 +604,12 @@ pub struct TextCharacterPropertiesType {
     qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx",
     qname = "a:CT_LineProperties/a:uLn"
   ))]
-  pub text_character_properties_type_choice3: Option<TextCharacterPropertiesTypeChoice3>,
+  pub choice3: Option<TextCharacterPropertiesTypeChoice3>,
   #[sdk(choice(
     qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx",
     qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"
   ))]
-  pub text_character_properties_type_choice4: Option<TextCharacterPropertiesTypeChoice4>,
+  pub choice4: Option<TextCharacterPropertiesTypeChoice4>,
   /// Latin Font.
   #[sdk(child(qname = "a:CT_TextFont/a:latin"))]
   pub a_latin: Option<crate::schemas::a::LatinFont>,
@@ -712,12 +712,12 @@ pub struct TextBodyProperties {
     qname = "a:CT_TextNormalAutofit/a:normAutofit",
     qname = "a:CT_TextShapeAutofit/a:spAutoFit"
   ))]
-  pub text_body_properties_choice1: Option<TextBodyPropertiesChoice>,
+  pub choice1: Option<TextBodyPropertiesChoice>,
   /// 3D Scene Properties.
   #[sdk(child(qname = "a:CT_Scene3D/a:scene3d"))]
   pub a_scene3d: Option<std::boxed::Box<crate::schemas::a::Scene3DType>>,
   #[sdk(choice(qname = "a:CT_Shape3D/a:sp3d", qname = "a:CT_FlatText/a:flatTx"))]
-  pub text_body_properties_choice2: Option<TextBodyPropertiesChoice2>,
+  pub choice2: Option<TextBodyPropertiesChoice2>,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub a_ext_lst: Option<crate::schemas::a::ExtensionList>,
@@ -2296,107 +2296,107 @@ pub enum FontReferenceChoice {
 pub enum ShapePropertiesChoice {
   /// Custom geometry.
   #[sdk(child(qname = "a:CT_CustomGeometry2D/a:custGeom"))]
-  ACustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
+  CustGeom(std::boxed::Box<crate::schemas::a::CustomGeometry>),
   /// Preset geometry.
   #[sdk(child(qname = "a:CT_PresetGeometry2D/a:prstGeom"))]
-  APrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
+  PrstGeom(std::boxed::Box<crate::schemas::a::PresetGeometry>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice2 {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ShapePropertiesChoice3 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice {
   /// Defines the NoFill Class.
   #[sdk(child(qname = "a:CT_NoFillProperties/a:noFill"))]
-  ANoFill(std::boxed::Box<crate::schemas::a::NoFill>),
+  NoFill(std::boxed::Box<crate::schemas::a::NoFill>),
   /// Defines the SolidFill Class.
   #[sdk(child(qname = "a:CT_SolidColorFillProperties/a:solidFill"))]
-  ASolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
+  SolidFill(std::boxed::Box<crate::schemas::a::SolidFill>),
   /// Defines the GradientFill Class.
   #[sdk(child(qname = "a:CT_GradientFillProperties/a:gradFill"))]
-  AGradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
+  GradFill(std::boxed::Box<crate::schemas::a::GradientFill>),
   /// Defines the BlipFill Class.
   #[sdk(child(qname = "a:CT_BlipFillProperties/a:blipFill"))]
-  ABlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
+  BlipFill(std::boxed::Box<crate::schemas::a::BlipFill>),
   /// Pattern Fill.
   #[sdk(child(qname = "a:CT_PatternFillProperties/a:pattFill"))]
-  APattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
+  PattFill(std::boxed::Box<crate::schemas::a::PatternFill>),
   /// Group Fill.
   #[sdk(empty_child(qname = "a:CT_GroupFillProperties/a:grpFill"))]
-  AGrpFill,
+  GrpFill,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice2 {
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectList/a:effectLst"))]
-  AEffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
+  EffectLst(std::boxed::Box<crate::schemas::a::EffectList>),
   /// Effect Container.
   #[sdk(child(qname = "a:CT_EffectContainer/a:effectDag"))]
-  AEffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
+  EffectDag(std::boxed::Box<crate::schemas::a::EffectDag>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice3 {
   /// Underline Follows Text.
   #[sdk(empty_child(qname = "a:CT_TextUnderlineLineFollowText/a:uLnTx"))]
-  AULnTx,
+  ULnTx,
   /// Underline Stroke.
   #[sdk(child(qname = "a:CT_LineProperties/a:uLn"))]
-  AULn(std::boxed::Box<crate::schemas::a::Underline>),
+  ULn(std::boxed::Box<crate::schemas::a::Underline>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextCharacterPropertiesTypeChoice4 {
   /// Underline Fill Properties Follow Text.
   #[sdk(empty_child(qname = "a:CT_TextUnderlineFillFollowText/a:uFillTx"))]
-  AUFillTx,
+  UFillTx,
   /// Underline Fill.
   #[sdk(child(qname = "a:CT_TextUnderlineFillGroupWrapper/a:uFill"))]
-  AUFill(std::boxed::Box<crate::schemas::a::UnderlineFill>),
+  UFill(std::boxed::Box<crate::schemas::a::UnderlineFill>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice {
   /// No AutoFit.
   #[sdk(empty_child(qname = "a:CT_TextNoAutofit/a:noAutofit"))]
-  ANoAutofit,
+  NoAutofit,
   /// Normal AutoFit.
   #[sdk(child(qname = "a:CT_TextNormalAutofit/a:normAutofit"))]
-  ANormAutofit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
+  NormAutofit(std::boxed::Box<crate::schemas::a::NormalAutoFit>),
   /// Shape AutoFit.
   #[sdk(child(qname = "a:CT_TextShapeAutofit/a:spAutoFit"))]
-  ASpAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
+  SpAutoFit(std::boxed::Box<crate::schemas::a::ShapeAutoFit>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TextBodyPropertiesChoice2 {
   /// Apply 3D shape properties.
   #[sdk(child(qname = "a:CT_Shape3D/a:sp3d"))]
-  ASp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
+  Sp3d(std::boxed::Box<crate::schemas::a::Shape3DType>),
   /// No text in 3D scene.
   #[sdk(child(qname = "a:CT_FlatText/a:flatTx"))]
-  AFlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
+  FlatTx(std::boxed::Box<crate::schemas::a::FlatText>),
 }

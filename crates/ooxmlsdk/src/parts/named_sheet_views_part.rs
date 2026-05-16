@@ -17,9 +17,8 @@ pub struct NamedSheetViewsPart {
 }
 impl NamedSheetViewsPart {
   crate::sdk_part_root_methods!(
-    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
-    NamedSheetViewsPart,
-    as_named_sheet_views_part,
-    as_named_sheet_views_part_mut
-  );
+        crate
+        ::schemas::schemas_microsoft_com_office_spreadsheetml_2019_namedsheetviews::NamedSheetViews,
+        NamedSheetViewsPart, as_named_sheet_views_part, as_named_sheet_views_part_mut
+    );
 }

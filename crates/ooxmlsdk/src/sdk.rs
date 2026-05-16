@@ -492,28 +492,31 @@ impl ElementName {
 }
 
 pub trait SdkType: Sized {
-  fn deserialize_type_borrowed_inner<'de>(
+  fn read_borrowed<'de>(
     _xml_reader: &mut crate::common::SliceReader<'de>,
-    _xml_event: Option<(quick_xml::events::BytesStart<'de>, bool)>,
+    _start: quick_xml::events::BytesStart<'de>,
+    _empty: bool,
   ) -> Result<Self, crate::common::SdkError> {
     Err(crate::common::SdkError::CommonError(
       "SdkType does not support borrowed deserialization".to_string(),
     ))
   }
 
-  fn deserialize_type_io_inner<R: std::io::BufRead>(
+  fn read_io<R: std::io::BufRead>(
     _xml_reader: &mut crate::common::IoReader<R>,
-    _xml_event: Option<(quick_xml::events::BytesStart<'static>, bool)>,
+    _start: quick_xml::events::BytesStart<'static>,
+    _empty: bool,
   ) -> Result<Self, crate::common::SdkError> {
     Err(crate::common::SdkError::CommonError(
       "SdkType does not support IO deserialization".to_string(),
     ))
   }
 
-  fn write_type_xml<W: std::io::Write>(
+  fn write_inner<W: std::io::Write>(
     &self,
     _writer: &mut W,
     _xmlns_prefix: &str,
+    _name: ElementName,
   ) -> Result<(), std::io::Error> {
     Err(std::io::Error::other(
       "SdkType does not support XML writing",
@@ -523,45 +526,6 @@ pub trait SdkType: Sized {
   #[inline]
   fn matches_type_start_qname(_name: &[u8]) -> bool {
     false
-  }
-
-  fn read_root_borrowed<'de>(
-    xml_reader: &mut crate::common::SliceReader<'de>,
-  ) -> Result<Self, crate::common::SdkError> {
-    Self::deserialize_type_borrowed_inner(xml_reader, None)
-  }
-
-  fn read_root_io<R: std::io::BufRead>(
-    xml_reader: &mut crate::common::IoReader<R>,
-  ) -> Result<Self, crate::common::SdkError> {
-    Self::deserialize_type_io_inner(xml_reader, None)
-  }
-
-  fn read_body_borrowed<'de>(
-    xml_reader: &mut crate::common::SliceReader<'de>,
-    xml_event: (quick_xml::events::BytesStart<'de>, bool),
-  ) -> Result<Self, crate::common::SdkError> {
-    Self::deserialize_type_borrowed_inner(xml_reader, Some(xml_event))
-  }
-
-  fn read_body_io<R: std::io::BufRead>(
-    xml_reader: &mut crate::common::IoReader<R>,
-    xml_event: (quick_xml::events::BytesStart<'static>, bool),
-  ) -> Result<Self, crate::common::SdkError> {
-    Self::deserialize_type_io_inner(xml_reader, Some(xml_event))
-  }
-
-  fn write_root<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
-    Self::write_type_xml(self, writer, "")
-  }
-
-  fn write_enveloped<W: std::io::Write>(
-    &self,
-    writer: &mut W,
-    xmlns_prefix: &str,
-    _name: ElementName,
-  ) -> Result<(), std::io::Error> {
-    Self::write_type_xml(self, writer, xmlns_prefix)
   }
 }
 

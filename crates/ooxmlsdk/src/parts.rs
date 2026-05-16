@@ -339,8 +339,9 @@ impl PartRef {
                 )
       } else {
         <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-          storage, part_id,
-        )
+                    storage,
+                    part_id,
+                )
       };
       return Some(PartRef::ExtendedPart(part));
     };
@@ -424,12 +425,12 @@ impl PartRef {
         if part.content_type() == "application/xml" =>
       {
         return Some(
-          <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::quick_access_toolbar_customizations_part::QuickAccessToolbarCustomizationsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2006/relationships/vbaProject"
         if part.content_type() == "application/vnd.ms-office.vbaProject" =>
@@ -466,12 +467,12 @@ impl PartRef {
         if part.content_type() == "application/vnd.ms-excel.intlmacrosheet+xml" =>
       {
         return Some(
-          <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::international_macro_sheet_part::InternationalMacroSheetPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet"
         if part.content_type() == "application/vnd.ms-excel.macrosheet+xml" =>
@@ -552,12 +553,12 @@ impl PartRef {
         if part.content_type() == "application/xml" =>
       {
         return Some(
-          <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::ribbon_and_backstage_customizations_part::RibbonAndBackstageCustomizationsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2011/relationships/chartColorStyle"
         if part.content_type() == "application/vnd.ms-office.chartcolorstyle+xml" =>
@@ -586,12 +587,12 @@ impl PartRef {
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml" =>
       {
         return Some(
-          <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::wordprocessing_comments_ex_part::WordprocessingCommentsExPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2011/relationships/people"
         if part.content_type()
@@ -663,23 +664,23 @@ impl PartRef {
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsIds+xml" =>
       {
         return Some(
-          <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::wordprocessing_comments_ids_part::WordprocessingCommentsIdsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/model3d"
         if part.content_type() == "model/gltf-binary" =>
       {
         return Some(
-          <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::model3_d_reference_relationship_part::Model3DReferenceRelationshipPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdArray"
         if part.content_type() == "application/vnd.ms-excel.rdarray+xml" =>
@@ -727,12 +728,12 @@ impl PartRef {
         if part.content_type() == "application/vnd.ms-excel.rdsupportingpropertybag+xml" =>
       {
         return Some(
-          <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::rd_supporting_property_bag_part::RdSupportingPropertyBagPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2017/06/relationships/rdSupportingPropertyBagStructure"
         if part.content_type()
@@ -772,12 +773,12 @@ impl PartRef {
         if part.content_type() == "application/vnd.ms-excel.threadedcomments+xml" =>
       {
         return Some(
-          <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::worksheet_threaded_comments_part::WorksheetThreadedCommentsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.microsoft.com/office/2018/08/relationships/commentsExtensible"
         if part.content_type()
@@ -870,12 +871,12 @@ impl PartRef {
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk" => {
         return Some(
-          <crate::parts::alternative_format_import_part::AlternativeFormatImportPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::alternative_format_import_part::AlternativeFormatImportPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain"
         if part.content_type()
@@ -985,12 +986,12 @@ impl PartRef {
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" => {
         return Some(
-          <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::embedded_control_persistence_part::EmbeddedControlPersistencePart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp"
         if part.content_type() == "application/vnd.ms-excel.controlproperties+xml" =>
@@ -1074,12 +1075,12 @@ impl PartRef {
           == "application/vnd.openxmlformats-officedocument.drawingml.diagramLayout+xml" =>
       {
         return Some(
-          <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::diagram_layout_definition_part::DiagramLayoutDefinitionPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/diagramQuickStyle"
         if part.content_type()
@@ -1320,12 +1321,12 @@ impl PartRef {
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml" =>
       {
         return Some(
-          <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::pivot_table_cache_definition_part::PivotTableCacheDefinitionPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords"
         if part.content_type()
@@ -1368,24 +1369,24 @@ impl PartRef {
           == "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings" =>
       {
         return Some(
-          <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::spreadsheet_printer_settings_part::SpreadsheetPrinterSettingsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
         if part.content_type()
           == "application/vnd.openxmlformats-officedocument.wordprocessingml.printerSettings" =>
       {
         return Some(
-          <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart>::make_part_ref(
-            storage,
-            part_id,
-            relationship_id,
-          ),
-        );
+                    <crate::parts::wordprocessing_printer_settings_part::WordprocessingPrinterSettingsPart>::make_part_ref(
+                        storage,
+                        part_id,
+                        relationship_id,
+                    ),
+                );
       }
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
         if part.content_type()
@@ -1743,8 +1744,9 @@ impl PartRef {
             )
     } else {
       <crate::parts::extended_part::ExtendedPart as crate::sdk::SdkPartInternal>::from_part_id_with_relationships(
-        storage, part_id,
-      )
+                storage,
+                part_id,
+            )
     };
     Some(PartRef::ExtendedPart(part))
   }

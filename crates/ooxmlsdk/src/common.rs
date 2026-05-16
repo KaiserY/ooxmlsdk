@@ -37,11 +37,12 @@ pub(crate) use xml::{
   IoReader, IoTagEvent, SliceReader, SliceTagEvent, decode_attr_value, from_bytes_inner,
   from_reader_inner, from_str_inner, parse_decimal_number_or_percent_attr,
   parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
-  read_outer_xml_borrowed, read_outer_xml_io, write_attr_value, write_attr_value_str,
-  write_decimal_number_or_percent_attr, write_end_tag, write_end_tag_bytes, write_escaped_str,
-  write_escaped_text, write_list_attr_value, write_list_value, write_measurement_or_percent_attr,
-  write_signed_twips_measure_attr, write_start_tag_open, write_start_tag_open_bytes,
-  write_twips_measure_attr, write_xmlns_attr,
+  read_outer_xml_borrowed, read_outer_xml_io, read_root_start_borrowed,
+  read_root_start_borrowed_no_header, read_root_start_io, read_root_start_io_no_header,
+  write_attr_value, write_attr_value_str, write_decimal_number_or_percent_attr, write_end_tag,
+  write_end_tag_bytes, write_escaped_str, write_escaped_text, write_list_attr_value,
+  write_list_value, write_measurement_or_percent_attr, write_signed_twips_measure_attr,
+  write_start_tag_open, write_start_tag_open_bytes, write_twips_measure_attr, write_xmlns_attr,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -89,7 +90,7 @@ pub(crate) fn canonical_xmlns_prefix<'a>(prefix: &'a str, uri: &str) -> &'a str 
   }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_attr_value<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -102,7 +103,7 @@ where
   xml::parse_attr_value(attr, decoder, ty, field)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_list_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -115,7 +116,7 @@ where
   xml::parse_list_attr(attr, decoder, ty, field)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_list_value<T>(
   value: &str,
   ty: &'static str,
@@ -130,7 +131,7 @@ where
 macro_rules! define_attr_parser_forwarders {
   ($($name:ident -> $ty:ty),* $(,)?) => {
     $(
-      #[inline(always)]
+      #[inline]
       pub(crate) fn $name(
         attr: &Attribute<'_>,
         decoder: Decoder,
@@ -155,7 +156,7 @@ define_attr_parser_forwarders! {
   parse_i64_attr -> i64,
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_enum_attr<T>(
   attr: &Attribute<'_>,
   decoder: Decoder,
@@ -167,7 +168,7 @@ where
   xml::parse_enum_attr(attr, decoder, ty)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_value<T>(
   value: &str,
   ty: &'static str,
@@ -179,13 +180,13 @@ where
   xml::parse_value(value, ty, field)
 }
 
-#[inline(always)]
+#[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches(actual: &str, canonical: &str) -> bool {
   actual == canonical || canonical_relationship_type(actual).as_ref() == canonical
 }
 
-#[inline(always)]
+#[inline]
 #[cfg(feature = "parts")]
 pub(crate) fn relationship_type_matches_alias(actual: &str, canonical: &str) -> bool {
   actual != canonical && canonical_relationship_type(actual).as_ref() == canonical
@@ -284,7 +285,7 @@ fn package_main_part_path_matches(
     && &actual_stem[descriptor_path_prefix.len() + 1..] == descriptor_target_name
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn push_xml_text(
   value: &mut Option<String>,
   text: quick_xml::events::BytesText<'_>,
@@ -292,7 +293,7 @@ pub(crate) fn push_xml_text(
   xml::push_xml_text(value, text)
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn push_xml_general_ref(
   value: &mut Option<String>,
   text: quick_xml::events::BytesRef<'_>,

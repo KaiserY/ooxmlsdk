@@ -46,6 +46,28 @@ impl DeserializeMode {
   }
 }
 
+fn write_typed_child_tokens(
+  child_ty: &syn::Type,
+  value: proc_macro2::TokenStream,
+  qname: &str,
+) -> proc_macro2::TokenStream {
+  let QNameInfo {
+    tag_prefix,
+    local_name,
+  } = parse_qname_info(qname);
+  let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
+  let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
+  quote! {
+    crate::common::write_start_tag_open_bytes(writer, xmlns_prefix, #tag_prefix_lit, #local_name_lit)?;
+    <#child_ty as crate::sdk::SdkType>::write_inner(
+      #value,
+      writer,
+      xmlns_prefix,
+      crate::sdk::ElementName::new(#tag_prefix_lit, #local_name_lit),
+    )?;
+  }
+}
+
 fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
   mode.deserialize_inner_ident()
 }
@@ -301,22 +323,25 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
   let inner_ty = unwrap_wrapped_type(&field.ty);
 
   match &field.kind {
-    NamedSequenceVariantFieldKind::Child { .. } => {
+    NamedSequenceVariantFieldKind::Child { qname } => {
       if field.repeated {
+        let child_write = write_typed_child_tokens(&inner_ty, quote! { child }, qname);
         quote! {
           for child in #field_ident {
-            child.write_xml(writer, xmlns_prefix)?;
+            #child_write
           }
         }
       } else if field.optional {
+        let child_write = write_typed_child_tokens(&inner_ty, quote! { child }, qname);
         quote! {
           if let Some(child) = #field_ident {
-            child.write_xml(writer, xmlns_prefix)?;
+            #child_write
           }
         }
       } else {
+        let child_write = write_typed_child_tokens(&inner_ty, quote! { #field_ident }, qname);
         quote! {
-          #field_ident.write_xml(writer, xmlns_prefix)?;
+          #child_write
         }
       }
     }
@@ -602,21 +627,25 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => {
-            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
 
+        let write_child = write_typed_child_tokens(&inner_payload_ty, quote! { value }, &qnames[0]);
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => value.write_xml(writer, xmlns_prefix),
+          Self::#variant_ident(value) => {
+            #write_child
+            Ok(())
+          },
         };
         write_arms.push(write_arm);
         let validate_arm = if is_box_type(&payload_ty) {
@@ -772,20 +801,25 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         helper_child_dispatch_tokens_borrowed.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = <#inner_ty>::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         helper_child_dispatch_tokens_io.push(quote! {
           #(#cfg_attrs)*
           if #inner_ty::matches_specific_start_qname(event_name) {
-            let parsed_child = <#inner_ty>::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#inner_ty as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
             return Ok(#constructor);
           }
         });
         let write_arm = quote! {
           #(#cfg_attrs)*
-          Self::#variant_ident(value) => value.write_xml(writer, xmlns_prefix),
+          Self::#variant_ident(value) => <#inner_ty as crate::sdk::SdkType>::write_inner(
+            value,
+            writer,
+            xmlns_prefix,
+            crate::sdk::ElementName::new(b"", b""),
+          ),
         };
         write_arms.push(write_arm);
         let validate_arm = if is_box_type(&payload_ty) {
@@ -869,7 +903,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_borrowed.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => {
-            let parsed_child = #helper_ident::#deserialize_borrowed_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_borrowed(xml_reader, e, empty_tag)?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
           }
@@ -877,7 +911,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         direct_child_dispatch_arms_io.push(quote! {
           #(#cfg_attrs)*
           #( #start_qname_patterns )|* => {
-            let parsed_child = #helper_ident::#deserialize_io_inner_ident(xml_reader, Some((e, empty_tag)))?;
+            let parsed_child = <#helper_ident as crate::sdk::SdkType>::read_io(xml_reader, e, empty_tag)?;
             let #helper_ident { #( #field_idents ),* } = parsed_child;
             return Ok(Self::#variant_ident { #( #field_idents ),* });
           }

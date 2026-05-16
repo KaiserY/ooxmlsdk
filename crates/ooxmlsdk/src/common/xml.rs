@@ -5,7 +5,7 @@ use quick_xml::{
 use std::io::BufRead;
 use std::io::Cursor;
 
-use super::{SdkError, invalid_field_value, unexpected_eof};
+use super::{SdkError, invalid_field_value, unexpected_eof, unexpected_tag};
 
 pub struct IoReader<R: BufRead> {
   reader: Reader<R>,
@@ -269,7 +269,7 @@ macro_rules! define_unsigned_decimal_attr_parser {
       }
     }
 
-    #[inline(always)]
+    #[inline]
     fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
       let digits = match value {
         [b'+', rest @ ..] => rest,
@@ -313,7 +313,7 @@ macro_rules! define_signed_decimal_attr_parser {
       }
     }
 
-    #[inline(always)]
+    #[inline]
     fn $bytes_name(value: &[u8], ty: &'static str, field: &'static str) -> Result<$ty, SdkError> {
       let (negative, digits) = match value {
         [b'-', rest @ ..] => (true, rest),
@@ -464,7 +464,7 @@ pub(crate) fn parse_measurement_or_percent_value(
   }
 }
 
-#[inline(always)]
+#[inline]
 fn try_parse_u32_bytes(value: &[u8]) -> Option<u32> {
   let digits = match value {
     [b'+', rest @ ..] => rest,
@@ -484,7 +484,7 @@ fn try_parse_u32_bytes(value: &[u8]) -> Option<u32> {
   Some(parsed)
 }
 
-#[inline(always)]
+#[inline]
 fn try_parse_i32_bytes(value: &[u8]) -> Option<i32> {
   let (negative, digits) = match value {
     [b'-', rest @ ..] => (true, rest),
@@ -511,7 +511,7 @@ fn try_parse_i32_bytes(value: &[u8]) -> Option<i32> {
   Some(parsed)
 }
 
-#[inline(always)]
+#[inline]
 fn try_parse_i64_bytes(value: &[u8]) -> Option<i64> {
   let (negative, digits) = match value {
     [b'-', rest @ ..] => (true, rest),
@@ -637,7 +637,7 @@ where
   T::from_xml_bytes(value.as_bytes())
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn parse_value<T>(
   value: &str,
   ty: &'static str,
@@ -680,12 +680,12 @@ where
     .collect()
 }
 
-#[inline(always)]
+#[inline]
 fn invalid_field_value_bytes(ty: &'static str, field: &'static str, value: &[u8]) -> SdkError {
   invalid_field_value(ty, field, String::from_utf8_lossy(value).into_owned())
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn push_xml_text(
   value: &mut Option<String>,
   text: BytesText<'_>,
@@ -700,7 +700,7 @@ pub(crate) fn push_xml_text(
   Ok(())
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn push_xml_general_ref(
   value: &mut Option<String>,
   text: BytesRef<'_>,
@@ -1100,6 +1100,120 @@ fn namespace_supported(ns: &str, target: crate::sdk::FileFormatVersion) -> bool 
 #[cfg(feature = "mce")]
 fn qname_in(name: &[u8], expected: &[&[u8]]) -> bool {
   expected.contains(&name)
+}
+
+#[inline]
+pub(crate) fn read_root_start_borrowed<'de>(
+  reader: &mut SliceReader<'de>,
+  owner: &'static str,
+  tag_qname: &'static [u8],
+  local_name: &'static [u8],
+) -> Result<
+  (
+    quick_xml::events::BytesStart<'de>,
+    bool,
+    crate::common::XmlHeaderType,
+  ),
+  SdkError,
+> {
+  let mut xml_header = crate::common::XmlHeaderType::None;
+  loop {
+    match reader.next_tag_event()? {
+      SliceTagEvent::Decl(standalone) => {
+        xml_header = if standalone {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+      }
+      SliceTagEvent::Start(e, empty) => {
+        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+          return Ok((e, empty, xml_header));
+        }
+        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
+      }
+      SliceTagEvent::Eof => return Err(unexpected_eof(owner)),
+      SliceTagEvent::End(_) | SliceTagEvent::Other => {}
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn read_root_start_io<R: std::io::BufRead>(
+  reader: &mut IoReader<R>,
+  owner: &'static str,
+  tag_qname: &'static [u8],
+  local_name: &'static [u8],
+) -> Result<
+  (
+    quick_xml::events::BytesStart<'static>,
+    bool,
+    crate::common::XmlHeaderType,
+  ),
+  SdkError,
+> {
+  let mut xml_header = crate::common::XmlHeaderType::None;
+  loop {
+    match reader.next_tag_event()? {
+      IoTagEvent::Decl(standalone) => {
+        xml_header = if standalone {
+          crate::common::XmlHeaderType::Standalone
+        } else {
+          crate::common::XmlHeaderType::Plain
+        };
+      }
+      IoTagEvent::Start(e, empty) => {
+        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+          return Ok((e, empty, xml_header));
+        }
+        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
+      }
+      IoTagEvent::Eof => return Err(unexpected_eof(owner)),
+      IoTagEvent::End(_) | IoTagEvent::Other => {}
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn read_root_start_borrowed_no_header<'de>(
+  reader: &mut SliceReader<'de>,
+  owner: &'static str,
+  tag_qname: &'static [u8],
+  local_name: &'static [u8],
+) -> Result<(quick_xml::events::BytesStart<'de>, bool), SdkError> {
+  loop {
+    match reader.next_tag_event()? {
+      SliceTagEvent::Start(e, empty) => {
+        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+          return Ok((e, empty));
+        }
+        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
+      }
+      SliceTagEvent::Eof => return Err(unexpected_eof(owner)),
+      SliceTagEvent::Decl(_) | SliceTagEvent::End(_) | SliceTagEvent::Other => {}
+    }
+  }
+}
+
+#[inline]
+pub(crate) fn read_root_start_io_no_header<R: std::io::BufRead>(
+  reader: &mut IoReader<R>,
+  owner: &'static str,
+  tag_qname: &'static [u8],
+  local_name: &'static [u8],
+) -> Result<(quick_xml::events::BytesStart<'static>, bool), SdkError> {
+  loop {
+    match reader.next_tag_event()? {
+      IoTagEvent::Start(e, empty) => {
+        if e.name().as_ref() == tag_qname || e.name().as_ref() == local_name {
+          return Ok((e, empty));
+        }
+        return Err(unexpected_tag(owner, owner, e.name().as_ref()));
+      }
+      IoTagEvent::Eof => return Err(unexpected_eof(owner)),
+      IoTagEvent::Decl(_) | IoTagEvent::End(_) | IoTagEvent::Other => {}
+    }
+  }
 }
 
 #[inline(always)]

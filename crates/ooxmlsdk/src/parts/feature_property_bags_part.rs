@@ -17,9 +17,9 @@ pub struct FeaturePropertyBagsPart {
 }
 impl FeaturePropertyBagsPart {
   crate::sdk_part_root_methods!(
-    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
-    FeaturePropertyBagsPart,
-    as_feature_property_bags_part,
-    as_feature_property_bags_part_mut
-  );
+        crate
+        ::schemas::schemas_microsoft_com_office_spreadsheetml_2022_featurepropertybag::FeaturePropertyBags,
+        FeaturePropertyBagsPart, as_feature_property_bags_part,
+        as_feature_property_bags_part_mut
+    );
 }

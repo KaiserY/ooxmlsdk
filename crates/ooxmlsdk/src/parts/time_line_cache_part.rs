@@ -17,9 +17,8 @@ pub struct TimeLineCachePart {
 }
 impl TimeLineCachePart {
   crate::sdk_part_root_methods!(
-    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
-    TimeLineCachePart,
-    as_time_line_cache_part,
-    as_time_line_cache_part_mut
-  );
+        crate
+        ::schemas::schemas_microsoft_com_office_spreadsheetml_2010_11_main::TimelineCacheDefinition,
+        TimeLineCachePart, as_time_line_cache_part, as_time_line_cache_part_mut
+    );
 }

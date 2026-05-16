@@ -105,6 +105,20 @@ Full generator/feature validation:
 
 For runtime/doc-sample iteration, start with `cargo test -p ooxmlsdk-test`. If the change touches Flat OPC, also run Flat OPC test. If the change touches MCE behavior, also run MCE tests. Add broader lanes only when the change touches generator code, shared runtime behavior, feature gates, package behavior, or validators.
 
+### Macro Expansion Checks
+
+When changing `crates/ooxmlsdk-derive`, dump macro expansion with the existing
+ignored test before deciding the implementation is correct:
+
+- `cargo test -p ooxmlsdk-derive dump_context_node_expansion -- --ignored --nocapture`
+
+The dump writes expanded Rust under `target/ooxmlsdk_macro_expanded/`. Inspect
+the relevant expanded file and keep generated code direct, predictable, and
+cheap: prefer static decisions from generator metadata, avoid redundant runtime
+branches, avoid duplicate parsing/writing paths, and remove helper code that no
+longer appears in expansion. Do not add temporary macro-dump crates or external
+tools.
+
 ## Upstream Sources
 
 Prefer local checkouts before browsing:

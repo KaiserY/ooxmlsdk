@@ -611,7 +611,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
     content_write_stmts.push(quote! {
       if entry_set.insert(self.inner_path.clone()) {
         zip.start_file(&self.inner_path, options)?;
-        let xml = self.root_element.to_xml_bytes()?;
+        let xml = self.root_element.to_bytes()?;
         zip.write_all(&xml)?;
       }
     });
@@ -744,7 +744,7 @@ pub(crate) fn expand_sdk_part(input: &DeriveInput) -> syn::Result<proc_macro2::T
             .compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o755);
           zip.start_file("[Content_Types].xml", options)?;
-          let xml = self.content_types.to_xml_bytes()?;
+          let xml = self.content_types.to_bytes()?;
           zip.write_all(&xml)?;
           <Self as crate::sdk::SdkPartTree>::save_zip(
             self,

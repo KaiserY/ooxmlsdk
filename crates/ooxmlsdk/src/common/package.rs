@@ -981,10 +981,7 @@ impl SdkPackageStorage {
         writer,
         "/_rels/.rels",
         RELATIONSHIP_CONTENT_TYPE,
-        &self
-          .package_relationships
-          .to_relationships()
-          .to_xml_bytes()?,
+        &self.package_relationships.to_relationships().to_bytes()?,
       )?;
     }
 
@@ -1009,7 +1006,7 @@ impl SdkPackageStorage {
           writer,
           &rels_name,
           RELATIONSHIP_CONTENT_TYPE,
-          &part.relationships().to_relationships().to_xml_bytes()?,
+          &part.relationships().to_relationships().to_bytes()?,
         )?;
       }
     }
@@ -1696,9 +1693,10 @@ impl SdkPackageStorage {
 
   fn remove_content_type_override(&mut self, path: &str) {
     let part_name = format!("/{path}");
-    self.content_types.types_choice.retain(|child| {
-      !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name)
-    });
+    self
+      .content_types
+      .types_choice
+      .retain(|child| !matches!(child, TypesChoice::Override(override_type) if override_type.part_name == part_name));
   }
 
   pub(crate) fn set_part_content_type(

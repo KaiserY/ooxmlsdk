@@ -4231,7 +4231,7 @@ pub struct Run {
   #[sdk(child(qname = "a:CT_TextCharacterProperties/a:rPr"))]
   pub run_properties: Option<std::boxed::Box<RunProperties>>,
   /// Text String
-  #[sdk(text_child(qname = "xsd:string/a:t"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/a:t"))]
   pub text: Text,
 }
 /// Text Line Break.
@@ -4261,7 +4261,7 @@ pub struct Field {
   #[sdk(child(qname = "a:CT_TextParagraphProperties/a:pPr"))]
   pub paragraph_properties: Option<std::boxed::Box<ParagraphProperties>>,
   /// Defines the Text Class.
-  #[sdk(text_child(qname = "xsd:string/a:t"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/a:t"))]
   pub text: Option<Text>,
 }
 /// Graphic Object.
@@ -11122,7 +11122,7 @@ pub enum TablePropertiesChoice3 {
   #[sdk(child(qname = "a:CT_TableStyle/a:tableStyle"))]
   ATableStyle(std::boxed::Box<TableStyle>),
   /// Table Style ID.
-  #[sdk(text_child(qname = "a:ST_Guid/a:tableStyleId"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "a:ST_Guid/a:tableStyleId"))]
   ATableStyleId(TableStyleId),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

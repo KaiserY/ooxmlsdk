@@ -13,9 +13,17 @@ pub type Value = crate::simple_type::StringValue;
 #[sdk(office2013, qname = "pRoam:CT_RoamingProperty/pRoam:props")]
 pub struct RoamingProperty {
   /// Defines the Key Class.
-  #[sdk(text_child(office2013, qname = "xsd:string/pRoam:key"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "StringValue",
+    qname = "xsd:string/pRoam:key"
+  ))]
   pub key: Key,
   /// Defines the Value Class.
-  #[sdk(text_child(office2013, qname = "xsd:string/pRoam:value"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "StringValue",
+    qname = "xsd:string/pRoam:value"
+  ))]
   pub value: Value,
 }

@@ -2742,8 +2742,8 @@ fn create_vba_preserve_fixtures(root: &Path) {
   <Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>
 </Types>"#
-    .to_string()
-    .into_bytes();
+      .to_string()
+      .into_bytes();
 
     let doc_rels = docx_doc_rels(
       r#"

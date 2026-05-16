@@ -991,7 +991,11 @@ pub struct AxisTitle {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1026,7 +1030,11 @@ pub struct CategoryAxis {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1061,7 +1069,11 @@ pub struct ChartArea {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1096,7 +1108,11 @@ pub struct DataLabel {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1131,7 +1147,11 @@ pub struct DataLabelCallout {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1166,7 +1186,11 @@ pub struct DataPoint {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1201,7 +1225,11 @@ pub struct DataPoint3D {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1236,7 +1264,11 @@ pub struct DataPointLine {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1271,7 +1303,11 @@ pub struct DataPointMarker {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1306,7 +1342,11 @@ pub struct DataPointWireframe {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1341,7 +1381,11 @@ pub struct DataTableStyle {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1376,7 +1420,11 @@ pub struct DownBar {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1411,7 +1459,11 @@ pub struct DropLine {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1446,7 +1498,11 @@ pub struct ErrorBar {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1481,7 +1537,11 @@ pub struct Floor {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1516,7 +1576,11 @@ pub struct GridlineMajor {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1551,7 +1615,11 @@ pub struct GridlineMinor {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1586,7 +1654,11 @@ pub struct HiLoLine {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1621,7 +1693,11 @@ pub struct LeaderLine {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1656,7 +1732,11 @@ pub struct LegendStyle {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1691,7 +1771,11 @@ pub struct PlotArea {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1726,7 +1810,11 @@ pub struct PlotArea3D {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1761,7 +1849,11 @@ pub struct SeriesAxis {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1796,7 +1888,11 @@ pub struct SeriesLine {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1831,7 +1927,11 @@ pub struct TitleStyle {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1866,7 +1966,11 @@ pub struct TrendlineStyle {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1901,7 +2005,11 @@ pub struct TrendlineLabel {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1936,7 +2044,11 @@ pub struct UpBar {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -1971,7 +2083,11 @@ pub struct ValueAxis {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]
@@ -2006,7 +2122,11 @@ pub struct Wall {
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:lnRef"))]
   pub line_reference: std::boxed::Box<LineReference>,
   /// Defines the LineWidthScale Class.
-  #[sdk(text_child(office2013, qname = "xsd:double/cs:lineWidthScale"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cs:lineWidthScale"
+  ))]
   pub line_width_scale: Option<LineWidthScale>,
   /// Defines the FillReference Class.
   #[sdk(child(office2013, qname = "cs:CT_StyleReference/cs:fillRef"))]

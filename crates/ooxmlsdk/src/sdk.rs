@@ -478,6 +478,19 @@ pub trait SdkEnum: Sized {
   }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ElementName {
+  pub prefix: &'static [u8],
+  pub local: &'static [u8],
+}
+
+impl ElementName {
+  #[inline]
+  pub const fn new(prefix: &'static [u8], local: &'static [u8]) -> Self {
+    Self { prefix, local }
+  }
+}
+
 pub trait SdkType: Sized {
   fn deserialize_type_borrowed_inner<'de>(
     _xml_reader: &mut crate::common::SliceReader<'de>,
@@ -510,6 +523,45 @@ pub trait SdkType: Sized {
   #[inline]
   fn matches_type_start_qname(_name: &[u8]) -> bool {
     false
+  }
+
+  fn read_root_borrowed<'de>(
+    xml_reader: &mut crate::common::SliceReader<'de>,
+  ) -> Result<Self, crate::common::SdkError> {
+    Self::deserialize_type_borrowed_inner(xml_reader, None)
+  }
+
+  fn read_root_io<R: std::io::BufRead>(
+    xml_reader: &mut crate::common::IoReader<R>,
+  ) -> Result<Self, crate::common::SdkError> {
+    Self::deserialize_type_io_inner(xml_reader, None)
+  }
+
+  fn read_body_borrowed<'de>(
+    xml_reader: &mut crate::common::SliceReader<'de>,
+    xml_event: (quick_xml::events::BytesStart<'de>, bool),
+  ) -> Result<Self, crate::common::SdkError> {
+    Self::deserialize_type_borrowed_inner(xml_reader, Some(xml_event))
+  }
+
+  fn read_body_io<R: std::io::BufRead>(
+    xml_reader: &mut crate::common::IoReader<R>,
+    xml_event: (quick_xml::events::BytesStart<'static>, bool),
+  ) -> Result<Self, crate::common::SdkError> {
+    Self::deserialize_type_io_inner(xml_reader, Some(xml_event))
+  }
+
+  fn write_root<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
+    Self::write_type_xml(self, writer, "")
+  }
+
+  fn write_enveloped<W: std::io::Write>(
+    &self,
+    writer: &mut W,
+    xmlns_prefix: &str,
+    _name: ElementName,
+  ) -> Result<(), std::io::Error> {
+    Self::write_type_xml(self, writer, xmlns_prefix)
   }
 }
 
@@ -1359,7 +1411,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
     part_id: crate::common::PartId,
   ) -> Result<Vec<u8>, crate::common::SdkError> {
     if let Some(root_element) = self.root_element(part_id) {
-      root_element.to_xml_bytes()
+      root_element.to_bytes()
     } else {
       let part = Self::storage(self).part(part_id).ok_or_else(|| {
         crate::common::SdkError::CommonError(format!(
@@ -1386,7 +1438,7 @@ pub trait SdkPackage: Clone + Sized + 'static {
   ) -> Result<(), crate::common::SdkError> {
     crate::sdk::SdkPackage::storage(self).write_flat_opc(writer, |part_id, part| {
       if let Some(root_element) = crate::sdk::SdkPackage::root_element(self, part_id) {
-        root_element.to_xml_bytes()
+        root_element.to_bytes()
       } else {
         Ok(part.data().bytes().to_vec())
       }
@@ -1956,9 +2008,10 @@ pub trait SdkPackage: Clone + Sized + 'static {
     crate::common::SdkError,
   > {
     let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
-    self.add_new_part_with_target_mode::<
-      crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart,
-    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+    self.add_new_part_with_target_mode::<crate::parts::extended_file_properties_part::ExtendedFilePropertiesPart>(
+      relationship_id,
+      crate::common::NewPartTargetMode::Fixed,
+    )
   }
 
   #[inline]
@@ -1969,9 +2022,10 @@ pub trait SdkPackage: Clone + Sized + 'static {
     crate::common::SdkError,
   > {
     let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
-    self.add_new_part_with_target_mode::<
-      crate::parts::custom_file_properties_part::CustomFilePropertiesPart,
-    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+    self.add_new_part_with_target_mode::<crate::parts::custom_file_properties_part::CustomFilePropertiesPart>(
+      relationship_id,
+      crate::common::NewPartTargetMode::Fixed,
+    )
   }
 
   #[inline]
@@ -1982,9 +2036,10 @@ pub trait SdkPackage: Clone + Sized + 'static {
     crate::common::SdkError,
   > {
     let relationship_id = crate::sdk::SdkPackage::relationships(self).next_relationship_id();
-    self.add_new_part_with_target_mode::<
-      crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart,
-    >(relationship_id, crate::common::NewPartTargetMode::Fixed)
+    self.add_new_part_with_target_mode::<crate::parts::digital_signature_origin_part::DigitalSignatureOriginPart>(
+      relationship_id,
+      crate::common::NewPartTargetMode::Fixed,
+    )
   }
 
   #[inline]
@@ -2678,10 +2733,11 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type::<
-      P,
-      crate::parts::alternative_format_import_part::AlternativeFormatImportPart,
-    >(package, relationship_id, content_type)
+    self.add_new_part_with_content_type::<P, crate::parts::alternative_format_import_part::AlternativeFormatImportPart>(
+      package,
+      relationship_id,
+      content_type,
+    )
   }
 
   #[inline]
@@ -2785,10 +2841,10 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_auto_id::<
-      P,
-      crate::parts::custom_property_part::CustomPropertyPart,
-    >(package, content_type)
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::custom_property_part::CustomPropertyPart>(
+      package,
+      content_type,
+    )
   }
 
   #[inline]
@@ -2834,10 +2890,7 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_and_extension::<
-      P,
-      crate::parts::custom_property_part::CustomPropertyPart,
-    >(
+    self.add_new_part_with_content_type_and_extension::<P, crate::parts::custom_property_part::CustomPropertyPart>(
       package,
       relationship_id,
       part_type.content_type(),
@@ -2854,10 +2907,10 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_auto_id::<
-      P,
-      crate::parts::embedded_object_part::EmbeddedObjectPart,
-    >(package, content_type)
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::embedded_object_part::EmbeddedObjectPart>(
+      package,
+      content_type,
+    )
   }
 
   #[inline]
@@ -2903,10 +2956,7 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_and_extension::<
-      P,
-      crate::parts::embedded_object_part::EmbeddedObjectPart,
-    >(
+    self.add_new_part_with_content_type_and_extension::<P, crate::parts::embedded_object_part::EmbeddedObjectPart>(
       package,
       relationship_id,
       part_type.content_type(),
@@ -2923,10 +2973,10 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_auto_id::<
-      P,
-      crate::parts::embedded_package_part::EmbeddedPackagePart,
-    >(package, content_type)
+    self.add_new_part_with_content_type_auto_id::<P, crate::parts::embedded_package_part::EmbeddedPackagePart>(
+      package,
+      content_type,
+    )
   }
 
   #[inline]
@@ -2939,10 +2989,11 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type::<
-      P,
-      crate::parts::embedded_package_part::EmbeddedPackagePart,
-    >(package, relationship_id, content_type)
+    self.add_new_part_with_content_type::<P, crate::parts::embedded_package_part::EmbeddedPackagePart>(
+      package,
+      relationship_id,
+      content_type,
+    )
   }
 
   #[inline]
@@ -2970,10 +3021,7 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type_and_extension::<
-      P,
-      crate::parts::embedded_package_part::EmbeddedPackagePart,
-    >(
+    self.add_new_part_with_content_type_and_extension::<P, crate::parts::embedded_package_part::EmbeddedPackagePart>(
       package,
       relationship_id,
       part_type.content_type(),
@@ -3079,10 +3127,11 @@ pub trait SdkPart: Clone + Sized + 'static {
   where
     P: SdkPackage,
   {
-    self.add_new_part_with_content_type::<
-      P,
-      crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart,
-    >(package, relationship_id, content_type)
+    self.add_new_part_with_content_type::<P, crate::parts::mail_merge_recipient_data_part::MailMergeRecipientDataPart>(
+      package,
+      relationship_id,
+      content_type,
+    )
   }
 
   #[inline]

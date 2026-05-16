@@ -123,6 +123,7 @@ struct PartDataRefInfo {
 struct SdkAttrField {
   ident: Ident,
   name: String,
+  simple_type: Option<String>,
   ty: Type,
   optional: bool,
   list: bool,
@@ -150,6 +151,7 @@ struct SdkEmptyChildField {
 struct SdkTextChildField {
   ident: Ident,
   qname: String,
+  simple_type: Option<String>,
   ty: Type,
   optional: bool,
   repeated: bool,
@@ -193,14 +195,30 @@ struct SdkTextField {
 
 #[derive(Clone)]
 enum SdkTypeFieldKind {
-  Attr { name: String, list: bool },
-  Child { qname: String },
-  EmptyChild { qname: String },
-  TextChild { qname: String, list: bool },
-  AnyChild { qname: String },
+  Attr {
+    name: String,
+    simple_type: Option<String>,
+    list: bool,
+  },
+  Child {
+    qname: String,
+  },
+  EmptyChild {
+    qname: String,
+  },
+  TextChild {
+    qname: String,
+    simple_type: Option<String>,
+    list: bool,
+  },
+  AnyChild {
+    qname: String,
+  },
   Choice,
   Any,
-  Text { list: bool },
+  Text {
+    list: bool,
+  },
 }
 
 #[derive(Clone)]
@@ -350,12 +368,21 @@ impl Parse for StringSetValues {
 }
 
 enum SdkChoiceVariantKind {
-  Child { qnames: Vec<String> },
-  EmptyChild { qnames: Vec<String> },
-  AnyChild { qnames: Vec<String> },
+  Child {
+    qnames: Vec<String>,
+  },
+  EmptyChild {
+    qnames: Vec<String>,
+  },
+  AnyChild {
+    qnames: Vec<String>,
+  },
   Choice,
   Sequence,
-  TextChild { qnames: Vec<String> },
+  TextChild {
+    qnames: Vec<String>,
+    simple_type: Option<String>,
+  },
   Any,
   Text,
 }
@@ -994,6 +1021,7 @@ fn is_sdk_version_marker_path(path: &syn::Path) -> bool {
 fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeFieldAttrs> {
   let mut attr_name = None;
   let mut attr_list = false;
+  let mut attr_simple_type = None;
   let mut kind = None;
   let mut choice_accepts_text = None;
   let mut choice_accepts_any = None;
@@ -1014,6 +1042,10 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               attr_name = Some(normalize_attr_qname(&value.value()));
+              Ok(())
+            } else if nested.path.is_ident("simple_type") {
+              let value: LitStr = nested.value()?.parse()?;
+              attr_simple_type = Some(value.value());
               Ok(())
             } else if nested.path.is_ident("list") {
               attr_list = true;
@@ -1066,11 +1098,16 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
+          let mut simple_type = None;
           let mut list = false;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("simple_type") {
+              let value: LitStr = nested.value()?.parse()?;
+              simple_type = Some(value.value());
               Ok(())
             } else if nested.path.is_ident("list") {
               list = true;
@@ -1083,6 +1120,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
           })?;
           kind = Some(SdkTypeFieldKind::TextChild {
             qname: qname.unwrap_or_default(),
+            simple_type,
             list,
           });
         }
@@ -1433,6 +1471,7 @@ fn parse_sdk_type_field_attrs(attrs: &[Attribute]) -> syn::Result<ParsedSdkTypeF
   if kind.is_none() && attr_name.is_some() {
     kind = Some(SdkTypeFieldKind::Attr {
       name: attr_name.unwrap_or_default(),
+      simple_type: attr_simple_type,
       list: attr_list,
     });
   }
@@ -1450,6 +1489,7 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   let mut child_qnames = Vec::new();
   let mut empty_child_qnames = Vec::new();
   let mut text_child_qnames = Vec::new();
+  let mut text_child_simple_type = None;
   let mut any_child_qnames = Vec::new();
   for attr in attrs {
     if !attr.path().is_ident("sdk") {
@@ -1491,10 +1531,15 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
         }
         Meta::List(meta) if meta.path.is_ident("text_child") => {
           let mut qname = None;
+          let mut simple_type = None;
           meta.parse_nested_meta(|nested| {
             if nested.path.is_ident("qname") {
               let value: LitStr = nested.value()?.parse()?;
               qname = Some(value.value());
+              Ok(())
+            } else if nested.path.is_ident("simple_type") {
+              let value: LitStr = nested.value()?.parse()?;
+              simple_type = Some(value.value());
               Ok(())
             } else if nested.path.is_ident("list") || is_sdk_version_marker_path(&nested.path) {
               Ok(())
@@ -1502,6 +1547,18 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
               Err(nested.error("unsupported sdk choice text_child attribute"))
             }
           })?;
+          if let Some(simple_type) = simple_type {
+            if let Some(existing) = &text_child_simple_type {
+              if existing != &simple_type {
+                return Err(syn::Error::new_spanned(
+                  meta,
+                  "all sdk choice text_child simple_type values must match",
+                ));
+              }
+            } else {
+              text_child_simple_type = Some(simple_type);
+            }
+          }
           text_child_qnames.push(qname.unwrap_or_default());
         }
         Meta::List(meta) if meta.path.is_ident("any_child") => {
@@ -1556,6 +1613,7 @@ fn parse_sdk_choice_variant_kind(attrs: &[Attribute]) -> syn::Result<Option<SdkC
   if !text_child_qnames.is_empty() {
     return Ok(Some(SdkChoiceVariantKind::TextChild {
       qnames: text_child_qnames,
+      simple_type: text_child_simple_type,
     }));
   }
   if !any_child_qnames.is_empty() {
@@ -1763,29 +1821,57 @@ fn unwrap_option_vec_type(ty: &Type) -> Type {
 }
 
 fn is_string_like_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    matches!(
-      segment.ident.to_string().as_str(),
-      "str"
-        | "String"
-        | "StringValue"
-        | "DateTimeValue"
-        | "DecimalValue"
-        | "HexBinaryValue"
-        | "Base64BinaryValue"
-        | "UniversalMeasureValue"
-        | "PositiveUniversalMeasureValue"
-    )
-  }))
+  type_terminal_name(ty).is_some_and(|name| is_string_like_type_name(name.as_str()))
 }
 
-fn is_sdk_enum_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    matches!(
-      segment.ident.to_string().as_str(),
-      "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
-    ) || segment.ident.to_string().ends_with("Values")
-  }))
+fn type_terminal_name(ty: &Type) -> Option<String> {
+  match ty {
+    Type::Path(TypePath { path, .. }) => path
+      .segments
+      .last()
+      .map(|segment| segment.ident.to_string()),
+    _ => None,
+  }
+}
+
+fn effective_type_name<'a>(ty: &'a Type, simple_type: Option<&'a str>) -> Option<String> {
+  simple_type
+    .map(str::to_string)
+    .or_else(|| type_terminal_name(ty))
+}
+
+fn is_string_like_type_name(name: &str) -> bool {
+  matches!(
+    name,
+    "str"
+      | "String"
+      | "StringValue"
+      | "DateTimeValue"
+      | "DecimalValue"
+      | "HexBinaryValue"
+      | "Base64BinaryValue"
+      | "UniversalMeasureValue"
+      | "PositiveUniversalMeasureValue"
+  )
+}
+
+fn is_string_like_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type)
+    .as_deref()
+    .is_some_and(is_string_like_type_name)
+}
+
+fn is_sdk_enum_type_name(name: &str) -> bool {
+  matches!(
+    name,
+    "BooleanValue" | "OnOffValue" | "TrueFalseBlankValue" | "TrueFalseValue"
+  ) || name.ends_with("Values")
+}
+
+fn is_sdk_enum_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type)
+    .as_deref()
+    .is_some_and(is_sdk_enum_type_name)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1797,17 +1883,24 @@ enum SimpleUnionTypeKind {
 }
 
 fn simple_union_type_kind(ty: &Type) -> Option<SimpleUnionTypeKind> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let ident = path.segments.last()?.ident.to_string();
-  Some(match ident.as_str() {
+  type_terminal_name(ty).and_then(|ident| simple_union_type_kind_name(ident.as_str()))
+}
+
+fn simple_union_type_kind_name(name: &str) -> Option<SimpleUnionTypeKind> {
+  Some(match name {
     "TwipsMeasureValue" => SimpleUnionTypeKind::TwipsMeasure,
     "SignedTwipsMeasureValue" => SimpleUnionTypeKind::SignedTwipsMeasure,
     "DecimalNumberOrPercentValue" => SimpleUnionTypeKind::DecimalNumberOrPercent,
     "MeasurementOrPercentValue" => SimpleUnionTypeKind::MeasurementOrPercent,
     _ => return None,
   })
+}
+
+fn simple_union_effective_type_kind(
+  ty: &Type,
+  simple_type: Option<&str>,
+) -> Option<SimpleUnionTypeKind> {
+  effective_type_name(ty, simple_type).and_then(|name| simple_union_type_kind_name(name.as_str()))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1823,12 +1916,8 @@ enum IntegerTypeKind {
   I64,
 }
 
-fn integer_type_kind(ty: &Type) -> Option<IntegerTypeKind> {
-  let Type::Path(TypePath { path, .. }) = ty else {
-    return None;
-  };
-  let ident = path.segments.last()?.ident.to_string();
-  Some(match ident.as_str() {
+fn integer_type_kind_name(name: &str) -> Option<IntegerTypeKind> {
+  Some(match name {
     "ByteValue" | "u8" => IntegerTypeKind::U8,
     "SByteValue" | "i8" => IntegerTypeKind::I8,
     "UInt16Value" | "u16" => IntegerTypeKind::U16,
@@ -1842,18 +1931,45 @@ fn integer_type_kind(ty: &Type) -> Option<IntegerTypeKind> {
   })
 }
 
+fn integer_effective_type_kind(ty: &Type, simple_type: Option<&str>) -> Option<IntegerTypeKind> {
+  effective_type_name(ty, simple_type).and_then(|name| integer_type_kind_name(name.as_str()))
+}
+
 fn is_xml_schema_float_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| {
-    matches!(segment.ident.to_string().as_str(), "DoubleValue" | "SingleValue" | "f64" | "f32")
-  }))
+  type_terminal_name(ty).is_some_and(|name| is_xml_schema_float_type_name(name.as_str()))
+}
+
+fn is_xml_schema_float_type_name(name: &str) -> bool {
+  matches!(name, "DoubleValue" | "SingleValue" | "f64" | "f32")
 }
 
 fn write_xml_schema_float_tokens(
   value_expr: proc_macro2::TokenStream,
   float_ty: &Type,
 ) -> proc_macro2::TokenStream {
-  let (positive_infinity, negative_infinity) = if matches!(float_ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| matches!(segment.ident.to_string().as_str(), "SingleValue" | "f32")))
-  {
+  write_xml_schema_float_tokens_with_qname(value_expr, float_ty, "")
+}
+
+fn write_xml_schema_float_tokens_with_qname(
+  value_expr: proc_macro2::TokenStream,
+  float_ty: &Type,
+  qname: &str,
+) -> proc_macro2::TokenStream {
+  write_xml_schema_float_effective_tokens(value_expr, float_ty, None, qname)
+}
+
+fn write_xml_schema_float_effective_tokens(
+  value_expr: proc_macro2::TokenStream,
+  float_ty: &Type,
+  simple_type: Option<&str>,
+  qname: &str,
+) -> proc_macro2::TokenStream {
+  let single_precision = matches!(
+    qname.split_once('/').map(|(type_name, _)| type_name),
+    Some("xsd:float")
+  ) || effective_type_name(float_ty, simple_type)
+    .is_some_and(|name| matches!(name.as_str(), "SingleValue" | "f32"));
+  let (positive_infinity, negative_infinity) = if single_precision {
     (quote! { f32::INFINITY }, quote! { f32::NEG_INFINITY })
   } else {
     (quote! { f64::INFINITY }, quote! { f64::NEG_INFINITY })
@@ -1875,59 +1991,62 @@ fn write_xml_schema_float_tokens(
   }
 }
 
-fn parse_integer_attr_tokens(
+fn parse_integer_attr_tokens_by_kind(
+  kind: IntegerTypeKind,
   attr_expr: proc_macro2::TokenStream,
   decoder_expr: proc_macro2::TokenStream,
-  integer_ty: &Type,
   owner_expr: proc_macro2::TokenStream,
   field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-  match integer_type_kind(integer_ty) {
-    Some(IntegerTypeKind::U8) => quote! {
+  match kind {
+    IntegerTypeKind::U8 => quote! {
       crate::common::parse_u8_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::I8) => quote! {
+    IntegerTypeKind::I8 => quote! {
       crate::common::parse_i8_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::U16) => quote! {
+    IntegerTypeKind::U16 => quote! {
       crate::common::parse_u16_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::I16) => quote! {
+    IntegerTypeKind::I16 => quote! {
       crate::common::parse_i16_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::U32) => quote! {
+    IntegerTypeKind::U32 => quote! {
       crate::common::parse_u32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::I32) => quote! {
+    IntegerTypeKind::I32 => quote! {
       crate::common::parse_i32_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::I32ZeroOnOverflow) => quote! {
+    IntegerTypeKind::I32ZeroOnOverflow => quote! {
       crate::common::parse_i32_zero_on_overflow_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::U64) => quote! {
+    IntegerTypeKind::U64 => quote! {
       crate::common::parse_u64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    Some(IntegerTypeKind::I64) => quote! {
+    IntegerTypeKind::I64 => quote! {
       crate::common::parse_i64_attr(#attr_expr, #decoder_expr, #owner_expr, #field_expr)?
     },
-    None => unreachable!("parse_integer_attr_tokens requires an integer-like type"),
   }
 }
 
 fn is_hex_binary_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "HexBinaryValue"))
+  type_terminal_name(ty).as_deref() == Some("HexBinaryValue")
 }
 
-fn is_base64_binary_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "Base64BinaryValue"))
+fn is_hex_binary_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type).as_deref() == Some("HexBinaryValue")
 }
 
-fn is_decimal_value_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "DecimalValue"))
+fn is_base64_binary_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type).as_deref() == Some("Base64BinaryValue")
 }
 
-fn is_datetime_value_type(ty: &Type) -> bool {
-  matches!(ty, Type::Path(TypePath { path, .. }) if path.segments.last().is_some_and(|segment| segment.ident == "DateTimeValue"))
+fn is_decimal_value_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type).as_deref() == Some("DecimalValue")
+}
+
+fn is_datetime_value_effective_type(ty: &Type, simple_type: Option<&str>) -> bool {
+  effective_type_name(ty, simple_type).as_deref() == Some("DateTimeValue")
 }
 
 fn choice_variant_payload_type(variant: &syn::Variant) -> syn::Result<Type> {

@@ -207,7 +207,7 @@ pub struct CategoryFilterException {
 #[sdk(office2016, qname = "c:CT_NumData/c16:numCache")]
 pub struct NumberDataType {
   /// Format Code
-  #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:formatCode"))]
   pub format_code: Option<crate::schemas::c::FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
@@ -309,7 +309,11 @@ pub type XsdunsignedInt = crate::simple_type::UInt32Value;
 )]
 pub struct ChartDataPointUniqueIdMapEntry {
   /// Defines the XsdunsignedInt Class.
-  #[sdk(text_child(office2016, qname = "xsd:unsignedInt/c16:ptidx"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "UInt32Value",
+    qname = "xsd:unsignedInt/c16:ptidx"
+  ))]
   pub xsdunsigned_int: XsdunsignedInt,
   /// Defines the UniqueID Class.
   #[sdk(child(office2016, qname = "c16:CT_ChartUniqueID/c16:uniqueID"))]
@@ -393,7 +397,7 @@ pub struct DLblChoiceSequence {
   #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
   pub show_bubble_size: Option<crate::schemas::c::ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(qname = "xsd:string/c:separator"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:separator"))]
   pub separator: Option<crate::schemas::c::Separator>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

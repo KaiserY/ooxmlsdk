@@ -6673,7 +6673,10 @@ pub struct SimpleFieldRuby {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data.
-  #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
+  #[sdk(text_child(
+    simple_type = "Base64BinaryValue",
+    qname = "w:CT_Base64BinaryText/w:fldData"
+  ))]
   pub field_data: Option<FieldData>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlRuby/w:customXml",
@@ -8028,7 +8031,10 @@ pub struct SimpleField {
   #[sdk(attr(qname = "w:dirty"))]
   pub dirty: Option<crate::simple_type::OnOffValue>,
   /// Custom Field Data
-  #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
+  #[sdk(text_child(
+    simple_type = "Base64BinaryValue",
+    qname = "w:CT_Base64BinaryText/w:fldData"
+  ))]
   pub field_data: Option<FieldData>,
   #[sdk(choice(
     qname = "w:CT_CustomXmlRun/w:customXml",
@@ -15801,7 +15807,10 @@ pub enum PictureChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FieldCharChoice {
   /// Custom Field Data.
-  #[sdk(text_child(qname = "w:CT_Base64BinaryText/w:fldData"))]
+  #[sdk(text_child(
+    simple_type = "Base64BinaryValue",
+    qname = "w:CT_Base64BinaryText/w:fldData"
+  ))]
   WFldData(FieldData),
   /// Form Field Properties.
   #[sdk(child(qname = "w:CT_FFData/w:ffData"))]

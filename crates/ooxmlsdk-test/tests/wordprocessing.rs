@@ -91,7 +91,7 @@ fn append_run_text(run: &Run, out: &mut String) {
 
 #[test]
 fn twips_measure_attr_preserves_universal_measure_variant() {
-  let columns = Columns::from_str(r#"<w:cols w:space="1.5in"></w:cols>"#).unwrap();
+  let columns: Columns = r#"<w:cols w:space="1.5in"></w:cols>"#.parse().unwrap();
   assert_eq!(
     columns.space,
     Some(TwipsMeasureValue::PositiveUniversalMeasure(
@@ -102,7 +102,7 @@ fn twips_measure_attr_preserves_universal_measure_variant() {
   let xml = columns.to_xml().unwrap();
   assert!(xml.contains(r#"w:space="1.5in""#));
 
-  let numeric = Columns::from_str(r#"<w:cols w:space="720"></w:cols>"#).unwrap();
+  let numeric: Columns = r#"<w:cols w:space="720"></w:cols>"#.parse().unwrap();
   assert_eq!(
     numeric.space,
     Some(TwipsMeasureValue::UnsignedDecimalNumber(720))

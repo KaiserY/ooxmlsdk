@@ -561,7 +561,7 @@ pub struct WebExtension {
   #[sdk(attr(office2013, qname = ":appRef"))]
   pub application_reference: crate::simple_type::StringValue,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
   pub formula: crate::schemas::xne::Formula,
 }
 /// Defines the TimelineCacheReference Class.
@@ -834,7 +834,7 @@ pub struct PivotValueCell {
   #[sdk(attr(office2013, qname = ":t"))]
   pub text: Option<SxvCellType>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(office2013, qname = "x:ST_Xstring/x15:v"))]
+  #[sdk(text_child(office2013, simple_type = "StringValue", qname = "x:ST_Xstring/x15:v"))]
   pub xstring: Xstring,
   /// Defines the PivotValueCellExtra Class.
   #[sdk(child(office2013, qname = "x15:CT_PivotValueCellExtra/x15:x"))]

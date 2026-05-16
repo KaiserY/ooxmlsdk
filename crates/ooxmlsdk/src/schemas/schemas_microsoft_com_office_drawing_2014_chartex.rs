@@ -896,7 +896,11 @@ pub struct GeoPolygons {
 #[sdk(office2016, qname = "cx:CT_Copyrights/cx:copyrights")]
 pub struct Copyrights {
   /// Defines the CopyrightXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:copyright"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:copyright"
+  ))]
   pub cx_copyright: Vec<CopyrightXsdstring>,
 }
 /// Defines the GeoDataEntityQuery Class.
@@ -1409,7 +1413,11 @@ pub struct DataLabel {
   #[sdk(child(office2016, qname = "cx:CT_DataLabelVisibilities/cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:separator"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:separator"
+  ))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
@@ -1492,7 +1500,11 @@ pub struct DataLabels {
   #[sdk(child(office2016, qname = "cx:CT_DataLabelVisibilities/cx:visibility"))]
   pub data_label_visibilities: Option<DataLabelVisibilities>,
   /// Defines the SeparatorXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:separator"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:separator"
+  ))]
   pub separator_xsdstring: Option<SeparatorXsdstring>,
   /// Defines the DataLabel Class.
   #[sdk(child(office2016, qname = "cx:CT_DataLabel/cx:dataLabel"))]
@@ -1600,7 +1612,11 @@ pub struct Series {
   #[sdk(child(office2016, qname = "cx:CT_SeriesLayoutProperties/cx:layoutPr"))]
   pub cx_layout_pr: Option<std::boxed::Box<SeriesLayoutProperties>>,
   /// Defines the AxisId Class.
-  #[sdk(text_child(office2016, qname = "cx:ST_AxisId/cx:axisId"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "UInt32Value",
+    qname = "cx:ST_AxisId/cx:axisId"
+  ))]
   pub cx_axis_id: Vec<AxisId>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "cx:CT_ExtensionList/cx:extLst"))]
@@ -1769,22 +1785,46 @@ pub struct HeaderFooter {
   #[sdk(attr(office2016, qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Defines the OddHeaderXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:oddHeader"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:oddHeader"
+  ))]
   pub odd_header_xsdstring: Option<OddHeaderXsdstring>,
   /// Defines the OddFooterXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:oddFooter"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:oddFooter"
+  ))]
   pub odd_footer_xsdstring: Option<OddFooterXsdstring>,
   /// Defines the EvenHeaderXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:evenHeader"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:evenHeader"
+  ))]
   pub even_header_xsdstring: Option<EvenHeaderXsdstring>,
   /// Defines the EvenFooterXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:evenFooter"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:evenFooter"
+  ))]
   pub even_footer_xsdstring: Option<EvenFooterXsdstring>,
   /// Defines the FirstHeaderXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:firstHeader"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:firstHeader"
+  ))]
   pub first_header_xsdstring: Option<FirstHeaderXsdstring>,
   /// Defines the FirstFooterXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:firstFooter"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "xsd:string/cx:firstFooter"
+  ))]
   pub first_footer_xsdstring: Option<FirstFooterXsdstring>,
 }
 /// Defines the PageMargins Class.
@@ -2082,11 +2122,11 @@ pub enum TextDataChoice {
     #[sdk(child(office2016, qname = "cx:CT_Formula/cx:f"))]
     formula: std::boxed::Box<Formula>,
     /// Defines the VXsdstring Class.
-    #[sdk(text_child(office2016, qname = "xsd:string/cx:v"))]
+    #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xsd:string/cx:v"))]
     v_xsdstring: Option<VXsdstring>,
   },
   /// Defines the VXsdstring Class.
-  #[sdk(text_child(office2016, qname = "xsd:string/cx:v"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "xsd:string/cx:v"))]
   CxV(VXsdstring),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -2140,7 +2180,11 @@ pub enum ShapePropertiesChoice3 {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum GeoCacheChoice {
   /// Defines the Xsdbase64Binary Class.
-  #[sdk(text_child(office2016, qname = "xsd:base64Binary/cx:binary"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "Base64BinaryValue",
+    qname = "xsd:base64Binary/cx:binary"
+  ))]
   CxBinary(Xsdbase64Binary),
   /// Defines the Clear Class.
   #[sdk(child(office2016, qname = "cx:CT_Clear/cx:clear"))]
@@ -2149,10 +2193,18 @@ pub enum GeoCacheChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BinningChoice {
   /// Defines the Xsddouble Class.
-  #[sdk(text_child(office2016, qname = "xsd:double/cx:binSize"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "DoubleValue",
+    qname = "xsd:double/cx:binSize"
+  ))]
   CxBinSize(Xsddouble),
   /// Defines the BinCountXsdunsignedInt Class.
-  #[sdk(text_child(office2016, qname = "xsd:unsignedInt/cx:binCount"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "UInt32Value",
+    qname = "xsd:unsignedInt/cx:binCount"
+  ))]
   CxBinCount(BinCountXsdunsignedInt),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

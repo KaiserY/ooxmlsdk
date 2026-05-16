@@ -654,10 +654,13 @@ pub struct OleObject {
   #[sdk(text_child(qname = "o:ST_OLELinkType/o:LinkType"))]
   pub link_type: Option<LinkType>,
   /// Embedded Object Cannot Be Refreshed
-  #[sdk(text_child(qname = "o:ST_TrueFalseBlank/o:LockedField"))]
+  #[sdk(text_child(
+    simple_type = "TrueFalseBlankValue",
+    qname = "o:ST_TrueFalseBlank/o:LockedField"
+  ))]
   pub locked_field: Option<LockedField>,
   /// WordprocessingML Field Switches
-  #[sdk(text_child(qname = "xsd:string/o:FieldCodes"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/o:FieldCodes"))]
   pub field_codes: Option<FieldCodes>,
 }
 /// Complex.

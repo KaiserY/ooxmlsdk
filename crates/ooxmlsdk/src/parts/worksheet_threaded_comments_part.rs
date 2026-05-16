@@ -17,9 +17,9 @@ pub struct WorksheetThreadedCommentsPart {
 }
 impl WorksheetThreadedCommentsPart {
   crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
-        WorksheetThreadedCommentsPart, as_worksheet_threaded_comments_part,
-        as_worksheet_threaded_comments_part_mut
-    );
+    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2018_threadedcomments::ThreadedComments,
+    WorksheetThreadedCommentsPart,
+    as_worksheet_threaded_comments_part,
+    as_worksheet_threaded_comments_part_mut
+  );
 }

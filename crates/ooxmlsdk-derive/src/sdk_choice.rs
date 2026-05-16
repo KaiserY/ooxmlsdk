@@ -52,9 +52,16 @@ fn deserialize_choice_inner_ident(mode: DeserializeMode) -> Ident {
 
 #[derive(Clone)]
 enum NamedSequenceVariantFieldKind {
-  Child { qname: String },
-  EmptyChild { qname: String },
-  TextChild { qname: String },
+  Child {
+    qname: String,
+  },
+  EmptyChild {
+    qname: String,
+  },
+  TextChild {
+    qname: String,
+    simple_type: Option<String>,
+  },
 }
 
 #[derive(Clone)]
@@ -152,7 +159,7 @@ fn choice_child_local_name_fallback_qnames(
       Some(SdkChoiceVariantKind::Child { qnames })
       | Some(SdkChoiceVariantKind::EmptyChild { qnames })
       | Some(SdkChoiceVariantKind::AnyChild { qnames })
-      | Some(SdkChoiceVariantKind::TextChild { qnames }) => {
+      | Some(SdkChoiceVariantKind::TextChild { qnames, .. }) => {
         for qname in qnames {
           let QNameInfo { local_name, .. } = parse_qname_info(&qname);
           local_name_qnames.entry(local_name).or_default().push(qname);
@@ -265,9 +272,9 @@ fn parse_named_sequence_variant_fields(
     let kind = match field_kind {
       SdkTypeFieldKind::Child { qname, .. } => NamedSequenceVariantFieldKind::Child { qname },
       SdkTypeFieldKind::EmptyChild { qname } => NamedSequenceVariantFieldKind::EmptyChild { qname },
-      SdkTypeFieldKind::TextChild { qname, .. } => {
-        NamedSequenceVariantFieldKind::TextChild { qname }
-      }
+      SdkTypeFieldKind::TextChild {
+        qname, simple_type, ..
+      } => NamedSequenceVariantFieldKind::TextChild { qname, simple_type },
       _ => {
         return Err(syn::Error::new_spanned(
           field,
@@ -338,15 +345,23 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
         write_tokens
       }
     }
-    NamedSequenceVariantFieldKind::TextChild { qname } => {
+    NamedSequenceVariantFieldKind::TextChild { qname, simple_type } => {
       let QNameInfo {
         tag_prefix,
         local_name,
       } = parse_qname_info(qname);
       let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-        let value_write_tokens = if is_xml_schema_float_type(&inner_ty) {
-          write_xml_schema_float_tokens(value_expr.clone(), &inner_ty)
-        } else if is_string_like_type(&inner_ty) {
+        let value_write_tokens = if effective_type_name(&inner_ty, simple_type.as_deref())
+          .as_deref()
+          .is_some_and(is_xml_schema_float_type_name)
+        {
+          write_xml_schema_float_effective_tokens(
+            value_expr.clone(),
+            &inner_ty,
+            simple_type.as_deref(),
+            qname,
+          )
+        } else if is_string_like_effective_type(&inner_ty, simple_type.as_deref()) {
           quote! {
             crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
           }
@@ -841,7 +856,7 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
         let start_qname = match &named_fields[0].kind {
           NamedSequenceVariantFieldKind::Child { qname }
           | NamedSequenceVariantFieldKind::EmptyChild { qname }
-          | NamedSequenceVariantFieldKind::TextChild { qname } => qname,
+          | NamedSequenceVariantFieldKind::TextChild { qname, .. } => qname,
         };
         let start_qname_patterns = choice_qname_patterns(
           std::slice::from_ref(start_qname),
@@ -907,43 +922,50 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           },
         });
       }
-      (Fields::Unnamed(fields), SdkChoiceVariantKind::TextChild { qnames })
-        if fields.unnamed.len() == 1 =>
-      {
+      (
+        Fields::Unnamed(fields),
+        SdkChoiceVariantKind::TextChild {
+          qnames,
+          simple_type,
+        },
+      ) if fields.unnamed.len() == 1 => {
         let payload_ty = choice_variant_payload_type(variant)?;
         let qname_patterns = choice_qname_patterns(&qnames, &local_name_fallback_qnames);
         let QNameInfo {
           tag_prefix,
           local_name,
         } = parse_qname_info(qnames.first().map(String::as_str).unwrap_or_default());
+        let write_qname = qnames.first().map(String::as_str).unwrap_or_default();
         let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
         let tag_qname_lit = LitByteStr::new(
           format!("{tag_prefix}:{local_name}").as_bytes(),
           Span::call_site(),
         );
-        let parse_from_text_tokens = if is_string_like_type(&payload_ty) {
-          quote! { text.unwrap_or_default() }
-        } else {
-          quote! {{
-            let value = text.unwrap_or_default();
-            crate::common::parse_value::<#payload_ty>(
-              &value,
-              stringify!(#ident),
-              stringify!(#variant_ident),
-            )?
-          }}
-        };
-        let empty_value_tokens = if is_string_like_type(&payload_ty) {
-          quote! { Default::default() }
-        } else {
-          quote! {
-            crate::common::parse_value::<#payload_ty>(
-              "",
-              stringify!(#ident),
-              stringify!(#variant_ident),
-            )?
-          }
-        };
+        let parse_from_text_tokens =
+          if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
+            quote! { text.unwrap_or_default() }
+          } else {
+            quote! {{
+              let value = text.unwrap_or_default();
+              crate::common::parse_value::<#payload_ty>(
+                &value,
+                stringify!(#ident),
+                stringify!(#variant_ident),
+              )?
+            }}
+          };
+        let empty_value_tokens =
+          if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
+            quote! { Default::default() }
+          } else {
+            quote! {
+              crate::common::parse_value::<#payload_ty>(
+                "",
+                stringify!(#ident),
+                stringify!(#variant_ident),
+              )?
+            }
+          };
         direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
@@ -1024,9 +1046,17 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             return Ok(Self::#variant_ident(parsed_child));
           }
         });
-        let value_write_tokens = if is_xml_schema_float_type(&payload_ty) {
-          write_xml_schema_float_tokens(quote! { value }, &payload_ty)
-        } else if is_string_like_type(&payload_ty) {
+        let value_write_tokens = if effective_type_name(&payload_ty, simple_type.as_deref())
+          .as_deref()
+          .is_some_and(is_xml_schema_float_type_name)
+        {
+          write_xml_schema_float_effective_tokens(
+            quote! { value },
+            &payload_ty,
+            simple_type.as_deref(),
+            write_qname,
+          )
+        } else if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
           quote! {
             crate::common::write_escaped_str(writer, value.as_ref())?;
           }

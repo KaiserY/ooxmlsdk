@@ -384,7 +384,11 @@ pub struct SupportingPropertyBag {
   #[sdk(attr(office2019, qname = ":s"))]
   pub s: crate::simple_type::UInt32Value,
   /// Defines the SupportingPropertyBagValue Class.
-  #[sdk(text_child(office2019, qname = "xlrd2:CT_SupportingPropertyBagValue/xlrd2:v"))]
+  #[sdk(text_child(
+    office2019,
+    simple_type = "StringValue",
+    qname = "xlrd2:CT_SupportingPropertyBagValue/xlrd2:v"
+  ))]
   pub xlrd2_v: Vec<SupportingPropertyBagValue>,
 }
 /// Defines the SupportingPropertyBagValue Class.

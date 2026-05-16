@@ -1510,7 +1510,7 @@ pub struct NumericPoint {
   #[sdk(attr(qname = ":formatCode"))]
   pub format_code: Option<crate::simple_type::StringValue>,
   /// Numeric Value
-  #[sdk(text_child(qname = "c:ST_Xstring/c:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:v"))]
   pub numeric_value: NumericValue,
 }
 /// Defines the ExtensionList Class.
@@ -1527,7 +1527,7 @@ pub struct ExtensionList {
 #[sdk(qname = "c:CT_NumRef/c:numRef")]
 pub struct NumberReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "xsd:string/c:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:f"))]
   pub formula: Formula,
   /// Defines the NumberingCache Class.
   #[sdk(child(qname = "c:CT_NumData/c:numCache"))]
@@ -1541,7 +1541,7 @@ pub struct NumberReference {
 #[sdk(qname = "c:CT_NumData/c:numLit")]
 pub struct NumberLiteral {
   /// Format Code
-  #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
@@ -1558,7 +1558,7 @@ pub struct NumberLiteral {
 #[sdk(qname = "c:CT_NumData/c:numCache")]
 pub struct NumberingCache {
   /// Format Code
-  #[sdk(text_child(qname = "c:ST_Xstring/c:formatCode"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:formatCode"))]
   pub format_code: Option<FormatCode>,
   /// Point Count
   #[sdk(child(qname = "c:CT_UnsignedInt/c:ptCount"))]
@@ -1583,7 +1583,7 @@ pub struct Level {
 #[sdk(qname = "c:CT_MultiLvlStrRef/c:multiLvlStrRef")]
 pub struct MultiLevelStringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "xsd:string/c:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:f"))]
   pub formula: Formula,
   /// Defines the MultiLevelStringCache Class.
   #[sdk(child(qname = "c:CT_MultiLvlStrData/c:multiLvlStrCache"))]
@@ -1597,7 +1597,7 @@ pub struct MultiLevelStringReference {
 #[sdk(qname = "c:CT_StrRef/c:strRef")]
 pub struct StringReference {
   /// Defines the Formula Class.
-  #[sdk(text_child(qname = "xsd:string/c:f"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:f"))]
   pub formula: Formula,
   /// Defines the StringCache Class.
   #[sdk(child(qname = "c:CT_StrData/c:strCache"))]
@@ -2109,22 +2109,22 @@ pub struct HeaderFooter {
   #[sdk(attr(qname = ":differentFirst"))]
   pub different_first: Option<crate::simple_type::BooleanValue>,
   /// Odd Header
-  #[sdk(text_child(qname = "c:ST_Xstring/c:oddHeader"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:oddHeader"))]
   pub odd_header: Option<OddHeader>,
   /// Odd Footer
-  #[sdk(text_child(qname = "c:ST_Xstring/c:oddFooter"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:oddFooter"))]
   pub odd_footer: Option<OddFooter>,
   /// Even Header
-  #[sdk(text_child(qname = "c:ST_Xstring/c:evenHeader"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:evenHeader"))]
   pub even_header: Option<EvenHeader>,
   /// Even Footer
-  #[sdk(text_child(qname = "c:ST_Xstring/c:evenFooter"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:evenFooter"))]
   pub even_footer: Option<EvenFooter>,
   /// First Header
-  #[sdk(text_child(qname = "c:ST_Xstring/c:firstHeader"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:firstHeader"))]
   pub first_header: Option<FirstHeader>,
   /// First Footer
-  #[sdk(text_child(qname = "c:ST_Xstring/c:firstFooter"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:firstFooter"))]
   pub first_footer: Option<FirstFooter>,
 }
 /// Page Margins.
@@ -3008,7 +3008,7 @@ pub struct StringPoint {
   #[sdk(attr(qname = ":idx"))]
   pub index: crate::simple_type::UInt32Value,
   /// Text Value
-  #[sdk(text_child(qname = "c:ST_Xstring/c:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:v"))]
   pub numeric_value: NumericValue,
 }
 /// Thickness.
@@ -3929,7 +3929,7 @@ pub struct DataPoint {
 #[sdk(qname = "c:CT_Trendline/c:trendline")]
 pub struct Trendline {
   /// Trendline Name
-  #[sdk(text_child(qname = "xsd:string/c:name"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:name"))]
   pub trendline_name: Option<TrendlineName>,
   /// Defines the ChartShapeProperties Class.
   #[sdk(child(qname = "a:CT_ChartShapeProperties/c:spPr"))]
@@ -4529,7 +4529,7 @@ pub struct ColorMapOverride {
 #[sdk(qname = "c:CT_PivotSource/c:pivotSource")]
 pub struct PivotSource {
   /// Pivot Name
-  #[sdk(text_child(qname = "c:ST_Xstring/c:name"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:name"))]
   pub pivot_table_name: PivotTableName,
   /// Format ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:fmtId"))]
@@ -4711,7 +4711,7 @@ pub enum SeriesTextChoice {
   #[sdk(child(qname = "c:CT_StrRef/c:strRef"))]
   CStrRef(std::boxed::Box<StringReference>),
   /// Numeric Value.
-  #[sdk(text_child(qname = "c:ST_Xstring/c:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "c:ST_Xstring/c:v"))]
   CV(NumericValue),
 }
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4747,7 +4747,7 @@ pub struct DataLabelsChoiceSequence {
   #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
   pub show_bubble_size: Option<ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(qname = "xsd:string/c:separator"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:separator"))]
   pub separator: Option<Separator>,
   /// Show Leader Lines.
   #[sdk(child(qname = "c:CT_Boolean/c:showLeaderLines"))]
@@ -4916,7 +4916,7 @@ pub struct DataLabelChoiceSequence {
   #[sdk(child(qname = "c:CT_Boolean/c:showBubbleSize"))]
   pub show_bubble_size: Option<ShowBubbleSize>,
   /// Separator.
-  #[sdk(text_child(qname = "xsd:string/c:separator"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/c:separator"))]
   pub separator: Option<Separator>,
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]

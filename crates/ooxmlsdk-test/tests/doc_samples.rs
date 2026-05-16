@@ -47,10 +47,9 @@ fn assert_package_file_round_trip(path: &Path, file_name: &str) {
         panic!("round-trip failed for {file_name} while saving wordprocessing package: {err:?}");
       });
       let roundtripped_bytes = buffer.into_inner();
-      let reopened =
-        WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap_or_else(|err| {
-          panic!("round-trip failed for {file_name} while reopening saved wordprocessing package: {err:?}");
-        });
+      let reopened = WordprocessingDocument::new(Cursor::new(roundtripped_bytes.clone())).unwrap_or_else(|err| {
+        panic!("round-trip failed for {file_name} while reopening saved wordprocessing package: {err:?}");
+      });
       assert_wordprocessing_document_round_trip(&original, &reopened);
       assert_doc_sample_zip_equivalent(&original_bytes, &roundtripped_bytes, file_name);
     }

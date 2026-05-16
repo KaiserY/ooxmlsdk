@@ -497,11 +497,11 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
             }
           )*
 
-          pub fn to_xml_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
+          pub fn to_bytes(&self) -> Result<Vec<u8>, crate::common::SdkError> {
             match self {
               $(
                 $(#[$attrs])*
-                Self::$variant(root) => Ok(root.to_xml_bytes()?),
+                Self::$variant(root) => Ok(root.to_bytes()?),
               )*
             }
           }
@@ -683,7 +683,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
       let storage = crate::sdk::SdkPackage::storage(package);
 
       zip.start_file("[Content_Types].xml", options)?;
-      zip.write_all(&storage.content_types().to_xml_bytes()?)?;
+      zip.write_all(&storage.content_types().to_bytes()?)?;
 
       let package_relationships = storage.package_relationships();
       if !package_relationships.is_empty() {
@@ -691,7 +691,7 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           zip.add_directory("_rels", options)?;
         }
         zip.start_file("_rels/.rels", options)?;
-        zip.write_all(&package_relationships.to_relationships().to_xml_bytes()?)?;
+        zip.write_all(&package_relationships.to_relationships().to_bytes()?)?;
       }
 
       for (index, part) in storage.parts().iter().enumerate() {
@@ -714,12 +714,12 @@ pub fn gen_parts_mod(parts: &[&PartModuleDecl]) -> Result<TokenStream> {
           }
           let rels_path = crate::common::part_relationships_path(part.path());
           zip.start_file(&rels_path, options)?;
-          zip.write_all(&relationships.to_relationships().to_xml_bytes()?)?;
+          zip.write_all(&relationships.to_relationships().to_bytes()?)?;
         }
 
         zip.start_file(part.path(), options)?;
         if let Some(root_element) = crate::sdk::SdkPackage::root_element(package, part_id) {
-          zip.write_all(&root_element.to_xml_bytes()?)?;
+          zip.write_all(&root_element.to_bytes()?)?;
         } else {
           zip.write_all(part.data().bytes())?;
         }
@@ -990,9 +990,8 @@ mod tests {
     );
     assert!(rendered.contains("package_main"));
     assert!(
-      rendered.contains(
-        "main_document_part : Option < Box < crate :: parts :: main_document_part :: MainDocumentPart > >"
-      )
+      rendered
+        .contains("main_document_part : Option < Box < crate :: parts :: main_document_part :: MainDocumentPart > >")
     );
     assert!(!rendered.contains("ooxmlsdk_derive :: SdkPart"));
   }

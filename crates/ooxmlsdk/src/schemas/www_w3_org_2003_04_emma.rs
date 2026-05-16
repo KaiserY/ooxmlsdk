@@ -687,7 +687,7 @@ pub enum InterpretationChoice {
   #[sdk(child(qname = "emma:CT_Lattice/emma:lattice"))]
   EmmaLattice(std::boxed::Box<Lattice>),
   /// Defines the Literal Class.
-  #[sdk(text_child(qname = "emma:CT_Literal/emma:literal"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "emma:CT_Literal/emma:literal"))]
   EmmaLiteral(Literal),
   /// Defines the ContextNode Class.
   #[sdk(child(qname = "msink:CT_CtxNode/msink:context"))]

@@ -433,16 +433,16 @@ pub type RowId = crate::simple_type::Int32Value;
 pub struct FromMarker {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Ending Anchor Point.
@@ -451,16 +451,16 @@ pub struct FromMarker {
 pub struct ToMarker {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Client Data.

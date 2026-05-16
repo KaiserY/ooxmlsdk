@@ -38,10 +38,10 @@ pub(crate) use xml::{
   from_reader_inner, from_str_inner, parse_decimal_number_or_percent_attr,
   parse_measurement_or_percent_attr, parse_signed_twips_measure_attr, parse_twips_measure_attr,
   read_outer_xml_borrowed, read_outer_xml_io, write_attr_value, write_attr_value_str,
-  write_decimal_number_or_percent_attr, write_end_tag, write_escaped_str, write_escaped_text,
-  write_list_attr_value, write_list_value, write_measurement_or_percent_attr,
-  write_signed_twips_measure_attr, write_start_tag_open, write_twips_measure_attr,
-  write_xmlns_attr,
+  write_decimal_number_or_percent_attr, write_end_tag, write_end_tag_bytes, write_escaped_str,
+  write_escaped_text, write_list_attr_value, write_list_value, write_measurement_or_percent_attr,
+  write_signed_twips_measure_attr, write_start_tag_open, write_start_tag_open_bytes,
+  write_twips_measure_attr, write_xmlns_attr,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

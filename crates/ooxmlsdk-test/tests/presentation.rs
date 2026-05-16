@@ -50,9 +50,10 @@ fn boolean_value_attribute_accepts_upstream_lexical_forms_and_preserves_lexical_
 
 #[test]
 fn static_empty_element_serialization_uses_upstream_slash_spacing() {
-  let parsed = r#"<p:sldSz xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" cx="12192000" cy="6858000"/>"#
-    .parse::<SlideSize>()
-    .unwrap();
+  let parsed =
+    r#"<p:sldSz xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" cx="12192000" cy="6858000"/>"#
+      .parse::<SlideSize>()
+      .unwrap();
 
   assert_eq!(
     parsed.to_xml().unwrap(),
@@ -62,9 +63,10 @@ fn static_empty_element_serialization_uses_upstream_slash_spacing() {
 
 #[test]
 fn empty_child_unit_fields_are_serialized() {
-  let parsed = r#"<oac:spPr xmlns:oac="http://schemas.microsoft.com/office/drawing/2013/main/command"><oac:fill/></oac:spPr>"#
-    .parse::<ResetShapeProperties>()
-    .unwrap();
+  let parsed =
+    r#"<oac:spPr xmlns:oac="http://schemas.microsoft.com/office/drawing/2013/main/command"><oac:fill/></oac:spPr>"#
+      .parse::<ResetShapeProperties>()
+      .unwrap();
 
   assert_eq!(parsed.fill_empty, Some(()));
   assert_eq!(

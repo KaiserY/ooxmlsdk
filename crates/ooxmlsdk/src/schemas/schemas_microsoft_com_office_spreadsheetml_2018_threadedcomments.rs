@@ -92,7 +92,11 @@ pub struct ThreadedComment {
   #[sdk(attr(office2019, qname = ":done"))]
   pub done: Option<crate::simple_type::BooleanValue>,
   /// Defines the ThreadedCommentText Class.
-  #[sdk(text_child(office2019, qname = "x:ST_Xstring/xltc:text"))]
+  #[sdk(text_child(
+    office2019,
+    simple_type = "StringValue",
+    qname = "x:ST_Xstring/xltc:text"
+  ))]
   pub threaded_comment_text: Option<ThreadedCommentText>,
   /// Defines the ThreadedCommentMentions Class.
   #[sdk(child(office2019, qname = "xltc:CT_ThreadedCommentMentions/xltc:mentions"))]

@@ -294,7 +294,7 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:SizeWithCells"))]
   XvmlSizeWithCells(ResizeWithCells),
   /// Anchor.
-  #[sdk(text_child(qname = "xsd:string/xvml:Anchor"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:Anchor"))]
   XvmlAnchor(Anchor),
   /// Lock Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Locked"))]
@@ -318,13 +318,13 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:AutoPict"))]
   XvmlAutoPict(AutoSizePicture),
   /// Reference to Custom Function.
-  #[sdk(text_child(qname = "xvml:ST_Macro/xvml:FmlaMacro"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xvml:ST_Macro/xvml:FmlaMacro"))]
   XvmlFmlaMacro(FormulaMacro),
   /// Horizontal Text Alignment.
-  #[sdk(text_child(qname = "xsd:string/xvml:TextHAlign"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:TextHAlign"))]
   XvmlTextHAlign(HorizontalTextAlignment),
   /// Vertical Text Alignment.
-  #[sdk(text_child(qname = "xsd:string/xvml:TextVAlign"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:TextVAlign"))]
   XvmlTextVAlign(VerticalTextAlignment),
   /// Text Lock.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:LockText"))]
@@ -348,16 +348,16 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Dismiss"))]
   XvmlDismiss(DismissButton),
   /// Primary Keyboard Accelerator.
-  #[sdk(text_child(qname = "xsd:unsignedByte/xvml:Accel"))]
+  #[sdk(text_child(simple_type = "ByteValue", qname = "xsd:unsignedByte/xvml:Accel"))]
   XvmlAccel(AcceleratorPrimary),
   /// Secondary Keyboard Accelerator.
-  #[sdk(text_child(qname = "xsd:unsignedByte/xvml:Accel2"))]
+  #[sdk(text_child(simple_type = "ByteValue", qname = "xsd:unsignedByte/xvml:Accel2"))]
   XvmlAccel2(AcceleratorSecondary),
   /// Comment Row Target.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Row"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Row"))]
   XvmlRow(CommentRowTarget),
   /// Comment Column Target.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Column"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Column"))]
   XvmlColumn(CommentColumnTarget),
   /// Comment Visibility Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Visible"))]
@@ -369,7 +369,7 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:ColHidden"))]
   XvmlColHidden(ColumnHidden),
   /// Validation Type.
-  #[sdk(text_child(qname = "xsd:integer/xvml:VTEdit"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:VTEdit"))]
   XvmlVtEdit(InputValidationType),
   /// Multi-line.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MultiLine"))]
@@ -381,46 +381,46 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:ValidIds"))]
   XvmlValidIds(ValidIds),
   /// List Items Source Range.
-  #[sdk(text_child(qname = "xsd:string/xvml:FmlaRange"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:FmlaRange"))]
   XvmlFmlaRange(FormulaRange),
   /// Minimum Width.
-  #[sdk(text_child(qname = "xsd:integer/xvml:WidthMin"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:WidthMin"))]
   XvmlWidthMin(MinDropDownWidth),
   /// Selected Entry.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Sel"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Sel"))]
   XvmlSel(SelectionEntry),
   /// Disable 3D.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:NoThreeD2"))]
   XvmlNoThreeD2(Disable3DForListBoxAndDropDown),
   /// Selection Type.
-  #[sdk(text_child(qname = "xsd:string/xvml:SelType"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:SelType"))]
   XvmlSelType(SelectionType),
   /// Multiple Selections.
-  #[sdk(text_child(qname = "xsd:string/xvml:MultiSel"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:MultiSel"))]
   XvmlMultiSel(MultiSelections),
   /// Callback Type.
-  #[sdk(text_child(qname = "xsd:string/xvml:LCT"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:LCT"))]
   XvmlLct(ListBoxCallbackType),
   /// Non-linked List Item.
-  #[sdk(text_child(qname = "xsd:string/xvml:ListItem"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:ListItem"))]
   XvmlListItem(ListItem),
   /// Dropdown Style.
-  #[sdk(text_child(qname = "xsd:string/xvml:DropStyle"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:DropStyle"))]
   XvmlDropStyle(DropStyle),
   /// Dropdown Color Toggle.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Colored"))]
   XvmlColored(Colored),
   /// Dropdown Maximum Lines.
-  #[sdk(text_child(qname = "xsd:integer/xvml:DropLines"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:DropLines"))]
   XvmlDropLines(DropLines),
   /// Checked.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Checked"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Checked"))]
   XvmlChecked(Checked),
   /// Linked Formula.
-  #[sdk(text_child(qname = "xsd:string/xvml:FmlaLink"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:FmlaLink"))]
   XvmlFmlaLink(FormulaLink),
   /// Camera Source Range.
-  #[sdk(text_child(qname = "xsd:string/xvml:FmlaPict"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:FmlaPict"))]
   XvmlFmlaPict(FormulaPicture),
   /// Disable 3D.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:NoThreeD"))]
@@ -429,28 +429,28 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:FirstButton"))]
   XvmlFirstButton(FirstButton),
   /// Linked Formula - Group Box.
-  #[sdk(text_child(qname = "xsd:string/xvml:FmlaGroup"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:FmlaGroup"))]
   XvmlFmlaGroup(FormulaGroup),
   /// Scroll bar position.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Val"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Val"))]
   XvmlVal(ScrollBarPosition),
   /// Scroll Bar Minimum.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Min"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Min"))]
   XvmlMin(ScrollBarMin),
   /// Scroll Bar Maximum.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Max"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Max"))]
   XvmlMax(ScrollBarMax),
   /// Scroll Bar Increment.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Inc"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Inc"))]
   XvmlInc(ScrollBarIncrement),
   /// Scroll Bar Page Increment.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Page"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Page"))]
   XvmlPage(ScrollBarPageIncrement),
   /// Scroll Bar Orientation.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:Horiz"))]
   XvmlHoriz(HorizontalScrollBar),
   /// Scroll Bar Width.
-  #[sdk(text_child(qname = "xsd:integer/xvml:Dx"))]
+  #[sdk(text_child(simple_type = "IntegerValue", qname = "xsd:integer/xvml:Dx"))]
   XvmlDx(ScrollBarWidth),
   /// ActiveX Control.
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:MapOCX"))]
@@ -474,18 +474,24 @@ pub enum ClientDataChoice {
   #[sdk(text_child(qname = "xvml:ST_TrueFalseBlank/xvml:UIObj"))]
   XvmlUiObj(UiObject),
   /// HTML Script Text.
-  #[sdk(text_child(qname = "xsd:string/xvml:ScriptText"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:ScriptText"))]
   XvmlScriptText(ScriptText),
   /// HTML Script Attributes.
-  #[sdk(text_child(qname = "xsd:string/xvml:ScriptExtended"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:ScriptExtended"))]
   XvmlScriptExtended(ScriptExtended),
   /// HTML Script Language.
-  #[sdk(text_child(qname = "xsd:nonNegativeInteger/xvml:ScriptLanguage"))]
+  #[sdk(text_child(
+    simple_type = "IntegerValue",
+    qname = "xsd:nonNegativeInteger/xvml:ScriptLanguage"
+  ))]
   XvmlScriptLanguage(ScriptLanguage),
   /// HTML Script Location.
-  #[sdk(text_child(qname = "xsd:nonNegativeInteger/xvml:ScriptLocation"))]
+  #[sdk(text_child(
+    simple_type = "IntegerValue",
+    qname = "xsd:nonNegativeInteger/xvml:ScriptLocation"
+  ))]
   XvmlScriptLocation(ScriptLocation),
   /// Text Formula.
-  #[sdk(text_child(qname = "xsd:string/xvml:FmlaTxbx"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/xvml:FmlaTxbx"))]
   XvmlFmlaTxbx(FormulaTextBox),
 }

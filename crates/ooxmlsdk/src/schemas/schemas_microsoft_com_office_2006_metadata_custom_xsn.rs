@@ -9,16 +9,16 @@
 #[sdk(qname = "ntns:CT_CustomXsn/ntns:customXsn")]
 pub struct CustomXsn {
   /// Defines the XsnLocation Class.
-  #[sdk(text_child(qname = "xsd:string/ntns:xsnLocation"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:xsnLocation"))]
   pub xsn_location: XsnLocation,
   /// Defines the CachedView Class.
-  #[sdk(text_child(qname = "xsd:string/ntns:cached"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:cached"))]
   pub cached_view: CachedView,
   /// Defines the OpenByDefault Class.
-  #[sdk(text_child(qname = "xsd:string/ntns:openByDefault"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:openByDefault"))]
   pub open_by_default: OpenByDefault,
   /// Defines the Scope Class.
-  #[sdk(text_child(qname = "xsd:string/ntns:xsnScope"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/ntns:xsnScope"))]
   pub scope: Scope,
 }
 /// Defines the XsnLocation Class.

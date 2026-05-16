@@ -17,9 +17,9 @@ pub struct RdSupportingPropertyBagPart {
 }
 impl RdSupportingPropertyBagPart {
   crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
-        RdSupportingPropertyBagPart, as_rd_supporting_property_bag_part,
-        as_rd_supporting_property_bag_part_mut
-    );
+    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2017_richdata2::SupportingPropertyBags,
+    RdSupportingPropertyBagPart,
+    as_rd_supporting_property_bag_part,
+    as_rd_supporting_property_bag_part_mut
+  );
 }

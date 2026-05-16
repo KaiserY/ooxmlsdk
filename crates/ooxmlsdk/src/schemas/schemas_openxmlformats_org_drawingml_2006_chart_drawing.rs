@@ -440,10 +440,10 @@ pub type YPosition = crate::simple_type::DoubleValue;
 pub struct FromAnchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Relative X Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
   pub x_position: XPosition,
   /// Relative Y Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
   pub y_position: YPosition,
 }
 /// Ending Anchor Point.
@@ -452,10 +452,10 @@ pub struct FromAnchor {
 pub struct ToAnchor {
   pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Relative X Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:ST_MarkerCoordinate/cdr:x"))]
   pub x_position: XPosition,
   /// Relative Y Coordinate
-  #[sdk(text_child(qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
+  #[sdk(text_child(simple_type = "DoubleValue", qname = "cdr:ST_MarkerCoordinate/cdr:y"))]
   pub y_position: YPosition,
 }
 /// Shape Extent.

@@ -1958,7 +1958,7 @@ pub type Text = crate::simple_type::StringValue;
 #[sdk(qname = "p:CT_TLBehaviorAttributeNameList/p:attrNameLst")]
 pub struct AttributeNameList {
   /// Attribute Name.
-  #[sdk(text_child(qname = "xsd:string/p:attrName"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/p:attrName"))]
   pub p_attr_name: Vec<AttributeName>,
 }
 /// Boolean Variant.
@@ -2462,7 +2462,7 @@ pub struct Comment {
   #[sdk(child(qname = "a:CT_Point2D/p:pos"))]
   pub position: std::boxed::Box<Position>,
   /// Defines the Text Class.
-  #[sdk(text_child(qname = "xsd:string/p:text"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "xsd:string/p:text"))]
   pub text: Text,
   /// Defines the CommentExtensionList Class.
   #[sdk(child(qname = "p:CT_CommentExtensionList/p:extLst"))]

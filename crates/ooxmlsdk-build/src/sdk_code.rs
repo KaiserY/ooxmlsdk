@@ -187,11 +187,13 @@ fn write_schemas(loaded_schemas: &[LoadedSchema], out_dir_path: &Path) -> Result
 
     if let Some(alias_name) = schema_prefix_alias_name(&loaded_schema.ir) {
       if module_names.contains(alias_name.as_str()) || !alias_names.insert(alias_name.clone()) {
-        return Err(format!(
-          "schema prefix alias {alias_name} for module {} collides with an existing schema module or alias",
-          loaded_schema.ir.module_name
-        )
-        .into());
+        return Err(
+          format!(
+            "schema prefix alias {alias_name} for module {} collides with an existing schema module or alias",
+            loaded_schema.ir.module_name
+          )
+          .into(),
+        );
       }
       push_schema_alias_decl(
         &mut schema_alias_mod_list,

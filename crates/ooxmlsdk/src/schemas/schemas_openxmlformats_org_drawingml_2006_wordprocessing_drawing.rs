@@ -479,10 +479,17 @@ pub enum HorizontalPositionChoice {
   #[sdk(text_child(qname = "wp:ST_AlignH/wp:align"))]
   WpAlign(HorizontalAlignment),
   /// Defines the PositionOffset Class.
-  #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
+  #[sdk(text_child(
+    simple_type = "Int32Value",
+    qname = "wp:ST_PositionOffset/wp:posOffset"
+  ))]
   WpPosOffset(PositionOffset),
   /// Defines the PercentagePositionHeightOffset Class.
-  #[sdk(text_child(office2010, qname = "a:ST_Percentage/wp14:pctPosHOffset"))]
+  #[sdk(text_child(
+    office2010,
+    simple_type = "Int32Value",
+    qname = "a:ST_Percentage/wp14:pctPosHOffset"
+  ))]
   Wp14PctPosHOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
@@ -491,9 +498,16 @@ pub enum VerticalPositionChoice {
   #[sdk(text_child(qname = "wp:ST_AlignV/wp:align"))]
   WpAlign(VerticalAlignment),
   /// Defines the PositionOffset Class.
-  #[sdk(text_child(qname = "wp:ST_PositionOffset/wp:posOffset"))]
+  #[sdk(text_child(
+    simple_type = "Int32Value",
+    qname = "wp:ST_PositionOffset/wp:posOffset"
+  ))]
   WpPosOffset(PositionOffset),
   /// Defines the PercentagePositionVerticalOffset Class.
-  #[sdk(text_child(office2010, qname = "a:ST_Percentage/wp14:pctPosVOffset"))]
+  #[sdk(text_child(
+    office2010,
+    simple_type = "Int32Value",
+    qname = "a:ST_Percentage/wp14:pctPosVOffset"
+  ))]
   Wp14PctPosVOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),
 }

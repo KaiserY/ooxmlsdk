@@ -20,6 +20,7 @@ use crate::sdk_code::versioning::{common_choice_version, version_cfg_attrs};
 use crate::sdk_data::sdk_data_model::{
   Schema, SchemaEnum, SchemaType, SchemaTypeChild, SchemaTypeChildKind,
 };
+use crate::simple_type::simple_type_mapping;
 use crate::utils::{escape_snake_case, escape_upper_camel_case};
 
 #[derive(Debug)]
@@ -2079,9 +2080,10 @@ fn inline_single_field_sequence_variant_tokens(
     }
     FieldWireDecl::TextChild { qname } => {
       let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
+      let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
       Ok(Some(quote! {
         #( #variant_attrs )*
-        #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))]
+        #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))]
         #variant_ident(#payload_type),
       }))
     }
@@ -2208,9 +2210,10 @@ fn gen_choice_variant_tokens(
       let list_attr = is_list_type_ref(&variant.payload).then_some(quote! { list, });
       let qname_attrs = qnames
         .iter()
-        .map(
-          |qname| quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* #list_attr qname = #qname))] },
-        )
+        .map(|qname| {
+          let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+          quote! { #[sdk(text_child(#(#variant_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
+        })
         .collect::<Vec<_>>();
       Ok(vec![quote! {
         #prefix_attrs
@@ -3022,6 +3025,18 @@ fn is_list_type_ref(type_ref: &TypeRefDecl) -> bool {
   type_ref.module_path.is_none() && type_ref.rust_type.starts_with("Vec<")
 }
 
+fn simple_type_sdk_attr_from_qname(qname: &str) -> TokenStream {
+  let Some((type_name, _)) = qname.split_once('/') else {
+    return quote! {};
+  };
+  let simple_type = simple_type_mapping(type_name);
+  if simple_type == type_name {
+    quote! {}
+  } else {
+    quote! { simple_type = #simple_type, }
+  }
+}
+
 fn module_type_namespace(module_name: &str) -> String {
   format!("crate::schemas::{module_name}")
 }
@@ -3315,7 +3330,8 @@ fn gen_direct_child_fields_from_decl_with_context(
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))] }
+        let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
       }
       _ => return Err(format!("expected direct child field, got {:?}", field.wire).into()),
     };
@@ -3415,7 +3431,8 @@ fn gen_inline_sequence_variant_fields_from_decl(
       }
       FieldWireDecl::TextChild { qname } => {
         let list_attr = is_list_type_ref(&field.type_ref).then_some(quote! { list, });
-        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr qname = #qname))] }
+        let simple_type_attr = simple_type_sdk_attr_from_qname(qname);
+        quote! { #[sdk(text_child(#(#field_sdk_version_markers,)* #list_attr #simple_type_attr qname = #qname))] }
       }
       _ => {
         return Err(
@@ -4273,7 +4290,7 @@ mod tests {
     ));
     assert!(
       generated.contains(
-        "# [sdk (text_child (qname = \"xsd:string/t:v\"))] value : Option < crate :: simple_type :: StringValue >"
+        "# [sdk (text_child (simple_type = \"StringValue\" , qname = \"xsd:string/t:v\"))] value : Option < crate :: simple_type :: StringValue >"
       )
     );
     assert!(!generated.contains("pub struct HolderChoiceSequence1"));
@@ -5566,9 +5583,10 @@ mod tests {
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence1 (std :: boxed :: Box < First >)"
     ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence2 (std :: boxed :: Box < Second >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence2 (std :: boxed :: Box < Second >)")
+    );
     assert!(!generated.contains("Sequence32"));
     assert!(!generated.contains("Sequence8"));
   }
@@ -5654,9 +5672,10 @@ mod tests {
     assert!(generated.contains(
       "# [sdk (child (qname = \"t:CT_First/t:first\"))] Sequence (std :: boxed :: Box < First >)"
     ));
-    assert!(generated.contains(
-      "# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence32 (std :: boxed :: Box < Second >)"
-    ));
+    assert!(
+      generated
+        .contains("# [sdk (child (qname = \"t:CT_Second/t:second\"))] Sequence32 (std :: boxed :: Box < Second >)")
+    );
   }
 
   #[test]

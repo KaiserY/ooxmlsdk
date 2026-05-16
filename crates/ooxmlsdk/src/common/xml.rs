@@ -1114,6 +1114,22 @@ pub(crate) fn write_start_tag_open<W: std::io::Write>(
 }
 
 #[inline(always)]
+pub(crate) fn write_start_tag_open_bytes<W: std::io::Write>(
+  writer: &mut W,
+  default_namespace_prefix: &str,
+  tag_prefix: &[u8],
+  local_name: &[u8],
+) -> std::io::Result<()> {
+  writer.write_all(b"<")?;
+  write_qualified_name_bytes(
+    writer,
+    default_namespace_prefix.as_bytes(),
+    tag_prefix,
+    local_name,
+  )
+}
+
+#[inline(always)]
 pub(crate) fn write_end_tag<W: std::io::Write>(
   writer: &mut W,
   default_namespace_prefix: &str,
@@ -1122,6 +1138,23 @@ pub(crate) fn write_end_tag<W: std::io::Write>(
 ) -> std::io::Result<()> {
   writer.write_all(b"</")?;
   write_qualified_name(writer, default_namespace_prefix, tag_prefix, local_name)?;
+  writer.write_all(b">")
+}
+
+#[inline(always)]
+pub(crate) fn write_end_tag_bytes<W: std::io::Write>(
+  writer: &mut W,
+  default_namespace_prefix: &str,
+  tag_prefix: &[u8],
+  local_name: &[u8],
+) -> std::io::Result<()> {
+  writer.write_all(b"</")?;
+  write_qualified_name_bytes(
+    writer,
+    default_namespace_prefix.as_bytes(),
+    tag_prefix,
+    local_name,
+  )?;
   writer.write_all(b">")
 }
 
@@ -1138,6 +1171,21 @@ fn write_qualified_name<W: std::io::Write>(
   }
 
   writer.write_all(local_name.as_bytes())
+}
+
+#[inline(always)]
+fn write_qualified_name_bytes<W: std::io::Write>(
+  writer: &mut W,
+  default_namespace_prefix: &[u8],
+  tag_prefix: &[u8],
+  local_name: &[u8],
+) -> std::io::Result<()> {
+  if !tag_prefix.is_empty() && default_namespace_prefix != tag_prefix {
+    writer.write_all(tag_prefix)?;
+    writer.write_all(b":")?;
+  }
+
+  writer.write_all(local_name)
 }
 
 #[inline]

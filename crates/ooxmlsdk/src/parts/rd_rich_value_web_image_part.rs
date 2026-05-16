@@ -17,9 +17,9 @@ pub struct RdRichValueWebImagePart {
 }
 impl RdRichValueWebImagePart {
   crate::sdk_part_root_methods!(
-        crate
-        ::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
-        RdRichValueWebImagePart, as_rd_rich_value_web_image_part,
-        as_rd_rich_value_web_image_part_mut
-    );
+    crate::schemas::schemas_microsoft_com_office_spreadsheetml_2020_richdatawebimage::WebImagesSupportingRichData,
+    RdRichValueWebImagePart,
+    as_rd_rich_value_web_image_part,
+    as_rd_rich_value_web_image_part_mut
+  );
 }

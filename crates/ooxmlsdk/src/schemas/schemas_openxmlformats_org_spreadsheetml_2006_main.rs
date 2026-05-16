@@ -6746,7 +6746,11 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "StringValue",
+    qname = "x:ST_Xstring/x12ac:list"
+  ))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
@@ -7723,7 +7727,7 @@ pub struct ExternalCell {
   #[sdk(attr(qname = ":vm"))]
   pub value_meta_index: Option<crate::simple_type::UInt32Value>,
   /// Value
-  #[sdk(text_child(qname = "x:ST_Xstring/x:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "x:ST_Xstring/x:v"))]
   pub xstring: Option<Xstring>,
 }
 /// DDE Items Collection.
@@ -7987,7 +7991,7 @@ pub struct Topic {
   #[sdk(attr(qname = ":t"))]
   pub value_type: Option<VolatileValues>,
   /// Topic Value
-  #[sdk(text_child(qname = "x:ST_Xstring/x:v"))]
+  #[sdk(text_child(simple_type = "StringValue", qname = "x:ST_Xstring/x:v"))]
   pub xstring: Xstring,
   /// Strings in Subtopic.
   #[sdk(child(qname = "x:CT_Xstring/x:stp"))]
@@ -8285,16 +8289,16 @@ pub struct ObjectAnchor {
 #[sdk(office2010, qname = "xdr:CT_Marker/x:from")]
 pub struct FromMarker {
   /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ToMarker Class.
@@ -8302,16 +8306,16 @@ pub struct FromMarker {
 #[sdk(office2010, qname = "xdr:CT_Marker/x:to")]
 pub struct ToMarker {
   /// Column)
-  #[sdk(text_child(qname = "xdr:ST_ColID/xdr:col"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
-  #[sdk(text_child(qname = "xdr:ST_RowID/xdr:row"))]
+  #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ConditionalFormattingRuleExtension Class.
@@ -11327,7 +11331,7 @@ pub enum OleItemsChoice {
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum ConditionalFormattingRuleExtensionChoice {
   /// Defines the Id Class.
-  #[sdk(text_child(office2010, qname = "x:ST_Guid/x14:id"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Guid/x14:id"))]
   X14Id(crate::schemas::x14::Id),
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),
@@ -11610,7 +11614,11 @@ pub enum PivotCacheDefinitionExtensionChoice {
   ))]
   X15PivotCacheIdVersion(std::boxed::Box<crate::schemas::x15::PivotCacheIdVersion>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(office2021, qname = "xsd:boolean/xxpim:implicitMeasureSupport"))]
+  #[sdk(text_child(
+    office2021,
+    simple_type = "BooleanValue",
+    qname = "xsd:boolean/xxpim:implicitMeasureSupport"
+  ))]
   XxpimImplicitMeasureSupport(crate::schemas::xxpim::Xsdboolean),
   /// Defines the PivotCacheRichInfo Class.
   #[sdk(child(microsoft365, qname = "xprd:CT_PivotCacheRichInfo/xprd:richInfo"))]
@@ -11622,7 +11630,11 @@ pub enum PivotCacheDefinitionExtensionChoice {
   ))]
   XxpviCacheVersionInfo(std::boxed::Box<crate::schemas::xxpvi::CacheVersionInfo>),
   /// Defines the Xsdboolean Class.
-  #[sdk(text_child(microsoft365, qname = "xsd:boolean/xlpar:autoRefresh"))]
+  #[sdk(text_child(
+    microsoft365,
+    simple_type = "BooleanValue",
+    qname = "xsd:boolean/xlpar:autoRefresh"
+  ))]
   XlparAutoRefresh(crate::schemas::xlpar::Xsdboolean),
   /// Defines the PivotCacheDynamicArray Class.
   #[sdk(child(

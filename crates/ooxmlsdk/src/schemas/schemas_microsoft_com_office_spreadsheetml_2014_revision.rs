@@ -606,7 +606,11 @@ pub struct RevExDefinedName {
   #[sdk(attr(office2016, qname = ":comment"))]
   pub comment: Option<crate::simple_type::StringValue>,
   /// Defines the FormulaFormula Class.
-  #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:formula"))]
+  #[sdk(text_child(
+    office2016,
+    simple_type = "StringValue",
+    qname = "x:ST_Formula/xr:formula"
+  ))]
   pub formula_formula: Option<FormulaFormula>,
   /// Defines the ExtensionList Class.
   #[sdk(child(office2016, qname = "x:CT_ExtensionList/xr:extLst"))]
@@ -856,10 +860,10 @@ pub struct RevCell {
   #[sdk(attr(office2016, qname = ":rep"))]
   pub rep: Option<crate::simple_type::UInt32Value>,
   /// Defines the FFormula Class.
-  #[sdk(text_child(office2016, qname = "x:ST_Formula/xr:f"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "x:ST_Formula/xr:f"))]
   pub f_formula: Option<FFormula>,
   /// Defines the Xstring Class.
-  #[sdk(text_child(office2016, qname = "x:ST_Xstring/xr:v"))]
+  #[sdk(text_child(office2016, simple_type = "StringValue", qname = "x:ST_Xstring/xr:v"))]
   pub xstring: Option<Xstring>,
   /// Defines the RstType Class.
   #[sdk(child(office2016, qname = "x:CT_Rst/xr:is"))]
@@ -1215,7 +1219,11 @@ pub struct DataValidation {
   #[sdk(attr(list, qname = ":sqref"))]
   pub sequence_of_references: Vec<crate::simple_type::StringValue>,
   /// Defines the List Class.
-  #[sdk(text_child(office2013, qname = "x:ST_Xstring/x12ac:list"))]
+  #[sdk(text_child(
+    office2013,
+    simple_type = "StringValue",
+    qname = "x:ST_Xstring/x12ac:list"
+  ))]
   pub list: Option<crate::schemas::x12ac::List>,
   /// Defines the Formula1 Class.
   #[sdk(child(qname = "x:CT_Xstring/x:formula1"))]
@@ -1324,7 +1332,7 @@ pub struct SparklineGroup {
   #[sdk(child(office2010, qname = "x:CT_Color/x14:colorLow"))]
   pub low_marker_color: Option<crate::schemas::x14::LowMarkerColor>,
   /// Defines the Formula Class.
-  #[sdk(text_child(office2010, qname = "x:ST_Formula/xne:f"))]
+  #[sdk(text_child(office2010, simple_type = "StringValue", qname = "x:ST_Formula/xne:f"))]
   pub formula: Option<crate::schemas::xne::Formula>,
   /// Defines the Sparklines Class.
   #[sdk(child(office2010, qname = "x14:CT_Sparklines/x14:sparklines"))]

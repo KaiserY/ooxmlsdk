@@ -23,7 +23,11 @@ pub struct LineSketchStyleProperties {
   #[sdk(child(office2021, qname = "ask:CT_LineSketchTypeProperties/ask:type"))]
   pub ask_type: Option<std::boxed::Box<LineSketchTypeProperties>>,
   /// Defines the LineSketchSeed Class.
-  #[sdk(text_child(office2021, qname = "ask:ST_LineSketchSeed/ask:seed"))]
+  #[sdk(text_child(
+    office2021,
+    simple_type = "UInt32Value",
+    qname = "ask:ST_LineSketchSeed/ask:seed"
+  ))]
   pub ask_seed: Option<LineSketchSeed>,
   /// Defines the OfficeArtExtensionList Class.
   #[sdk(child(office2021, qname = "a:CT_OfficeArtExtensionList/ask:extLst"))]

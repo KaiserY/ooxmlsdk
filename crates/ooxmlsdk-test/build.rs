@@ -187,6 +187,14 @@ fn is_test_data_open_only(file_name: &str) -> bool {
       | "libreoffice/word/sdt-around-float-table.docx"
       // Missing required wp:anchor children; keep parse coverage but skip round-trip.
       | "libreoffice/word/tdf92157-1-minimized.docx"
+      // w:lvl children are ordered as start,pStyle,numFmt, which violates CT_Lvl sequence.
+      | "libreoffice/word/comment-annotationref.docx"
+      // Multiple WML sequences use non-canonical order, including w:pPr, w:settings, and w:style.
+      | "libreoffice/word/tdf119136.docx"
+      // w:tblBorders has insideH before right, opposite of CT_TblBorders sequence.
+      | "libreoffice/word/fdo63164-1.docx"
+      // Many w:tcPr and w:pPr children use non-canonical order; keep open coverage only.
+      | "libreoffice/word/tdf96749.docx"
   )
 }
 

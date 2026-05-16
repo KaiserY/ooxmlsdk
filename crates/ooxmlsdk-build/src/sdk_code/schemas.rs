@@ -1010,7 +1010,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
-    .filter(|ty| !ty.is_abstract)
+    .filter(|ty| should_emit_schema_type_decl(ty))
     .map(|ty| ty.rust_name.as_str())
     .collect();
 
@@ -1026,7 +1026,7 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
     .iter()
     .filter(|ty| matches!(ty.kind, TypeKind::ElementStruct | TypeKind::LeafTextAlias))
     .filter(|ty| !omitted_empty_leaf_marker_type_names.contains(ty.rust_name.as_str()))
-    .filter(|ty| !ty.is_abstract)
+    .filter(|ty| should_emit_schema_type_decl(ty))
   {
     let attr_fields: Vec<&FieldDecl> = type_decl
       .members
@@ -1150,6 +1150,25 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
         #( #type_attrs )*
         #[doc = #summary_doc]
         pub type #struct_name_ident = Vec<String>;
+      });
+
+      continue;
+    }
+
+    if let Some(base_type_decl) = type_decl
+      .base_rust_name
+      .as_deref()
+      .and_then(|base_name| type_decl_by_name.get(base_name).copied())
+      && can_wrap_derived_to_base_decl(type_decl, base_type_decl)
+    {
+      let base_type_ident: Ident = parse_str(&base_type_decl.rust_name.to_upper_camel_case())?;
+
+      token_stream_list.push(quote! {
+        #( #type_attrs )*
+        #[doc = #summary_doc]
+        #sdk_type_derive
+        #sdk_type_attrs
+        pub struct #struct_name_ident(pub #base_type_ident);
       });
 
       continue;
@@ -3685,6 +3704,26 @@ fn can_alias_raw_children_leaf_decl(type_decl: &TypeDecl, attr_fields: &[&FieldD
     && !type_decl.support.have_xml_other_attrs
     && type_decl.support.have_xml_other_children
     && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
+}
+
+fn can_wrap_derived_to_base_decl(type_decl: &TypeDecl, base_type_decl: &TypeDecl) -> bool {
+  type_decl.kind == TypeKind::ElementStruct
+    && type_decl.element_kind == Some(ElementKind::Derived)
+    && base_type_decl.kind == TypeKind::ElementStruct
+    && base_type_decl.element_kind == Some(ElementKind::LeafText)
+    && should_emit_schema_type_decl(base_type_decl)
+    && type_decl.members.is_empty()
+    && type_decl.content_model.is_none()
+    && type_decl.xml_content.is_some()
+    && type_decl.support == base_type_decl.support
+}
+
+fn should_emit_schema_type_decl(type_decl: &TypeDecl) -> bool {
+  !type_decl.is_abstract
+    || (type_decl.kind == TypeKind::ElementStruct
+      && type_decl.element_kind == Some(ElementKind::LeafText)
+      && type_decl.xml_content.is_some()
+      && type_decl.support.have_xml_other_attrs)
 }
 
 fn is_any_children_alias_type_ref(

@@ -1390,6 +1390,7 @@ fn have_xml_other_attrs_for_mixed_version_content(
           module_name,
           type_map,
         )
+        || have_xml_other_attrs_for_derived_text_base(schema_type, kind, type_map)
         || have_xml_other_attrs_for_derived_text_content(schema_type, kind, type_map)
         || particle_has_mixed_version_non_element_choice(&schema_type.particle, type_map, "")))
 }
@@ -1435,6 +1436,23 @@ fn have_xml_other_attrs_for_derived_text_content(
       && !base_type.attributes.is_empty()
       && base_type.base_class == "OpenXmlLeafTextElement"
   })
+}
+
+fn have_xml_other_attrs_for_derived_text_base(
+  schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
+  kind: SchemaTypeKind,
+  type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
+) -> bool {
+  kind == SchemaTypeKind::LeafText
+    && schema_type.base_class == "OpenXmlLeafTextElement"
+    && !schema_type.attributes.is_empty()
+    && type_map.values().any(|derived_type| {
+      derived_type.is_leaf_text
+        && derived_type.base_class == schema_type.class_name
+        && resolve_kind(derived_type, type_map) == SchemaTypeKind::Derived
+        && derived_type.attributes.is_empty()
+        && derived_type.children.is_empty()
+    })
 }
 
 fn have_xml_other_attrs_for_spreadsheet_extensible_composite(
@@ -2203,7 +2221,7 @@ fn resolve_derived_base_type<'a>(
 mod tests {
   use super::{
     gen_schemas, is_measure_override_candidate_type, matches_xsd_repeatable_choice_rule,
-    resolve_composite_kind, schema_type_complex_type_name, xsd_child_local_name,
+    resolve_composite_kind, schema_type_complex_type_name, schema_type_name, xsd_child_local_name,
     xsd_measure_attr_type_overrides, xsd_on_off_only_to_on_off_qname_overrides,
     xsd_table_width_element_qname_overrides, xsd_twips_measure_element_qname_overrides,
   };
@@ -2211,9 +2229,9 @@ mod tests {
     context::Context,
     open_xml::{OpenXmlSchemaType, OpenXmlSchemaTypeParticle},
     sdk_data_model::{SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind},
-    xsd::parse_xsd,
+    xsd::{parse_xsd, repeatable_choice_element_names},
   };
-  use std::collections::{HashMap, HashSet};
+  use std::collections::{BTreeMap, HashMap, HashSet};
   use std::path::PathBuf;
 
   #[test]
@@ -2368,6 +2386,71 @@ mod tests {
       .expect("font");
 
     assert_eq!(font.kind, SchemaTypeKind::Composite);
+  }
+
+  #[test]
+  #[ignore]
+  fn scan_xsd_repeated_child_backfill_candidates() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+    let mut candidates: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+    for schema in &schemas {
+      let Some(xsd) = context.xsd_schemas.get(schema.target_namespace.as_str()) else {
+        continue;
+      };
+
+      for schema_type in &schema.types {
+        if schema_type.composite_kind == SchemaTypeCompositeKind::XsdRepeatableChoice {
+          continue;
+        }
+
+        let Some(type_name) = schema_type_name(schema_type.name.as_str()) else {
+          continue;
+        };
+        let repeated_names = repeatable_choice_element_names(xsd, type_name);
+        if repeated_names.is_empty() {
+          continue;
+        }
+
+        for child in &schema_type.children {
+          if !matches!(
+            child.kind,
+            SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
+          ) || child.repeated
+          {
+            continue;
+          }
+
+          let child_local_name = xsd_child_local_name(child.name.rsplit('/').next().unwrap_or(""));
+          if repeated_names.contains(child_local_name) {
+            candidates
+              .entry(format!(
+                "{} {} {}",
+                schema.module_name, schema_type.name, schema_type.class_name
+              ))
+              .or_default()
+              .push(format!("{} {}", child.name, child.property_name));
+          }
+        }
+      }
+    }
+
+    let child_count = candidates.values().map(Vec::len).sum::<usize>();
+    println!(
+      "xsd repeated child backfill candidate types: {}, children: {}",
+      candidates.len(),
+      child_count
+    );
+    for (schema_type, mut children) in candidates {
+      children.sort();
+      children.dedup();
+      println!("{} ({})", schema_type, children.len());
+      for child in &children {
+        println!("  {child}");
+      }
+    }
   }
 
   #[test]

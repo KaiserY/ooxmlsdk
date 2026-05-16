@@ -4990,40 +4990,23 @@ pub struct Break {
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:t")]
-pub struct Text {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Text(pub TextType);
 /// Deleted Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delText")]
-pub struct DeletedText {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct DeletedText(pub TextType);
 /// Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:instrText")]
-pub struct FieldCode {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FieldCode(pub TextType);
 /// Deleted Field Code.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "w:CT_Text/w:delInstrText")]
-pub struct DeletedFieldCode {
+pub struct DeletedFieldCode(pub TextType);
+/// Defines the TextType Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "w:CT_Text/")]
+pub struct TextType {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// space
   #[sdk(attr(qname = "xml:space"))]
@@ -6352,7 +6335,7 @@ pub struct RunProperties {
   pub position: Option<Position>,
   /// Defines the FontSize Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:sz"))]
-  pub font_size: Option<FontSize>,
+  pub font_size: Vec<FontSize>,
   /// Defines the FontSizeComplexScript Class.
   #[sdk(child(qname = "w:CT_HpsMeasure/w:szCs"))]
   pub font_size_complex_script: Option<FontSizeComplexScript>,

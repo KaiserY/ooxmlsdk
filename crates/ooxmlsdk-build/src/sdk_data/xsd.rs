@@ -1,7 +1,7 @@
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::Result;
 use crate::simple_type::simple_type_mapping;
@@ -11,6 +11,7 @@ pub(crate) struct ParsedXsd {
   pub target_namespace: String,
   pub root_elements: BTreeMap<String, ParsedComplexType>,
   pub complex_types: BTreeMap<String, ParsedComplexType>,
+  pub groups: BTreeMap<String, ParsedParticleNode>,
   pub simple_types: BTreeMap<String, Vec<String>>,
 }
 
@@ -18,6 +19,7 @@ pub(crate) struct ParsedXsd {
 pub(crate) struct ParsedComplexType {
   pub _mixed: bool,
   pub top_level_particle: Option<ParsedParticle>,
+  pub particle: Option<Box<ParsedParticleNode>>,
   pub children: Vec<ParsedChildElement>,
   pub attributes: Vec<ParsedAttribute>,
 }
@@ -34,6 +36,20 @@ pub(crate) struct ParsedParticle {
   pub kind: ParsedParticleKind,
   pub min_occurs: u64,
   pub max_occurs: u64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum ParsedParticleNode {
+  Group {
+    particle: ParsedParticle,
+    children: Vec<ParsedParticleNode>,
+  },
+  Element(ParsedChildElement),
+  GroupRef {
+    reference: String,
+    _min_occurs: u64,
+    max_occurs: u64,
+  },
 }
 
 #[derive(Clone, Debug, Default)]
@@ -73,6 +89,10 @@ pub(crate) fn parse_xsd(source: &str) -> Result<ParsedXsd> {
           let (name, complex_type) = parse_complex_type(&mut reader, e)?;
           parsed.complex_types.insert(name, complex_type);
         }
+        b"group" => {
+          let (name, particle) = parse_group(&mut reader, e)?;
+          parsed.groups.insert(name, particle);
+        }
         b"simpleType" => {
           if optional_attr(&reader, &e, b"name")?.is_some() {
             let (name, values) = parse_simple_type(&mut reader, e)?;
@@ -90,6 +110,75 @@ pub(crate) fn parse_xsd(source: &str) -> Result<ParsedXsd> {
   }
 
   Ok(parsed)
+}
+
+pub(crate) fn repeatable_choice_element_names(
+  xsd: &ParsedXsd,
+  complex_type_name: &str,
+) -> BTreeSet<String> {
+  let Some(complex_type) = xsd.complex_types.get(complex_type_name) else {
+    return BTreeSet::new();
+  };
+  let Some(particle) = &complex_type.particle else {
+    return BTreeSet::new();
+  };
+
+  let mut names = BTreeSet::new();
+  let mut group_stack = BTreeSet::new();
+  collect_repeatable_choice_element_names(
+    xsd,
+    particle.as_ref(),
+    false,
+    false,
+    &mut group_stack,
+    &mut names,
+  );
+  names
+}
+
+fn collect_repeatable_choice_element_names(
+  xsd: &ParsedXsd,
+  node: &ParsedParticleNode,
+  inherited_repeated: bool,
+  inherited_choice: bool,
+  group_stack: &mut BTreeSet<String>,
+  names: &mut BTreeSet<String>,
+) {
+  match node {
+    ParsedParticleNode::Group { particle, children } => {
+      let repeated = inherited_repeated || particle.max_occurs > 1;
+      let choice = inherited_choice || particle.kind == ParsedParticleKind::Choice;
+      for child in children {
+        collect_repeatable_choice_element_names(xsd, child, repeated, choice, group_stack, names);
+      }
+    }
+    ParsedParticleNode::Element(element) => {
+      if inherited_choice && (inherited_repeated || element.max_occurs > 1) {
+        names.insert(xsd_local_name(element.q_name.as_str()).to_string());
+      }
+    }
+    ParsedParticleNode::GroupRef {
+      reference,
+      max_occurs,
+      ..
+    } => {
+      let group_name = xsd_local_name(reference);
+      if !group_stack.insert(group_name.to_string()) {
+        return;
+      }
+      if let Some(group) = xsd.groups.get(group_name) {
+        collect_repeatable_choice_element_names(
+          xsd,
+          group,
+          inherited_repeated || *max_occurs > 1,
+          inherited_choice,
+          group_stack,
+          names,
+        );
+      }
+      group_stack.remove(group_name);
+    }
+  }
 }
 
 fn parse_complex_type(
@@ -114,8 +203,13 @@ fn parse_complex_type_body(
     match reader.read_event()? {
       Event::Start(e) => match local_name(e.name().as_ref()) {
         b"sequence" | b"choice" | b"all" => {
-          if complex_type.top_level_particle.is_none() {
-            complex_type.top_level_particle = Some(parse_particle(reader, &e)?);
+          let node = parse_particle_node(reader, e, false)?;
+          if complex_type.particle.is_none() {
+            if let ParsedParticleNode::Group { particle, .. } = &node {
+              complex_type.top_level_particle = Some(*particle);
+            }
+            collect_particle_elements(&node, &mut complex_type.children);
+            complex_type.particle = Some(Box::new(node));
           }
         }
         b"simpleContent" | b"extension" => {}
@@ -131,6 +225,15 @@ fn parse_complex_type_body(
         _ => skip_element(reader, e.name().as_ref())?,
       },
       Event::Empty(e) => match local_name(e.name().as_ref()) {
+        b"sequence" | b"choice" | b"all" => {
+          let node = parse_particle_node(reader, e, true)?;
+          if complex_type.particle.is_none() {
+            if let ParsedParticleNode::Group { particle, .. } = &node {
+              complex_type.top_level_particle = Some(*particle);
+            }
+            complex_type.particle = Some(Box::new(node));
+          }
+        }
         b"element" => complex_type
           .children
           .push(parse_child_element(reader, &e, true)?),
@@ -160,6 +263,33 @@ fn parse_complex_type_body(
   }
 
   Ok(complex_type)
+}
+
+fn parse_group(
+  reader: &mut Reader<&[u8]>,
+  start: BytesStart<'_>,
+) -> Result<(String, ParsedParticleNode)> {
+  let name = required_attr(reader, &start, b"name")?;
+
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) if is_particle(e.name().as_ref()) => {
+        let particle = parse_particle_node(reader, e, false)?;
+        skip_to_end(reader, start.name().as_ref())?;
+        return Ok((name, particle));
+      }
+      Event::Empty(e) if is_particle(e.name().as_ref()) => {
+        let particle = parse_particle_node(reader, e, true)?;
+        return Ok((name, particle));
+      }
+      Event::End(e) if e.name().as_ref() == start.name().as_ref() => {
+        return Err(format!("group {} does not contain a particle", name).into());
+      }
+      Event::Text(_) | Event::Comment(_) => {}
+      Event::Eof => return Err(format!("unexpected EOF in group {}", name).into()),
+      _ => {}
+    }
+  }
 }
 
 fn parse_element(
@@ -277,6 +407,67 @@ fn parse_child_element(
   })
 }
 
+fn parse_particle_node(
+  reader: &mut Reader<&[u8]>,
+  element: BytesStart<'_>,
+  empty: bool,
+) -> Result<ParsedParticleNode> {
+  let particle = parse_particle(reader, &element)?;
+  let mut children = Vec::new();
+
+  if !empty {
+    loop {
+      match reader.read_event()? {
+        Event::Start(e) if is_particle(e.name().as_ref()) => {
+          children.push(parse_particle_node(reader, e, false)?);
+        }
+        Event::Empty(e) if is_particle(e.name().as_ref()) => {
+          children.push(parse_particle_node(reader, e, true)?);
+        }
+        Event::Start(e) if local_name(e.name().as_ref()) == b"element" => {
+          children.push(ParsedParticleNode::Element(parse_child_element(
+            reader, &e, false,
+          )?));
+        }
+        Event::Empty(e) if local_name(e.name().as_ref()) == b"element" => {
+          children.push(ParsedParticleNode::Element(parse_child_element(
+            reader, &e, true,
+          )?));
+        }
+        Event::Start(e) if local_name(e.name().as_ref()) == b"group" => {
+          children.push(parse_group_ref(reader, &e)?);
+          skip_element(reader, e.name().as_ref())?;
+        }
+        Event::Empty(e) if local_name(e.name().as_ref()) == b"group" => {
+          children.push(parse_group_ref(reader, &e)?);
+        }
+        Event::End(e) if e.name().as_ref() == element.name().as_ref() => break,
+        Event::Text(_) | Event::Comment(_) => {}
+        Event::Eof => {
+          return Err(
+            format!(
+              "unexpected EOF in particle {}",
+              String::from_utf8_lossy(element.name().as_ref())
+            )
+            .into(),
+          );
+        }
+        _ => {}
+      }
+    }
+  }
+
+  Ok(ParsedParticleNode::Group { particle, children })
+}
+
+fn parse_group_ref(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<ParsedParticleNode> {
+  Ok(ParsedParticleNode::GroupRef {
+    reference: required_attr(reader, element, b"ref")?,
+    _min_occurs: parse_min_occurs(reader, element)?,
+    max_occurs: parse_max_occurs(reader, element)?,
+  })
+}
+
 fn parse_particle(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<ParsedParticle> {
   let kind = match local_name(element.name().as_ref()) {
     b"sequence" => ParsedParticleKind::Sequence,
@@ -289,12 +480,39 @@ fn parse_particle(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<Pa
 
   Ok(ParsedParticle {
     kind,
-    min_occurs: optional_attr(reader, element, b"minOccurs")?
+    min_occurs: parse_min_occurs(reader, element)?,
+    max_occurs: parse_max_occurs(reader, element)?,
+  })
+}
+
+fn collect_particle_elements(node: &ParsedParticleNode, children: &mut Vec<ParsedChildElement>) {
+  match node {
+    ParsedParticleNode::Group {
+      children: particle_children,
+      ..
+    } => {
+      for child in particle_children {
+        collect_particle_elements(child, children);
+      }
+    }
+    ParsedParticleNode::Element(element) => children.push(element.clone()),
+    ParsedParticleNode::GroupRef { .. } => {}
+  }
+}
+
+fn parse_min_occurs(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<u64> {
+  Ok(
+    optional_attr(reader, element, b"minOccurs")?
       .as_deref()
       .unwrap_or("1")
       .parse()
       .unwrap_or(1),
-    max_occurs: optional_attr(reader, element, b"maxOccurs")?
+  )
+}
+
+fn parse_max_occurs(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<u64> {
+  Ok(
+    optional_attr(reader, element, b"maxOccurs")?
       .as_deref()
       .map(|value| {
         if value == "unbounded" {
@@ -304,7 +522,7 @@ fn parse_particle(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<Pa
         }
       })
       .unwrap_or(1),
-  })
+  )
 }
 
 fn parse_attribute(
@@ -430,6 +648,21 @@ fn skip_element(reader: &mut Reader<&[u8]>, tag: &[u8]) -> Result<()> {
   Ok(())
 }
 
+fn skip_to_end(reader: &mut Reader<&[u8]>, tag: &[u8]) -> Result<()> {
+  loop {
+    match reader.read_event()? {
+      Event::Start(e) if e.name().as_ref() == tag => skip_element(reader, e.name().as_ref())?,
+      Event::End(e) if e.name().as_ref() == tag => return Ok(()),
+      Event::Eof => return Err("unexpected EOF while skipping to end".into()),
+      _ => {}
+    }
+  }
+}
+
+fn is_particle(name: &[u8]) -> bool {
+  matches!(local_name(name), b"sequence" | b"choice" | b"all")
+}
+
 fn local_name(name: &[u8]) -> &[u8] {
   match name.iter().rposition(|byte| *byte == b':') {
     Some(index) => &name[index + 1..],
@@ -444,9 +677,13 @@ fn strip_prefix(value: &str) -> &str {
   }
 }
 
+fn xsd_local_name(value: &str) -> &str {
+  strip_prefix(value)
+}
+
 #[cfg(test)]
 mod tests {
-  use super::{ParsedParticleKind, parse_xsd};
+  use super::{ParsedParticleKind, ParsedParticleNode, parse_xsd, repeatable_choice_element_names};
 
   #[test]
   fn captures_top_level_choice_particle() {
@@ -470,5 +707,44 @@ mod tests {
     assert_eq!(particle.kind, ParsedParticleKind::Choice);
     assert_eq!(particle.min_occurs, 1);
     assert_eq!(particle.max_occurs, u64::MAX);
+  }
+
+  #[test]
+  fn resolves_repeated_elements_through_group_refs() {
+    let xsd = parse_xsd(
+      r#"
+      <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:test">
+        <xsd:group name="EG_RPrBase">
+          <xsd:choice>
+            <xsd:element name="b" type="CT_OnOff"/>
+            <xsd:element name="sz" type="CT_HpsMeasure"/>
+          </xsd:choice>
+        </xsd:group>
+        <xsd:group name="EG_RPrContent">
+          <xsd:sequence>
+            <xsd:group ref="EG_RPrBase" minOccurs="0" maxOccurs="unbounded"/>
+            <xsd:element name="rPrChange" type="CT_RPrChange" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:group>
+        <xsd:complexType name="CT_RPr">
+          <xsd:sequence>
+            <xsd:group ref="EG_RPrContent" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:schema>
+      "#,
+    )
+    .expect("parse xsd");
+
+    assert!(matches!(
+      xsd.groups.get("EG_RPrBase"),
+      Some(ParsedParticleNode::Group { .. })
+    ));
+    assert_eq!(
+      repeatable_choice_element_names(&xsd, "CT_RPr")
+        .into_iter()
+        .collect::<Vec<_>>(),
+      vec!["b".to_string(), "sz".to_string()],
+    );
   }
 }

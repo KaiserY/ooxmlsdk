@@ -26,6 +26,24 @@
     {
       "ClassName": "TableStyle",
       "HaveXmlOtherAttrs": true
+    },
+    {
+      "ClassName": "ExternalCell",
+      "Children": [
+        {
+          "Name": "x:ST_Xstring/x:v",
+          "OverrideName": "x:CT_Xstring/x:v"
+        }
+      ]
+    },
+    {
+      "ClassName": "Topic",
+      "Children": [
+        {
+          "Name": "x:ST_Xstring/x:v",
+          "OverrideName": "x:CT_Xstring/x:v"
+        }
+      ]
     }
   ]
 }

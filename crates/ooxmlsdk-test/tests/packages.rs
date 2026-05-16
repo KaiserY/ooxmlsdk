@@ -27,7 +27,7 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_spreadsheetml_2006_main::{
 };
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main::{
   Body, BodyChoice, Document, Header, Paragraph, ParagraphChoice, Run, RunChoice,
-  SdtPropertiesChoice, Text,
+  SdtPropertiesChoice, Text, TextType,
 };
 use ooxmlsdk::sdk::{
   AlternativeFormatImportPartType, CustomPropertyPartType, CustomXmlPartType,
@@ -3956,10 +3956,10 @@ fn create_apis_create_office_document_packages() {
         body: Some(Box::new(Body {
           body_choice: vec![BodyChoice::WP(Box::new(Paragraph {
             paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
-              run_choice: vec![RunChoice::WT(Box::new(Text {
+              run_choice: vec![RunChoice::WT(Box::new(Text(TextType {
                 xml_content: Some("Hello World!".to_string()),
                 ..Default::default()
-              }))],
+              })))],
               ..Default::default()
             }))],
             ..Default::default()
@@ -4783,10 +4783,10 @@ fn wordprocessing_clone_mutation_is_saved_without_changing_source_package() {
     0,
     BodyChoice::WP(Box::new(Paragraph {
       paragraph_choice: vec![ParagraphChoice::WR(Box::new(Run {
-        run_choice: vec![RunChoice::WT(Box::new(Text {
+        run_choice: vec![RunChoice::WT(Box::new(Text(TextType {
           xml_content: Some("Hello World from clone".to_string()),
           ..Default::default()
-        }))],
+        })))],
         ..Default::default()
       }))],
       ..Default::default()

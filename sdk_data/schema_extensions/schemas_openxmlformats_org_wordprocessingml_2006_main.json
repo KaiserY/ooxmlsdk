@@ -40,6 +40,15 @@
       "HaveXmlOtherAttrs": true
     },
     {
+      "ClassName": "RunProperties",
+      "Children": [
+        {
+          "Name": "w:CT_HpsMeasure/w:sz",
+          "Repeated": true
+        }
+      ]
+    },
+    {
       "ClassName": "Font",
       "ParentChoiceHasAnyIn": ["Fonts"]
     },

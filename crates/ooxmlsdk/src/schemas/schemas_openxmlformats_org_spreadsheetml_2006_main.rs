@@ -2839,161 +2839,67 @@ pub struct Comment {
 /// Author.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:author")]
-pub struct Author {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Author(pub XstringType);
 /// Text.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:t")]
-pub struct Text {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Text(pub XstringType);
 /// Cell Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:v")]
-pub struct CellValue {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct CellValue(pub XstringType);
 /// Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula")]
-pub struct Formula {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula(pub XstringType);
 /// Old Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oldFormula")]
-pub struct OldFormula {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OldFormula(pub XstringType);
 /// Odd Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oddHeader")]
-pub struct OddHeader {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OddHeader(pub XstringType);
 /// Odd Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:oddFooter")]
-pub struct OddFooter {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct OddFooter(pub XstringType);
 /// Even Page Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:evenHeader")]
-pub struct EvenHeader {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct EvenHeader(pub XstringType);
 /// Even Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:evenFooter")]
-pub struct EvenFooter {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct EvenFooter(pub XstringType);
 /// First Page Header.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:firstHeader")]
-pub struct FirstHeader {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FirstHeader(pub XstringType);
 /// First Page Footer.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:firstFooter")]
-pub struct FirstFooter {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct FirstFooter(pub XstringType);
 /// DDE Link Value.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:val")]
-pub struct DdeLinkValue {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct DdeLinkValue(pub XstringType);
 /// Strings in Subtopic.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:stp")]
-pub struct Subtopic {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Subtopic(pub XstringType);
 /// Defines the Formula1 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula1")]
-pub struct Formula1 {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Content Contains Significant Whitespace
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct Formula1(pub XstringType);
 /// Defines the Formula2 Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_Xstring/x:formula2")]
-pub struct Formula2 {
+pub struct Formula2(pub XstringType);
+/// Defines the XstringType Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "x:CT_Xstring/")]
+pub struct XstringType {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Content Contains Significant Whitespace
   #[sdk(attr(qname = "xml:space"))]
@@ -7727,8 +7633,8 @@ pub struct ExternalCell {
   #[sdk(attr(qname = ":vm"))]
   pub value_meta_index: Option<crate::simple_type::UInt32Value>,
   /// Value
-  #[sdk(text_child(simple_type = "StringValue", qname = "x:ST_Xstring/x:v"))]
-  pub xstring: Option<Xstring>,
+  #[sdk(child(qname = "x:CT_Xstring/x:v"))]
+  pub xstring: Option<CellValue>,
 }
 /// DDE Items Collection.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7913,21 +7819,15 @@ pub struct TableColumn {
 /// Calculated Column Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableFormula/x:calculatedColumnFormula")]
-pub struct CalculatedColumnFormula {
-  pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
-  /// Array
-  #[sdk(attr(qname = ":array"))]
-  pub array: Option<crate::simple_type::BooleanValue>,
-  /// space
-  #[sdk(attr(qname = "xml:space"))]
-  pub space: Option<crate::schemas::xml::SpaceProcessingModeValues>,
-  #[sdk(text)]
-  pub xml_content: Option<crate::simple_type::StringValue>,
-}
+pub struct CalculatedColumnFormula(pub TableFormulaType);
 /// Totals Row Formula.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "x:CT_TableFormula/x:totalsRowFormula")]
-pub struct TotalsRowFormula {
+pub struct TotalsRowFormula(pub TableFormulaType);
+/// Defines the TableFormulaType Class.
+#[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
+#[sdk(qname = "x:CT_TableFormula/")]
+pub struct TableFormulaType {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Array
   #[sdk(attr(qname = ":array"))]
@@ -7991,8 +7891,8 @@ pub struct Topic {
   #[sdk(attr(qname = ":t"))]
   pub value_type: Option<VolatileValues>,
   /// Topic Value
-  #[sdk(text_child(simple_type = "StringValue", qname = "x:ST_Xstring/x:v"))]
-  pub xstring: Xstring,
+  #[sdk(child(qname = "x:CT_Xstring/x:v"))]
+  pub xstring: std::boxed::Box<CellValue>,
   /// Strings in Subtopic.
   #[sdk(child(qname = "x:CT_Xstring/x:stp"))]
   pub x_stp: Vec<Subtopic>,

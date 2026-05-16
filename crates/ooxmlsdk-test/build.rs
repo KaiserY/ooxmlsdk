@@ -177,7 +177,17 @@ fn is_valid_open_only(file_name: &str) -> bool {
 }
 
 fn is_test_data_open_only(file_name: &str) -> bool {
-  matches!(file_name, "libreoffice/spreadsheet/formats.xlsx")
+  matches!(
+    file_name,
+    // c:chart has c:extLst before c:showDLblsOverMax, opposite of CT_Chart particle order.
+    "libreoffice/presentation/chart-theme-override.pptx"
+      |
+    "libreoffice/spreadsheet/formats.xlsx"
+      // Missing required w:tblGrid under w:tbl; keep parse coverage but skip round-trip.
+      | "libreoffice/word/sdt-around-float-table.docx"
+      // Missing required wp:anchor children; keep parse coverage but skip round-trip.
+      | "libreoffice/word/tdf92157-1-minimized.docx"
+  )
 }
 
 fn version_cfg_attr(file_name: &str) -> String {

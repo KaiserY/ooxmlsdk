@@ -79,7 +79,7 @@ pub struct TaskHistoryEvent {
   pub id: crate::simple_type::StringValue,
   /// Defines the AttributionTaskUser Class.
   #[sdk(child(office2021, qname = "t:CT_TaskUser/t:Attribution"))]
-  pub attribution_task_user: Option<AttributionTaskUser>,
+  pub attribution_task_user: std::boxed::Box<AttributionTaskUser>,
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "t:CT_TaskAnchor/t:Anchor"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,

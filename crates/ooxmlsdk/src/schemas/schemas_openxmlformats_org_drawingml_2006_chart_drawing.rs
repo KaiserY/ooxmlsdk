@@ -12,10 +12,10 @@ pub struct RelativeAnchorSize {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
-  pub from_anchor: Option<FromAnchor>,
+  pub from_anchor: std::boxed::Box<FromAnchor>,
   /// Ending Anchor Point
   #[sdk(child(qname = "cdr:CT_Marker/cdr:to"))]
-  pub to_anchor: Option<ToAnchor>,
+  pub to_anchor: std::boxed::Box<ToAnchor>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
@@ -34,10 +34,10 @@ pub struct AbsoluteAnchorSize {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "cdr:CT_Marker/cdr:from"))]
-  pub from_anchor: Option<FromAnchor>,
+  pub from_anchor: std::boxed::Box<FromAnchor>,
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/cdr:ext"))]
-  pub extent: Option<Extent>,
+  pub extent: std::boxed::Box<Extent>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",
@@ -86,10 +86,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Group Shape Properties
   #[sdk(child(qname = "cdr:CT_GroupShapeNonVisual/cdr:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
+  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/cdr:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "cdr:CT_Shape/cdr:sp",
     qname = "cdr:CT_GroupShape/cdr:grpSp",

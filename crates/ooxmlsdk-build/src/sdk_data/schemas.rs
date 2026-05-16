@@ -167,7 +167,6 @@ pub fn gen_schemas(gen_context: &Context) -> Vec<Schema> {
               );
             }
             mark_sequence_collection_children_repeated(ty, &mut children);
-            mark_mixed_sequence_direct_children_optional(&mut children);
             let have_xml_other_attrs = have_xml_other_attrs_for_mixed_version_content(
               ty,
               kind,
@@ -1267,32 +1266,6 @@ fn mark_sequence_collection_children_repeated(
   children[0].repeated = true;
 }
 
-fn mark_mixed_sequence_direct_children_optional(children: &mut [SchemaTypeChild]) {
-  let Some(choice_child) = children
-    .iter()
-    .find(|child| child.kind == SchemaTypeChildKind::Choice)
-  else {
-    return;
-  };
-
-  let mut choice_leaf_names = std::collections::HashSet::new();
-  collect_choice_child_leaf_names(choice_child, &mut choice_leaf_names);
-
-  if choice_leaf_names.is_empty() {
-    return;
-  }
-
-  for child in children.iter_mut() {
-    if matches!(
-      child.kind,
-      SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild
-    ) && !choice_leaf_names.contains(child.name.as_str())
-    {
-      child.optional = true;
-    }
-  }
-}
-
 fn have_xml_other_children_for_mixed_version_content(
   schema_type: &crate::sdk_data::open_xml::OpenXmlSchemaType,
   type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
@@ -1876,24 +1849,6 @@ fn assign_particle_ids_with_prefix(children: &mut [SchemaTypeChild], prefix: &st
   }
 }
 
-fn collect_choice_child_leaf_names(
-  child: &SchemaTypeChild,
-  out: &mut std::collections::HashSet<String>,
-) {
-  match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild | SchemaTypeChildKind::Any => {
-      if !child.name.is_empty() {
-        out.insert(child.name.clone());
-      }
-    }
-    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
-      for item in &child.children {
-        collect_choice_child_leaf_names(item, out);
-      }
-    }
-  }
-}
-
 fn resolve_child_kind(
   child_name: &str,
   type_map: &HashMap<&str, &crate::sdk_data::open_xml::OpenXmlSchemaType>,
@@ -2255,7 +2210,7 @@ mod tests {
   use crate::sdk_data::{
     context::Context,
     open_xml::{OpenXmlSchemaType, OpenXmlSchemaTypeParticle},
-    sdk_data_model::{SchemaTypeCompositeKind, SchemaTypeKind},
+    sdk_data_model::{SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeKind},
     xsd::parse_xsd,
   };
   use std::collections::{HashMap, HashSet};
@@ -2413,6 +2368,40 @@ mod tests {
       .expect("font");
 
     assert_eq!(font.kind, SchemaTypeKind::Composite);
+  }
+
+  #[test]
+  fn mixed_sequence_choice_preserves_direct_child_occurs() {
+    let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
+    let context = Context::new(&data_dir).expect("context");
+    let schemas = gen_schemas(&context);
+    let schema_type = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_microsoft_com_office_powerpoint_2019_12_main")
+      .and_then(|schema| {
+        schema
+          .types
+          .iter()
+          .find(|schema_type| schema_type.class_name == "TaskHistoryEvent")
+      })
+      .expect("TaskHistoryEvent");
+
+    let atrbtn = schema_type
+      .children
+      .iter()
+      .find(|child| child.name == "p1912:CT_TaskAssignUnassignUser/p1912:atrbtn")
+      .expect("atrbtn child");
+    assert_eq!(atrbtn.kind, SchemaTypeChildKind::Child);
+    assert!(!atrbtn.optional);
+    assert!(!atrbtn.repeated);
+
+    let choice = schema_type
+      .children
+      .iter()
+      .find(|child| child.kind == SchemaTypeChildKind::Choice)
+      .expect("choice child");
+    assert!(choice.optional);
+    assert!(!choice.repeated);
   }
 
   #[test]

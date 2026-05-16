@@ -21,7 +21,7 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice1: Option<WordprocessingShapeChoice>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeProperties/wps:spPr"))]
-  pub wps_sp_pr: Option<std::boxed::Box<ShapeProperties>>,
+  pub wps_sp_pr: std::boxed::Box<ShapeProperties>,
   /// Defines the ShapeStyle Class.
   #[sdk(child(office2010, qname = "a:CT_ShapeStyle/wps:style"))]
   pub wps_style: Option<std::boxed::Box<ShapeStyle>>,
@@ -35,7 +35,7 @@ pub struct WordprocessingShape {
   pub wordprocessing_shape_choice2: Option<WordprocessingShapeChoice2>,
   /// Defines the TextBodyProperties Class.
   #[sdk(child(office2010, qname = "a:CT_TextBodyProperties/wps:bodyPr"))]
-  pub wps_body_pr: Option<std::boxed::Box<TextBodyProperties>>,
+  pub wps_body_pr: std::boxed::Box<TextBodyProperties>,
 }
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

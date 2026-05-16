@@ -1,0 +1,13 @@
+{
+  "Types": [
+    {
+      "ClassName": "DLblsExtension",
+      "Children": [
+        {
+          "Name": "c:CT_Tx/c15:tx",
+          "Repeated": true
+        }
+      ]
+    }
+  ]
+}

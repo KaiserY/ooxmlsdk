@@ -67,6 +67,7 @@ pub struct SchemaTypeChildExtension {
   pub name: String,
   pub property_name: String,
   pub optional: Option<bool>,
+  pub repeated: Option<bool>,
   #[serde(skip_serializing_if = "String::is_empty")]
   pub override_name: String,
 }
@@ -228,6 +229,9 @@ pub fn apply_schema_extensions(
         if let Some(optional) = child_extension.optional {
           child.optional = optional;
         }
+        if let Some(repeated) = child_extension.repeated {
+          child.repeated = repeated;
+        }
         if !child_extension.override_name.is_empty() {
           child.name = child_extension.override_name.clone();
         }
@@ -336,6 +340,42 @@ mod tests {
       schemas[0].types[0].parent_choice_has_any_in,
       vec!["ParentContainer".to_string()]
     );
+  }
+
+  #[test]
+  fn applies_child_repeated_extension_by_name() {
+    let mut schemas = vec![Schema {
+      module_name: "test_schema".to_string(),
+      types: vec![SchemaType {
+        class_name: "Parent".to_string(),
+        children: vec![SchemaTypeChild {
+          name: "t:CT_Choice/t:choice".to_string(),
+          repeated: false,
+          ..Default::default()
+        }],
+        ..Default::default()
+      }],
+      ..Default::default()
+    }];
+    let extensions = vec![(
+      "test_schema".to_string(),
+      SchemaExtensions {
+        types: vec![SchemaTypeExtension {
+          class_name: "Parent".to_string(),
+          children: vec![SchemaTypeChildExtension {
+            name: "t:CT_Choice/t:choice".to_string(),
+            repeated: Some(true),
+            ..Default::default()
+          }],
+          ..Default::default()
+        }],
+        ..Default::default()
+      },
+    )];
+
+    apply_schema_extensions(&mut schemas, &extensions).unwrap();
+
+    assert!(schemas[0].types[0].children[0].repeated);
   }
 
   #[test]

@@ -7607,10 +7607,10 @@ pub struct Table {
   pub table_choice1: Vec<TableChoice>,
   /// Table Properties.
   #[sdk(child(qname = "w:CT_TblPr/w:tblPr"))]
-  pub w_tbl_pr: Option<std::boxed::Box<TableProperties>>,
+  pub w_tbl_pr: std::boxed::Box<TableProperties>,
   /// Table Grid.
   #[sdk(child(qname = "w:CT_TblGrid/w:tblGrid"))]
-  pub w_tbl_grid: Option<std::boxed::Box<TableGrid>>,
+  pub w_tbl_grid: std::boxed::Box<TableGrid>,
   #[sdk(choice(
     qname = "w:CT_Row/w:tr",
     qname = "w:CT_CustomXmlRow/w:customXml",

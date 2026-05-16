@@ -141,7 +141,7 @@ pub struct TaskHistoryEvent {
   pub id: crate::simple_type::StringValue,
   /// Defines the AtrbtnTaskAssignUnassignUser Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskAssignUnassignUser/p1912:atrbtn"))]
-  pub atrbtn_task_assign_unassign_user: Option<AtrbtnTaskAssignUnassignUser>,
+  pub atrbtn_task_assign_unassign_user: std::boxed::Box<AtrbtnTaskAssignUnassignUser>,
   /// Defines the TaskAnchor Class.
   #[sdk(child(office2021, qname = "p1912:CT_TaskAnchor/p1912:anchr"))]
   pub task_anchor: Option<std::boxed::Box<TaskAnchor>>,

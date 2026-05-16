@@ -13,11 +13,10 @@ pub struct LockedCanvas {
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
   pub non_visual_group_shape_properties:
-    Option<std::boxed::Box<crate::schemas::a::NonVisualGroupShapeProperties>>,
+    std::boxed::Box<crate::schemas::a::NonVisualGroupShapeProperties>,
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
-  pub visual_group_shape_properties:
-    Option<std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>>,
+  pub visual_group_shape_properties: std::boxed::Box<crate::schemas::a::VisualGroupShapeProperties>,
   #[sdk(choice(
     qname = "a:CT_GvmlTextShape/a:txSp",
     qname = "a:CT_GvmlShape/a:sp",

@@ -210,6 +210,8 @@ pub struct UseLocalDpi {
   #[sdk(attr(office2010, qname = ":val"))]
   pub val: Option<crate::simple_type::BooleanValue>,
 }
+/// Defines the TextMath Class.
+pub type TextMath = Vec<String>;
 /// Defines the OfficeArtExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "a:CT_OfficeArtExtensionList/a14:extLst")]

@@ -26,10 +26,10 @@ pub struct TwoCellAnchor {
   pub edit_as: Option<EditAsValues>,
   /// Starting Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
-  pub from_marker: Option<FromMarker>,
+  pub from_marker: std::boxed::Box<FromMarker>,
   /// Ending Anchor Point
   #[sdk(child(qname = "xdr:CT_Marker/xdr:to"))]
-  pub to_marker: Option<ToMarker>,
+  pub to_marker: std::boxed::Box<ToMarker>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -42,7 +42,7 @@ pub struct TwoCellAnchor {
   pub two_cell_anchor_choice: Option<TwoCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
-  pub xdr_client_data: Option<ClientData>,
+  pub xdr_client_data: std::boxed::Box<ClientData>,
 }
 /// One Cell Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -52,10 +52,10 @@ pub struct OneCellAnchor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Starting Anchor Point.
   #[sdk(child(qname = "xdr:CT_Marker/xdr:from"))]
-  pub from_marker: Option<FromMarker>,
+  pub from_marker: std::boxed::Box<FromMarker>,
   /// Defines the Extent Class.
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
-  pub extent: Option<Extent>,
+  pub extent: std::boxed::Box<Extent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -67,7 +67,7 @@ pub struct OneCellAnchor {
   pub one_cell_anchor_choice: Option<OneCellAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
-  pub xdr_client_data: Option<ClientData>,
+  pub xdr_client_data: std::boxed::Box<ClientData>,
 }
 /// Absolute Anchor Shape Size.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -77,10 +77,10 @@ pub struct AbsoluteAnchor {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Position
   #[sdk(child(qname = "a:CT_Point2D/xdr:pos"))]
-  pub position: Option<Position>,
+  pub position: std::boxed::Box<Position>,
   /// Shape Extent
   #[sdk(child(qname = "a:CT_PositiveSize2D/xdr:ext"))]
-  pub extent: Option<Extent>,
+  pub extent: std::boxed::Box<Extent>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",
@@ -92,7 +92,7 @@ pub struct AbsoluteAnchor {
   pub absolute_anchor_choice: Option<AbsoluteAnchorChoice>,
   /// Client Data.
   #[sdk(child(qname = "xdr:CT_AnchorClientData/xdr:clientData"))]
-  pub xdr_client_data: Option<ClientData>,
+  pub xdr_client_data: std::boxed::Box<ClientData>,
 }
 /// Shape.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -132,10 +132,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "xdr:CT_GroupShapeNonVisual/xdr:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
+  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/xdr:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "xdr:CT_Shape/xdr:sp",
     qname = "xdr:CT_GroupShape/xdr:grpSp",

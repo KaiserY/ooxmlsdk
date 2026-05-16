@@ -3721,10 +3721,10 @@ pub struct ShapeTree {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
+  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -3747,10 +3747,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "p:CT_GroupShapeNonVisual/p:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
+  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/p:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "p:CT_Shape/p:sp",
     qname = "p:CT_GroupShape/p:grpSp",
@@ -3843,6 +3843,7 @@ pub struct GroupShapeProperties {
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(qname = "p:CT_Shape/p:sp")]
 pub struct Shape {
+  pub xmlns: Vec<crate::common::XmlNamespaceDecl>,
   /// Use Background Fill
   #[sdk(attr(qname = ":useBgFill"))]
   pub use_background_fill: Option<crate::simple_type::BooleanValue>,
@@ -5630,8 +5631,8 @@ pub enum PresentationPropertiesExtensionChoice {
   #[sdk(child(office2010, qname = "p14:CT_DefaultImageDpi/p14:defaultImageDpi"))]
   P14DefaultImageDpi(std::boxed::Box<crate::schemas::p14::DefaultImageDpi>),
   /// Defines the TextMath Class.
-  #[sdk(empty_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  A14M,
+  #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
+  A14M(crate::schemas::a14::TextMath),
   /// Defines the ChartTrackingReferenceBased Class.
   #[sdk(child(
     office2013,

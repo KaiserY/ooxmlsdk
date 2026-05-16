@@ -668,7 +668,7 @@ pub struct RevExChgObj {
   pub ctx: Option<RevisionContext>,
   /// Defines the StateBasedHeader Class.
   #[sdk(child(office2016, qname = "xr:CT_StateBasedHeader/xr:hdr"))]
-  pub state_based_header: Option<std::boxed::Box<StateBasedHeader>>,
+  pub state_based_header: std::boxed::Box<StateBasedHeader>,
   #[sdk(choice(
     qname = "xr:CT_RevisionStateLink/xr:link",
     qname = "xr:CT_RevisionState/xr:body"

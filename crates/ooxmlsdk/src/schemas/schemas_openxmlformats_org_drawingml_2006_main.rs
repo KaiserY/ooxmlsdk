@@ -5220,7 +5220,7 @@ pub struct ShapeProperties {
 pub struct TextShape {
   /// Shape Text Body
   #[sdk(child(qname = "a:CT_TextBody/a:txBody"))]
-  pub text_body: Option<std::boxed::Box<TextBody>>,
+  pub text_body: std::boxed::Box<TextBody>,
   #[sdk(choice(
     qname = "a:CT_GvmlUseShapeRectangle/a:useSpRect",
     qname = "a:CT_Transform2D/a:xfrm"
@@ -8559,10 +8559,10 @@ pub struct GroupShape {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// Non-Visual Properties for a Group Shape
   #[sdk(child(qname = "a:CT_GvmlGroupShapeNonVisual/a:nvGrpSpPr"))]
-  pub non_visual_group_shape_properties: Option<std::boxed::Box<NonVisualGroupShapeProperties>>,
+  pub non_visual_group_shape_properties: std::boxed::Box<NonVisualGroupShapeProperties>,
   /// Visual Group Shape Properties
   #[sdk(child(qname = "a:CT_GroupShapeProperties/a:grpSpPr"))]
-  pub visual_group_shape_properties: Option<std::boxed::Box<VisualGroupShapeProperties>>,
+  pub visual_group_shape_properties: std::boxed::Box<VisualGroupShapeProperties>,
   #[sdk(choice(
     qname = "a:CT_GvmlTextShape/a:txSp",
     qname = "a:CT_GvmlShape/a:sp",
@@ -11904,9 +11904,8 @@ pub enum ParagraphChoice {
   /// Text Field.
   #[sdk(child(qname = "a:CT_TextField/a:fld"))]
   AFld(std::boxed::Box<Field>),
-  /// Defines the TextMath Class.
-  #[sdk(empty_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
-  A14M,
+  #[sdk(any_child(office2010, qname = "a14:CT_TextMath/a14:m"))]
+  A14M(crate::schemas::a14::TextMath),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LineSpacingChoice {

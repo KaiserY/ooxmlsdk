@@ -17,10 +17,10 @@ pub struct WordprocessingGroup {
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
+    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",
@@ -46,10 +46,10 @@ pub struct GroupShape {
     qname = "a:CT_NonVisualGroupDrawingShapeProps/wpg:cNvGrpSpPr"
   ))]
   pub non_visual_group_drawing_shape_properties:
-    Option<std::boxed::Box<NonVisualGroupDrawingShapeProperties>>,
+    std::boxed::Box<NonVisualGroupDrawingShapeProperties>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/wpg:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(
     qname = "wps:CT_WordprocessingShape/wps:wsp",
     qname = "wpg:CT_WordprocessingGroup/wpg:grpSp",

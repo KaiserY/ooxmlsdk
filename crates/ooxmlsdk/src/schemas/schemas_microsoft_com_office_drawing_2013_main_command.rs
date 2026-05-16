@@ -169,7 +169,7 @@ pub struct GroupCommand {
   pub grp_id: Option<crate::simple_type::UInt32Value>,
   /// Defines the DrawingMonikerList Class.
   #[sdk(any_child(office2016, qname = "oac:CT_DrawingMonikerList/oac:dgMkLst"))]
-  pub drawing_moniker_list: Option<DrawingMonikerList>,
+  pub drawing_moniker_list: DrawingMonikerList,
   #[sdk(choice(
     qname = "oac:CT_ShapeMoniker/oac:spMk",
     qname = "oac:CT_GroupShapeMoniker/oac:grpSpMk",

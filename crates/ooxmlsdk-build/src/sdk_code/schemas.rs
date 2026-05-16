@@ -183,7 +183,9 @@ impl TypeContainmentGraph {
               .insert(generated_rust_name);
           }
         }
-        if can_alias_any_children_wrapper_decl(type_decl, &[]) {
+        if can_alias_any_children_wrapper_decl(type_decl, &[])
+          || can_alias_raw_children_leaf_decl(type_decl, &[])
+        {
           graph.any_children_alias_keys.insert(type_key);
         }
       }
@@ -1140,7 +1142,9 @@ pub(crate) fn gen_schema_from_ir_with_type_graph(
       continue;
     }
 
-    if can_alias_any_children_wrapper_decl(type_decl, &attr_fields) {
+    if can_alias_any_children_wrapper_decl(type_decl, &attr_fields)
+      || can_alias_raw_children_leaf_decl(type_decl, &attr_fields)
+    {
       token_stream_list.push(quote! {
         #( #type_attrs )*
         #[doc = #summary_doc]
@@ -3645,6 +3649,25 @@ fn can_alias_any_children_wrapper_decl(type_decl: &TypeDecl, attr_fields: &[&Fie
     && field.cardinality == Cardinality::Many
     && field.type_ref.module_path.is_none()
     && field.type_ref.rust_type == "std::boxed::Box<str>"
+}
+
+fn can_alias_raw_children_leaf_decl(type_decl: &TypeDecl, attr_fields: &[&FieldDecl]) -> bool {
+  type_decl.kind == TypeKind::ElementStruct
+    && matches!(
+      type_decl.base_rust_name.as_deref(),
+      Some("OpenXmlLeafElement" | "OpenXmlEmptyElement" | "EmptyType")
+    )
+    && matches!(
+      type_decl.element_kind,
+      Some(ElementKind::Leaf | ElementKind::Composite)
+    )
+    && attr_fields.is_empty()
+    && type_decl.members.is_empty()
+    && type_decl.xml_content.is_none()
+    && !type_decl.support.have_xmlns_fields
+    && !type_decl.support.have_xml_other_attrs
+    && type_decl.support.have_xml_other_children
+    && type_decl.support.xml_header == crate::sdk_code::codegen_ir::XmlHeaderMode::None
 }
 
 fn is_any_children_alias_type_ref(
@@ -6677,5 +6700,49 @@ mod tests {
     );
     assert!(!generated.contains("pub enum AnyHolderChoice"));
     assert!(!generated.contains("UnknownXml (String)"));
+  }
+
+  #[test]
+  fn aliases_raw_children_leaf_and_uses_any_child_refs() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_TextMath/t:m".to_string(),
+          class_name: "TextMath".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          base_class: "OpenXmlLeafElement".to_string(),
+          have_direct_xml_other_children: true,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Paragraph/t:p".to_string(),
+          class_name: "Paragraph".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![SchemaTypeChild {
+            name: "t:CT_TextMath/t:m".to_string(),
+            property_name: "TextMath".to_string(),
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let generated = gen_schema(&schema, None, &context, false)
+      .unwrap()
+      .to_string();
+
+    assert!(generated.contains("pub type TextMath = Vec < String >"));
+    assert!(generated.contains("# [sdk (any_child (qname = \"t:CT_TextMath/t:m\"))]"));
+    assert!(generated.contains("pub text_math : TextMath"));
+    assert!(!generated.contains("pub struct TextMath"));
+    assert!(!generated.contains("# [sdk (empty_child (qname = \"t:CT_TextMath/t:m\"))]"));
   }
 }

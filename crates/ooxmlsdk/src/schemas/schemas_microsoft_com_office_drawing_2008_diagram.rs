@@ -293,10 +293,10 @@ pub struct Shape {
 pub struct GroupShape {
   /// Defines the GroupShapeNonVisualProperties Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
-  pub group_shape_non_visual_properties: Option<std::boxed::Box<GroupShapeNonVisualProperties>>,
+  pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub group_shape_choice: Vec<GroupShapeChoice>,
   /// Defines the OfficeArtExtensionList Class.
@@ -309,10 +309,10 @@ pub struct GroupShape {
 pub struct ShapeTree {
   /// Defines the GroupShapeNonVisualProperties Class.
   #[sdk(child(office2010, qname = "dsp:CT_GroupShapeNonVisual/dsp:nvGrpSpPr"))]
-  pub group_shape_non_visual_properties: Option<std::boxed::Box<GroupShapeNonVisualProperties>>,
+  pub group_shape_non_visual_properties: std::boxed::Box<GroupShapeNonVisualProperties>,
   /// Defines the GroupShapeProperties Class.
   #[sdk(child(office2010, qname = "a:CT_GroupShapeProperties/dsp:grpSpPr"))]
-  pub group_shape_properties: Option<std::boxed::Box<GroupShapeProperties>>,
+  pub group_shape_properties: std::boxed::Box<GroupShapeProperties>,
   #[sdk(choice(qname = "dsp:CT_Shape/dsp:sp", qname = "dsp:CT_GroupShape/dsp:grpSp"))]
   pub shape_tree_choice: Vec<ShapeTreeChoice>,
   /// Defines the OfficeArtExtensionList Class.

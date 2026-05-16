@@ -1412,7 +1412,7 @@ pub struct ChartSpace {
   pub c_protection: Option<std::boxed::Box<Protection>>,
   /// Defines the Chart Class.
   #[sdk(child(qname = "c:CT_Chart/c:chart"))]
-  pub c_chart: Option<std::boxed::Box<Chart>>,
+  pub c_chart: std::boxed::Box<Chart>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(qname = "a:CT_ShapeProperties/c:spPr"))]
   pub c_sp_pr: Option<std::boxed::Box<ShapeProperties>>,
@@ -2088,7 +2088,7 @@ pub struct LegendPosition {
 pub struct LegendEntry {
   /// Index
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: Option<Index>,
+  pub index: std::boxed::Box<Index>,
   #[sdk(choice(qname = "c:CT_Boolean/c:delete", qname = "a:CT_TextBody/c:txPr"))]
   pub legend_entry_choice: Option<LegendEntryChoice>,
   /// Defines the ExtensionList Class.
@@ -2232,7 +2232,7 @@ pub struct ShapeProperties {
 pub struct DataLabel {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: Option<Index>,
+  pub index: std::boxed::Box<Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",
@@ -2697,16 +2697,16 @@ pub struct BubbleChart {
 pub struct ValueAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: Option<AxisId>,
+  pub axis_id: std::boxed::Box<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: Option<std::boxed::Box<Scaling>>,
+  pub scaling: std::boxed::Box<Scaling>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: Option<AxisPosition>,
+  pub axis_position: std::boxed::Box<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2736,7 +2736,7 @@ pub struct ValueAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: Option<CrossingAxis>,
+  pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub value_axis_choice: Option<ValueAxisChoice>,
   /// Defines the CrossBetween Class.
@@ -2761,16 +2761,16 @@ pub struct ValueAxis {
 pub struct CategoryAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: Option<AxisId>,
+  pub axis_id: std::boxed::Box<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: Option<std::boxed::Box<Scaling>>,
+  pub scaling: std::boxed::Box<Scaling>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: Option<AxisPosition>,
+  pub axis_position: std::boxed::Box<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2800,7 +2800,7 @@ pub struct CategoryAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: Option<CrossingAxis>,
+  pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub category_axis_choice: Option<CategoryAxisChoice>,
   /// Defines the AutoLabeled Class.
@@ -2831,16 +2831,16 @@ pub struct CategoryAxis {
 pub struct DateAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: Option<AxisId>,
+  pub axis_id: std::boxed::Box<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: Option<std::boxed::Box<Scaling>>,
+  pub scaling: std::boxed::Box<Scaling>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: Option<AxisPosition>,
+  pub axis_position: std::boxed::Box<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2870,7 +2870,7 @@ pub struct DateAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: Option<CrossingAxis>,
+  pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub date_axis_choice: Option<DateAxisChoice>,
   /// Defines the AutoLabeled Class.
@@ -2904,16 +2904,16 @@ pub struct DateAxis {
 pub struct SeriesAxis {
   /// Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:axId"))]
-  pub axis_id: Option<AxisId>,
+  pub axis_id: std::boxed::Box<AxisId>,
   /// Scaling
   #[sdk(child(qname = "c:CT_Scaling/c:scaling"))]
-  pub scaling: Option<std::boxed::Box<Scaling>>,
+  pub scaling: std::boxed::Box<Scaling>,
   /// Delete
   #[sdk(child(qname = "c:CT_Boolean/c:delete"))]
   pub delete: Option<Delete>,
   /// Axis Position
   #[sdk(child(qname = "c:CT_AxPos/c:axPos"))]
-  pub axis_position: Option<AxisPosition>,
+  pub axis_position: std::boxed::Box<AxisPosition>,
   /// Major Gridlines
   #[sdk(child(qname = "c:CT_ChartLines/c:majorGridlines"))]
   pub major_gridlines: Option<std::boxed::Box<MajorGridlines>>,
@@ -2943,7 +2943,7 @@ pub struct SeriesAxis {
   pub text_properties: Option<std::boxed::Box<TextProperties>>,
   /// Crossing Axis ID
   #[sdk(child(qname = "c:CT_UnsignedInt/c:crossAx"))]
-  pub crossing_axis: Option<CrossingAxis>,
+  pub crossing_axis: std::boxed::Box<CrossingAxis>,
   #[sdk(choice(qname = "c:CT_Crosses/c:crosses", qname = "c:CT_Double/c:crossesAt"))]
   pub series_axis_choice: Option<SeriesAxisChoice>,
   /// Defines the TickLabelSkip Class.
@@ -3146,7 +3146,7 @@ pub struct DLblsExtension {
     qname = "c:CT_ChartLines/c15:leaderLines",
     any
   ))]
-  pub d_lbls_extension_choice: Option<DLblsExtensionChoice>,
+  pub d_lbls_extension_choice: Vec<DLblsExtensionChoice>,
 }
 /// Defines the LineChartExtension Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -16,13 +16,13 @@ pub struct Model3D {
   pub link: Option<crate::simple_type::StringValue>,
   /// Defines the ShapeProperties Class.
   #[sdk(child(office2019, qname = "a:CT_ShapeProperties/am3d:spPr"))]
-  pub shape_properties: Option<std::boxed::Box<ShapeProperties>>,
+  pub shape_properties: std::boxed::Box<ShapeProperties>,
   /// Defines the Model3DCamera Class.
   #[sdk(child(office2019, qname = "am3d:CT_Model3DCamera/am3d:camera"))]
-  pub model3_d_camera: Option<std::boxed::Box<Model3DCamera>>,
+  pub model3_d_camera: std::boxed::Box<Model3DCamera>,
   /// Defines the Model3DTransform Class.
   #[sdk(child(office2019, qname = "am3d:CT_Model3DTransform/am3d:trans"))]
-  pub model3_d_transform: Option<std::boxed::Box<Model3DTransform>>,
+  pub model3_d_transform: std::boxed::Box<Model3DTransform>,
   /// Optional source attribution URL describes from whence the 3D model came.
   #[sdk(child(
     office2019,
@@ -392,13 +392,13 @@ pub struct ShapeProperties {
 pub struct Model3DCamera {
   /// Defines the PosPoint3D Class.
   #[sdk(child(office2019, qname = "a:CT_Point3D/am3d:pos"))]
-  pub pos_point3_d: Option<PosPoint3D>,
+  pub pos_point3_d: std::boxed::Box<PosPoint3D>,
   /// Defines the UpVector3D Class.
   #[sdk(child(office2019, qname = "a:CT_Vector3D/am3d:up"))]
-  pub up_vector3_d: Option<UpVector3D>,
+  pub up_vector3_d: std::boxed::Box<UpVector3D>,
   /// Defines the LookAtPoint3D Class.
   #[sdk(child(office2019, qname = "a:CT_Point3D/am3d:lookAt"))]
-  pub look_at_point3_d: Option<LookAtPoint3D>,
+  pub look_at_point3_d: std::boxed::Box<LookAtPoint3D>,
   #[sdk(choice(
     qname = "am3d:CT_OrthographicProjection/am3d:orthographic",
     qname = "am3d:CT_PerspectiveProjection/am3d:perspective"

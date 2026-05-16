@@ -2,6 +2,7 @@
   "Types": [
     {
       "ClassName": "Shape",
+      "HaveXmlnsFields": true,
       "ParentChoiceHasAnyIn": ["ShapeTree"]
     },
     {

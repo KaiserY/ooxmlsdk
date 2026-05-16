@@ -96,7 +96,7 @@ pub struct Marker {
 pub struct DLbl {
   /// Index.
   #[sdk(child(qname = "c:CT_UnsignedInt/c:idx"))]
-  pub index: Option<crate::schemas::c::Index>,
+  pub index: std::boxed::Box<crate::schemas::c::Index>,
   #[sdk(choice(
     qname = "c:CT_Boolean/c:delete",
     qname = "c:CT_Layout/c:layout",

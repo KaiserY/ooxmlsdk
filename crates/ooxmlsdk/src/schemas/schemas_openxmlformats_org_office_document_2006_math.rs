@@ -2220,7 +2220,13 @@ pub enum RunChoice {
   XmlAny(std::boxed::Box<str>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ParagraphChoice2 {
+pub enum ParagraphChoice {
+  /// Defines the OfficeMath Class.
+  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+  MOMath(std::boxed::Box<OfficeMath>),
+  /// Defines the Run Class.
+  #[sdk(child(qname = "m:CT_R/m:r"))]
+  MR(std::boxed::Box<Run>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -2329,18 +2335,6 @@ pub enum ParagraphChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ParagraphChoice {
-  /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
-  MOMath(std::boxed::Box<OfficeMath>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<Run>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<ParagraphChoice2>),
   /// Phonetic Guide Text Run.
   #[sdk(child(qname = "w:CT_R/w:r"))]
   WR(std::boxed::Box<crate::schemas::w::Run>),
@@ -2350,117 +2344,6 @@ pub enum ParagraphChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum OfficeMathChoice2 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
-  WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
-  /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
-  WDel(std::boxed::Box<crate::schemas::w::DeletedRun>),
-  /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
-  WMoveFrom(std::boxed::Box<crate::schemas::w::MoveFromRun>),
-  /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
-  WMoveTo(std::boxed::Box<crate::schemas::w::MoveToRun>),
-  /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
-  WContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum OfficeMathChoice3 {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
   WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
@@ -2473,9 +2356,114 @@ pub enum OfficeMathChoice3 {
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<OfficeMathChoice2>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<crate::schemas::w::PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<crate::schemas::w::PermEnd>),
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<crate::schemas::w::BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<crate::schemas::w::BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<crate::schemas::w::CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<crate::schemas::w::CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<crate::schemas::w::MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<crate::schemas::w::MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<crate::schemas::w::MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<crate::schemas::w::CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+  /// Inserted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+  WIns(std::boxed::Box<crate::schemas::w::InsertedRun>),
+  /// Deleted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+  WDel(std::boxed::Box<crate::schemas::w::DeletedRun>),
+  /// Move Source Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+  WMoveFrom(std::boxed::Box<crate::schemas::w::MoveFromRun>),
+  /// Move Destination Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+  WMoveTo(std::boxed::Box<crate::schemas::w::MoveToRun>),
+  /// Defines the ContentPart Class.
+  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
+  WContentPart(std::boxed::Box<crate::schemas::w::ContentPart>),
+  /// Sequence of w14:conflictIns, w14:conflictDel
+  #[sdk(sequence)]
+  Sequence {
+    /// Defines the RunConflictInsertion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
+    /// Defines the RunConflictDeletion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
+  },
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -2607,7 +2595,7 @@ pub enum OfficeMathChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<OfficeMathChoice3>),
+  Choice(std::boxed::Box<OfficeMathChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MathPropertiesChoice {
@@ -2655,6 +2643,18 @@ pub enum ControlPropertiesChoice {
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum BaseChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -2763,24 +2763,6 @@ pub enum BaseChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum BaseChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<BaseChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -2912,10 +2894,22 @@ pub enum BaseChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<BaseChoice3>),
+  Choice(std::boxed::Box<BaseChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum NumeratorChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -3024,24 +3018,6 @@ pub enum NumeratorChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum NumeratorChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<NumeratorChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -3173,10 +3149,22 @@ pub enum NumeratorChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<NumeratorChoice3>),
+  Choice(std::boxed::Box<NumeratorChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DenominatorChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -3285,24 +3273,6 @@ pub enum DenominatorChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DenominatorChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<DenominatorChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -3434,10 +3404,22 @@ pub enum DenominatorChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<DenominatorChoice3>),
+  Choice(std::boxed::Box<DenominatorChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FunctionNameChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -3546,24 +3528,6 @@ pub enum FunctionNameChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FunctionNameChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<FunctionNameChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -3695,10 +3659,22 @@ pub enum FunctionNameChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<FunctionNameChoice3>),
+  Choice(std::boxed::Box<FunctionNameChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum LimitChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -3807,24 +3783,6 @@ pub enum LimitChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum LimitChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<LimitChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -3956,10 +3914,22 @@ pub enum LimitChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<LimitChoice3>),
+  Choice(std::boxed::Box<LimitChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SubArgumentChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -4068,24 +4038,6 @@ pub enum SubArgumentChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SubArgumentChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<SubArgumentChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -4217,10 +4169,22 @@ pub enum SubArgumentChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<SubArgumentChoice3>),
+  Choice(std::boxed::Box<SubArgumentChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SuperArgumentChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -4329,24 +4293,6 @@ pub enum SuperArgumentChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SuperArgumentChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<SuperArgumentChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -4478,10 +4424,22 @@ pub enum SuperArgumentChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<SuperArgumentChoice3>),
+  Choice(std::boxed::Box<SuperArgumentChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DegreeChoice2 {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<crate::schemas::w::ProofError>),
@@ -4590,24 +4548,6 @@ pub enum DegreeChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DegreeChoice3 {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<crate::schemas::w::CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<crate::schemas::w::SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<crate::schemas::w::Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<crate::schemas::w::SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<DegreeChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<Paragraph>),
@@ -4739,5 +4679,5 @@ pub enum DegreeChoice {
   MR(std::boxed::Box<Run>),
   /// Choice of choice1, choice2
   #[sdk(choice)]
-  Choice(std::boxed::Box<DegreeChoice3>),
+  Choice(std::boxed::Box<DegreeChoice2>),
 }

@@ -15842,7 +15842,22 @@ pub enum MoveToMathControlChoice {
   WDel(std::boxed::Box<DeletedMathControl>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlRubyChoice2 {
+pub enum CustomXmlRubyChoice {
+  /// Defines the CustomXmlRuby Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  WCustomXml(std::boxed::Box<CustomXmlRuby>),
+  /// Defines the SimpleFieldRuby Class.
+  #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<SimpleFieldRuby>),
+  /// Defines the HyperlinkRuby Class.
+  #[sdk(child(qname = "w:CT_HyperlinkRuby/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<HyperlinkRuby>),
+  /// Phonetic Guide Text Run.
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<Run>),
+  /// Defines the SdtRunRuby Class.
+  #[sdk(child(qname = "w:CT_SdtRunRuby/w:sdt"))]
+  WSdt(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -15951,27 +15966,6 @@ pub enum CustomXmlRubyChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlRubyChoice {
-  /// Defines the CustomXmlRuby Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
-  WCustomXml(std::boxed::Box<CustomXmlRuby>),
-  /// Defines the SimpleFieldRuby Class.
-  #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<SimpleFieldRuby>),
-  /// Defines the HyperlinkRuby Class.
-  #[sdk(child(qname = "w:CT_HyperlinkRuby/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<HyperlinkRuby>),
-  /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
-  WR(std::boxed::Box<Run>),
-  /// Defines the SdtRunRuby Class.
-  #[sdk(child(qname = "w:CT_SdtRunRuby/w:sdt"))]
-  WSdt(std::boxed::Box<SdtRunRuby>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<CustomXmlRubyChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16040,7 +16034,22 @@ pub enum CustomXmlRubyChoice {
   MR(std::boxed::Box<crate::schemas::m::Run>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SimpleFieldRubyChoice2 {
+pub enum SimpleFieldRubyChoice {
+  /// Defines the CustomXmlRuby Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
+  WCustomXml(std::boxed::Box<CustomXmlRuby>),
+  /// Defines the SimpleFieldRuby Class.
+  #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<SimpleFieldRuby>),
+  /// Defines the HyperlinkRuby Class.
+  #[sdk(child(qname = "w:CT_HyperlinkRuby/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<HyperlinkRuby>),
+  /// Phonetic Guide Text Run.
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<Run>),
+  /// Defines the SdtRunRuby Class.
+  #[sdk(child(qname = "w:CT_SdtRunRuby/w:sdt"))]
+  WSdt(std::boxed::Box<SdtRunRuby>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -16149,27 +16158,6 @@ pub enum SimpleFieldRubyChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SimpleFieldRubyChoice {
-  /// Defines the CustomXmlRuby Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRuby/w:customXml"))]
-  WCustomXml(std::boxed::Box<CustomXmlRuby>),
-  /// Defines the SimpleFieldRuby Class.
-  #[sdk(child(qname = "w:CT_SimpleFieldRuby/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<SimpleFieldRuby>),
-  /// Defines the HyperlinkRuby Class.
-  #[sdk(child(qname = "w:CT_HyperlinkRuby/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<HyperlinkRuby>),
-  /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
-  WR(std::boxed::Box<Run>),
-  /// Defines the SdtRunRuby Class.
-  #[sdk(child(qname = "w:CT_SdtRunRuby/w:sdt"))]
-  WSdt(std::boxed::Box<SdtRunRuby>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<SimpleFieldRubyChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16583,7 +16571,10 @@ pub enum SdtRunRubyChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum InsertedRunChoice2 {
+pub enum InsertedRunChoice {
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -16692,15 +16683,6 @@ pub enum InsertedRunChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum InsertedRunChoice {
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<InsertedRunChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -16776,204 +16758,12 @@ pub enum InsertedRunChoice {
   /// Defines the BidirectionalEmbedding Class.
   #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
   WDir(std::boxed::Box<BidirectionalEmbedding>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DeletedRunChoice2 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<PermEnd>),
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
-  WIns(std::boxed::Box<InsertedRun>),
-  /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
-  WDel(std::boxed::Box<DeletedRun>),
-  /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
-  WMoveFrom(std::boxed::Box<MoveFromRun>),
-  /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
-  WMoveTo(std::boxed::Box<MoveToRun>),
-  /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
-  WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum DeletedRunChoice {
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<DeletedRunChoice2>),
-  /// Defines the Paragraph Class.
-  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
-  MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
-  /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
-  MOMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<crate::schemas::m::Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<crate::schemas::m::Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<crate::schemas::m::Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<crate::schemas::m::Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<crate::schemas::m::EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<crate::schemas::m::Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<crate::schemas::m::MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<crate::schemas::m::GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<crate::schemas::m::LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<crate::schemas::m::LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<crate::schemas::m::Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<crate::schemas::m::Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<crate::schemas::m::Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<crate::schemas::m::Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<crate::schemas::m::PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<crate::schemas::m::Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<crate::schemas::m::SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<crate::schemas::m::Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<crate::schemas::m::Run>),
-  /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
-  WR(std::boxed::Box<Run>),
-  /// Defines the BidirectionalOverride Class.
-  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
-  WBdo(std::boxed::Box<BidirectionalOverride>),
-  /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
-  WDir(std::boxed::Box<BidirectionalEmbedding>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum MoveFromRunChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -17082,93 +16872,87 @@ pub enum MoveFromRunChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
+  /// Defines the Paragraph Class.
+  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+  MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
+  /// Defines the OfficeMath Class.
+  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+  MOMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  /// Accent.
+  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
+  MAcc(std::boxed::Box<crate::schemas::m::Accent>),
+  /// Bar.
+  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
+  MBar(std::boxed::Box<crate::schemas::m::Bar>),
+  /// Box Function.
+  #[sdk(child(qname = "m:CT_Box/m:box"))]
+  MBox(std::boxed::Box<crate::schemas::m::Box>),
+  /// Border-Box Function.
+  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
+  MBorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
+  /// Delimiter Function.
+  #[sdk(child(qname = "m:CT_D/m:d"))]
+  MD(std::boxed::Box<crate::schemas::m::Delimiter>),
+  /// Equation-Array Function.
+  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
+  MEqArr(std::boxed::Box<crate::schemas::m::EquationArray>),
+  /// Fraction Function.
+  #[sdk(child(qname = "m:CT_F/m:f"))]
+  MF(std::boxed::Box<crate::schemas::m::Fraction>),
+  /// Function Apply Function.
+  #[sdk(child(qname = "m:CT_Func/m:func"))]
+  MFunc(std::boxed::Box<crate::schemas::m::MathFunction>),
+  /// Group-Character Function.
+  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
+  MGroupChr(std::boxed::Box<crate::schemas::m::GroupChar>),
+  /// Lower-Limit Function.
+  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
+  MLimLow(std::boxed::Box<crate::schemas::m::LimitLower>),
+  /// Upper-Limit Function.
+  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
+  MLimUpp(std::boxed::Box<crate::schemas::m::LimitUpper>),
+  /// Matrix Function.
+  #[sdk(child(qname = "m:CT_M/m:m"))]
+  MM(std::boxed::Box<crate::schemas::m::Matrix>),
+  /// n-ary Operator Function.
+  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
+  MNary(std::boxed::Box<crate::schemas::m::Nary>),
+  /// Phantom Function.
+  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
+  MPhant(std::boxed::Box<crate::schemas::m::Phantom>),
+  /// Radical Function.
+  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
+  MRad(std::boxed::Box<crate::schemas::m::Radical>),
+  /// Pre-Sub-Superscript Function.
+  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
+  MSPre(std::boxed::Box<crate::schemas::m::PreSubSuper>),
+  /// Subscript Function.
+  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
+  MSSub(std::boxed::Box<crate::schemas::m::Subscript>),
+  /// Sub-Superscript Function.
+  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
+  MSSubSup(std::boxed::Box<crate::schemas::m::SubSuperscript>),
+  /// Superscript Function.
+  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
+  MSSup(std::boxed::Box<crate::schemas::m::Superscript>),
+  /// Defines the Run Class.
+  #[sdk(child(qname = "m:CT_R/m:r"))]
+  MR(std::boxed::Box<crate::schemas::m::Run>),
+  /// Phonetic Guide Text Run.
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<Run>),
+  /// Defines the BidirectionalOverride Class.
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
+  WBdo(std::boxed::Box<BidirectionalOverride>),
+  /// Defines the BidirectionalEmbedding Class.
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
+  WDir(std::boxed::Box<BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveFromRunChoice {
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<MoveFromRunChoice2>),
-  /// Defines the Paragraph Class.
-  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
-  MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
-  /// Defines the OfficeMath Class.
-  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
-  MOMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
-  /// Accent.
-  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
-  MAcc(std::boxed::Box<crate::schemas::m::Accent>),
-  /// Bar.
-  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
-  MBar(std::boxed::Box<crate::schemas::m::Bar>),
-  /// Box Function.
-  #[sdk(child(qname = "m:CT_Box/m:box"))]
-  MBox(std::boxed::Box<crate::schemas::m::Box>),
-  /// Border-Box Function.
-  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
-  MBorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
-  /// Delimiter Function.
-  #[sdk(child(qname = "m:CT_D/m:d"))]
-  MD(std::boxed::Box<crate::schemas::m::Delimiter>),
-  /// Equation-Array Function.
-  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
-  MEqArr(std::boxed::Box<crate::schemas::m::EquationArray>),
-  /// Fraction Function.
-  #[sdk(child(qname = "m:CT_F/m:f"))]
-  MF(std::boxed::Box<crate::schemas::m::Fraction>),
-  /// Function Apply Function.
-  #[sdk(child(qname = "m:CT_Func/m:func"))]
-  MFunc(std::boxed::Box<crate::schemas::m::MathFunction>),
-  /// Group-Character Function.
-  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
-  MGroupChr(std::boxed::Box<crate::schemas::m::GroupChar>),
-  /// Lower-Limit Function.
-  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
-  MLimLow(std::boxed::Box<crate::schemas::m::LimitLower>),
-  /// Upper-Limit Function.
-  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
-  MLimUpp(std::boxed::Box<crate::schemas::m::LimitUpper>),
-  /// Matrix Function.
-  #[sdk(child(qname = "m:CT_M/m:m"))]
-  MM(std::boxed::Box<crate::schemas::m::Matrix>),
-  /// n-ary Operator Function.
-  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
-  MNary(std::boxed::Box<crate::schemas::m::Nary>),
-  /// Phantom Function.
-  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
-  MPhant(std::boxed::Box<crate::schemas::m::Phantom>),
-  /// Radical Function.
-  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
-  MRad(std::boxed::Box<crate::schemas::m::Radical>),
-  /// Pre-Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
-  MSPre(std::boxed::Box<crate::schemas::m::PreSubSuper>),
-  /// Subscript Function.
-  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
-  MSSub(std::boxed::Box<crate::schemas::m::Subscript>),
-  /// Sub-Superscript Function.
-  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
-  MSSubSup(std::boxed::Box<crate::schemas::m::SubSuperscript>),
-  /// Superscript Function.
-  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
-  MSSup(std::boxed::Box<crate::schemas::m::Superscript>),
-  /// Defines the Run Class.
-  #[sdk(child(qname = "m:CT_R/m:r"))]
-  MR(std::boxed::Box<crate::schemas::m::Run>),
-  /// Phonetic Guide Text Run.
-  #[sdk(child(qname = "w:CT_R/w:r"))]
-  WR(std::boxed::Box<Run>),
-  /// Defines the BidirectionalOverride Class.
-  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
-  WBdo(std::boxed::Box<BidirectionalOverride>),
-  /// Defines the BidirectionalEmbedding Class.
-  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
-  WDir(std::boxed::Box<BidirectionalEmbedding>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum MoveToRunChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -17277,15 +17061,195 @@ pub enum MoveToRunChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
+  /// Defines the Paragraph Class.
+  #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
+  MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
+  /// Defines the OfficeMath Class.
+  #[sdk(child(qname = "m:CT_OMath/m:oMath"))]
+  MOMath(std::boxed::Box<crate::schemas::m::OfficeMath>),
+  /// Accent.
+  #[sdk(child(qname = "m:CT_Acc/m:acc"))]
+  MAcc(std::boxed::Box<crate::schemas::m::Accent>),
+  /// Bar.
+  #[sdk(child(qname = "m:CT_Bar/m:bar"))]
+  MBar(std::boxed::Box<crate::schemas::m::Bar>),
+  /// Box Function.
+  #[sdk(child(qname = "m:CT_Box/m:box"))]
+  MBox(std::boxed::Box<crate::schemas::m::Box>),
+  /// Border-Box Function.
+  #[sdk(child(qname = "m:CT_BorderBox/m:borderBox"))]
+  MBorderBox(std::boxed::Box<crate::schemas::m::BorderBox>),
+  /// Delimiter Function.
+  #[sdk(child(qname = "m:CT_D/m:d"))]
+  MD(std::boxed::Box<crate::schemas::m::Delimiter>),
+  /// Equation-Array Function.
+  #[sdk(child(qname = "m:CT_EqArr/m:eqArr"))]
+  MEqArr(std::boxed::Box<crate::schemas::m::EquationArray>),
+  /// Fraction Function.
+  #[sdk(child(qname = "m:CT_F/m:f"))]
+  MF(std::boxed::Box<crate::schemas::m::Fraction>),
+  /// Function Apply Function.
+  #[sdk(child(qname = "m:CT_Func/m:func"))]
+  MFunc(std::boxed::Box<crate::schemas::m::MathFunction>),
+  /// Group-Character Function.
+  #[sdk(child(qname = "m:CT_GroupChr/m:groupChr"))]
+  MGroupChr(std::boxed::Box<crate::schemas::m::GroupChar>),
+  /// Lower-Limit Function.
+  #[sdk(child(qname = "m:CT_LimLow/m:limLow"))]
+  MLimLow(std::boxed::Box<crate::schemas::m::LimitLower>),
+  /// Upper-Limit Function.
+  #[sdk(child(qname = "m:CT_LimUpp/m:limUpp"))]
+  MLimUpp(std::boxed::Box<crate::schemas::m::LimitUpper>),
+  /// Matrix Function.
+  #[sdk(child(qname = "m:CT_M/m:m"))]
+  MM(std::boxed::Box<crate::schemas::m::Matrix>),
+  /// n-ary Operator Function.
+  #[sdk(child(qname = "m:CT_Nary/m:nary"))]
+  MNary(std::boxed::Box<crate::schemas::m::Nary>),
+  /// Phantom Function.
+  #[sdk(child(qname = "m:CT_Phant/m:phant"))]
+  MPhant(std::boxed::Box<crate::schemas::m::Phantom>),
+  /// Radical Function.
+  #[sdk(child(qname = "m:CT_Rad/m:rad"))]
+  MRad(std::boxed::Box<crate::schemas::m::Radical>),
+  /// Pre-Sub-Superscript Function.
+  #[sdk(child(qname = "m:CT_SPre/m:sPre"))]
+  MSPre(std::boxed::Box<crate::schemas::m::PreSubSuper>),
+  /// Subscript Function.
+  #[sdk(child(qname = "m:CT_SSub/m:sSub"))]
+  MSSub(std::boxed::Box<crate::schemas::m::Subscript>),
+  /// Sub-Superscript Function.
+  #[sdk(child(qname = "m:CT_SSubSup/m:sSubSup"))]
+  MSSubSup(std::boxed::Box<crate::schemas::m::SubSuperscript>),
+  /// Superscript Function.
+  #[sdk(child(qname = "m:CT_SSup/m:sSup"))]
+  MSSup(std::boxed::Box<crate::schemas::m::Superscript>),
+  /// Defines the Run Class.
+  #[sdk(child(qname = "m:CT_R/m:r"))]
+  MR(std::boxed::Box<crate::schemas::m::Run>),
+  /// Phonetic Guide Text Run.
+  #[sdk(child(qname = "w:CT_R/w:r"))]
+  WR(std::boxed::Box<Run>),
+  /// Defines the BidirectionalOverride Class.
+  #[sdk(child(office2010, qname = "w:CT_BdoContentRun/w:bdo"))]
+  WBdo(std::boxed::Box<BidirectionalOverride>),
+  /// Defines the BidirectionalEmbedding Class.
+  #[sdk(child(office2010, qname = "w:CT_DirContentRun/w:dir"))]
+  WDir(std::boxed::Box<BidirectionalEmbedding>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum MoveToRunChoice {
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<MoveToRunChoice2>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<PermEnd>),
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+  /// Inserted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+  WIns(std::boxed::Box<InsertedRun>),
+  /// Deleted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+  WDel(std::boxed::Box<DeletedRun>),
+  /// Move Source Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+  WMoveFrom(std::boxed::Box<MoveFromRun>),
+  /// Move Destination Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+  WMoveTo(std::boxed::Box<MoveToRun>),
+  /// Defines the ContentPart Class.
+  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
+  WContentPart(std::boxed::Box<ContentPart>),
+  /// Sequence of w14:conflictIns, w14:conflictDel
+  #[sdk(sequence)]
+  Sequence {
+    /// Defines the RunConflictInsertion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
+    /// Defines the RunConflictDeletion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
+  },
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -17440,7 +17404,19 @@ pub enum SdtRunChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlBlockChoice2 {
+pub enum CustomXmlBlockChoice {
+  /// Defines the CustomXmlBlock Class.
+  #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
+  WCustomXml(std::boxed::Box<CustomXmlBlock>),
+  /// Defines the SdtBlock Class.
+  #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
+  WSdt(std::boxed::Box<SdtBlock>),
+  /// Defines the Paragraph Class.
+  #[sdk(child(qname = "w:CT_P/w:p"))]
+  WP(std::boxed::Box<Paragraph>),
+  /// Defines the Table Class.
+  #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
+  WTbl(std::boxed::Box<Table>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -17549,24 +17525,6 @@ pub enum CustomXmlBlockChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlBlockChoice {
-  /// Defines the CustomXmlBlock Class.
-  #[sdk(child(qname = "w:CT_CustomXmlBlock/w:customXml"))]
-  WCustomXml(std::boxed::Box<CustomXmlBlock>),
-  /// Defines the SdtBlock Class.
-  #[sdk(child(qname = "w:CT_SdtBlock/w:sdt"))]
-  WSdt(std::boxed::Box<SdtBlock>),
-  /// Defines the Paragraph Class.
-  #[sdk(child(qname = "w:CT_P/w:p"))]
-  WP(std::boxed::Box<Paragraph>),
-  /// Defines the Table Class.
-  #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
-  WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<CustomXmlBlockChoice2>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum SdtBlockChoice {
@@ -17646,7 +17604,19 @@ pub enum SdtBlockChoice {
   ),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ParagraphChoice2 {
+pub enum ParagraphChoice {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -17755,24 +17725,6 @@ pub enum ParagraphChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum ParagraphChoice {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<ParagraphChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -18053,117 +18005,6 @@ pub enum TableChoice2 {
   },
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TableRowChoice2 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<PermEnd>),
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
-  WIns(std::boxed::Box<InsertedRun>),
-  /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
-  WDel(std::boxed::Box<DeletedRun>),
-  /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
-  WMoveFrom(std::boxed::Box<MoveFromRun>),
-  /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
-  WMoveTo(std::boxed::Box<MoveToRun>),
-  /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
-  WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableRowChoice {
   /// Table Cell.
   #[sdk(child(qname = "w:CT_Tc/w:tc"))]
@@ -18174,12 +18015,6 @@ pub enum TableRowChoice {
   /// Cell-Level Structured Document Tag.
   #[sdk(child(qname = "w:CT_SdtCell/w:sdt"))]
   WSdt(std::boxed::Box<SdtCell>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<TableRowChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlRowChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -18300,89 +18135,6 @@ pub enum CustomXmlRowChoice {
   /// Row-Level Structured Document Tag.
   #[sdk(child(qname = "w:CT_SdtRow/w:sdt"))]
   WSdt(std::boxed::Box<SdtRow>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<CustomXmlRowChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SdtRowChoice {
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum TableCellChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -18493,6 +18245,83 @@ pub enum TableCellChoice2 {
   },
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum SdtRowChoice {
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum TableCellChoice {
   /// Defines the AltChunk Class.
   #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
@@ -18509,12 +18338,6 @@ pub enum TableCellChoice {
   /// Defines the Table Class.
   #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
   WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<TableCellChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlCellChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -18635,89 +18458,6 @@ pub enum CustomXmlCellChoice {
   /// Cell-Level Structured Document Tag.
   #[sdk(child(qname = "w:CT_SdtCell/w:sdt"))]
   WSdt(std::boxed::Box<SdtCell>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<CustomXmlCellChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SdtCellChoice {
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum CustomXmlRunChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -18828,6 +18568,83 @@ pub enum CustomXmlRunChoice2 {
   },
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
+pub enum SdtCellChoice {
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+}
+#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum CustomXmlRunChoice {
   /// Defines the CustomXmlRun Class.
   #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
@@ -18841,9 +18658,114 @@ pub enum CustomXmlRunChoice {
   /// Defines the SdtRun Class.
   #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
   WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<CustomXmlRunChoice2>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<PermEnd>),
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+  /// Inserted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+  WIns(std::boxed::Box<InsertedRun>),
+  /// Deleted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+  WDel(std::boxed::Box<DeletedRun>),
+  /// Move Source Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+  WMoveFrom(std::boxed::Box<MoveFromRun>),
+  /// Move Destination Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+  WMoveTo(std::boxed::Box<MoveToRun>),
+  /// Defines the ContentPart Class.
+  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
+  WContentPart(std::boxed::Box<ContentPart>),
+  /// Sequence of w14:conflictIns, w14:conflictDel
+  #[sdk(sequence)]
+  Sequence {
+    /// Defines the RunConflictInsertion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
+    /// Defines the RunConflictDeletion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
+  },
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -18924,7 +18846,19 @@ pub enum CustomXmlRunChoice {
   WSubDoc(std::boxed::Box<SubDocumentReference>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SimpleFieldChoice2 {
+pub enum SimpleFieldChoice {
+  /// Defines the CustomXmlRun Class.
+  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
+  WCustomXml(std::boxed::Box<CustomXmlRun>),
+  /// Defines the SimpleField Class.
+  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
+  WFldSimple(std::boxed::Box<SimpleField>),
+  /// Defines the Hyperlink Class.
+  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
+  WHyperlink(std::boxed::Box<Hyperlink>),
+  /// Defines the SdtRun Class.
+  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
+  WSdt(std::boxed::Box<SdtRun>),
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -19033,24 +18967,6 @@ pub enum SimpleFieldChoice2 {
     #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
     run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
   },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum SimpleFieldChoice {
-  /// Defines the CustomXmlRun Class.
-  #[sdk(child(qname = "w:CT_CustomXmlRun/w:customXml"))]
-  WCustomXml(std::boxed::Box<CustomXmlRun>),
-  /// Defines the SimpleField Class.
-  #[sdk(child(qname = "w:CT_SimpleField/w:fldSimple"))]
-  WFldSimple(std::boxed::Box<SimpleField>),
-  /// Defines the Hyperlink Class.
-  #[sdk(child(qname = "w:CT_Hyperlink/w:hyperlink"))]
-  WHyperlink(std::boxed::Box<Hyperlink>),
-  /// Defines the SdtRun Class.
-  #[sdk(child(qname = "w:CT_SdtRun/w:sdt"))]
-  WSdt(std::boxed::Box<SdtRun>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<SimpleFieldChoice2>),
   /// Defines the Paragraph Class.
   #[sdk(child(qname = "m:CT_OMathPara/m:oMathPara"))]
   MOMathPara(std::boxed::Box<crate::schemas::m::Paragraph>),
@@ -21335,117 +21251,6 @@ pub enum CommentChoice {
   WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
 }
 #[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum FootnoteChoice2 {
-  /// Defines the ProofError Class.
-  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
-  WProofErr(std::boxed::Box<ProofError>),
-  /// Defines the PermStart Class.
-  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
-  WPermStart(std::boxed::Box<PermStart>),
-  /// Defines the PermEnd Class.
-  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
-  WPermEnd(std::boxed::Box<PermEnd>),
-  /// Defines the BookmarkStart Class.
-  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
-  WBookmarkStart(std::boxed::Box<BookmarkStart>),
-  /// Defines the BookmarkEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
-  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
-  /// Defines the CommentRangeStart Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
-  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
-  /// Defines the CommentRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
-  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
-  /// Defines the MoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
-  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
-  /// Defines the MoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
-  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
-  /// Defines the MoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
-  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
-  /// Defines the MoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
-  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
-  /// Defines the CustomXmlInsRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
-  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
-  /// Defines the CustomXmlInsRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
-  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
-  /// Defines the CustomXmlDelRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
-  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
-  /// Defines the CustomXmlDelRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
-  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
-  /// Defines the CustomXmlMoveFromRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
-  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
-  /// Defines the CustomXmlMoveFromRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
-  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
-  /// Defines the CustomXmlMoveToRangeStart Class.
-  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
-  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
-  /// Defines the CustomXmlMoveToRangeEnd Class.
-  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
-  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
-  /// Defines the CustomXmlConflictInsertionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
-  ))]
-  W14CustomXmlConflictInsRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
-  W14CustomXmlConflictInsRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeStart Class.
-  #[sdk(child(
-    office2010,
-    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
-  ))]
-  W14CustomXmlConflictDelRangeStart(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
-  ),
-  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
-  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
-  W14CustomXmlConflictDelRangeEnd(
-    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
-  ),
-  /// Inserted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
-  WIns(std::boxed::Box<InsertedRun>),
-  /// Deleted Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
-  WDel(std::boxed::Box<DeletedRun>),
-  /// Move Source Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
-  WMoveFrom(std::boxed::Box<MoveFromRun>),
-  /// Move Destination Run Content.
-  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
-  WMoveTo(std::boxed::Box<MoveToRun>),
-  /// Defines the ContentPart Class.
-  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
-  WContentPart(std::boxed::Box<ContentPart>),
-  /// Sequence of w14:conflictIns, w14:conflictDel
-  #[sdk(sequence)]
-  Sequence {
-    /// Defines the RunConflictInsertion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
-    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
-    /// Defines the RunConflictDeletion Class.
-    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
-    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
-  },
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
 pub enum FootnoteChoice {
   /// Defines the AltChunk Class.
   #[sdk(child(qname = "w:CT_AltChunk/w:altChunk"))]
@@ -21462,12 +21267,6 @@ pub enum FootnoteChoice {
   /// Defines the Table Class.
   #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
   WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<FootnoteChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum EndnoteChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -21594,12 +21393,6 @@ pub enum EndnoteChoice {
   /// Defines the Table Class.
   #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
   WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<EndnoteChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum DocPartBodyChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -21726,12 +21519,6 @@ pub enum DocPartBodyChoice {
   /// Defines the Table Class.
   #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
   WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<DocPartBodyChoice2>),
-}
-#[derive(Clone, Debug, PartialEq, ooxmlsdk_derive::SdkChoice)]
-pub enum BodyChoice2 {
   /// Defines the ProofError Class.
   #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
   WProofErr(std::boxed::Box<ProofError>),
@@ -21858,9 +21645,114 @@ pub enum BodyChoice {
   /// Defines the Table Class.
   #[sdk(child(qname = "w:CT_Tbl/w:tbl"))]
   WTbl(std::boxed::Box<Table>),
-  /// Choice of choice1, choice2, w:ins, w:del, w:moveFrom, w:moveTo, w:contentPart, sequence8
-  #[sdk(choice)]
-  Choice(std::boxed::Box<BodyChoice2>),
+  /// Defines the ProofError Class.
+  #[sdk(child(qname = "w:CT_ProofErr/w:proofErr"))]
+  WProofErr(std::boxed::Box<ProofError>),
+  /// Defines the PermStart Class.
+  #[sdk(child(qname = "w:CT_PermStart/w:permStart"))]
+  WPermStart(std::boxed::Box<PermStart>),
+  /// Defines the PermEnd Class.
+  #[sdk(child(qname = "w:CT_Perm/w:permEnd"))]
+  WPermEnd(std::boxed::Box<PermEnd>),
+  /// Defines the BookmarkStart Class.
+  #[sdk(child(qname = "w:CT_Bookmark/w:bookmarkStart"))]
+  WBookmarkStart(std::boxed::Box<BookmarkStart>),
+  /// Defines the BookmarkEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:bookmarkEnd"))]
+  WBookmarkEnd(std::boxed::Box<BookmarkEnd>),
+  /// Defines the CommentRangeStart Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeStart"))]
+  WCommentRangeStart(std::boxed::Box<CommentRangeStart>),
+  /// Defines the CommentRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:commentRangeEnd"))]
+  WCommentRangeEnd(std::boxed::Box<CommentRangeEnd>),
+  /// Defines the MoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveFromRangeStart"))]
+  WMoveFromRangeStart(std::boxed::Box<MoveFromRangeStart>),
+  /// Defines the MoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveFromRangeEnd"))]
+  WMoveFromRangeEnd(std::boxed::Box<MoveFromRangeEnd>),
+  /// Defines the MoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_MoveBookmark/w:moveToRangeStart"))]
+  WMoveToRangeStart(std::boxed::Box<MoveToRangeStart>),
+  /// Defines the MoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_MarkupRange/w:moveToRangeEnd"))]
+  WMoveToRangeEnd(std::boxed::Box<MoveToRangeEnd>),
+  /// Defines the CustomXmlInsRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlInsRangeStart"))]
+  WCustomXmlInsRangeStart(std::boxed::Box<CustomXmlInsRangeStart>),
+  /// Defines the CustomXmlInsRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlInsRangeEnd"))]
+  WCustomXmlInsRangeEnd(std::boxed::Box<CustomXmlInsRangeEnd>),
+  /// Defines the CustomXmlDelRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlDelRangeStart"))]
+  WCustomXmlDelRangeStart(std::boxed::Box<CustomXmlDelRangeStart>),
+  /// Defines the CustomXmlDelRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlDelRangeEnd"))]
+  WCustomXmlDelRangeEnd(std::boxed::Box<CustomXmlDelRangeEnd>),
+  /// Defines the CustomXmlMoveFromRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveFromRangeStart"))]
+  WCustomXmlMoveFromRangeStart(std::boxed::Box<CustomXmlMoveFromRangeStart>),
+  /// Defines the CustomXmlMoveFromRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveFromRangeEnd"))]
+  WCustomXmlMoveFromRangeEnd(std::boxed::Box<CustomXmlMoveFromRangeEnd>),
+  /// Defines the CustomXmlMoveToRangeStart Class.
+  #[sdk(child(qname = "w:CT_TrackChange/w:customXmlMoveToRangeStart"))]
+  WCustomXmlMoveToRangeStart(std::boxed::Box<CustomXmlMoveToRangeStart>),
+  /// Defines the CustomXmlMoveToRangeEnd Class.
+  #[sdk(child(qname = "w:CT_Markup/w:customXmlMoveToRangeEnd"))]
+  WCustomXmlMoveToRangeEnd(std::boxed::Box<CustomXmlMoveToRangeEnd>),
+  /// Defines the CustomXmlConflictInsertionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictInsRangeStart"
+  ))]
+  W14CustomXmlConflictInsRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictInsertionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictInsRangeEnd"))]
+  W14CustomXmlConflictInsRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictInsertionRangeEnd>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeStart Class.
+  #[sdk(child(
+    office2010,
+    qname = "w:CT_TrackChange/w14:customXmlConflictDelRangeStart"
+  ))]
+  W14CustomXmlConflictDelRangeStart(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeStart>,
+  ),
+  /// Defines the CustomXmlConflictDeletionRangeEnd Class.
+  #[sdk(child(office2010, qname = "w:CT_Markup/w14:customXmlConflictDelRangeEnd"))]
+  W14CustomXmlConflictDelRangeEnd(
+    std::boxed::Box<crate::schemas::w14::CustomXmlConflictDeletionRangeEnd>,
+  ),
+  /// Inserted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:ins"))]
+  WIns(std::boxed::Box<InsertedRun>),
+  /// Deleted Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:del"))]
+  WDel(std::boxed::Box<DeletedRun>),
+  /// Move Source Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveFrom"))]
+  WMoveFrom(std::boxed::Box<MoveFromRun>),
+  /// Move Destination Run Content.
+  #[sdk(child(qname = "w:CT_RunTrackChange/w:moveTo"))]
+  WMoveTo(std::boxed::Box<MoveToRun>),
+  /// Defines the ContentPart Class.
+  #[sdk(child(office2010, qname = "w:CT_ContentPart/w:contentPart"))]
+  WContentPart(std::boxed::Box<ContentPart>),
+  /// Sequence of w14:conflictIns, w14:conflictDel
+  #[sdk(sequence)]
+  Sequence {
+    /// Defines the RunConflictInsertion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictIns"))]
+    run_conflict_insertion: Option<std::boxed::Box<crate::schemas::w14::RunConflictInsertion>>,
+    /// Defines the RunConflictDeletion Class.
+    #[sdk(child(office2010, qname = "w:CT_RunTrackChange/w14:conflictDel"))]
+    run_conflict_deletion: Option<std::boxed::Box<crate::schemas::w14::RunConflictDeletion>>,
+  },
   /// Unknown XML child.
   #[sdk(any)]
   XmlAny(std::boxed::Box<str>),

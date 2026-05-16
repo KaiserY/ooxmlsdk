@@ -1,7 +1,9 @@
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+#[cfg(test)]
+use std::collections::BTreeSet;
 
 use crate::Result;
 use crate::simple_type::simple_type_mapping;
@@ -46,9 +48,9 @@ pub(crate) enum ParsedParticleNode {
   },
   Element(ParsedChildElement),
   GroupRef {
-    reference: String,
+    _reference: String,
     _min_occurs: u64,
-    max_occurs: u64,
+    _max_occurs: u64,
   },
 }
 
@@ -112,6 +114,7 @@ pub(crate) fn parse_xsd(source: &str) -> Result<ParsedXsd> {
   Ok(parsed)
 }
 
+#[cfg(test)]
 pub(crate) fn repeatable_choice_element_names(
   xsd: &ParsedXsd,
   complex_type_name: &str,
@@ -136,6 +139,7 @@ pub(crate) fn repeatable_choice_element_names(
   names
 }
 
+#[cfg(test)]
 fn collect_repeatable_choice_element_names(
   xsd: &ParsedXsd,
   node: &ParsedParticleNode,
@@ -158,11 +162,11 @@ fn collect_repeatable_choice_element_names(
       }
     }
     ParsedParticleNode::GroupRef {
-      reference,
-      max_occurs,
+      _reference,
+      _max_occurs,
       ..
     } => {
-      let group_name = xsd_local_name(reference);
+      let group_name = xsd_local_name(_reference);
       if !group_stack.insert(group_name.to_string()) {
         return;
       }
@@ -170,7 +174,7 @@ fn collect_repeatable_choice_element_names(
         collect_repeatable_choice_element_names(
           xsd,
           group,
-          inherited_repeated || *max_occurs > 1,
+          inherited_repeated || *_max_occurs > 1,
           inherited_choice,
           group_stack,
           names,
@@ -462,9 +466,9 @@ fn parse_particle_node(
 
 fn parse_group_ref(reader: &Reader<&[u8]>, element: &BytesStart<'_>) -> Result<ParsedParticleNode> {
   Ok(ParsedParticleNode::GroupRef {
-    reference: required_attr(reader, element, b"ref")?,
+    _reference: required_attr(reader, element, b"ref")?,
     _min_occurs: parse_min_occurs(reader, element)?,
-    max_occurs: parse_max_occurs(reader, element)?,
+    _max_occurs: parse_max_occurs(reader, element)?,
   })
 }
 
@@ -677,6 +681,7 @@ fn strip_prefix(value: &str) -> &str {
   }
 }
 
+#[cfg(test)]
 fn xsd_local_name(value: &str) -> &str {
   strip_prefix(value)
 }

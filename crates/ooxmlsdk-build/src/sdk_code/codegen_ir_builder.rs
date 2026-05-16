@@ -112,7 +112,7 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
 
   apply_parent_choice_has_any_rewrites(&mut types, schema, context);
   dedupe_helper_struct_types(&mut types)?;
-  inline_safe_pure_child_choice_payloads(&mut types);
+  inline_safe_choice_payloads(&mut types);
   populate_content_structures(&mut types, schema, context)?;
 
   Ok(SchemaModuleDecl {
@@ -161,7 +161,7 @@ pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result
   })
 }
 
-fn inline_safe_pure_child_choice_payloads(types: &mut [TypeDecl]) {
+fn inline_safe_choice_payloads(types: &mut [TypeDecl]) {
   loop {
     let choice_members_by_name = types
       .iter()
@@ -175,8 +175,7 @@ fn inline_safe_pure_child_choice_payloads(types: &mut [TypeDecl]) {
         continue;
       }
 
-      let members =
-        inline_safe_pure_child_choice_members(&ty.rust_name, &ty.members, &choice_members_by_name);
+      let members = inline_safe_choice_members(&ty.rust_name, &ty.members, &choice_members_by_name);
       changed |= members != ty.members;
       ty.members = members;
     }
@@ -187,39 +186,48 @@ fn inline_safe_pure_child_choice_payloads(types: &mut [TypeDecl]) {
   }
 }
 
-fn inline_safe_pure_child_choice_members(
+fn inline_safe_choice_members(
   parent_name: &str,
   members: &[MemberDecl],
   choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
 ) -> Vec<MemberDecl> {
   let mut inlined = Vec::with_capacity(members.len());
   let mut used_variant_names = std::collections::HashSet::new();
-  let mut used_child_qnames = std::collections::HashSet::new();
+  let mut used_start_qnames = std::collections::HashSet::new();
 
   for (index, member) in members.iter().enumerate() {
-    if let Some(candidate) = safe_pure_child_choice_inline_candidate(
+    if let Some(candidate) = safe_anonymous_choice_wrapper_inline_candidate(
       parent_name,
       member,
       members,
       index,
       choice_members_by_name,
-    ) && candidate.iter().all(|variant| {
+    )
+    .or_else(|| {
+      safe_pure_child_choice_inline_candidate(
+        parent_name,
+        member,
+        members,
+        index,
+        choice_members_by_name,
+      )
+    }) && candidate.iter().all(|variant| {
       let MemberDecl::Variant(variant) = variant else {
         return false;
       };
-      let Some(qnames) = variant_child_qnames(variant) else {
+      let Some(qnames) = variant_start_qnames(variant) else {
         return false;
       };
       !used_variant_names.contains(variant.rust_name.as_str())
         && qnames
           .iter()
-          .all(|qname| !used_child_qnames.contains(qname.as_str()))
+          .all(|qname| !used_start_qnames.contains(qname.as_str()))
     }) {
       for variant in candidate {
         if let MemberDecl::Variant(ref variant_decl) = variant {
           used_variant_names.insert(variant_decl.rust_name.clone());
-          for qname in variant_child_qnames(variant_decl).into_iter().flatten() {
-            used_child_qnames.insert(qname.clone());
+          for qname in variant_start_qnames(variant_decl).into_iter().flatten() {
+            used_start_qnames.insert(qname.clone());
           }
         }
         inlined.push(variant);
@@ -228,13 +236,127 @@ fn inline_safe_pure_child_choice_members(
       track_member_variant_name_and_child_qnames(
         member,
         &mut used_variant_names,
-        &mut used_child_qnames,
+        &mut used_start_qnames,
       );
       inlined.push(member.clone());
     }
   }
 
   inlined
+}
+
+fn safe_anonymous_choice_wrapper_inline_candidate(
+  parent_name: &str,
+  member: &MemberDecl,
+  parent_members: &[MemberDecl],
+  member_index: usize,
+  choice_members_by_name: &std::collections::HashMap<String, Vec<MemberDecl>>,
+) -> Option<Vec<MemberDecl>> {
+  let MemberDecl::Variant(parent_variant) = member else {
+    return None;
+  };
+  let VariantWireDecl::Child {
+    qnames: parent_qnames,
+  } = &parent_variant.wire
+  else {
+    return None;
+  };
+  if !is_generic_choice_variant_name(parent_variant.rust_name.as_str())
+    || parent_variant.payload.module_path.is_some()
+    || parent_variant.payload.rust_type == parent_name
+  {
+    return None;
+  }
+
+  let payload_members = choice_members_by_name.get(parent_variant.payload.rust_type.as_str())?;
+  let payload_variants = inlineable_anonymous_choice_wrapper_payload_variants(payload_members)?;
+  let payload_qnames = payload_variants
+    .iter()
+    .flat_map(|variant| variant_start_qnames(variant).into_iter().flatten())
+    .cloned()
+    .collect::<Vec<_>>();
+  if payload_qnames != *parent_qnames {
+    return None;
+  }
+
+  let other_variant_names = parent_members
+    .iter()
+    .enumerate()
+    .filter_map(|(index, member)| {
+      (index != member_index)
+        .then_some(member)
+        .and_then(member_variant_name)
+    })
+    .collect::<std::collections::HashSet<_>>();
+  let other_start_qnames = parent_members
+    .iter()
+    .enumerate()
+    .filter(|(index, _)| *index != member_index)
+    .flat_map(|(_, member)| {
+      member_start_qnames(member)
+        .into_iter()
+        .flatten()
+        .map(String::as_str)
+    })
+    .collect::<std::collections::HashSet<_>>();
+
+  let mut candidate_variant_names = std::collections::HashSet::new();
+  let mut candidate_start_qnames = std::collections::HashSet::new();
+  for variant in &payload_variants {
+    if other_variant_names.contains(variant.rust_name.as_str())
+      || !candidate_variant_names.insert(variant.rust_name.as_str())
+    {
+      return None;
+    }
+
+    for qname in variant_start_qnames(variant)? {
+      if other_start_qnames.contains(qname.as_str())
+        || !candidate_start_qnames.insert(qname.as_str())
+      {
+        return None;
+      }
+    }
+  }
+
+  Some(
+    payload_variants
+      .into_iter()
+      .map(|variant| {
+        let mut variant = variant.clone();
+        variant.version =
+          effective_version(parent_variant.version.as_str(), variant.version.as_str()).to_string();
+        MemberDecl::Variant(variant)
+      })
+      .collect(),
+  )
+}
+
+fn is_generic_choice_variant_name(rust_name: &str) -> bool {
+  rust_name == "Choice"
+    || rust_name
+      .strip_prefix("Choice")
+      .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
+}
+
+fn inlineable_anonymous_choice_wrapper_payload_variants(
+  members: &[MemberDecl],
+) -> Option<Vec<&VariantDecl>> {
+  let mut variants = Vec::with_capacity(members.len());
+
+  for member in members {
+    let MemberDecl::Variant(variant) = member else {
+      return None;
+    };
+    match &variant.wire {
+      VariantWireDecl::Child { .. }
+      | VariantWireDecl::Sequence { .. }
+      | VariantWireDecl::TextChild { .. } => {}
+      VariantWireDecl::Any | VariantWireDecl::Text => return None,
+    }
+    variants.push(variant);
+  }
+
+  (!variants.is_empty()).then_some(variants)
 }
 
 fn safe_pure_child_choice_inline_candidate(
@@ -405,6 +527,13 @@ fn member_child_qnames(member: &MemberDecl) -> Option<&Vec<String>> {
   }
 }
 
+fn member_start_qnames(member: &MemberDecl) -> Option<&Vec<String>> {
+  match member {
+    MemberDecl::Variant(variant) => variant_start_qnames(variant),
+    MemberDecl::Field(_) => None,
+  }
+}
+
 fn variant_child_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
   match &variant.wire {
     VariantWireDecl::Child { qnames } => Some(qnames),
@@ -415,17 +544,26 @@ fn variant_child_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
   }
 }
 
+fn variant_start_qnames(variant: &VariantDecl) -> Option<&Vec<String>> {
+  match &variant.wire {
+    VariantWireDecl::Child { qnames }
+    | VariantWireDecl::Sequence { qnames }
+    | VariantWireDecl::TextChild { qnames } => Some(qnames),
+    VariantWireDecl::Any | VariantWireDecl::Text => None,
+  }
+}
+
 fn track_member_variant_name_and_child_qnames(
   member: &MemberDecl,
   used_variant_names: &mut std::collections::HashSet<String>,
-  used_child_qnames: &mut std::collections::HashSet<String>,
+  used_start_qnames: &mut std::collections::HashSet<String>,
 ) {
   let MemberDecl::Variant(variant) = member else {
     return;
   };
   used_variant_names.insert(variant.rust_name.clone());
-  if let Some(qnames) = variant_child_qnames(variant) {
-    used_child_qnames.extend(qnames.iter().cloned());
+  if let Some(qnames) = variant_start_qnames(variant) {
+    used_start_qnames.extend(qnames.iter().cloned());
   }
 }
 
@@ -4094,6 +4232,141 @@ mod tests {
     SchemaTypeCompositeKind,
   };
   use std::collections::HashMap;
+
+  #[test]
+  fn inlines_anonymous_choice_wrapper_without_qname_conflicts() {
+    let members = vec![
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "TDirect".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["t:CT_Direct/t:direct".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "Direct".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "Choice2".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec![
+            "t:CT_First/t:first".to_string(),
+            "t:CT_Second/t:second".to_string(),
+          ],
+        },
+        payload: TypeRefDecl {
+          rust_type: "RootChoice2".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+    ];
+    let payload_members = vec![
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "TFirst".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["t:CT_First/t:first".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "First".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "Sequence1".to_string(),
+        wire: VariantWireDecl::Sequence {
+          qnames: vec!["t:CT_Second/t:second".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "RootSequence1".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+    ];
+    let choice_members_by_name = HashMap::from([("RootChoice2".to_string(), payload_members)]);
+
+    let inlined = inline_safe_choice_members("RootChoice", &members, &choice_members_by_name);
+
+    let variant_names = inlined
+      .iter()
+      .filter_map(member_variant_name)
+      .collect::<Vec<_>>();
+    assert_eq!(variant_names, vec!["TDirect", "TFirst", "Sequence1"]);
+    assert!(matches!(
+      inlined[2],
+      MemberDecl::Variant(VariantDecl {
+        wire: VariantWireDecl::Sequence { .. },
+        ..
+      })
+    ));
+  }
+
+  #[test]
+  fn keeps_anonymous_choice_wrapper_when_qnames_overlap_siblings() {
+    let members = vec![
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "TFirst".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["t:CT_First/t:first".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "First".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "Choice2".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec![
+            "t:CT_First/t:first".to_string(),
+            "t:CT_Second/t:second".to_string(),
+          ],
+        },
+        payload: TypeRefDecl {
+          rust_type: "RootChoice2".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+    ];
+    let payload_members = vec![
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "TFirstNested".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["t:CT_First/t:first".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "First".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+      MemberDecl::Variant(VariantDecl {
+        rust_name: "TSecond".to_string(),
+        wire: VariantWireDecl::Child {
+          qnames: vec!["t:CT_Second/t:second".to_string()],
+        },
+        payload: TypeRefDecl {
+          rust_type: "Second".to_string(),
+          module_path: None,
+        },
+        ..Default::default()
+      }),
+    ];
+    let choice_members_by_name = HashMap::from([("RootChoice2".to_string(), payload_members)]);
+
+    let inlined = inline_safe_choice_members("RootChoice", &members, &choice_members_by_name);
+
+    let variant_names = inlined
+      .iter()
+      .filter_map(member_variant_name)
+      .collect::<Vec<_>>();
+    assert_eq!(variant_names, vec!["TFirst", "Choice2"]);
+  }
 
   fn expected_content_structure_from_schema_type(
     schema_type: &SchemaType,

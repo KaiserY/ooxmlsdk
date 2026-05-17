@@ -1523,7 +1523,7 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
   if let Some(fill_color) = rect.fill_color {
     surface.set_fill(Some(Fill {
       paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
-      opacity: NormalizedF32::ONE,
+      opacity: NormalizedF32::new(rect.fill_opacity.clamp(0.0, 1.0)).unwrap_or(NormalizedF32::ZERO),
       rule: FillRule::EvenOdd,
     }));
     surface.set_stroke(None);
@@ -1535,6 +1535,8 @@ fn draw_rect_item(surface: &mut Surface<'_>, rect: &RectItem) {
     surface.set_stroke(Some(Stroke {
       width: stroke.width_pt,
       paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+      opacity: NormalizedF32::new(rect.stroke_opacity.clamp(0.0, 1.0))
+        .unwrap_or(NormalizedF32::ZERO),
       ..Default::default()
     }));
     draw_rect_path(surface, rect);

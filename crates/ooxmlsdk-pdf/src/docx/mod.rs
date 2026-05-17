@@ -2245,6 +2245,7 @@ fn table_position_placement(properties: &w::TablePositionProperties) -> Floating
       .as_ref()
       .and_then(signed_twips_measure_to_points)
       .unwrap_or(0.0),
+    vertical_offset_explicit: properties.table_position_y.is_some(),
     wrap: FrameWrapMode::Around,
     margin_top_pt: properties
       .top_from_text
@@ -3150,11 +3151,80 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
       .filter(|level| *level <= 8);
   }
 
-  if let Some(frame) = properties.frame_properties()
-    && !matches!(frame.y_align, Some(w::VerticalAlignmentValues::Inline))
-  {
-    format.frame = Some(paragraph_frame_properties(frame));
+  if let Some(frame) = properties.frame_properties() {
+    merge_paragraph_frame_properties(format, frame);
   }
+}
+
+fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::FrameProperties) {
+  if matches!(frame.y_align, Some(w::VerticalAlignmentValues::Inline)) {
+    format.frame = None;
+    return;
+  }
+
+  let Some(mut merged) = format.frame else {
+    format.frame = Some(paragraph_frame_properties(frame));
+    return;
+  };
+
+  if frame.width.is_some() {
+    merged.width_pt = frame.width.as_ref().and_then(twips_measure_to_points);
+  }
+  if frame.height.is_some() {
+    merged.height_pt = frame.height.as_ref().and_then(twips_measure_to_points);
+  }
+  if frame.height_type.is_some() {
+    merged.height_rule = frame_height_rule(frame.height_type);
+  }
+  if frame.horizontal_position.is_some() {
+    merged.placement.horizontal_anchor = frame_horizontal_anchor(frame.horizontal_position);
+  }
+  if frame.vertical_position.is_some() {
+    merged.placement.vertical_anchor = frame_vertical_anchor(frame.vertical_position);
+  }
+  if let Some(alignment) = frame.x_align {
+    merged.placement.horizontal_alignment = Some(frame_horizontal_alignment(alignment));
+  }
+  if let Some(alignment) = frame.y_align {
+    merged.placement.vertical_alignment = Some(frame_vertical_alignment(alignment));
+  }
+  if frame.x.is_some() {
+    merged.placement.horizontal_offset_pt = frame
+      .x
+      .as_ref()
+      .and_then(signed_twips_measure_to_points)
+      .unwrap_or(0.0);
+  }
+  if frame.y.is_some() {
+    merged.placement.vertical_offset_pt = frame
+      .y
+      .as_ref()
+      .and_then(signed_twips_measure_to_points)
+      .unwrap_or(0.0);
+    merged.placement.vertical_offset_explicit = true;
+  }
+  if frame.wrap.is_some() {
+    merged.placement.wrap = frame_wrap_mode(frame.wrap);
+  }
+  if frame.horizontal_space.is_some() {
+    let horizontal_space = frame
+      .horizontal_space
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0);
+    merged.placement.margin_right_pt = horizontal_space;
+    merged.placement.margin_left_pt = horizontal_space;
+  }
+  if frame.vertical_space.is_some() {
+    let vertical_space = frame
+      .vertical_space
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(0.0);
+    merged.placement.margin_top_pt = vertical_space;
+    merged.placement.margin_bottom_pt = vertical_space;
+  }
+  format.frame = Some(merged);
 }
 
 fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFrameProperties {
@@ -3187,6 +3257,7 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
         .as_ref()
         .and_then(signed_twips_measure_to_points)
         .unwrap_or(0.0),
+      vertical_offset_explicit: frame.y.is_some(),
       wrap: frame_wrap_mode(frame.wrap),
       margin_top_pt: vertical_space,
       margin_right_pt: horizontal_space,
@@ -10282,6 +10353,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
   }
   if values.outline_level.is_some() {
     target.outline_level = values.outline_level;
+  }
+  if values.frame.is_some() {
+    target.frame = values.frame;
   }
 }
 

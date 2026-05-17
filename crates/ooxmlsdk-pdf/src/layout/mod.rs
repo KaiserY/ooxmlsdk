@@ -501,7 +501,9 @@ pub(crate) struct RectItem {
   pub width_pt: f32,
   pub height_pt: f32,
   pub fill_color: Option<RgbColor>,
+  pub fill_opacity: f32,
   pub stroke: Option<BorderStyle>,
+  pub stroke_opacity: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -3066,7 +3068,7 @@ fn layout_floating_frame(
 ) -> (FlowContext, f32) {
   let width = frame
     .width_pt
-    .unwrap_or(flow.content_width)
+    .unwrap_or_else(|| default_floating_frame_width(frame.placement, flow))
     .max(DEFAULT_FONT_SIZE_PT);
   let measured_height = frame_content_height(
     frame,
@@ -3082,21 +3084,22 @@ fn layout_floating_frame(
   }
   .max(DEFAULT_LINE_HEIGHT_PT);
   let (x, frame_y) = floating_frame_position(frame.placement, flow, y, width, height);
-  if frame.fill_color.is_some() || frame.borders != Default::default() {
-    current.items.push(PageItem::Rect(RectItem {
-      x_pt: x,
-      y_pt: frame_y,
-      width_pt: width,
-      height_pt: height,
-      fill_color: frame.fill_color,
-      stroke: frame
-        .borders
-        .top
-        .or(frame.borders.left)
-        .or(frame.borders.right)
-        .or(frame.borders.bottom),
-    }));
-  }
+  let frame_stroke = frame
+    .borders
+    .top
+    .or(frame.borders.left)
+    .or(frame.borders.right)
+    .or(frame.borders.bottom);
+  current.items.push(PageItem::Rect(RectItem {
+    x_pt: x,
+    y_pt: frame_y,
+    width_pt: width,
+    height_pt: height,
+    fill_color: frame.fill_color,
+    fill_opacity: 1.0,
+    stroke: frame_stroke.or_else(|| frame.fill_color.is_none().then_some(BorderStyle::default())),
+    stroke_opacity: if frame_stroke.is_some() { 1.0 } else { 0.0 },
+  }));
   let frame_flow = FlowContext {
     content_top_pt: frame_y,
     content_left_pt: x,
@@ -3140,11 +3143,22 @@ fn layout_floating_frame(
         || table_cell_item_intersects_vertical_bounds(item, frame_y, frame_y + height)
     }));
   let occupied_bottom = frame_y + height.max(block_y - frame_y) + frame.placement.margin_bottom_pt;
-  if frame_wrap_blocks_flow(frame.placement.wrap) {
+  if floating_frame_blocks_flow(frame) {
     (flow, y.max(occupied_bottom))
   } else {
     (flow, y)
   }
+}
+
+fn default_floating_frame_width(placement: FloatingFramePlacement, flow: FlowContext) -> f32 {
+  match placement.horizontal_anchor {
+    FrameHorizontalAnchor::Page => flow.setup.width_pt,
+    FrameHorizontalAnchor::Margin => {
+      flow.setup.width_pt - flow.setup.margin_left_pt - flow.setup.margin_right_pt
+    }
+    FrameHorizontalAnchor::Text => flow.content_width,
+  }
+  .max(DEFAULT_FONT_SIZE_PT)
 }
 
 fn frame_content_height(frame: &FloatingFrame, flow: FlowContext) -> f32 {
@@ -5795,6 +5809,16 @@ fn frame_wrap_blocks_flow(wrap: FrameWrapMode) -> bool {
   matches!(wrap, FrameWrapMode::None | FrameWrapMode::NotBeside)
 }
 
+fn floating_frame_blocks_flow(frame: &FloatingFrame) -> bool {
+  if matches!(frame.height_rule, FrameHeightRule::Exact)
+    && frame.placement.vertical_offset_explicit
+    && matches!(frame.placement.vertical_anchor, FrameVerticalAnchor::Text)
+  {
+    return false;
+  }
+  frame_wrap_blocks_flow(frame.placement.wrap)
+}
+
 fn effective_horizontal_reference(placement: FloatingImagePlacement) -> HorizontalImageReference {
   if placement.layout_in_cell {
     return placement.horizontal_relative_to;
@@ -6362,7 +6386,9 @@ impl<'a> TextFrameLayout<'a> {
             width_pt: highlight_right - highlight_left,
             height_pt: line_height,
             fill_color: Some(highlight),
+            fill_opacity: 1.0,
             stroke: None,
+            stroke_opacity: 1.0,
           }));
         }
       }
@@ -6957,7 +6983,9 @@ impl<'a> TextFrameLayout<'a> {
                 width_pt,
                 height_pt,
                 fill_color: shape.fill_color,
+                fill_opacity: 1.0,
                 stroke: shape.stroke,
+                stroke_opacity: 1.0,
               }));
             }
             for color in &shape.additional_fill_colors {
@@ -6967,7 +6995,9 @@ impl<'a> TextFrameLayout<'a> {
                 width_pt,
                 height_pt,
                 fill_color: Some(*color),
+                fill_opacity: 1.0,
                 stroke: None,
+                stroke_opacity: 1.0,
               }));
             }
             layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);

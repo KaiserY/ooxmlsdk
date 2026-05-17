@@ -1244,10 +1244,15 @@ fn parse_xml_node(
       panic!("failed to parse xml attribute for {file_name}:{entry_name}: {err}");
     });
     let key = String::from_utf8_lossy(attr.key.as_ref()).into_owned();
-    let value = attr
-      .decode_and_unescape_value(reader.decoder())
+    let decoded = reader
+      .decoder()
+      .decode(attr.value.as_ref())
       .unwrap_or_else(|err| {
         panic!("failed to decode xml attribute for {file_name}:{entry_name}: {err}");
+      });
+    let value = unescape(&decoded)
+      .unwrap_or_else(|err| {
+        panic!("failed to unescape xml attribute for {file_name}:{entry_name}: {err}");
       })
       .into_owned();
     if key == "xmlns" {

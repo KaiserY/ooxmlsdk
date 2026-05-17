@@ -1,6 +1,6 @@
-use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
+use quick_xml::{Reader, escape::unescape};
 use std::collections::BTreeMap;
 #[cfg(test)]
 use std::collections::BTreeSet;
@@ -627,9 +627,7 @@ fn optional_attr(
     let attr = attr?;
     if attr.key == QName(key) {
       return Ok(Some(
-        attr
-          .decode_and_unescape_value(reader.decoder())?
-          .into_owned(),
+        unescape(&reader.decoder().decode(attr.value.as_ref())?)?.into_owned(),
       ));
     }
   }

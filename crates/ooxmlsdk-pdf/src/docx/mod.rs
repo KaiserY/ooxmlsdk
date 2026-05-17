@@ -23,7 +23,8 @@ use ooxmlsdk::simple_type::{
 };
 use quick_xml::Reader;
 use quick_xml::Writer;
-use quick_xml::events::Event;
+use quick_xml::escape::unescape;
+use quick_xml::events::{Event, attributes::Attribute};
 
 use crate::error::Result;
 use crate::options::PdfOptions;
@@ -430,7 +431,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     endnote_reference_ids: Vec::new(),
     #[cfg(test)]
     runs: Vec::new(),
-    format: ParagraphFormat::default(),
+    format: Box::new(ParagraphFormat::default()),
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
@@ -1438,17 +1439,20 @@ fn table_model(
   hyperlinks: &HyperlinkCatalog,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Table {
-  let properties = table.w_tbl_pr.as_deref();
+  let properties = table.w_tbl_pr.as_ref();
   let table_style_id = properties
-    .and_then(|properties| properties.table_style.as_ref())
+    .table_style
+    .as_ref()
     .map(|style| style.val.as_str());
   let table_style = styles.table_style(table_style_id);
   let table_look = properties
-    .and_then(|properties| properties.table_look.as_ref())
+    .table_look
+    .as_ref()
     .map(table_look_model)
     .unwrap_or_default();
   let cell_margins = properties
-    .and_then(|properties| properties.table_cell_margin_default.as_deref())
+    .table_cell_margin_default
+    .as_deref()
     .map(table_cell_margin_default)
     .or(table_style.cell_margins)
     .unwrap_or_default();
@@ -1464,40 +1468,42 @@ fn table_model(
   Table {
     column_widths_pt: table
       .w_tbl_grid
-      .as_deref()
-      .map(|grid| {
-        grid
-          .w_grid_col
-          .iter()
-          .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
-          .collect()
-      })
-      .unwrap_or_default(),
+      .w_grid_col
+      .iter()
+      .filter_map(|column| column.width.as_ref().and_then(twips_measure_to_points))
+      .collect(),
     preferred_width_pt: properties
-      .and_then(|properties| properties.table_width.as_ref())
+      .table_width
+      .as_ref()
       .and_then(table_width_to_points),
     preferred_width_pct: properties
-      .and_then(|properties| properties.table_width.as_ref())
+      .table_width
+      .as_ref()
       .and_then(table_width_to_percent),
     indent_left_pt: properties
-      .and_then(|properties| properties.table_indentation.as_ref())
+      .table_indentation
+      .as_ref()
       .and_then(table_indentation_to_points)
       .or(table_style.indent_left_pt)
       .unwrap_or(0.0),
     alignment: properties
-      .and_then(|properties| properties.table_justification.as_ref())
+      .table_justification
+      .as_ref()
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
     placement: properties
-      .and_then(|properties| properties.table_position_properties.as_ref())
+      .table_position_properties
+      .as_ref()
       .map(table_position_placement),
     borders: properties
-      .and_then(|properties| properties.table_borders.as_deref())
+      .table_borders
+      .as_deref()
       .map(|borders| direct_table_borders_model(table_style.table_borders, borders))
       .or(table_style.table_borders),
     cell_spacing_pt: properties
-      .and_then(|properties| properties.table_cell_spacing.as_ref())
+      .table_cell_spacing
+      .as_ref()
       .and_then(table_cell_spacing_to_points)
       .or(table_style.cell_spacing_pt)
       .unwrap_or(0.0),
@@ -2502,53 +2508,50 @@ fn paragraph_inlines(
           &mut complex_field,
         );
       }
-      w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
-        w::ParagraphChoice2::WIns(inserted) => {
-          push_inserted_run(
-            inserted,
-            &mut inlines,
-            base_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            None,
-          );
-        }
-        w::ParagraphChoice2::WDel(deleted) => {
-          push_deleted_run(
-            deleted,
-            &mut inlines,
-            base_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            None,
-          );
-        }
-        w::ParagraphChoice2::WMoveFrom(moved) => {
-          push_move_from_run(
-            moved,
-            &mut inlines,
-            base_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            None,
-          );
-        }
-        w::ParagraphChoice2::WMoveTo(moved) => {
-          push_move_to_run(
-            moved,
-            &mut inlines,
-            base_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            None,
-          );
-        }
-        _ => {}
-      },
+      w::ParagraphChoice::WIns(inserted) => {
+        push_inserted_run(
+          inserted,
+          &mut inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          None,
+        );
+      }
+      w::ParagraphChoice::WDel(deleted) => {
+        push_deleted_run(
+          deleted,
+          &mut inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          None,
+        );
+      }
+      w::ParagraphChoice::WMoveFrom(moved) => {
+        push_move_from_run(
+          moved,
+          &mut inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          None,
+        );
+      }
+      w::ParagraphChoice::WMoveTo(moved) => {
+        push_move_to_run(
+          moved,
+          &mut inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          None,
+        );
+      }
       w::ParagraphChoice::WSdt(sdt) => push_sdt_run(
         sdt,
         &mut inlines,
@@ -2833,21 +2836,18 @@ fn paragraph_note_reference_ids(paragraph: &w::Paragraph) -> (Vec<i64>, Vec<i64>
       w::ParagraphChoice::WHyperlink(hyperlink) => {
         collect_hyperlink_note_reference_ids(hyperlink, &mut footnotes, &mut endnotes);
       }
-      w::ParagraphChoice::Choice(choice) => match choice.as_ref() {
-        w::ParagraphChoice2::WIns(inserted) => {
-          collect_inserted_run_note_reference_ids(inserted, &mut footnotes, &mut endnotes);
-        }
-        w::ParagraphChoice2::WDel(deleted) => {
-          collect_deleted_run_note_reference_ids(deleted, &mut footnotes, &mut endnotes);
-        }
-        w::ParagraphChoice2::WMoveFrom(moved) => {
-          collect_move_from_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
-        }
-        w::ParagraphChoice2::WMoveTo(moved) => {
-          collect_move_to_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
-        }
-        _ => {}
-      },
+      w::ParagraphChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, &mut footnotes, &mut endnotes);
+      }
+      w::ParagraphChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, &mut footnotes, &mut endnotes);
+      }
+      w::ParagraphChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
+      }
+      w::ParagraphChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, &mut footnotes, &mut endnotes);
+      }
       w::ParagraphChoice::WSdt(sdt) => {
         collect_sdt_run_note_reference_ids(sdt, &mut footnotes, &mut endnotes);
       }
@@ -2976,21 +2976,18 @@ fn collect_inserted_run_note_reference_ids(
   for choice in &inserted.inserted_run_choice {
     match choice {
       w::InsertedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
-        w::InsertedRunChoice2::WIns(inserted) => {
-          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
-        }
-        w::InsertedRunChoice2::WDel(deleted) => {
-          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
-        }
-        w::InsertedRunChoice2::WMoveFrom(moved) => {
-          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        w::InsertedRunChoice2::WMoveTo(moved) => {
-          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        _ => {}
-      },
+      w::InsertedRunChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::InsertedRunChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::InsertedRunChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::InsertedRunChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
       _ => {}
     }
   }
@@ -3004,21 +3001,18 @@ fn collect_deleted_run_note_reference_ids(
   for choice in &deleted.deleted_run_choice {
     match choice {
       w::DeletedRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::DeletedRunChoice::Choice(choice) => match choice.as_ref() {
-        w::DeletedRunChoice2::WIns(inserted) => {
-          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
-        }
-        w::DeletedRunChoice2::WDel(deleted) => {
-          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
-        }
-        w::DeletedRunChoice2::WMoveFrom(moved) => {
-          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        w::DeletedRunChoice2::WMoveTo(moved) => {
-          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        _ => {}
-      },
+      w::DeletedRunChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::DeletedRunChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::DeletedRunChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::DeletedRunChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
       _ => {}
     }
   }
@@ -3032,21 +3026,18 @@ fn collect_move_from_run_note_reference_ids(
   for choice in &moved.move_from_run_choice {
     match choice {
       w::MoveFromRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::MoveFromRunChoice::Choice(choice) => match choice.as_ref() {
-        w::MoveFromRunChoice2::WIns(inserted) => {
-          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
-        }
-        w::MoveFromRunChoice2::WDel(deleted) => {
-          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
-        }
-        w::MoveFromRunChoice2::WMoveFrom(moved) => {
-          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        w::MoveFromRunChoice2::WMoveTo(moved) => {
-          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        _ => {}
-      },
+      w::MoveFromRunChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::MoveFromRunChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::MoveFromRunChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::MoveFromRunChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
       _ => {}
     }
   }
@@ -3060,21 +3051,18 @@ fn collect_move_to_run_note_reference_ids(
   for choice in &moved.move_to_run_choice {
     match choice {
       w::MoveToRunChoice::WR(run) => collect_run_note_reference_ids(run, footnotes, endnotes),
-      w::MoveToRunChoice::Choice(choice) => match choice.as_ref() {
-        w::MoveToRunChoice2::WIns(inserted) => {
-          collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
-        }
-        w::MoveToRunChoice2::WDel(deleted) => {
-          collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
-        }
-        w::MoveToRunChoice2::WMoveFrom(moved) => {
-          collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        w::MoveToRunChoice2::WMoveTo(moved) => {
-          collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
-        }
-        _ => {}
-      },
+      w::MoveToRunChoice::WIns(inserted) => {
+        collect_inserted_run_note_reference_ids(inserted, footnotes, endnotes);
+      }
+      w::MoveToRunChoice::WDel(deleted) => {
+        collect_deleted_run_note_reference_ids(deleted, footnotes, endnotes);
+      }
+      w::MoveToRunChoice::WMoveFrom(moved) => {
+        collect_move_from_run_note_reference_ids(moved, footnotes, endnotes);
+      }
+      w::MoveToRunChoice::WMoveTo(moved) => {
+        collect_move_to_run_note_reference_ids(moved, footnotes, endnotes);
+      }
       _ => {}
     }
   }
@@ -3553,53 +3541,50 @@ fn push_inserted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::InsertedRunChoice::Choice(choice) => match choice.as_ref() {
-        w::InsertedRunChoice2::WIns(nested) => {
-          push_inserted_run(
-            nested,
-            inlines,
-            redline_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url,
-          );
-        }
-        w::InsertedRunChoice2::WDel(deleted) => {
-          push_deleted_run(
-            deleted,
-            inlines,
-            redline_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url,
-          );
-        }
-        w::InsertedRunChoice2::WMoveFrom(moved) => {
-          push_move_from_run(
-            moved,
-            inlines,
-            redline_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url,
-          );
-        }
-        w::InsertedRunChoice2::WMoveTo(moved) => {
-          push_move_to_run(
-            moved,
-            inlines,
-            redline_style.clone(),
-            styles,
-            images,
-            hyperlinks,
-            hyperlink_url,
-          );
-        }
-        _ => {}
-      },
+      w::InsertedRunChoice::WIns(nested) => {
+        push_inserted_run(
+          nested,
+          inlines,
+          redline_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::InsertedRunChoice::WDel(deleted) => {
+        push_deleted_run(
+          deleted,
+          inlines,
+          redline_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::InsertedRunChoice::WMoveFrom(moved) => {
+        push_move_from_run(
+          moved,
+          inlines,
+          redline_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
+      w::InsertedRunChoice::WMoveTo(moved) => {
+        push_move_to_run(
+          moved,
+          inlines,
+          redline_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+          hyperlink_url,
+        );
+      }
       _ => {}
     }
   }
@@ -3626,45 +3611,42 @@ fn push_deleted_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::DeletedRunChoice::Choice(choice) => match choice.as_ref() {
-        w::DeletedRunChoice2::WIns(inserted) => push_inserted_run(
-          inserted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::DeletedRunChoice2::WDel(deleted) => push_deleted_run(
-          deleted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::DeletedRunChoice2::WMoveFrom(moved) => push_move_from_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::DeletedRunChoice2::WMoveTo(moved) => push_move_to_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        _ => {}
-      },
+      w::DeletedRunChoice::WIns(inserted) => push_inserted_run(
+        inserted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::DeletedRunChoice::WDel(deleted) => push_deleted_run(
+        deleted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::DeletedRunChoice::WMoveFrom(moved) => push_move_from_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::DeletedRunChoice::WMoveTo(moved) => push_move_to_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       _ => {}
     }
   }
@@ -3692,45 +3674,42 @@ fn push_move_from_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveFromRunChoice::Choice(choice) => match choice.as_ref() {
-        w::MoveFromRunChoice2::WIns(inserted) => push_inserted_run(
-          inserted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveFromRunChoice2::WDel(deleted) => push_deleted_run(
-          deleted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveFromRunChoice2::WMoveFrom(moved) => push_move_from_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveFromRunChoice2::WMoveTo(moved) => push_move_to_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        _ => {}
-      },
+      w::MoveFromRunChoice::WIns(inserted) => push_inserted_run(
+        inserted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveFromRunChoice::WDel(deleted) => push_deleted_run(
+        deleted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveFromRunChoice::WMoveFrom(moved) => push_move_from_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveFromRunChoice::WMoveTo(moved) => push_move_to_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       _ => {}
     }
   }
@@ -3757,45 +3736,42 @@ fn push_move_to_run(
         hyperlinks,
         hyperlink_url,
       ),
-      w::MoveToRunChoice::Choice(choice) => match choice.as_ref() {
-        w::MoveToRunChoice2::WIns(inserted) => push_inserted_run(
-          inserted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveToRunChoice2::WDel(deleted) => push_deleted_run(
-          deleted,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveToRunChoice2::WMoveFrom(moved) => push_move_from_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        w::MoveToRunChoice2::WMoveTo(moved) => push_move_to_run(
-          moved,
-          inlines,
-          base_style.clone(),
-          styles,
-          images,
-          hyperlinks,
-          hyperlink_url,
-        ),
-        _ => {}
-      },
+      w::MoveToRunChoice::WIns(inserted) => push_inserted_run(
+        inserted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveToRunChoice::WDel(deleted) => push_deleted_run(
+        deleted,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveToRunChoice::WMoveFrom(moved) => push_move_from_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
+      w::MoveToRunChoice::WMoveTo(moved) => push_move_to_run(
+        moved,
+        inlines,
+        base_style.clone(),
+        styles,
+        images,
+        hyperlinks,
+        hyperlink_url,
+      ),
       _ => {}
     }
   }
@@ -4127,15 +4103,15 @@ fn inline_image_impl(
       })
     }
     w::DrawingChoice::WpAnchor(anchor) => {
-      let graphic = anchor.a_graphic.as_ref()?;
-      let extent = anchor.extent.as_ref()?;
+      let graphic = anchor.a_graphic.as_ref();
+      let extent = anchor.extent.as_ref();
       let properties = drawing_image_properties(&graphic.graphic_data)?;
       let relationship_id = properties.relationship_id?;
       let resource = images.by_relationship_id.get(&relationship_id)?;
       let hyperlink_url = anchor
         .wp_doc_pr
-        .as_ref()
-        .and_then(|doc_pr| doc_pr.hyperlink_on_click.as_deref())
+        .hyperlink_on_click
+        .as_deref()
         .and_then(|hyperlink| hyperlink.id.as_deref())
         .and_then(|relationship_id| hyperlinks.target(relationship_id))
         .or_else(|| {
@@ -4158,10 +4134,7 @@ fn inline_image_impl(
         rotation_deg: properties.rotation_deg,
         flip_horizontal: properties.flip_horizontal,
         flip_vertical: properties.flip_vertical,
-        alt_text: anchor
-          .wp_doc_pr
-          .as_ref()
-          .and_then(|properties| properties.description.clone()),
+        alt_text: anchor.wp_doc_pr.description.clone(),
         hyperlink_url,
         placement: ImagePlacement::Floating(floating_image_placement(anchor)),
       })
@@ -4199,56 +4172,33 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     .simple_pos
     .as_ref()
     .is_some_and(|value| value.as_bool())
-    .then_some(anchor.simple_position.as_ref())
-    .flatten();
+    .then_some(anchor.simple_position.as_ref());
   FloatingImagePlacement {
     horizontal_relative_to: simple_position
       .map(|_| HorizontalImageReference::Page)
       .or_else(|| {
-        anchor
-          .horizontal_position
-          .as_deref()
-          .map(horizontal_image_reference)
+        Some(horizontal_image_reference(
+          anchor.horizontal_position.as_ref(),
+        ))
       })
       .unwrap_or_default(),
     vertical_relative_to: simple_position
       .map(|_| VerticalImageReference::Page)
-      .or_else(|| {
-        anchor
-          .vertical_position
-          .as_deref()
-          .map(vertical_image_reference)
-      })
+      .or_else(|| Some(vertical_image_reference(anchor.vertical_position.as_ref())))
       .unwrap_or_default(),
-    horizontal_alignment: simple_position.map(|_| None).unwrap_or_else(|| {
-      anchor
-        .horizontal_position
-        .as_deref()
-        .and_then(horizontal_position_alignment)
-    }),
-    vertical_alignment: simple_position.map(|_| None).unwrap_or_else(|| {
-      anchor
-        .vertical_position
-        .as_deref()
-        .and_then(vertical_position_alignment)
-    }),
+    horizontal_alignment: simple_position
+      .map(|_| None)
+      .unwrap_or_else(|| horizontal_position_alignment(anchor.horizontal_position.as_ref())),
+    vertical_alignment: simple_position
+      .map(|_| None)
+      .unwrap_or_else(|| vertical_position_alignment(anchor.vertical_position.as_ref())),
     horizontal_offset_pt: simple_position
       .map(|position| units::emu_to_points(position.x))
-      .or_else(|| {
-        anchor
-          .horizontal_position
-          .as_deref()
-          .and_then(horizontal_position_offset)
-      })
+      .or_else(|| horizontal_position_offset(anchor.horizontal_position.as_ref()))
       .unwrap_or(0.0),
     vertical_offset_pt: simple_position
       .map(|position| units::emu_to_points(position.y))
-      .or_else(|| {
-        anchor
-          .vertical_position
-          .as_deref()
-          .and_then(vertical_position_offset)
-      })
+      .or_else(|| vertical_position_offset(anchor.vertical_position.as_ref()))
       .unwrap_or(0.0),
     wrap: anchor
       .anchor_choice
@@ -4794,7 +4744,7 @@ fn first_named_xml_fragment(xml: &str, local_name: &[u8]) -> Option<String> {
 fn drawing_graphic_data(drawing: &w::Drawing) -> Option<&ooxmlsdk::schemas::a::GraphicData> {
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => Some(&inline.graphic.graphic_data),
-    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.a_graphic.as_ref()?.graphic_data),
+    w::DrawingChoice::WpAnchor(anchor) => Some(&anchor.a_graphic.graphic_data),
   }
 }
 
@@ -4987,8 +4937,8 @@ fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
         .is_some_and(|hidden| hidden.as_bool())
         || anchor
           .wp_doc_pr
+          .hidden
           .as_ref()
-          .and_then(|properties| properties.hidden.as_ref())
           .is_some_and(|hidden| hidden.as_bool())
     }
     None => false,
@@ -5101,14 +5051,12 @@ fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
   loop {
     match reader.read_event() {
       Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"prstGeom") =>
+        if qname_ends_with(event.name().as_ref(), b"prstGeom")
+          && attr_value(&event, b"prst")
+            .as_deref()
+            .is_some_and(|value| value.eq_ignore_ascii_case("line")) =>
       {
-        if attr_value(&event, b"prst")
-          .as_deref()
-          .is_some_and(|value| value.eq_ignore_ascii_case("line"))
-        {
-          return InlineShapeGeometry::Line;
-        }
+        return InlineShapeGeometry::Line;
       }
       Ok(Event::Eof) | Err(_) => break,
       _ => {}
@@ -6295,6 +6243,11 @@ fn drawing_image_properties(
     .find_map(|child| drawing_image_properties_from_xml(child))
 }
 
+fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> Option<String> {
+  let decoded = decoder.decode(attr.value.as_ref()).ok()?;
+  Some(unescape(&decoded).ok()?.into_owned())
+}
+
 fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(true);
@@ -6304,10 +6257,7 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
       Event::Empty(event) | Event::Start(event) if event.name().as_ref().ends_with(b":blip") => {
         for attr in event.attributes().with_checks(false).flatten() {
           if attr.key.as_ref().ends_with(b":embed") || attr.key.as_ref() == b"embed" {
-            properties.relationship_id = attr
-              .decode_and_unescape_value(reader.decoder())
-              .ok()
-              .map(|value| value.into_owned());
+            properties.relationship_id = decode_xml_attr_value(&attr, reader.decoder());
           }
         }
       }
@@ -6316,10 +6266,7 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
       {
         for attr in event.attributes().with_checks(false).flatten() {
           if attr.key.as_ref().ends_with(b":id") || attr.key.as_ref() == b"id" {
-            properties.hyperlink_relationship_id = attr
-              .decode_and_unescape_value(reader.decoder())
-              .ok()
-              .map(|value| value.into_owned());
+            properties.hyperlink_relationship_id = decode_xml_attr_value(&attr, reader.decoder());
           }
         }
       }
@@ -6345,9 +6292,8 @@ fn image_crop_from_src_rect(
 ) -> ImageCrop {
   let mut crop = ImageCrop::default();
   for attr in event.attributes().with_checks(false).flatten() {
-    let value = attr
-      .decode_and_unescape_value(decoder)
-      .ok()
+    let value = decode_xml_attr_value(&attr, decoder)
+      .as_deref()
       .and_then(|value| value.parse::<i32>().ok())
       .map(relative_rect_attr_to_fraction)
       .unwrap_or(0.0);
@@ -6368,7 +6314,7 @@ fn apply_image_transform_attrs(
   decoder: quick_xml::Decoder,
 ) {
   for attr in event.attributes().with_checks(false).flatten() {
-    let value = attr.decode_and_unescape_value(decoder).ok();
+    let value = decode_xml_attr_value(&attr, decoder);
     match attr.key.as_ref() {
       b"rot" => {
         properties.rotation_deg = value
@@ -8247,7 +8193,7 @@ impl<'a> RunProps<'a> {
 
   fn font_size(&self) -> Option<&'a w::FontSize> {
     match self {
-      Self::Direct(properties) => properties.font_size.as_ref(),
+      Self::Direct(properties) => properties.font_size.first(),
       Self::Style(properties) => properties.font_size.as_ref(),
       Self::BaseStyle(properties) => properties.font_size.as_ref(),
       Self::Numbering(properties) => properties.font_size.as_ref(),
@@ -8514,6 +8460,13 @@ mod tests {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
     )
+  }
+
+  fn text(value: &str) -> Box<w::Text> {
+    Box::new(w::Text(w::TextType {
+      xml_content: Some(value.into()),
+      ..Default::default()
+    }))
   }
 
   #[test]
@@ -9120,10 +9073,7 @@ mod tests {
           }),
           ..Default::default()
         })),
-        run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
-          xml_content: Some("Header".into()),
-          ..Default::default()
-        }))],
+        run_choice: vec![w::RunChoice::WT(text("Header"))],
         ..Default::default()
       }))],
       ..Default::default()
@@ -9185,10 +9135,7 @@ mod tests {
     let cell = w::TableCell {
       table_cell_choice: vec![w::TableCellChoice::WP(Box::new(w::Paragraph {
         paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
-          run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
-            xml_content: Some("Header".into()),
-            ..Default::default()
-          }))],
+          run_choice: vec![w::RunChoice::WT(text("Header"))],
           ..Default::default()
         }))],
         ..Default::default()
@@ -9288,10 +9235,7 @@ mod tests {
     let ruby = w::Ruby {
       ruby_base: Box::new(w::RubyBase {
         ruby_base_choice: vec![w::RubyBaseChoice::WR(Box::new(w::Run {
-          run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
-            xml_content: Some("漢".into()),
-            ..Default::default()
-          }))],
+          run_choice: vec![w::RunChoice::WT(text("漢"))],
           ..Default::default()
         }))],
         ..Default::default()
@@ -9300,15 +9244,9 @@ mod tests {
     };
     let run = w::Run {
       run_choice: vec![
-        w::RunChoice::WT(Box::new(w::Text {
-          xml_content: Some("Before ".into()),
-          ..Default::default()
-        })),
+        w::RunChoice::WT(text("Before ")),
         w::RunChoice::WRuby(Box::new(ruby)),
-        w::RunChoice::WT(Box::new(w::Text {
-          xml_content: Some(" after".into()),
-          ..Default::default()
-        })),
+        w::RunChoice::WT(text(" after")),
       ],
       ..Default::default()
     };
@@ -9439,10 +9377,7 @@ mod tests {
                 text_box_content_choice: vec![w::TextBoxContentChoice::WP(Box::new(
                   w::Paragraph {
                     paragraph_choice: vec![w::ParagraphChoice::WR(Box::new(w::Run {
-                      run_choice: vec![w::RunChoice::WT(Box::new(w::Text {
-                        xml_content: Some("Text inside VML box".into()),
-                        ..Default::default()
-                      }))],
+                      run_choice: vec![w::RunChoice::WT(text("Text inside VML box"))],
                       ..Default::default()
                     }))],
                     ..Default::default()

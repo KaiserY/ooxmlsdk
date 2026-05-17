@@ -984,10 +984,8 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
     if ch == '\t' {
       ranges.push((PaintTextPortionKind::Tab, index..index + ch.len_utf8()));
       start = index + ch.len_utf8();
-    } else if split_portions {
-      if start < index {
-        start = index;
-      }
+    } else if split_portions && start < index {
+      start = index;
     }
   }
   if start < text.text.len() {

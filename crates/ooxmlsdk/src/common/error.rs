@@ -1,4 +1,4 @@
-use quick_xml::{encoding::EncodingError, events::attributes::AttrError};
+use quick_xml::{encoding::EncodingError, escape::EscapeError, events::attributes::AttrError};
 use std::num::{ParseFloatError, ParseIntError};
 use thiserror::Error;
 
@@ -10,6 +10,8 @@ pub enum SdkError {
   QuickEncodingError(#[from] EncodingError),
   #[error("quick_xml attr error")]
   AttrError(#[from] AttrError),
+  #[error("quick_xml escape error")]
+  EscapeError(#[from] EscapeError),
   #[error("ParseIntError")]
   ParseIntError(#[from] ParseIntError),
   #[error("ParseFloatError")]

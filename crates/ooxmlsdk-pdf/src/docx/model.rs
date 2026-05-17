@@ -106,7 +106,7 @@ pub(crate) struct Paragraph {
   pub endnote_reference_ids: Vec<i64>,
   #[cfg(test)]
   pub runs: Vec<TextRun>,
-  pub format: ParagraphFormat,
+  pub format: Box<ParagraphFormat>,
   pub list_label: Option<String>,
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,

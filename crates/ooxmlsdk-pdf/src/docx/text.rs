@@ -106,7 +106,7 @@ pub(super) fn paragraph_model_with_base(
     endnote_reference_ids,
     #[cfg(test)]
     runs,
-    format,
+    format: Box::new(format),
     list_label,
     list_label_style,
     list_label_hyperlink_url: None,

@@ -104,7 +104,7 @@ fn paragraph_text(paragraph: &a::Paragraph) -> String {
           text.push_str(value);
         }
       }
-      a::ParagraphChoice::A14M => {}
+      a::ParagraphChoice::A14M(_) => {}
     }
   }
   text

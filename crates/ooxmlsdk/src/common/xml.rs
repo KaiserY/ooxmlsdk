@@ -1,5 +1,6 @@
 use quick_xml::{
   Decoder, Reader, Writer,
+  escape::unescape,
   events::{BytesRef, BytesText, Event, attributes::Attribute},
 };
 use std::io::BufRead;
@@ -248,7 +249,7 @@ pub(crate) fn decode_attr_value(
   if let Some(value) = attr_raw_value(attr) {
     Ok(decoder.decode(value)?.into_owned())
   } else {
-    Ok(attr.decode_and_unescape_value(decoder)?.into_owned())
+    Ok(unescape(&decoder.decode(attr.value.as_ref())?)?.into_owned())
   }
 }
 
@@ -1518,4 +1519,29 @@ pub(crate) fn write_xmlns_attr<W: std::io::Write>(
   writer.write_all(b"=\"")?;
   writer.write_all(uri.as_bytes())?;
   writer.write_all(b"\"")
+}
+
+#[cfg(test)]
+mod tests {
+  use quick_xml::{Reader, events::Event};
+
+  use super::decode_attr_value;
+
+  #[test]
+  fn attribute_decode_preserves_literal_newlines_for_round_trip() {
+    let mut reader = Reader::from_str("<x a=\"one\ntwo &amp; three\"/>");
+    let Event::Empty(event) = reader.read_event().expect("empty event") else {
+      panic!("expected empty element");
+    };
+    let attr = event
+      .attributes()
+      .with_checks(false)
+      .next()
+      .expect("attribute")
+      .expect("valid attribute");
+
+    let value = decode_attr_value(&attr, reader.decoder()).expect("decoded attribute");
+
+    assert_eq!(value, "one\ntwo & three");
+  }
 }

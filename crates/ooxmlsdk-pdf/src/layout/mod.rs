@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use icu_segmenter::LineSegmenter;
+use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 
 use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
@@ -1250,10 +1249,9 @@ impl<'a> RootFrameLayout<'a> {
         .outline_entries
         .last()
         .is_some_and(|entry| entry.level > level && entry.merged_hidden_separator)
+      && let Some(previous) = self.outline_entries.last().cloned()
     {
-      if let Some(previous) = self.outline_entries.last().cloned() {
-        self.outline_entries.push(previous);
-      }
+      self.outline_entries.push(previous);
     }
     if let Some((page_index, text_item)) = first_text_item_from(&self.pages, &self.current, start) {
       self.outline_entries.push(OutlineEntry {
@@ -6409,10 +6407,11 @@ fn push_line_segments(text: &str, segments: &mut Vec<String>) {
   }
 
   thread_local! {
-    static LINE_SEGMENTER: RefCell<LineSegmenter> = RefCell::new(LineSegmenter::new_auto());
+    static LINE_SEGMENTER: LineSegmenterBorrowed<'static> =
+      LineSegmenter::new_auto(LineBreakOptions::default());
   }
 
-  LINE_SEGMENTER.with_borrow(|segmenter| {
+  LINE_SEGMENTER.with(|segmenter| {
     let mut start = 0;
     for point in segmenter.segment_str(text) {
       if point == 0 {
@@ -6913,11 +6912,11 @@ mod tests {
       endnote_reference_ids: Vec::new(),
       #[cfg(test)]
       runs: Vec::new(),
-      format: ParagraphFormat {
+      format: Box::new(ParagraphFormat {
         line_height_rule: LineHeightRule::Auto,
         line_height_pt: Some(2.0),
         ..Default::default()
-      },
+      }),
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -7008,7 +7007,7 @@ mod tests {
       endnote_reference_ids: Vec::new(),
       #[cfg(test)]
       runs: vec![run],
-      format: ParagraphFormat::default(),
+      format: Box::new(ParagraphFormat::default()),
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,

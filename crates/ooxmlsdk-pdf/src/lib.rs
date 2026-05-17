@@ -251,6 +251,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -353,6 +354,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       })],
     };
 
@@ -423,6 +425,7 @@ mod tests {
           list_label: None,
           list_label_style: crate::docx::TextStyle::default(),
           list_label_hyperlink_url: None,
+          list_label_tab_stop_pt: None,
         })],
       };
 
@@ -462,6 +465,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       }
     }
 
@@ -550,6 +554,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       }
     }
 
@@ -688,6 +693,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       }
     }
 
@@ -780,6 +786,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       }
     }
 
@@ -871,6 +878,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -950,6 +958,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
         footnote_reference_ids: Vec::new(),
         endnote_reference_ids: Vec::new(),
         runs: vec![crate::docx::TextRun {
@@ -1011,6 +1020,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       }
     }
 
@@ -1099,6 +1109,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       })],
     };
 
@@ -1196,6 +1207,7 @@ mod tests {
       list_label: None,
       list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
     };
     let following = crate::docx::Paragraph {
       inlines: vec![crate::docx::InlineItem::Text(follow.clone())],
@@ -1206,6 +1218,7 @@ mod tests {
       list_label: None,
       list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
     };
     let doc = crate::docx::DocxDocument {
       page,
@@ -1331,6 +1344,7 @@ mod tests {
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
+        list_label_tab_stop_pt: None,
       })],
     };
 

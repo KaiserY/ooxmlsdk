@@ -70,10 +70,22 @@ pub(super) fn paragraph_model_with_base(
     .paragraph_properties
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
-  let mut numbering_base_style = run_style.clone();
+  let has_direct_indentation = paragraph
+    .paragraph_properties
+    .as_deref()
+    .is_some_and(|properties| properties.indentation.is_some());
+  let mut numbering_base_style = styles.doc_default_run.clone();
+  numbering_base_style.color = run_style.color;
+  numbering_base_style.highlight = run_style.highlight;
   numbering_base_style.bold = false;
   numbering_base_style.italic = false;
   numbering_base_style.underline = false;
+  numbering_base_style = properties::paragraph_mark_run_style(
+    paragraph_mark_run_properties,
+    numbering_base_style,
+    styles,
+  );
+  let style_tab_stop_pt = format.tab_stops.last().map(|stop| stop.position_pt);
   let numbering_label = direct_numbering
     .or(style_numbering.as_ref())
     .and_then(|properties| {
@@ -88,6 +100,13 @@ pub(super) fn paragraph_model_with_base(
   let list_label = numbering_label
     .as_ref()
     .and_then(|label| label.text.clone());
+  let list_label_tab_stop_pt = numbering_label.as_ref().and_then(|_| {
+    style_tab_stop_pt.or_else(|| {
+      (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
+        format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
+      )
+    })
+  });
   let mut list_label_style = numbering_label
     .as_ref()
     .map(|label| label.style.clone())
@@ -140,6 +159,7 @@ pub(super) fn paragraph_model_with_base(
     list_label,
     list_label_style,
     list_label_hyperlink_url: None,
+    list_label_tab_stop_pt,
   }
 }
 

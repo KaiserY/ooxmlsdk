@@ -110,6 +110,7 @@ pub(crate) struct Paragraph {
   pub list_label: Option<String>,
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
+  pub list_label_tab_stop_pt: Option<f32>,
 }
 
 #[derive(Clone, Debug)]
@@ -664,6 +665,15 @@ pub(crate) struct PageSetup {
   pub background: Option<RgbColor>,
   pub borders: CellBordersModel,
   pub borders_offset_from_text: bool,
+  pub line_numbering: Option<LineNumbering>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LineNumbering {
+  pub count_by: i16,
+  pub start: i16,
+  pub distance_pt: f32,
+  pub restart_each_page: bool,
 }
 
 impl Default for PageSetup {
@@ -684,6 +694,7 @@ impl Default for PageSetup {
       background: None,
       borders: CellBordersModel::default(),
       borders_offset_from_text: false,
+      line_numbering: None,
     }
   }
 }

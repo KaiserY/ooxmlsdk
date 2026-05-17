@@ -619,6 +619,7 @@ struct RootFrameLayout<'a> {
   frames: Vec<LayoutFrame>,
   outline_entries: Vec<OutlineEntry>,
   checkpoints: Vec<LayoutCheckpoint>,
+  next_line_number: i16,
 }
 
 #[derive(Clone, Debug)]
@@ -634,6 +635,7 @@ struct LayoutCheckpoint {
   follows: Vec<FrameFollow>,
   frames: Vec<LayoutFrame>,
   outline_entries: Vec<OutlineEntry>,
+  next_line_number: i16,
 }
 
 impl<'a> RootFrameLayout<'a> {
@@ -648,6 +650,11 @@ impl<'a> RootFrameLayout<'a> {
       frames: Vec::new(),
       outline_entries: Vec::new(),
       checkpoints: Vec::new(),
+      next_line_number: document
+        .page
+        .line_numbering
+        .map(|line_numbering| line_numbering.start)
+        .unwrap_or(1),
     }
   }
 
@@ -874,6 +881,7 @@ impl<'a> RootFrameLayout<'a> {
       follows: self.follows.clone(),
       frames: self.frames.clone(),
       outline_entries: self.outline_entries.clone(),
+      next_line_number: self.next_line_number,
     });
   }
 
@@ -907,6 +915,7 @@ impl<'a> RootFrameLayout<'a> {
     *flow = self.advance_if_past_body(*flow);
     let transition = self.follow_transition_start(*flow);
     let frame_start = self.frame_segment_start(*flow);
+    let line_number_start = self.current.items.len();
     let frame_influences = block_frame_influences(
       block,
       self.document,
@@ -923,6 +932,7 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.pages,
       self.y,
     );
+    self.add_line_number_for_block(block, *flow, line_number_start);
     self.record_layout_frame_segments(
       frame_start,
       *flow,
@@ -949,6 +959,57 @@ impl<'a> RootFrameLayout<'a> {
     );
     *flow = restore_body_content_bottom(*flow);
     *flow = self.advance_if_past_body(*flow);
+  }
+
+  fn add_line_number_for_block(&mut self, block: &Block, flow: FlowContext, start_index: usize) {
+    if flow.text_segmentation != TextSegmentation::Body {
+      return;
+    }
+    if !matches!(block, Block::Paragraph(_)) {
+      return;
+    }
+    let Some(line_numbering) = flow.setup.line_numbering else {
+      return;
+    };
+    let Some(first_text) = self.current.items[start_index..].iter().find_map(|item| {
+      if let PageItem::Text(text) = item {
+        Some(text)
+      } else {
+        None
+      }
+    }) else {
+      return;
+    };
+
+    let number = self.next_line_number;
+    self.next_line_number = self.next_line_number.saturating_add(1);
+    if number < line_numbering.start
+      || (number - line_numbering.start) % line_numbering.count_by != 0
+    {
+      return;
+    }
+
+    let mut style = TextStyle::default();
+    style.font_size_pt = first_text.style.font_size_pt;
+    let text = number.to_string();
+    let width = measure_text(&text, &style);
+    self.current.items.insert(
+      start_index,
+      PageItem::Text(TextItem {
+        x_pt: (flow.content_left_pt - line_numbering.distance_pt - width).max(0.0),
+        y_pt: first_text.y_pt,
+        line_height_pt: first_text.line_height_pt,
+        text,
+        style,
+        hyperlink_url: None,
+        dynamic_field: None,
+        preserve_text_portion: false,
+        form_widget_id: None,
+        paragraph_bidi: false,
+        decoration_span_start_x_pt: None,
+        pdf_text_segmentation: PdfTextSegmentation::Line,
+      }),
+    );
   }
 
   fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
@@ -1132,6 +1193,7 @@ impl<'a> RootFrameLayout<'a> {
       frames: checkpoint.frames.clone(),
       outline_entries: checkpoint.outline_entries.clone(),
       checkpoints: self.checkpoints[..=checkpoint_index].to_vec(),
+      next_line_number: checkpoint.next_line_number,
     };
     rerun.format_body_from_checkpoint(&checkpoint, &constraints);
     rerun.format_trailing_note_frames();
@@ -1145,6 +1207,7 @@ impl<'a> RootFrameLayout<'a> {
     self.frames = rerun.frames;
     self.outline_entries = rerun.outline_entries;
     self.checkpoints = rerun.checkpoints;
+    self.next_line_number = rerun.next_line_number;
 
     Some(LayoutRerun {
       checkpoint_index,
@@ -5811,6 +5874,20 @@ impl<'a> TextFrameLayout<'a> {
     }
     let mut x = line.x_pt.max(line_left);
     if let Some(label) = &paragraph.list_label {
+      if let Some(highlight) = paragraph.list_label_style.highlight {
+        let highlight_left = flow.content_left_pt.min(first_line_left);
+        let highlight_right = default_line_left.max(first_line_left);
+        if highlight_right > highlight_left {
+          current.items.push(PageItem::Rect(RectItem {
+            x_pt: highlight_left,
+            y_pt: y,
+            width_pt: highlight_right - highlight_left,
+            height_pt: line_height,
+            fill_color: Some(highlight),
+            stroke: None,
+          }));
+        }
+      }
       current.items.push(PageItem::Text(TextItem {
         x_pt: first_line_left,
         y_pt: y,
@@ -5826,6 +5903,11 @@ impl<'a> TextFrameLayout<'a> {
         pdf_text_segmentation: PdfTextSegmentation::Line,
       }));
       x = default_line_left;
+      if label.trim().is_empty()
+        && let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt
+      {
+        x = x.max(flow.content_left_pt + tab_stop_pt);
+      }
     }
     let mut line_item_start_index = current.items.len();
     let justify_wrapped_lines =
@@ -7151,6 +7233,7 @@ mod tests {
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
     };
 
     assert!((table_cell_line_spacing_before_border(&paragraph) - 12.65).abs() < 0.01);
@@ -7243,6 +7326,7 @@ mod tests {
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
+      list_label_tab_stop_pt: None,
     })];
 
     let measured = measured_note_blocks_height(&blocks, flow);

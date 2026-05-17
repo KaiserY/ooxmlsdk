@@ -440,6 +440,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
+    list_label_tab_stop_pt: None,
   })
 }
 
@@ -1470,6 +1471,7 @@ fn append_note_blocks<'a>(
       prepend_note_marker(&mut model, &label);
       is_first_paragraph = false;
     }
+    preserve_note_text_portions(&mut model);
     blocks.push(Block::Paragraph(model));
   }
 }
@@ -1493,6 +1495,14 @@ fn prepend_note_marker(paragraph: &mut Paragraph, label: &NoteLabel) {
       preserve_text_portion: false,
     }),
   );
+}
+
+fn preserve_note_text_portions(paragraph: &mut Paragraph) {
+  for inline in &mut paragraph.inlines {
+    if let InlineItem::Text(run) = inline {
+      run.preserve_text_portion = true;
+    }
+  }
 }
 
 fn table_model(
@@ -9150,7 +9160,32 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
       matches!(borders.offset_from, Some(w::PageBorderOffsetValues::Text));
   }
 
+  setup.line_numbering = section
+    .w_ln_num_type
+    .as_ref()
+    .and_then(line_numbering_model);
+
   setup
+}
+
+fn line_numbering_model(properties: &w::LineNumberType) -> Option<LineNumbering> {
+  let count_by = properties.count_by.unwrap_or(1);
+  if count_by <= 0 {
+    return None;
+  }
+  Some(LineNumbering {
+    count_by,
+    start: properties.start.unwrap_or(1),
+    distance_pt: properties
+      .distance
+      .as_ref()
+      .and_then(twips_measure_to_points)
+      .unwrap_or(14.0),
+    restart_each_page: matches!(
+      properties.restart,
+      None | Some(w::LineNumberRestartValues::NewPage)
+    ),
+  })
 }
 
 #[cfg(test)]

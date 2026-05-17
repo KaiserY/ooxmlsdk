@@ -3963,7 +3963,7 @@ fn push_deleted_run(
   base_style.color = redline_author_color();
   for choice in &deleted.deleted_run_choice {
     match choice {
-      w::DeletedRunChoice::WR(run) => push_redline_run(
+      w::DeletedRunChoice::WR(run) => push_run(
         run,
         inlines,
         base_style.clone(),
@@ -9506,6 +9506,7 @@ fn roman_number(mut value: i32) -> String {
 
 enum ParagraphProps<'a> {
   Direct(&'a w::ParagraphProperties),
+  Extended(&'a w::ParagraphPropertiesExtended),
   Style(&'a w::StyleParagraphProperties),
   BaseStyle(&'a w::ParagraphPropertiesBaseStyle),
   Previous(&'a w::PreviousParagraphProperties),
@@ -9515,6 +9516,7 @@ impl<'a> ParagraphProps<'a> {
   fn page_break_before(&self) -> Option<&'a w::PageBreakBefore> {
     match self {
       Self::Direct(properties) => properties.page_break_before.as_ref(),
+      Self::Extended(properties) => properties.page_break_before.as_ref(),
       Self::Style(properties) => properties.page_break_before.as_ref(),
       Self::BaseStyle(properties) => properties.page_break_before.as_ref(),
       Self::Previous(properties) => properties.page_break_before.as_ref(),
@@ -9524,6 +9526,7 @@ impl<'a> ParagraphProps<'a> {
   fn keep_next(&self) -> Option<&'a w::KeepNext> {
     match self {
       Self::Direct(properties) => properties.keep_next.as_ref(),
+      Self::Extended(properties) => properties.keep_next.as_ref(),
       Self::Style(properties) => properties.keep_next.as_ref(),
       Self::BaseStyle(properties) => properties.keep_next.as_ref(),
       Self::Previous(properties) => properties.keep_next.as_ref(),
@@ -9533,6 +9536,7 @@ impl<'a> ParagraphProps<'a> {
   fn keep_lines(&self) -> Option<&'a w::KeepLines> {
     match self {
       Self::Direct(properties) => properties.keep_lines.as_ref(),
+      Self::Extended(properties) => properties.keep_lines.as_ref(),
       Self::Style(properties) => properties.keep_lines.as_ref(),
       Self::BaseStyle(properties) => properties.keep_lines.as_ref(),
       Self::Previous(properties) => properties.keep_lines.as_ref(),
@@ -9542,6 +9546,7 @@ impl<'a> ParagraphProps<'a> {
   fn contextual_spacing(&self) -> Option<&'a w::ContextualSpacing> {
     match self {
       Self::Direct(properties) => properties.contextual_spacing.as_ref(),
+      Self::Extended(properties) => properties.contextual_spacing.as_ref(),
       Self::Style(properties) => properties.contextual_spacing.as_ref(),
       Self::BaseStyle(properties) => properties.contextual_spacing.as_ref(),
       Self::Previous(properties) => properties.contextual_spacing.as_ref(),
@@ -9551,6 +9556,7 @@ impl<'a> ParagraphProps<'a> {
   fn spacing_between_lines(&self) -> Option<&'a w::SpacingBetweenLines> {
     match self {
       Self::Direct(properties) => properties.spacing_between_lines.as_ref(),
+      Self::Extended(properties) => properties.spacing_between_lines.as_ref(),
       Self::Style(properties) => properties.spacing_between_lines.as_ref(),
       Self::BaseStyle(properties) => properties.spacing_between_lines.as_ref(),
       Self::Previous(properties) => properties.spacing_between_lines.as_ref(),
@@ -9560,6 +9566,7 @@ impl<'a> ParagraphProps<'a> {
   fn indentation(&self) -> Option<&'a w::Indentation> {
     match self {
       Self::Direct(properties) => properties.indentation.as_ref(),
+      Self::Extended(properties) => properties.indentation.as_ref(),
       Self::Style(properties) => properties.indentation.as_ref(),
       Self::BaseStyle(properties) => properties.indentation.as_ref(),
       Self::Previous(properties) => properties.indentation.as_ref(),
@@ -9569,6 +9576,7 @@ impl<'a> ParagraphProps<'a> {
   fn tabs(&self) -> Option<&'a w::Tabs> {
     match self {
       Self::Direct(properties) => properties.tabs.as_ref(),
+      Self::Extended(properties) => properties.tabs.as_ref(),
       Self::Style(properties) => properties.tabs.as_ref(),
       Self::BaseStyle(properties) => properties.tabs.as_ref(),
       Self::Previous(properties) => properties.tabs.as_ref(),
@@ -9578,6 +9586,7 @@ impl<'a> ParagraphProps<'a> {
   fn justification(&self) -> Option<&'a w::Justification> {
     match self {
       Self::Direct(properties) => properties.justification.as_ref(),
+      Self::Extended(properties) => properties.justification.as_ref(),
       Self::Style(properties) => properties.justification.as_ref(),
       Self::BaseStyle(properties) => properties.justification.as_ref(),
       Self::Previous(properties) => properties.justification.as_ref(),
@@ -9587,6 +9596,7 @@ impl<'a> ParagraphProps<'a> {
   fn bidi(&self) -> Option<&'a w::BiDi> {
     match self {
       Self::Direct(properties) => properties.bi_di.as_ref(),
+      Self::Extended(properties) => properties.bi_di.as_ref(),
       Self::Style(properties) => properties.bi_di.as_ref(),
       Self::BaseStyle(properties) => properties.bi_di.as_ref(),
       Self::Previous(properties) => properties.bi_di.as_ref(),
@@ -9596,6 +9606,7 @@ impl<'a> ParagraphProps<'a> {
   fn paragraph_borders(&self) -> Option<&'a w::ParagraphBorders> {
     match self {
       Self::Direct(properties) => properties.paragraph_borders.as_deref(),
+      Self::Extended(properties) => properties.paragraph_borders.as_deref(),
       Self::Style(properties) => properties.paragraph_borders.as_deref(),
       Self::BaseStyle(properties) => properties.paragraph_borders.as_deref(),
       Self::Previous(properties) => properties.paragraph_borders.as_deref(),
@@ -9605,6 +9616,7 @@ impl<'a> ParagraphProps<'a> {
   fn shading(&self) -> Option<&'a w::Shading> {
     match self {
       Self::Direct(properties) => properties.shading.as_ref(),
+      Self::Extended(properties) => properties.shading.as_ref(),
       Self::Style(properties) => properties.shading.as_ref(),
       Self::BaseStyle(properties) => properties.shading.as_ref(),
       Self::Previous(properties) => properties.shading.as_ref(),
@@ -9614,6 +9626,7 @@ impl<'a> ParagraphProps<'a> {
   fn outline_level(&self) -> Option<&'a w::OutlineLevel> {
     match self {
       Self::Direct(properties) => properties.outline_level.as_ref(),
+      Self::Extended(properties) => properties.outline_level.as_ref(),
       Self::Style(properties) => properties.outline_level.as_ref(),
       Self::BaseStyle(properties) => properties.outline_level.as_ref(),
       Self::Previous(properties) => properties.outline_level.as_ref(),
@@ -9623,6 +9636,7 @@ impl<'a> ParagraphProps<'a> {
   fn frame_properties(&self) -> Option<&'a w::FrameProperties> {
     match self {
       Self::Direct(properties) => properties.frame_properties.as_ref(),
+      Self::Extended(properties) => properties.frame_properties.as_ref(),
       Self::Style(properties) => properties.frame_properties.as_ref(),
       Self::BaseStyle(properties) => properties.frame_properties.as_ref(),
       Self::Previous(properties) => properties.frame_properties.as_ref(),

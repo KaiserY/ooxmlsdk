@@ -41,25 +41,30 @@ pub(super) fn paragraph_model_with_base(
   form_widget_ids: &mut FormWidgetIdAllocator,
   base: ParagraphImportBase,
 ) -> Paragraph {
-  let style_id = paragraph
-    .paragraph_properties
-    .as_deref()
-    .and_then(|properties| properties.paragraph_style_id.as_ref())
-    .map(|style| style.val.as_str());
-  let mut format = properties::paragraph_format(
-    styles,
-    style_id,
-    base.format,
-    paragraph
-      .paragraph_properties
-      .as_deref()
-      .map(ParagraphProps::Direct),
-  );
+  let paragraph_properties = paragraph.paragraph_properties.as_deref();
+  let previous_paragraph_properties = paragraph_properties
+    .and_then(|properties| properties.paragraph_properties_change.as_deref())
+    .map(|change| change.paragraph_properties_extended.as_ref());
+  let use_previous_paragraph_properties =
+    paragraph_mark_is_deleted(paragraph) && previous_paragraph_properties.is_some();
+  let effective_style_id = if use_previous_paragraph_properties {
+    previous_paragraph_properties.and_then(|properties| properties.paragraph_style_id.as_ref())
+  } else {
+    paragraph_properties.and_then(|properties| properties.paragraph_style_id.as_ref())
+  };
+  let style_id = effective_style_id.map(|style| style.val.as_str());
+  let direct_paragraph_properties = if use_previous_paragraph_properties {
+    previous_paragraph_properties.map(ParagraphProps::Extended)
+  } else {
+    paragraph_properties.map(ParagraphProps::Direct)
+  };
+  let mut format =
+    properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
   let mut run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);
   if paragraph_mark_is_deleted(paragraph) {
     run_style.color = redline_author_color();
-    run_style.strikethrough = true;
+    run_style.strikethrough = !paragraph_contains_drawing(paragraph);
   }
   let direct_numbering = paragraph
     .paragraph_properties
@@ -178,6 +183,49 @@ fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
     .is_some_and(|properties| properties.deleted.is_some() || properties.move_from.is_some())
+}
+
+fn paragraph_contains_drawing(paragraph: &w::Paragraph) -> bool {
+  paragraph
+    .paragraph_choice
+    .iter()
+    .any(|choice| match choice {
+      w::ParagraphChoice::WR(run) => run_contains_drawing(run),
+      w::ParagraphChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
+      w::ParagraphChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      _ => false,
+    })
+}
+
+fn inserted_run_contains_drawing(inserted: &w::InsertedRun) -> bool {
+  inserted
+    .inserted_run_choice
+    .iter()
+    .any(|choice| match choice {
+      w::InsertedRunChoice::WR(run) => run_contains_drawing(run),
+      w::InsertedRunChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
+      w::InsertedRunChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      _ => false,
+    })
+}
+
+fn deleted_run_contains_drawing(deleted: &w::DeletedRun) -> bool {
+  deleted
+    .deleted_run_choice
+    .iter()
+    .any(|choice| match choice {
+      w::DeletedRunChoice::WR(run) => run_contains_drawing(run),
+      w::DeletedRunChoice::WIns(inserted) => inserted_run_contains_drawing(inserted),
+      w::DeletedRunChoice::WDel(deleted) => deleted_run_contains_drawing(deleted),
+      _ => false,
+    })
+}
+
+fn run_contains_drawing(run: &w::Run) -> bool {
+  run
+    .run_choice
+    .iter()
+    .any(|choice| matches!(choice, w::RunChoice::WDrawing(_)))
 }
 
 fn paragraph_mark_is_inserted(paragraph: &w::Paragraph) -> bool {

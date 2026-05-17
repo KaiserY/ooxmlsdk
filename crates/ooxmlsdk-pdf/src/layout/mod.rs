@@ -2030,6 +2030,7 @@ fn execute_reflow_requests(
   let mut influence_replayed_items = 0usize;
   let mut suppressed_moves = 0usize;
   let mut move_backward_keys = HashMap::<MoveBackwardKey, usize>::new();
+  let mut replayed_influence_frames = HashSet::<usize>::new();
 
   for request in requests {
     match request.reason {
@@ -2045,6 +2046,12 @@ fn execute_reflow_requests(
         remaining.push(request);
       }
       ReflowReason::InsertionInfluenceChanged => {
+        if replayed_influence_frames.contains(&request.frame_index) {
+          influence_count += 1;
+          first_influence_page = first_influence_page.min(request.page_index);
+          influence_scope = influence_scope.max(request.scope);
+          continue;
+        }
         if let Some(frame) = frames.get(request.frame_index)
           && !frame.influences.is_empty()
           && !frame.fragments.is_empty()
@@ -2062,6 +2069,7 @@ fn execute_reflow_requests(
           let replay = replay_scoped_frames(frames, &request);
           influence_replayed_frames += replay.frames;
           influence_replayed_items += replay.items;
+          replayed_influence_frames.extend(replay.frame_indices);
           page_replays.extend(replay.pages);
           continue;
         }
@@ -2238,6 +2246,7 @@ fn previous_page_replay_start_frame(
 struct ReflowReplayStats {
   frames: usize,
   items: usize,
+  frame_indices: Vec<usize>,
   pages: Vec<PageReplay>,
 }
 
@@ -2250,7 +2259,7 @@ fn replay_scoped_frames(frames: &mut [LayoutFrame], request: &ReflowRequest) -> 
   let start_section_page_index = start.section_page_index;
   let start_column_index = start.column_index;
 
-  for frame in frames.iter_mut().skip(request.frame_index) {
+  for (frame_index, frame) in frames.iter_mut().enumerate().skip(request.frame_index) {
     if !frame_in_reflow_scope(
       frame,
       request.scope,
@@ -2264,6 +2273,7 @@ fn replay_scoped_frames(frames: &mut [LayoutFrame], request: &ReflowRequest) -> 
     replay_layout_frame(frame);
     stats.frames += 1;
     stats.items += frame.items.len();
+    stats.frame_indices.push(frame_index);
     stats.pages.push(replay);
   }
   stats

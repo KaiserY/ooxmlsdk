@@ -974,8 +974,7 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
     return vec![(PaintTextPortionKind::Field(kind), 0..text.text.len())];
   }
   let split_portions = text.pdf_text_segmentation == PdfTextSegmentation::Portion
-    || text.style.underline
-    || text.style.strikethrough;
+    || (text.preserve_text_portion && (text.style.underline || text.style.strikethrough));
   if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
     return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
   }

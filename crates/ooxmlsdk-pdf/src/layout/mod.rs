@@ -41,6 +41,7 @@ const LAYOUT_EPSILON_PT: f32 = 0.1;
 const LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT: f32 = 115.0;
 const PERCENT_SCALE: f32 = 100.0;
 const LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE: f32 = 340.0 / 220.0;
+const LO_DRAWING_ANCHOR_MARGIN_LINE_HEIGHT_PT: f32 = 288.0 / units::TWIPS_PER_POINT;
 // Source: LibreOffice sw/source/core/layout/pagedesc.cxx
 // SwPageFootnoteInfo defaults: line width 10 twips, relative width 25%,
 // top/bottom distance 57 twips.
@@ -1773,6 +1774,15 @@ fn block_frame_influences(
             InlineItem::Image(image)
               if matches!(
                 image.placement,
+                crate::docx::ImagePlacement::Floating(placement)
+                  if !placement.behind_text
+                    && !matches!(placement.wrap, ImageWrapMode::Through | ImageWrapMode::Inline)
+              )
+          ) || matches!(
+            inline,
+            InlineItem::Shape(shape)
+              if matches!(
+                shape.placement,
                 crate::docx::ImagePlacement::Floating(placement)
                   if !placement.behind_text
                     && !matches!(placement.wrap, ImageWrapMode::Through | ImageWrapMode::Inline)
@@ -5840,6 +5850,16 @@ fn floating_shape_is_zero_relative_background(
     && shape.text_box_blocks.is_empty()
 }
 
+fn floating_shape_may_extend_outside_page(placement: FloatingImagePlacement) -> bool {
+  matches!(
+    (placement.vertical_relative_to, placement.vertical_alignment),
+    (
+      VerticalImageReference::BottomMargin,
+      Some(VerticalImageAlignment::Outside)
+    )
+  )
+}
+
 fn horizontal_reference_width(reference: HorizontalImageReference, flow: FlowContext) -> f32 {
   match reference {
     HorizontalImageReference::Page => flow.setup.width_pt,
@@ -6871,6 +6891,7 @@ impl<'a> TextFrameLayout<'a> {
                              y_pt: f32,
                              width_pt: f32,
                              height_pt: f32| {
+            let item_start = current.items.len();
             if let Some(fill_image) = &shape.fill_image {
               current.items.push(PageItem::Image(ImageItem {
                 x_pt,
@@ -6901,7 +6922,7 @@ impl<'a> TextFrameLayout<'a> {
                 y_pt + height_pt,
                 stroke,
               );
-              return;
+              return (item_start, current.items.len());
             }
             if let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry {
               current.items.push(PageItem::Polyline(PolylineItem {
@@ -6927,7 +6948,7 @@ impl<'a> TextFrameLayout<'a> {
                 }));
               }
               layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
-              return;
+              return (item_start, current.items.len());
             }
             if shape.fill_color.is_some() || shape.stroke.is_some() {
               current.items.push(PageItem::Rect(RectItem {
@@ -6950,6 +6971,7 @@ impl<'a> TextFrameLayout<'a> {
               }));
             }
             layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
+            (item_start, current.items.len())
           };
 
           match shape.placement {
@@ -6962,24 +6984,93 @@ impl<'a> TextFrameLayout<'a> {
               let (shape_x, shape_y) =
                 floating_image_position(placement, flow, x, y, width, height);
               let shape_x = shape_x + shape.offset_x_pt;
-              let vml_text_anchor_offset = if shape.allow_outside_page {
-                match placement.vertical_relative_to {
-                  crate::docx::VerticalImageReference::Paragraph
-                  | crate::docx::VerticalImageReference::Line => vml_anchor_line_height,
-                  crate::docx::VerticalImageReference::TopMargin
-                  | crate::docx::VerticalImageReference::BottomMargin => line_height,
-                  _ => 0.0,
+              let text_anchor_offset = match placement.vertical_relative_to {
+                crate::docx::VerticalImageReference::Paragraph
+                | crate::docx::VerticalImageReference::Line
+                  if shape.allow_outside_page =>
+                {
+                  vml_anchor_line_height
                 }
-              } else {
-                0.0
+                crate::docx::VerticalImageReference::TopMargin
+                | crate::docx::VerticalImageReference::BottomMargin
+                  if placement.vertical_alignment != Some(VerticalImageAlignment::Inside) =>
+                {
+                  LO_DRAWING_ANCHOR_MARGIN_LINE_HEIGHT_PT
+                }
+                crate::docx::VerticalImageReference::BottomMargin => line_height,
+                _ => 0.0,
               };
-              let shape_y = shape_y + shape.offset_y_pt + vml_text_anchor_offset;
-              let (shape_x, shape_y) = if shape.allow_outside_page {
+              let shape_y = shape_y + shape.offset_y_pt + text_anchor_offset;
+              let allows_outside_page =
+                shape.allow_outside_page || floating_shape_may_extend_outside_page(placement);
+              let (shape_x, shape_y) = if allows_outside_page {
                 (shape_x, shape_y)
               } else {
                 keep_floating_shape_inside_page(shape_x, shape_y, width, height, flow)
               };
-              place_shape(current, flow, shape_x, shape_y, width, height);
+              let (shape_item_start, shape_item_end) =
+                place_shape(current, flow, shape_x, shape_y, width, height);
+              let influence_bounds = Some(FrameBounds {
+                x_pt: shape_x - placement.margin_left_pt,
+                y_pt: shape_y - placement.margin_top_pt,
+                width_pt: width + placement.margin_left_pt + placement.margin_right_pt,
+                height_pt: height + placement.margin_top_pt + placement.margin_bottom_pt,
+              });
+              match placement.wrap {
+                ImageWrapMode::TopBottom | ImageWrapMode::None => {
+                  if !placement.behind_text {
+                    push_page_influence(
+                      current,
+                      FrameInfluenceKind::FlyWrap,
+                      shape_item_start,
+                      shape_item_end,
+                      influence_bounds,
+                    );
+                  }
+                  y = y.max(shape_y + height + placement.margin_bottom_pt);
+                  if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                    (flow, y) = advance_section_flow(flow, current, pages);
+                    text_frame = TextFrame::new(self.paragraph, flow);
+                    text_state.note_page_follow(pages.len(), y);
+                    wrap_exclusions.clear();
+                    default_line_right = text_frame.default_line_right;
+                    paragraph_left = text_frame.paragraph_left;
+                    base_line_height = text_frame.base_line_height;
+                    line_height = base_line_height;
+                    line_item_start_index = current.items.len();
+                  }
+                  (line_left, line_right) =
+                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                  x = line_left;
+                  line_height = base_line_height;
+                }
+                ImageWrapMode::Square | ImageWrapMode::Tight if !placement.behind_text => {
+                  let exclusion = WrapExclusion {
+                    left_pt: shape_x - placement.margin_left_pt,
+                    right_pt: shape_x + width + placement.margin_right_pt,
+                    top_pt: shape_y - placement.margin_top_pt,
+                    bottom_pt: shape_y + height + placement.margin_bottom_pt,
+                    side: placement.wrap_side,
+                  };
+                  wrap_exclusions.push(exclusion);
+                  current.wrap_exclusions.push(exclusion);
+                  push_page_influence(
+                    current,
+                    FrameInfluenceKind::FlyWrap,
+                    shape_item_start,
+                    shape_item_end,
+                    influence_bounds,
+                  );
+                  (line_left, line_right) =
+                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                  x = x.max(line_left).min(line_right);
+                  line_height = line_height.max(height.min(base_line_height));
+                }
+                ImageWrapMode::Through
+                | ImageWrapMode::Inline
+                | ImageWrapMode::Square
+                | ImageWrapMode::Tight => {}
+              }
             }
             crate::docx::ImagePlacement::Inline => {
               if x + shape.width_pt > line_right && x > line_left {
@@ -7007,7 +7098,7 @@ impl<'a> TextFrameLayout<'a> {
                 base_line_height = text_frame.base_line_height;
                 x = line_left;
               }
-              place_shape(
+              let _ = place_shape(
                 current,
                 flow,
                 x + shape.offset_x_pt,

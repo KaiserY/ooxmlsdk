@@ -158,13 +158,7 @@ fn is_supported_document_path(path: &Path) -> bool {
 }
 
 fn is_invalid(file_name: &str) -> bool {
-  matches!(
-    file_name,
-    "Strict01.docx"
-      | "encrypted_pptx.pptx"
-      | "libreoffice/presentation/strict_ooxml.pptx"
-      | "libreoffice/word/strict-lockedcanvas.docx"
-  )
+  matches!(file_name, "encrypted_pptx.pptx")
 }
 
 fn is_round_trip_supported(file_name: &str) -> bool {
@@ -173,12 +167,20 @@ fn is_round_trip_supported(file_name: &str) -> bool {
 }
 
 fn is_valid_open_only(file_name: &str) -> bool {
-  matches!(file_name, "5Errors.docx" | "simpleSdt.docx")
+  matches!(
+    file_name,
+    "5Errors.docx" | "simpleSdt.docx" | "Strict01.docx"
+  )
 }
 
 fn is_test_data_open_only(file_name: &str) -> bool {
   matches!(
     file_name,
+    // Strict packages open after DrawingML percentage union parsing; keep them out of round-trip
+    // coverage until strict namespace save semantics are explicitly supported.
+    "libreoffice/presentation/strict_ooxml.pptx"
+      | "libreoffice/word/strict-lockedcanvas.docx"
+      |
     // c:chart has c:extLst before c:showDLblsOverMax, opposite of CT_Chart particle order.
     "libreoffice/presentation/chart-theme-override.pptx"
       |

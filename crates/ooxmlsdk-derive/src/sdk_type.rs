@@ -998,26 +998,6 @@ fn parse_simple_union_attr_tokens(kind: SimpleUnionTypeKind) -> proc_macro2::Tok
   }
 }
 
-fn parse_simple_union_value_tokens(
-  kind: SimpleUnionTypeKind,
-  value_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  match kind {
-    SimpleUnionTypeKind::TwipsMeasure => {
-      quote! { crate::common::parse_twips_measure_value(#value_expr) }
-    }
-    SimpleUnionTypeKind::SignedTwipsMeasure => {
-      quote! { crate::common::parse_signed_twips_measure_value(#value_expr) }
-    }
-    SimpleUnionTypeKind::DecimalNumberOrPercent => {
-      quote! { crate::common::parse_decimal_number_or_percent_value(#value_expr) }
-    }
-    SimpleUnionTypeKind::MeasurementOrPercent => {
-      quote! { crate::common::parse_measurement_or_percent_value(#value_expr) }
-    }
-  }
-}
-
 fn write_simple_union_attr_tokens(
   kind: SimpleUnionTypeKind,
   attr_name: &LitStr,
@@ -1035,26 +1015,6 @@ fn write_simple_union_attr_tokens(
     }
     SimpleUnionTypeKind::MeasurementOrPercent => {
       quote! { crate::common::write_measurement_or_percent_attr(writer, #attr_name, #value_expr)?; }
-    }
-  }
-}
-
-fn write_simple_union_value_tokens(
-  kind: SimpleUnionTypeKind,
-  value_expr: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-  match kind {
-    SimpleUnionTypeKind::TwipsMeasure => {
-      quote! { crate::common::write_twips_measure_value(writer, #value_expr)?; }
-    }
-    SimpleUnionTypeKind::SignedTwipsMeasure => {
-      quote! { crate::common::write_signed_twips_measure_value(writer, #value_expr)?; }
-    }
-    SimpleUnionTypeKind::DecimalNumberOrPercent => {
-      quote! { crate::common::write_decimal_number_or_percent_value(writer, #value_expr)?; }
-    }
-    SimpleUnionTypeKind::MeasurementOrPercent => {
-      quote! { crate::common::write_measurement_or_percent_value(writer, #value_expr)?; }
     }
   }
 }

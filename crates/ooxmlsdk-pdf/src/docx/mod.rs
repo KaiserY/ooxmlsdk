@@ -22,7 +22,8 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
 use ooxmlsdk::simple_type::{
-  MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
+  DecimalNumberOrPercentValue, MeasurementOrPercentValue, SignedTwipsMeasureValue,
+  TwipsMeasureValue,
 };
 use quick_xml::Reader;
 use quick_xml::Writer;
@@ -1319,18 +1320,39 @@ fn push_body_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
   }
   if let Some(frame) = paragraph.format.frame {
     paragraph.format.frame = None;
+    if let Some(Block::Frame(previous)) = blocks.last_mut()
+      && paragraph_belongs_to_frame(previous, frame, &paragraph)
+    {
+      previous.blocks.push(Block::Paragraph(paragraph));
+      return;
+    }
+    let fill_color = paragraph.format.shading;
+    let borders = paragraph.format.borders;
     blocks.push(Block::Frame(FloatingFrame {
-      blocks: vec![Block::Paragraph(paragraph.clone())],
+      blocks: vec![Block::Paragraph(paragraph)],
       width_pt: frame.width_pt,
       height_pt: frame.height_pt,
       height_rule: frame.height_rule,
       placement: frame.placement,
-      fill_color: paragraph.format.shading,
-      borders: paragraph.format.borders,
+      fill_color,
+      borders,
     }));
     return;
   }
   blocks.push(Block::Paragraph(paragraph));
+}
+
+fn paragraph_belongs_to_frame(
+  frame: &FloatingFrame,
+  properties: ParagraphFrameProperties,
+  paragraph: &Paragraph,
+) -> bool {
+  frame.width_pt == properties.width_pt
+    && frame.height_pt == properties.height_pt
+    && frame.height_rule == properties.height_rule
+    && frame.placement == properties.placement
+    && frame.fill_color == paragraph.format.shading
+    && frame.borders == paragraph.format.borders
 }
 
 fn paragraph_mark_is_hidden(paragraph: &w::Paragraph) -> bool {
@@ -1378,6 +1400,12 @@ fn close_section(
   section_properties: Option<w::SectionProperties>,
   previous_properties: &mut Option<w::SectionProperties>,
 ) {
+  if let Some(rotation_deg) = section_properties
+    .as_ref()
+    .and_then(section_text_rotation_degrees)
+  {
+    rotate_blocks_text(current_blocks, rotation_deg);
+  }
   let break_kind =
     normalized_section_break(section_properties.as_ref(), previous_properties.as_ref());
   let page = section_properties
@@ -1499,6 +1527,42 @@ fn section_orientation(section: &w::SectionProperties) -> w::PageOrientationValu
       )
     })
     .unwrap_or_default()
+}
+
+fn section_text_rotation_degrees(section: &w::SectionProperties) -> Option<f32> {
+  let direction = section.w_text_direction.as_ref()?.val;
+  match direction {
+    w::TextDirectionValues::TopToBottomRightToLeft
+    | w::TextDirectionValues::TopToBottomRightToLeft2010
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated2010
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated2010 => Some(-90.0),
+    w::TextDirectionValues::BottomToTopLeftToRight
+    | w::TextDirectionValues::BottomToTopLeftToRight2010 => Some(90.0),
+    w::TextDirectionValues::LefToRightTopToBottom
+    | w::TextDirectionValues::LeftToRightTopToBottom2010
+    | w::TextDirectionValues::LefttoRightTopToBottomRotated
+    | w::TextDirectionValues::LeftToRightTopToBottomRotated2010 => None,
+  }
+}
+
+fn table_cell_text_rotation_degrees(properties: &w::TableCellProperties) -> Option<f32> {
+  let direction = properties.text_direction.as_ref()?.val;
+  match direction {
+    w::TextDirectionValues::TopToBottomRightToLeft
+    | w::TextDirectionValues::TopToBottomRightToLeft2010
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated
+    | w::TextDirectionValues::TopToBottomRightToLeftRotated2010 => Some(-90.0),
+    w::TextDirectionValues::BottomToTopLeftToRight
+    | w::TextDirectionValues::BottomToTopLeftToRight2010 => Some(90.0),
+    w::TextDirectionValues::LefToRightTopToBottom
+    | w::TextDirectionValues::LeftToRightTopToBottom2010
+    | w::TextDirectionValues::LefttoRightTopToBottomRotated
+    | w::TextDirectionValues::LeftToRightTopToBottomRotated2010
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated
+    | w::TextDirectionValues::TopToBottomLeftToRightRotated2010 => None,
+  }
 }
 
 fn section_column_count(section: &w::SectionProperties) -> i16 {
@@ -2411,36 +2475,44 @@ fn table_cell_model(
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
-  let blocks = cell
+  let mut blocks = cell
     .table_cell_choice
     .iter()
-    .filter_map(|choice| match choice {
-      w::TableCellChoice::WP(paragraph) => Some(Block::Paragraph(paragraph_model_with_base(
-        paragraph,
-        context.styles,
-        context.numbering,
-        context.images,
-        context.hyperlinks,
-        context.form_widget_ids,
-        ParagraphImportBase {
-          format: style.paragraph_format.clone(),
-          run_style: style.run_style.clone(),
-          run_overrides: style.run_overrides,
-          custom_xml_bindings: Some(context.custom_xml_bindings),
-        },
-      ))),
-      w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
-        table,
-        context.styles,
-        context.numbering,
-        context.images,
-        context.hyperlinks,
-        context.custom_xml_bindings,
-        context.form_widget_ids,
-      ))),
-      _ => None,
-    })
-    .collect();
+    .fold(Vec::new(), |mut blocks, choice| {
+      match choice {
+        w::TableCellChoice::WP(paragraph) => {
+          let paragraph = paragraph_model_with_base(
+            paragraph,
+            context.styles,
+            context.numbering,
+            context.images,
+            context.hyperlinks,
+            context.form_widget_ids,
+            ParagraphImportBase {
+              format: style.paragraph_format.clone(),
+              run_style: style.run_style.clone(),
+              run_overrides: style.run_overrides,
+              custom_xml_bindings: Some(context.custom_xml_bindings),
+            },
+          );
+          push_cell_paragraph(&mut blocks, paragraph);
+        }
+        w::TableCellChoice::WTbl(table) => blocks.push(Block::Table(table_model(
+          table,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          context.custom_xml_bindings,
+          context.form_widget_ids,
+        ))),
+        _ => {}
+      }
+      blocks
+    });
+  if let Some(rotation_deg) = properties.and_then(table_cell_text_rotation_degrees) {
+    rotate_blocks_text(&mut blocks, rotation_deg);
+  }
   TableCell {
     blocks,
     shading: properties
@@ -2476,6 +2548,31 @@ fn table_cell_model(
       .or(style.vertical_alignment)
       .unwrap_or_default(),
   }
+}
+
+fn push_cell_paragraph(blocks: &mut Vec<Block>, mut paragraph: Paragraph) {
+  let Some(frame) = paragraph.format.frame else {
+    blocks.push(Block::Paragraph(paragraph));
+    return;
+  };
+  paragraph.format.frame = None;
+  if let Some(Block::Frame(previous)) = blocks.last_mut()
+    && paragraph_belongs_to_frame(previous, frame, &paragraph)
+  {
+    previous.blocks.push(Block::Paragraph(paragraph));
+    return;
+  }
+  let fill_color = paragraph.format.shading;
+  let borders = paragraph.format.borders;
+  blocks.push(Block::Frame(FloatingFrame {
+    blocks: vec![Block::Paragraph(paragraph)],
+    width_pt: frame.width_pt,
+    height_pt: frame.height_pt,
+    height_rule: frame.height_rule,
+    placement: frame.placement,
+    fill_color,
+    borders,
+  }));
 }
 
 fn table_row_grid_properties(properties: Option<&w::TableRowProperties>) -> (usize, usize) {
@@ -3053,7 +3150,9 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
       .filter(|level| *level <= 8);
   }
 
-  if let Some(frame) = properties.frame_properties() {
+  if let Some(frame) = properties.frame_properties()
+    && !matches!(frame.y_align, Some(w::VerticalAlignmentValues::Inline))
+  {
     format.frame = Some(paragraph_frame_properties(frame));
   }
 }
@@ -5153,7 +5252,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     relative_width_pct: anchor
       .wp14_size_rel_h
       .as_ref()
-      .map(|relative| relative.percentage_width as f32 / units::DRAWINGML_PERCENT_SCALE),
+      .and_then(|relative| drawingml_percent_to_ratio(&relative.percentage_width)),
     relative_height_to: anchor
       .wp14_size_rel_v
       .as_ref()
@@ -5161,7 +5260,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     relative_height_pct: anchor
       .wp14_size_rel_v
       .as_ref()
-      .map(|relative| relative.percentage_height as f32 / units::DRAWINGML_PERCENT_SCALE),
+      .and_then(|relative| drawingml_percent_to_ratio(&relative.percentage_height)),
     margin_top_pt: margins.top_pt,
     margin_right_pt: margins.right_pt,
     margin_bottom_pt: margins.bottom_pt,
@@ -5771,8 +5870,65 @@ fn text_box_frame_from_drawingml(
   if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
     apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
   }
+  if let Some(rotation_deg) = drawingml_textbox_text_rotation(xml) {
+    rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
+  }
   apply_drawingml_textbox_layout_adjustments(&mut frame);
   frame
+}
+
+fn drawingml_textbox_text_rotation(xml: &str) -> Option<f32> {
+  let body_pr = first_named_xml_fragment(xml, b"bodyPr")?;
+  let mut reader = Reader::from_str(&body_pr);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"bodyPr") =>
+      {
+        return match attr_value(&event, b"vert").as_deref() {
+          Some("vert") | Some("wordArtVert") | Some("eaVert") => Some(-90.0),
+          Some("vert270") | Some("wordArtVertRtl") => Some(90.0),
+          _ => None,
+        };
+      }
+      Ok(Event::Eof) | Err(_) => return None,
+      _ => {}
+    }
+  }
+}
+
+fn rotate_textbox_blocks(blocks: &mut [Block], rotation_deg: f32) {
+  rotate_blocks_text(blocks, rotation_deg);
+}
+
+fn rotate_blocks_text(blocks: &mut [Block], rotation_deg: f32) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => rotate_paragraph_text(paragraph, rotation_deg),
+      Block::Table(table) => {
+        for row in &mut table.rows {
+          for cell in &mut row.cells {
+            rotate_textbox_blocks(&mut cell.blocks, rotation_deg);
+          }
+        }
+      }
+      Block::Frame(frame) => rotate_textbox_blocks(&mut frame.blocks, rotation_deg),
+    }
+  }
+}
+
+fn rotate_paragraph_text(paragraph: &mut Paragraph, rotation_deg: f32) {
+  for inline in &mut paragraph.inlines {
+    if let InlineItem::Text(run) = inline {
+      run.style.rotation_deg = rotation_deg;
+    }
+  }
+  #[cfg(test)]
+  for run in &mut paragraph.runs {
+    run.style.rotation_deg = rotation_deg;
+  }
+  paragraph.list_label_style.rotation_deg = rotation_deg;
 }
 
 fn apply_drawingml_textbox_layout_adjustments(frame: &mut TextBoxFrameContent) {
@@ -8078,7 +8234,7 @@ fn textbox_blocks_with_base(
         blocks.push(Block::Paragraph(paragraph));
       }
       w::TextBoxContentChoice::WTbl(table) => {
-        let table = table_model(
+        let mut table = table_model(
           table,
           styles,
           &mut numbering,
@@ -8087,12 +8243,34 @@ fn textbox_blocks_with_base(
           &custom_xml_bindings,
           &mut form_widget_ids,
         );
+        clear_shape_text_table_placements(&mut table);
         blocks.push(Block::Table(table));
       }
       _ => {}
     }
   }
   blocks
+}
+
+fn clear_shape_text_table_placements(table: &mut Table) {
+  table.placement = None;
+  for row in &mut table.rows {
+    for cell in &mut row.cells {
+      for block in &mut cell.blocks {
+        match block {
+          Block::Table(table) => clear_shape_text_table_placements(table),
+          Block::Frame(frame) => {
+            for block in &mut frame.blocks {
+              if let Block::Table(table) = block {
+                clear_shape_text_table_placements(table);
+              }
+            }
+          }
+          Block::Paragraph(_) => {}
+        }
+      }
+    }
+  }
 }
 
 fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyle) {
@@ -10951,6 +11129,18 @@ fn measurement_or_percent_to_percent(value: &MeasurementOrPercentValue) -> Optio
       .and_then(|value| value.parse::<f32>().ok())
       .map(|value| value / units::VML_PERCENT_SCALE),
     MeasurementOrPercentValue::UniversalMeasure(_) => None,
+  }
+}
+
+fn drawingml_percent_to_ratio(value: &DecimalNumberOrPercentValue) -> Option<f32> {
+  match value {
+    DecimalNumberOrPercentValue::DecimalNumber(value) => {
+      Some(*value as f32 / units::DRAWINGML_PERCENT_SCALE)
+    }
+    DecimalNumberOrPercentValue::Percent(value) => value
+      .strip_suffix('%')
+      .and_then(|value| value.parse::<f32>().ok())
+      .map(|value| value / units::VML_PERCENT_SCALE),
   }
 }
 

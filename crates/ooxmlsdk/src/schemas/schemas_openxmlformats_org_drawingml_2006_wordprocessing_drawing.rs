@@ -487,7 +487,7 @@ pub enum HorizontalPositionChoice {
   /// Defines the PercentagePositionHeightOffset Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "Int32Value",
+    simple_type = "DecimalNumberOrPercentValue",
     qname = "a:ST_Percentage/wp14:pctPosHOffset"
   ))]
   Wp14PctPosHOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
@@ -506,7 +506,7 @@ pub enum VerticalPositionChoice {
   /// Defines the PercentagePositionVerticalOffset Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "Int32Value",
+    simple_type = "DecimalNumberOrPercentValue",
     qname = "a:ST_Percentage/wp14:pctPosVOffset"
   ))]
   Wp14PctPosVOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),

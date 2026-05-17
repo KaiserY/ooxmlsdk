@@ -37,9 +37,9 @@ pub enum SizeRelativeVerticallyValues {
   OutsideMargin,
 }
 /// Defines the PercentagePositionHeightOffset Class.
-pub type PercentagePositionHeightOffset = crate::simple_type::Int32Value;
+pub type PercentagePositionHeightOffset = crate::simple_type::DecimalNumberOrPercentValue;
 /// Defines the PercentagePositionVerticalOffset Class.
-pub type PercentagePositionVerticalOffset = crate::simple_type::Int32Value;
+pub type PercentagePositionVerticalOffset = crate::simple_type::DecimalNumberOrPercentValue;
 /// Defines the RelativeWidth Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
 #[sdk(office2010, qname = "wp14:CT_SizeRelH/wp14:sizeRelH")]
@@ -51,7 +51,7 @@ pub struct RelativeWidth {
   /// Defines the PercentageWidth Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "Int32Value",
+    simple_type = "DecimalNumberOrPercentValue",
     qname = "a:ST_PositivePercentage/wp14:pctWidth"
   ))]
   pub percentage_width: PercentageWidth,
@@ -67,12 +67,12 @@ pub struct RelativeHeight {
   /// Defines the PercentageHeight Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "Int32Value",
+    simple_type = "DecimalNumberOrPercentValue",
     qname = "a:ST_PositivePercentage/wp14:pctHeight"
   ))]
   pub percentage_height: PercentageHeight,
 }
 /// Defines the PercentageWidth Class.
-pub type PercentageWidth = crate::simple_type::Int32Value;
+pub type PercentageWidth = crate::simple_type::DecimalNumberOrPercentValue;
 /// Defines the PercentageHeight Class.
-pub type PercentageHeight = crate::simple_type::Int32Value;
+pub type PercentageHeight = crate::simple_type::DecimalNumberOrPercentValue;

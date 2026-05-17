@@ -375,25 +375,28 @@ fn named_sequence_write_tokens(field: &NamedSequenceVariantField) -> proc_macro2
         local_name,
       } = parse_qname_info(qname);
       let write_value_tokens = |value_expr: proc_macro2::TokenStream| {
-        let value_write_tokens = if effective_type_name(&inner_ty, simple_type.as_deref())
-          .as_deref()
-          .is_some_and(is_xml_schema_float_type_name)
-        {
-          write_xml_schema_float_effective_tokens(
-            value_expr.clone(),
-            &inner_ty,
-            simple_type.as_deref(),
-            qname,
-          )
-        } else if is_string_like_effective_type(&inner_ty, simple_type.as_deref()) {
-          quote! {
-            crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
-          }
-        } else {
-          quote! {
-            crate::common::write_escaped_text(writer, #value_expr)?;
-          }
-        };
+        let value_write_tokens =
+          if let Some(kind) = simple_union_effective_type_kind(&inner_ty, simple_type.as_deref()) {
+            write_simple_union_value_tokens(kind, value_expr.clone())
+          } else if effective_type_name(&inner_ty, simple_type.as_deref())
+            .as_deref()
+            .is_some_and(is_xml_schema_float_type_name)
+          {
+            write_xml_schema_float_effective_tokens(
+              value_expr.clone(),
+              &inner_ty,
+              simple_type.as_deref(),
+              qname,
+            )
+          } else if is_string_like_effective_type(&inner_ty, simple_type.as_deref()) {
+            quote! {
+              crate::common::write_escaped_str(writer, #value_expr.as_ref())?;
+            }
+          } else {
+            quote! {
+              crate::common::write_escaped_text(writer, #value_expr)?;
+            }
+          };
         quote! {
           crate::common::write_start_tag_open(writer, xmlns_prefix, #tag_prefix, #local_name)?;
           writer.write_all(b">")?;
@@ -974,31 +977,39 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
           format!("{tag_prefix}:{local_name}").as_bytes(),
           Span::call_site(),
         );
-        let parse_from_text_tokens =
-          if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
-            quote! { text.unwrap_or_default() }
-          } else {
-            quote! {{
-              let value = text.unwrap_or_default();
-              crate::common::parse_value::<#payload_ty>(
-                &value,
-                stringify!(#ident),
-                stringify!(#variant_ident),
-              )?
-            }}
-          };
-        let empty_value_tokens =
-          if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
-            quote! { Default::default() }
-          } else {
-            quote! {
-              crate::common::parse_value::<#payload_ty>(
-                "",
-                stringify!(#ident),
-                stringify!(#variant_ident),
-              )?
-            }
-          };
+        let simple_union_kind =
+          simple_union_effective_type_kind(&payload_ty, simple_type.as_deref());
+        let parse_from_text_tokens = if let Some(kind) = simple_union_kind {
+          let parse_tokens = parse_simple_union_value_tokens(kind, quote! { value });
+          quote! {{
+            let value = text.unwrap_or_default();
+            #parse_tokens
+          }}
+        } else if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
+          quote! { text.unwrap_or_default() }
+        } else {
+          quote! {{
+            let value = text.unwrap_or_default();
+            crate::common::parse_value::<#payload_ty>(
+              &value,
+              stringify!(#ident),
+              stringify!(#variant_ident),
+            )?
+          }}
+        };
+        let empty_value_tokens = if let Some(kind) = simple_union_kind {
+          parse_simple_union_value_tokens(kind, quote! { String::new() })
+        } else if is_string_like_effective_type(&payload_ty, simple_type.as_deref()) {
+          quote! { Default::default() }
+        } else {
+          quote! {
+            crate::common::parse_value::<#payload_ty>(
+              "",
+              stringify!(#ident),
+              stringify!(#variant_ident),
+            )?
+          }
+        };
         direct_matcher_arms.push(quote! {
           #(#cfg_attrs)*
           #( #qname_patterns )|* => true,
@@ -1079,7 +1090,11 @@ pub(crate) fn expand_sdk_choice(input: &DeriveInput) -> syn::Result<proc_macro2:
             return Ok(Self::#variant_ident(parsed_child));
           }
         });
-        let value_write_tokens = if effective_type_name(&payload_ty, simple_type.as_deref())
+        let value_write_tokens = if let Some(kind) =
+          simple_union_effective_type_kind(&payload_ty, simple_type.as_deref())
+        {
+          write_simple_union_value_tokens(kind, quote! { value })
+        } else if effective_type_name(&payload_ty, simple_type.as_deref())
           .as_deref()
           .is_some_and(is_xml_schema_float_type_name)
         {

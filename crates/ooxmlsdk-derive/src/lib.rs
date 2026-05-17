@@ -1903,6 +1903,46 @@ fn simple_union_effective_type_kind(
   effective_type_name(ty, simple_type).and_then(|name| simple_union_type_kind_name(name.as_str()))
 }
 
+fn parse_simple_union_value_tokens(
+  kind: SimpleUnionTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::parse_twips_measure_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::parse_signed_twips_measure_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::parse_decimal_number_or_percent_value(#value_expr) }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::parse_measurement_or_percent_value(#value_expr) }
+    }
+  }
+}
+
+fn write_simple_union_value_tokens(
+  kind: SimpleUnionTypeKind,
+  value_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+  match kind {
+    SimpleUnionTypeKind::TwipsMeasure => {
+      quote! { crate::common::write_twips_measure_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::SignedTwipsMeasure => {
+      quote! { crate::common::write_signed_twips_measure_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::DecimalNumberOrPercent => {
+      quote! { crate::common::write_decimal_number_or_percent_value(writer, #value_expr)?; }
+    }
+    SimpleUnionTypeKind::MeasurementOrPercent => {
+      quote! { crate::common::write_measurement_or_percent_value(writer, #value_expr)?; }
+    }
+  }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum IntegerTypeKind {
   U8,

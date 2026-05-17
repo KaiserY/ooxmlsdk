@@ -2020,7 +2020,7 @@ pub struct Tint {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Shade.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2029,7 +2029,7 @@ pub struct Shade {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Alpha.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2038,7 +2038,7 @@ pub struct Alpha {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Alpha Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2047,7 +2047,7 @@ pub struct AlphaOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Alpha Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2056,7 +2056,7 @@ pub struct AlphaModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Hue Modulate.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2065,7 +2065,7 @@ pub struct HueModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Hue.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2090,7 +2090,7 @@ pub struct HueOffset {
 pub struct Saturation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Saturation Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2098,7 +2098,7 @@ pub struct Saturation {
 pub struct SaturationOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Saturation Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2106,7 +2106,7 @@ pub struct SaturationOffset {
 pub struct SaturationModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Luminance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2114,7 +2114,7 @@ pub struct SaturationModulation {
 pub struct Luminance {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Luminance Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2122,7 +2122,7 @@ pub struct Luminance {
 pub struct LuminanceOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Luminance Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2130,7 +2130,7 @@ pub struct LuminanceOffset {
 pub struct LuminanceModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Red.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2138,7 +2138,7 @@ pub struct LuminanceModulation {
 pub struct Red {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Red Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2146,7 +2146,7 @@ pub struct Red {
 pub struct RedOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Red Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2154,7 +2154,7 @@ pub struct RedOffset {
 pub struct RedModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Green.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2162,7 +2162,7 @@ pub struct RedModulation {
 pub struct Green {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Green Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2170,7 +2170,7 @@ pub struct Green {
 pub struct GreenOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Green Modification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2178,7 +2178,7 @@ pub struct GreenOffset {
 pub struct GreenModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Blue.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2186,7 +2186,7 @@ pub struct GreenModulation {
 pub struct Blue {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Blue Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2194,7 +2194,7 @@ pub struct Blue {
 pub struct BlueOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Blue Modification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2202,7 +2202,7 @@ pub struct BlueOffset {
 pub struct BlueModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Extension.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2222,13 +2222,13 @@ pub struct Extension {
 pub struct RgbColorModelPercentage {
   /// Red
   #[sdk(attr(qname = ":r"))]
-  pub red_portion: crate::simple_type::Int32Value,
+  pub red_portion: crate::simple_type::DecimalNumberOrPercentValue,
   /// Green
   #[sdk(attr(qname = ":g"))]
-  pub green_portion: crate::simple_type::Int32Value,
+  pub green_portion: crate::simple_type::DecimalNumberOrPercentValue,
   /// Blue
   #[sdk(attr(qname = ":b"))]
-  pub blue_portion: crate::simple_type::Int32Value,
+  pub blue_portion: crate::simple_type::DecimalNumberOrPercentValue,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
     qname = "a:CT_PositiveFixedPercentage/a:shade",
@@ -2324,10 +2324,10 @@ pub struct HslColor {
   pub hue_value: crate::simple_type::Int32Value,
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
-  pub sat_value: crate::simple_type::Int32Value,
+  pub sat_value: crate::simple_type::DecimalNumberOrPercentValue,
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
-  pub lum_value: crate::simple_type::Int32Value,
+  pub lum_value: crate::simple_type::DecimalNumberOrPercentValue,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
     qname = "a:CT_PositiveFixedPercentage/a:shade",
@@ -2567,10 +2567,10 @@ pub struct Tile {
   pub vertical_offset: Option<crate::simple_type::Int64Value>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::Int32Value>,
+  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::Int32Value>,
+  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Tile Flipping
   #[sdk(attr(qname = ":flip"))]
   #[sdk(string_format(kind = "token"))]
@@ -2778,7 +2778,7 @@ pub struct AlphaBiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub threshold: crate::simple_type::Int32Value,
+  pub threshold: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Alpha Inverse Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2811,7 +2811,7 @@ pub struct AlphaModulationFixed {
   /// Amount
   #[sdk(attr(qname = ":amt"))]
   #[sdk(number_range(range = 0..))]
-  pub amount: Option<crate::simple_type::Int32Value>,
+  pub amount: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Alpha Inset/Outset Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2829,7 +2829,7 @@ pub struct AlphaReplace {
   /// Alpha
   #[sdk(attr(qname = ":a"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub alpha: crate::simple_type::Int32Value,
+  pub alpha: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the BiLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2838,7 +2838,7 @@ pub struct BiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub threshold: crate::simple_type::Int32Value,
+  pub threshold: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Blend Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2973,11 +2973,11 @@ pub struct Hsl {
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub saturation: Option<crate::simple_type::Int32Value>,
+  pub saturation: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub luminance: Option<crate::simple_type::Int32Value>,
+  pub luminance: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Inner Shadow Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3014,11 +3014,11 @@ pub struct LuminanceEffect {
   /// Brightness
   #[sdk(attr(qname = ":bright"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub brightness: Option<crate::simple_type::Int32Value>,
+  pub brightness: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Contrast
   #[sdk(attr(qname = ":contrast"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub contrast: Option<crate::simple_type::Int32Value>,
+  pub contrast: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Outer Shadow Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3040,10 +3040,10 @@ pub struct OuterShadow {
   pub direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Scaling Factor
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::Int32Value>,
+  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Vertical Scaling Factor
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::Int32Value>,
+  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3122,19 +3122,19 @@ pub struct Reflection {
   /// Start Opacity
   #[sdk(attr(qname = ":stA"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub start_opacity: Option<crate::simple_type::Int32Value>,
+  pub start_opacity: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Start Position
   #[sdk(attr(qname = ":stPos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub start_position: Option<crate::simple_type::Int32Value>,
+  pub start_position: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// End Alpha
   #[sdk(attr(qname = ":endA"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub end_alpha: Option<crate::simple_type::Int32Value>,
+  pub end_alpha: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// End Position
   #[sdk(attr(qname = ":endPos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub end_position: Option<crate::simple_type::Int32Value>,
+  pub end_position: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
   #[sdk(number_range(range = 0..= 2147483647))]
@@ -3149,10 +3149,10 @@ pub struct Reflection {
   pub fade_direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::Int32Value>,
+  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::Int32Value>,
+  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3189,10 +3189,10 @@ pub struct Reflection {
 pub struct RelativeOffset {
   /// Offset X
   #[sdk(attr(qname = ":tx"))]
-  pub offset_x: Option<crate::simple_type::Int32Value>,
+  pub offset_x: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Offset Y
   #[sdk(attr(qname = ":ty"))]
-  pub offset_y: Option<crate::simple_type::Int32Value>,
+  pub offset_y: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Soft Edge Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3214,7 +3214,7 @@ pub struct TintEffect {
   /// Amount
   #[sdk(attr(qname = ":amt"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub amount: Option<crate::simple_type::Int32Value>,
+  pub amount: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Transform Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3222,10 +3222,10 @@ pub struct TintEffect {
 pub struct TransformEffect {
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::Int32Value>,
+  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::Int32Value>,
+  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3342,7 +3342,7 @@ pub struct Miter {
   /// Miter Join Limit
   #[sdk(attr(qname = ":lim"))]
   #[sdk(number_range(range = 0..))]
-  pub limit: Option<crate::simple_type::Int32Value>,
+  pub limit: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Preset Dash.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3529,11 +3529,11 @@ pub struct NormalAutoFit {
   /// Font Scale
   #[sdk(attr(qname = ":fontScale"))]
   #[sdk(number_range(range = 1000..= 100000))]
-  pub font_scale: Option<crate::simple_type::Int32Value>,
+  pub font_scale: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Line Space Reduction
   #[sdk(attr(qname = ":lnSpcReduction"))]
   #[sdk(number_range(range = 0..= 13200000))]
-  pub line_space_reduction: Option<crate::simple_type::Int32Value>,
+  pub line_space_reduction: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Shape AutoFit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5368,7 +5368,7 @@ pub struct Camera {
   /// Zoom
   #[sdk(attr(qname = ":zoom"))]
   #[sdk(number_range(range = 0..))]
-  pub zoom: Option<crate::simple_type::Int32Value>,
+  pub zoom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
   pub rotation: Option<Rotation>,
@@ -5514,16 +5514,16 @@ pub struct Bevel {
 pub struct FillToRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::Int32Value>,
+  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::Int32Value>,
+  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::Int32Value>,
+  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
+  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Tile Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5531,16 +5531,16 @@ pub struct FillToRectangle {
 pub struct TileRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::Int32Value>,
+  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::Int32Value>,
+  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::Int32Value>,
+  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
+  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Fill Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5548,16 +5548,16 @@ pub struct TileRectangle {
 pub struct FillRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::Int32Value>,
+  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::Int32Value>,
+  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::Int32Value>,
+  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
+  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Source Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5565,16 +5565,16 @@ pub struct FillRectangle {
 pub struct SourceRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::Int32Value>,
+  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::Int32Value>,
+  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::Int32Value>,
+  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::Int32Value>,
+  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
 }
 /// Gradient stops.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5585,7 +5585,7 @@ pub struct GradientStop {
   /// Position
   #[sdk(attr(qname = ":pos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub position: crate::simple_type::Int32Value,
+  pub position: crate::simple_type::DecimalNumberOrPercentValue,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -6006,11 +6006,11 @@ pub struct DashStop {
   /// Dash Length
   #[sdk(attr(qname = ":d"))]
   #[sdk(number_range(range = 0..))]
-  pub dash_length: crate::simple_type::Int32Value,
+  pub dash_length: crate::simple_type::DecimalNumberOrPercentValue,
   /// Space Length
   #[sdk(attr(qname = ":sp"))]
   #[sdk(number_range(range = 0..))]
-  pub space_length: crate::simple_type::Int32Value,
+  pub space_length: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// 2D Transform for Grouped Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -7979,7 +7979,7 @@ pub struct EndParagraphRunProperties {
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::Int32Value>,
+  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8102,7 +8102,7 @@ pub struct RunProperties {
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::Int32Value>,
+  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8225,7 +8225,7 @@ pub struct DefaultRunProperties {
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::Int32Value>,
+  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8338,7 +8338,7 @@ pub struct SpacingPercent {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 13200000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Spacing Points.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

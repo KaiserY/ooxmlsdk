@@ -96,10 +96,6 @@ fn assert_doc_sample_invalid(file_name: &str) {
   assert_package_file_invalid(&test_file_path(file_name), file_name);
 }
 
-fn assert_test_data_invalid(file_name: &str) {
-  assert_package_file_invalid(&workspace_file_path(file_name), file_name);
-}
-
 fn assert_package_file_invalid(path: &Path, file_name: &str) {
   let kind = doc_sample_kind(file_name);
 

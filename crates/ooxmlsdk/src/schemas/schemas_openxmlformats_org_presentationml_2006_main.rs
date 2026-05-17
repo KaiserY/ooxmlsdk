@@ -1002,7 +1002,7 @@ pub struct Presentation {
   pub xml_other_attrs: Vec<(std::boxed::Box<str>, std::boxed::Box<str>)>,
   /// serverZoom
   #[sdk(attr(qname = ":serverZoom"))]
-  pub server_zoom: Option<crate::simple_type::Int32Value>,
+  pub server_zoom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// firstSlideNum
   #[sdk(attr(qname = ":firstSlideNum"))]
   pub first_slide_num: Option<crate::simple_type::Int32Value>,
@@ -1436,7 +1436,7 @@ pub struct TimePercentage {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Target Element Trigger Choice.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -1834,15 +1834,15 @@ pub struct CommonTimeNode {
   pub repeat_duration: Option<crate::simple_type::StringValue>,
   /// spd
   #[sdk(attr(qname = ":spd"))]
-  pub speed: Option<crate::simple_type::Int32Value>,
+  pub speed: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// accel
   #[sdk(attr(qname = ":accel"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub acceleration: Option<crate::simple_type::Int32Value>,
+  pub acceleration: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// decel
   #[sdk(attr(qname = ":decel"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub deceleration: Option<crate::simple_type::Int32Value>,
+  pub deceleration: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// autoRev
   #[sdk(attr(qname = ":autoRev"))]
   pub auto_reverse: Option<crate::simple_type::BooleanValue>,
@@ -2055,15 +2055,15 @@ pub struct RgbColor {
   /// Red
   #[sdk(attr(qname = ":r"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub red: crate::simple_type::Int32Value,
+  pub red: crate::simple_type::DecimalNumberOrPercentValue,
   /// Green
   #[sdk(attr(qname = ":g"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub green: crate::simple_type::Int32Value,
+  pub green: crate::simple_type::DecimalNumberOrPercentValue,
   /// Blue
   #[sdk(attr(qname = ":b"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub blue: crate::simple_type::Int32Value,
+  pub blue: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// HSL.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2075,11 +2075,11 @@ pub struct HslColor {
   /// Saturation
   #[sdk(attr(qname = ":s"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub saturation: crate::simple_type::Int32Value,
+  pub saturation: crate::simple_type::DecimalNumberOrPercentValue,
   /// Lightness
   #[sdk(attr(qname = ":l"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub lightness: crate::simple_type::Int32Value,
+  pub lightness: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the CommonBehavior Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2168,7 +2168,7 @@ pub struct CommonMediaNode {
   /// Volume
   #[sdk(attr(qname = ":vol"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub volume: Option<crate::simple_type::Int32Value>,
+  pub volume: Option<crate::simple_type::DecimalNumberOrPercentValue>,
   /// Mute
   #[sdk(attr(qname = ":mute"))]
   pub mute: Option<crate::simple_type::BooleanValue>,
@@ -3266,7 +3266,7 @@ pub struct RestoredLeft {
   /// Normal View Dimension Size
   #[sdk(attr(qname = ":sz"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub size: crate::simple_type::Int32Value,
+  pub size: crate::simple_type::DecimalNumberOrPercentValue,
   /// Auto Adjust Normal View
   #[sdk(attr(qname = ":autoAdjust"))]
   pub auto_adjust: Option<crate::simple_type::BooleanValue>,
@@ -3278,7 +3278,7 @@ pub struct RestoredTop {
   /// Normal View Dimension Size
   #[sdk(attr(qname = ":sz"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub size: crate::simple_type::Int32Value,
+  pub size: crate::simple_type::DecimalNumberOrPercentValue,
   /// Auto Adjust Normal View
   #[sdk(attr(qname = ":autoAdjust"))]
   pub auto_adjust: Option<crate::simple_type::BooleanValue>,
@@ -4151,10 +4151,10 @@ pub struct TimeAnimateValueList {
 pub struct ByPosition {
   /// X coordinate
   #[sdk(attr(qname = ":x"))]
-  pub x: crate::simple_type::Int32Value,
+  pub x: crate::simple_type::DecimalNumberOrPercentValue,
   /// Y coordinate
   #[sdk(attr(qname = ":y"))]
-  pub y: crate::simple_type::Int32Value,
+  pub y: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the FromPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4162,10 +4162,10 @@ pub struct ByPosition {
 pub struct FromPosition {
   /// X coordinate
   #[sdk(attr(qname = ":x"))]
-  pub x: crate::simple_type::Int32Value,
+  pub x: crate::simple_type::DecimalNumberOrPercentValue,
   /// Y coordinate
   #[sdk(attr(qname = ":y"))]
-  pub y: crate::simple_type::Int32Value,
+  pub y: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the ToPosition Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4173,10 +4173,10 @@ pub struct FromPosition {
 pub struct ToPosition {
   /// X coordinate
   #[sdk(attr(qname = ":x"))]
-  pub x: crate::simple_type::Int32Value,
+  pub x: crate::simple_type::DecimalNumberOrPercentValue,
   /// Y coordinate
   #[sdk(attr(qname = ":y"))]
-  pub y: crate::simple_type::Int32Value,
+  pub y: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the RotationCenter Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4184,10 +4184,10 @@ pub struct ToPosition {
 pub struct RotationCenter {
   /// X coordinate
   #[sdk(attr(qname = ":x"))]
-  pub x: crate::simple_type::Int32Value,
+  pub x: crate::simple_type::DecimalNumberOrPercentValue,
   /// Y coordinate
   #[sdk(attr(qname = ":y"))]
-  pub y: crate::simple_type::Int32Value,
+  pub y: crate::simple_type::DecimalNumberOrPercentValue,
 }
 /// Defines the CommentAuthorExtensionList Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

@@ -549,6 +549,12 @@ fn xsd_measure_value_type(type_name: &str) -> Option<&'static str> {
   match xsd_type_local_name(type_name) {
     "ST_TwipsMeasure" => Some("TwipsMeasureValue"),
     "ST_SignedTwipsMeasure" => Some("SignedTwipsMeasureValue"),
+    "ST_Percentage" => Some("DecimalNumberOrPercentValue"),
+    "ST_PositivePercentage" => Some("DecimalNumberOrPercentValue"),
+    "ST_FixedPercentage" => Some("DecimalNumberOrPercentValue"),
+    "ST_PositiveFixedPercentage" => Some("DecimalNumberOrPercentValue"),
+    "ST_TextFontScalePercentOrPercentString" => Some("DecimalNumberOrPercentValue"),
+    "ST_TextSpacingPercentOrPercentString" => Some("DecimalNumberOrPercentValue"),
     "ST_DecimalNumberOrPercent" => Some("DecimalNumberOrPercentValue"),
     "ST_MeasurementOrPercent" => Some("MeasurementOrPercentValue"),
     "ST_UniversalMeasure" => Some("UniversalMeasureValue"),
@@ -2631,6 +2637,33 @@ mod tests {
         .r#type,
       "TwipsMeasureValue"
     );
+
+    let drawing_schema = schemas
+      .iter()
+      .find(|schema| schema.module_name == "schemas_openxmlformats_org_drawingml_2006_main")
+      .expect("drawing schema");
+    for (class_name, property_name) in [
+      ("GradientStop", "Position"),
+      ("RelativeRectangleType", "Left"),
+      ("NormalAutoFit", "FontScale"),
+      ("NormalAutoFit", "LineSpaceReduction"),
+      ("SpacingPercent", "Val"),
+    ] {
+      let schema_type = drawing_schema
+        .types
+        .iter()
+        .find(|schema_type| schema_type.class_name == class_name)
+        .unwrap_or_else(|| panic!("missing drawing type {class_name}"));
+      let attr = schema_type
+        .attributes
+        .iter()
+        .find(|attr| attr.property_name == property_name)
+        .unwrap_or_else(|| panic!("missing drawing attr {class_name}.{property_name}"));
+      assert_eq!(
+        attr.r#type, "DecimalNumberOrPercentValue",
+        "{class_name}.{property_name}"
+      );
+    }
   }
 
   #[test]

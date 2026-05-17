@@ -58,7 +58,6 @@ fn write_typed_child_tokens(
   let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   quote! {
-    crate::common::write_start_tag_open_bytes(writer, xmlns_prefix, #tag_prefix_lit, #local_name_lit)?;
     <#child_ty as crate::sdk::SdkType>::write_inner(
       #value,
       writer,

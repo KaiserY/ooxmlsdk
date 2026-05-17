@@ -139,7 +139,6 @@ fn write_typed_child_tokens(
   let tag_prefix_lit = LitByteStr::new(tag_prefix.as_bytes(), Span::call_site());
   let local_name_lit = LitByteStr::new(local_name.as_bytes(), Span::call_site());
   quote! {
-    crate::common::write_start_tag_open_bytes(writer, xmlns_prefix, #tag_prefix_lit, #local_name_lit)?;
     <#child_ty as crate::sdk::SdkType>::write_inner(
       #value,
       writer,
@@ -461,7 +460,6 @@ fn expand_tuple_wrapper(
       }
 
       pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), std::io::Error> {
-        crate::common::write_start_tag_open_bytes(writer, "", #tag_prefix_lit, #local_name_lit)?;
         <Self as crate::sdk::SdkType>::write_inner(
           self,
           writer,
@@ -6508,6 +6506,17 @@ fn expand_named_struct(
     || !any_fields.is_empty()
     || has_xml_other_children_field
     || text_field.is_some();
+  let body_write_tokens = if has_body {
+    quote! {
+      writer.write_all(b">")?;
+      #( #ordered_write_tokens )*
+      crate::common::write_end_tag_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
+    }
+  } else {
+    quote! {
+      writer.write_all(b" />")?;
+    }
+  };
   let mce_child_process_tokens = child_fields
     .iter()
     .map(mce_process_child_field_tokens)
@@ -6555,12 +6564,6 @@ fn expand_named_struct(
         writer: &mut W,
       ) -> Result<(), std::io::Error> {
         #xml_header_tokens
-        crate::common::write_start_tag_open_bytes(
-          writer,
-          #to_xml_prefix_tokens,
-          #tag_prefix_lit,
-          #local_name_lit,
-        )?;
         <Self as crate::sdk::SdkType>::write_inner(
           self,
           writer,
@@ -6617,16 +6620,11 @@ fn expand_named_struct(
         xmlns_prefix: &str,
         name: crate::sdk::ElementName,
       ) -> Result<(), std::io::Error> {
+        crate::common::write_start_tag_open_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
         #special_namespace_write_tokens
         #( #attr_write_tokens )*
         #xml_other_attrs_write_tokens
-        if #has_body {
-          writer.write_all(b">")?;
-          #( #ordered_write_tokens )*
-          crate::common::write_end_tag_bytes(writer, xmlns_prefix, name.prefix, name.local)?;
-        } else {
-          writer.write_all(b" />")?;
-        }
+        #body_write_tokens
         Ok(())
       }
 

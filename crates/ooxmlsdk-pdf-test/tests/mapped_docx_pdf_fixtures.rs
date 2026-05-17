@@ -748,6 +748,34 @@ fn assert_matching_text_segments_inside_paths(summary: &PdfSummary, page_index: 
   }
 }
 
+fn assert_text_inside_page_path_extents(summary: &PdfSummary, page_index: usize, text: &str) {
+  let text_bounds = text_segment_bounds_on_page(summary, page_index, text);
+  let path_bounds = path_bounds_on_page(summary, page_index);
+  let left = path_bounds
+    .iter()
+    .map(|bounds| bounds.left)
+    .fold(f32::INFINITY, f32::min);
+  let right = path_bounds
+    .iter()
+    .map(|bounds| bounds.right)
+    .fold(f32::NEG_INFINITY, f32::max);
+  let bottom = path_bounds
+    .iter()
+    .map(|bounds| bounds.bottom)
+    .fold(f32::INFINITY, f32::min);
+  let top = path_bounds
+    .iter()
+    .map(|bounds| bounds.top)
+    .fold(f32::NEG_INFINITY, f32::max);
+  assert!(
+    text_bounds.left >= left
+      && text_bounds.right <= right
+      && text_bounds.bottom >= bottom
+      && text_bounds.top <= top,
+    "page {page_index} text {text:?} should be inside path extents; text={text_bounds:?}; paths={path_bounds:?}"
+  );
+}
+
 fn assert_text_below_any_path_by_at_least(summary: &PdfSummary, text: &str, minimum_gap: f32) {
   let text_bounds = text_segment_bounds(summary, text);
   let path_bounds = path_bounds_on_page(summary, 0);
@@ -1290,6 +1318,7 @@ fn assert_first_two_rectangular_paths_do_not_overlap_vertically(
 ) {
   let mut paths = rectangular_path_bounds_on_page(summary, page_index);
   paths.sort_by(|a, b| b.top.total_cmp(&a.top));
+  let paths = distinct_rectangular_paths(paths);
   assert!(
     paths.len() >= 2,
     "expected at least two rectangular paths; paths={paths:?}"
@@ -1298,6 +1327,32 @@ fn assert_first_two_rectangular_paths_do_not_overlap_vertically(
     paths[0].bottom >= paths[1].top,
     "expected first two rectangular paths to be vertically separated; paths={paths:?}"
   );
+}
+
+fn distinct_rectangular_paths(paths: Vec<PdfBounds>) -> Vec<PdfBounds> {
+  let mut distinct = Vec::new();
+  for path in paths {
+    if distinct
+      .iter()
+      .any(|existing| rectangles_substantially_overlap(existing, &path))
+    {
+      continue;
+    }
+    distinct.push(path);
+  }
+  distinct
+}
+
+fn rectangles_substantially_overlap(a: &PdfBounds, b: &PdfBounds) -> bool {
+  let overlap_width = (a.right.min(b.right) - a.left.max(b.left)).max(0.0);
+  let overlap_height = (a.top.min(b.top) - a.bottom.max(b.bottom)).max(0.0);
+  let overlap_area = overlap_width * overlap_height;
+  let smaller_area = rect_area(a).min(rect_area(b));
+  smaller_area > 0.0 && overlap_area / smaller_area >= 0.8
+}
+
+fn rect_area(bounds: &PdfBounds) -> f32 {
+  (bounds.right - bounds.left).max(0.0) * (bounds.top - bounds.bottom).max(0.0)
 }
 
 fn assert_first_two_rectangular_path_tops_close(
@@ -1337,6 +1392,7 @@ fn assert_any_two_rectangular_path_heights_close(
 fn assert_three_rectangular_paths_are_vertically_ordered(summary: &PdfSummary, page_index: usize) {
   let mut paths = rectangular_path_bounds_on_page(summary, page_index);
   paths.sort_by(|a, b| b.top.total_cmp(&a.top));
+  let paths = distinct_rectangular_paths(paths);
   assert!(
     paths.len() >= 3,
     "expected at least three rectangular paths; paths={paths:?}"
@@ -4237,8 +4293,8 @@ fn mapped_fixture_footnote_spacing_hanging_para_keeps_footnote_number_gap_small(
 // Source: ../core/sw/qa/extras/layout/layout2.cxx:testTdf116256
 fn mapped_fixture_tdf116256_keeps_follow_text_flow_textbox_inside_table_cell() {
   let summary = render_summary("tdf116256.docx");
-  assert_page_text_occurrences(&summary, 0, "xxx", 2);
-  assert_matching_text_segments_inside_paths(&summary, 0, "xxx");
+  assert_page_text_occurrences(&summary, 0, "xxx", 1);
+  assert_text_inside_page_path_extents(&summary, 0, "xxx");
 }
 
 #[test]

@@ -4768,7 +4768,7 @@ fn drawingml_textbox_frames_from_xml(
             .unwrap_or(transform);
           frames.extend(drawingml_textbox_frames_from_xml(
             &fragment,
-            placement,
+            drawingml_group_child_placement(placement),
             child_transform,
             context.clone(),
             true,
@@ -4830,7 +4830,8 @@ fn drawingml_textbox_frame_from_fragment(
   let auto_fit = drawingml_textbox_uses_auto_fit(xml);
   let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
   let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit);
-  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
+    drawingml_shape_geometry_with_transform(xml, transform)?;
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
   let width_pt = if expands_auto_fit {
@@ -5283,6 +5284,7 @@ struct DrawingMlGroupTransform {
   scale_y: f32,
   translate_x_pt: f32,
   translate_y_pt: f32,
+  raw_coordinates: bool,
 }
 
 impl DrawingMlGroupTransform {
@@ -5292,27 +5294,33 @@ impl DrawingMlGroupTransform {
       scale_y: 1.0,
       translate_x_pt: 0.0,
       translate_y_pt: 0.0,
+      raw_coordinates: false,
     }
   }
 
   fn child(self, xfrm: DrawingMlGroupXfrm) -> Self {
-    let scale_x = if xfrm.child_width_pt != 0.0 {
-      xfrm.width_pt / xfrm.child_width_pt
+    let scale_x = if xfrm.child_width != 0.0 {
+      xfrm.width_pt / xfrm.child_width
     } else {
       1.0
     };
-    let scale_y = if xfrm.child_height_pt != 0.0 {
-      xfrm.height_pt / xfrm.child_height_pt
+    let scale_y = if xfrm.child_height != 0.0 {
+      xfrm.height_pt / xfrm.child_height
     } else {
       1.0
     };
+    let (offset_x_pt, offset_y_pt, _, _) = self.rect(
+      xfrm.offset_x_pt,
+      xfrm.offset_y_pt,
+      xfrm.width_pt,
+      xfrm.height_pt,
+    );
     Self {
       scale_x: self.scale_x * scale_x,
       scale_y: self.scale_y * scale_y,
-      translate_x_pt: self.translate_x_pt
-        + self.scale_x * (xfrm.offset_x_pt - xfrm.child_offset_x_pt * scale_x),
-      translate_y_pt: self.translate_y_pt
-        + self.scale_y * (xfrm.offset_y_pt - xfrm.child_offset_y_pt * scale_y),
+      translate_x_pt: offset_x_pt - self.scale_x * xfrm.child_offset_x * scale_x,
+      translate_y_pt: offset_y_pt - self.scale_y * xfrm.child_offset_y * scale_y,
+      raw_coordinates: true,
     }
   }
 
@@ -5332,10 +5340,10 @@ struct DrawingMlGroupXfrm {
   offset_y_pt: f32,
   width_pt: f32,
   height_pt: f32,
-  child_offset_x_pt: f32,
-  child_offset_y_pt: f32,
-  child_width_pt: f32,
-  child_height_pt: f32,
+  child_offset_x: f32,
+  child_offset_y: f32,
+  child_width: f32,
+  child_height: f32,
 }
 
 fn drawingml_shapes_from_xml(
@@ -5367,7 +5375,7 @@ fn drawingml_shapes_from_xml(
             .unwrap_or(transform);
           shapes.extend(drawingml_shapes_from_xml(
             &fragment,
-            placement,
+            drawingml_group_child_placement(placement),
             child_transform,
             styles,
             images,
@@ -5416,6 +5424,19 @@ fn drawingml_shapes_from_xml(
   shapes
 }
 
+fn drawingml_group_child_placement(placement: ImagePlacement) -> ImagePlacement {
+  match placement {
+    ImagePlacement::Floating(mut placement) => {
+      placement.relative_width_to = None;
+      placement.relative_width_pct = None;
+      placement.relative_height_to = None;
+      placement.relative_height_pct = None;
+      ImagePlacement::Floating(placement)
+    }
+    ImagePlacement::Inline => ImagePlacement::Inline,
+  }
+}
+
 fn drawing_is_hidden(drawing: &w::Drawing) -> bool {
   match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::WpInline(inline)) => inline
@@ -5457,7 +5478,7 @@ fn drawingml_shape_from_fragment(
 
   let geometry = drawingml_shape_geometry_kind(&sp_pr);
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    drawingml_geometry_from_sp_pr(&sp_pr, &geometry)?;
+    drawingml_geometry_from_sp_pr(&sp_pr, &geometry, transform.raw_coordinates)?;
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
@@ -5480,9 +5501,22 @@ fn drawingml_shape_from_fragment(
   })
 }
 
+#[cfg(test)]
 fn drawingml_shape_geometry(xml: &str) -> Option<(f32, f32, f32, f32)> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr))
+  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr), false)
+}
+
+fn drawingml_shape_geometry_with_transform(
+  xml: &str,
+  transform: DrawingMlGroupTransform,
+) -> Option<(f32, f32, f32, f32)> {
+  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
+  drawingml_geometry_from_sp_pr(
+    &sp_pr,
+    &drawingml_shape_geometry_kind(&sp_pr),
+    transform.raw_coordinates,
+  )
 }
 
 fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXfrm> {
@@ -5515,24 +5549,20 @@ fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXf
           .unwrap_or(group.height_pt);
       }
       Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chOff") => {
-        group.child_offset_x_pt = attr_value(&event, b"x")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.child_offset_x_pt);
-        group.child_offset_y_pt = attr_value(&event, b"y")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.child_offset_y_pt);
+        group.child_offset_x = attr_value(&event, b"x")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(group.child_offset_x);
+        group.child_offset_y = attr_value(&event, b"y")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(group.child_offset_y);
       }
       Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"chExt") => {
-        group.child_width_pt = attr_value(&event, b"cx")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.child_width_pt);
-        group.child_height_pt = attr_value(&event, b"cy")
-          .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
-          .unwrap_or(group.child_height_pt);
+        group.child_width = attr_value(&event, b"cx")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(group.child_width);
+        group.child_height = attr_value(&event, b"cy")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(group.child_height);
       }
       Event::Eof => return Some(group),
       _ => {}
@@ -5565,6 +5595,7 @@ fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
 fn drawingml_geometry_from_sp_pr(
   sp_pr: &str,
   geometry: &InlineShapeGeometry,
+  raw_coordinates: bool,
 ) -> Option<(f32, f32, f32, f32)> {
   let mut reader = Reader::from_str(sp_pr);
   reader.config_mut().trim_text(false);
@@ -5578,21 +5609,21 @@ fn drawingml_geometry_from_sp_pr(
       Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"off") => {
         offset_x_pt = attr_value(&event, b"x")
           .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
+          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
           .unwrap_or(offset_x_pt);
         offset_y_pt = attr_value(&event, b"y")
           .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
+          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
           .unwrap_or(offset_y_pt);
       }
       Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
         width_pt = attr_value(&event, b"cx")
           .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
+          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
           .unwrap_or(width_pt);
         height_pt = attr_value(&event, b"cy")
           .and_then(|value| value.parse::<i64>().ok())
-          .map(units::emu_to_points)
+          .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
           .unwrap_or(height_pt);
       }
       Ok(Event::Eof) | Err(_) => break,
@@ -5611,12 +5642,21 @@ fn drawingml_geometry_from_sp_pr(
   Some((offset_x_pt, offset_y_pt, width_pt, height_pt))
 }
 
+fn drawingml_coordinate_to_points(value: i64, raw_coordinates: bool) -> f32 {
+  if raw_coordinates {
+    value as f32
+  } else {
+    units::emu_to_points(value)
+  }
+}
+
 fn drawingml_picture_frame_from_fragment(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
 ) -> Option<InlineShape> {
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    drawingml_shape_geometry_with_transform(xml, transform)?;
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
@@ -5651,7 +5691,8 @@ fn drawingml_picture_image_from_fragment(
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &properties);
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_shape_geometry(xml)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
+    drawingml_shape_geometry_with_transform(xml, transform)?;
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
   let hyperlink_url = properties
@@ -10583,6 +10624,46 @@ mod tests {
     );
 
     assert!(inline_text(&inlines).contains("Text inside VML box"));
+  }
+
+  #[test]
+  fn drawingml_wpg_group_maps_child_coordinates_to_points() {
+    let xml = r#"
+      <wpg:wgp xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+               xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <wpg:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/>
+            <a:ext cx="6994525" cy="4023360"/>
+            <a:chOff x="613" y="8712"/>
+            <a:chExt cx="11015" cy="6336"/>
+          </a:xfrm>
+        </wpg:grpSpPr>
+        <wps:wsp>
+          <wps:spPr><a:xfrm><a:off x="4897" y="8714"/><a:ext cx="6731" cy="6334"/></a:xfrm></wps:spPr>
+          <wps:txbx><w:txbxContent><w:p><w:r><w:t>Right</w:t></w:r></w:p></w:txbxContent></wps:txbx>
+        </wps:wsp>
+      </wpg:wgp>
+    "#;
+
+    let frames = drawingml_textbox_frames_from_xml(
+      xml,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      DrawingTextBoxImportContext {
+        base_style: TextStyle::default(),
+        styles: &StylesCatalog::default(),
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+      },
+      false,
+    );
+
+    assert_eq!(frames.len(), 1);
+    assert!((frames[0].offset_x_pt - 214.2).abs() < 0.5);
+    assert!((frames[0].width_pt - 336.4).abs() < 0.5);
   }
 
   #[test]

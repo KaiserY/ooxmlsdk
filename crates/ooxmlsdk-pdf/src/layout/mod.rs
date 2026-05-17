@@ -5103,7 +5103,7 @@ fn layout_shape_text_box(
     content_width,
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
-    text_segmentation: TextSegmentation::DrawingLayer,
+    text_segmentation: TextSegmentation::TableCell,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
   let content_height = shape
@@ -5232,6 +5232,21 @@ fn floating_image_position(
   image_width: f32,
   image_height: f32,
 ) -> (f32, f32) {
+  if placement.layout_in_cell && flow.text_segmentation == TextSegmentation::TableCell {
+    return (
+      flow.content_left_pt
+        + aligned_horizontal_offset(
+          placement.horizontal_alignment,
+          flow.content_width,
+          image_width,
+        )
+        + placement.horizontal_offset_pt,
+      current_y
+        + aligned_vertical_offset(placement.vertical_alignment, 0.0, image_height)
+        + placement.vertical_offset_pt,
+    );
+  }
+
   let horizontal_reference = effective_horizontal_reference(placement);
   let vertical_reference = effective_vertical_reference(placement);
   let (base_x, reference_width) = match horizontal_reference {

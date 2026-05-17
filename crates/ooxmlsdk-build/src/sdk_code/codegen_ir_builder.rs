@@ -267,6 +267,9 @@ fn safe_anonymous_choice_wrapper_inline_candidate(
   {
     return None;
   }
+  if generic_choice_members_have_overlapping_start_qnames(parent_members) {
+    return None;
+  }
 
   let payload_members = choice_members_by_name.get(parent_variant.payload.rust_type.as_str())?;
   let payload_variants = inlineable_anonymous_choice_wrapper_payload_variants(payload_members)?;
@@ -338,6 +341,31 @@ fn is_generic_choice_variant_name(rust_name: &str) -> bool {
       .is_some_and(|suffix| !suffix.is_empty() && suffix.chars().all(|ch| ch.is_ascii_digit()))
 }
 
+fn generic_choice_members_have_overlapping_start_qnames(members: &[MemberDecl]) -> bool {
+  let mut generic_choice_count = 0usize;
+  let mut seen = std::collections::HashSet::<String>::new();
+  let mut has_overlap = false;
+
+  for member in members {
+    let MemberDecl::Variant(variant) = member else {
+      continue;
+    };
+    if !is_generic_choice_variant_name(variant.rust_name.as_str()) {
+      continue;
+    }
+    generic_choice_count += 1;
+    if let Some(qnames) = variant_start_qnames(variant) {
+      for qname in qnames {
+        if !seen.insert(qname.clone()) {
+          has_overlap = true;
+        }
+      }
+    }
+  }
+
+  generic_choice_count > 1 && has_overlap
+}
+
 fn inlineable_anonymous_choice_wrapper_payload_variants(
   members: &[MemberDecl],
 ) -> Option<Vec<&VariantDecl>> {
@@ -377,6 +405,9 @@ fn safe_pure_child_choice_inline_candidate(
   };
   if parent_variant.payload.module_path.is_some() || parent_variant.payload.rust_type == parent_name
   {
+    return None;
+  }
+  if generic_choice_members_have_overlapping_start_qnames(parent_members) {
     return None;
   }
 
@@ -1446,10 +1477,21 @@ fn build_recursive_choice_enum_decl(
   let mut members = Vec::new();
   let mut used_leaf_names = std::collections::HashSet::new();
   let mut used_variant_names = std::collections::HashSet::new();
+  let direct_choice_branches = choice_child
+    .children
+    .iter()
+    .filter(|child| {
+      child.kind == SchemaTypeChildKind::Choice
+        && is_generic_choice_wrapper_name(child.property_name.as_str())
+    })
+    .collect::<Vec<_>>();
+  let preserve_choice_branches = direct_choice_branches.len() > 1
+    && choice_branches_have_overlapping_leaf_qnames(&direct_choice_branches);
 
   for (index, child) in choice_child.children.iter().enumerate() {
     let mut candidate_leafs = Vec::new();
-    if collect_flattenable_recursive_choice_leafs(child, &mut candidate_leafs)
+    if !(preserve_choice_branches && child.kind == SchemaTypeChildKind::Choice)
+      && collect_flattenable_recursive_choice_leafs(child, &mut candidate_leafs)
       && recursive_choice_leaf_names_are_unique(&candidate_leafs, &used_leaf_names)
       && recursive_choice_variant_names_are_unique(&candidate_leafs, &used_variant_names)
     {
@@ -1514,6 +1556,18 @@ fn collect_flattenable_recursive_choice_leafs<'a>(
   }
 
   !child.children.is_empty()
+}
+
+fn choice_branches_have_overlapping_leaf_qnames(branches: &[&SchemaTypeChild]) -> bool {
+  let mut seen = std::collections::HashSet::<String>::new();
+  for branch in branches {
+    for qname in collect_choice_leaf_qnames(branch) {
+      if !seen.insert(qname) {
+        return true;
+      }
+    }
+  }
+  false
 }
 
 fn is_flattenable_recursive_choice_wrapper(child: &SchemaTypeChild) -> bool {
@@ -4366,6 +4420,116 @@ mod tests {
       .filter_map(member_variant_name)
       .collect::<Vec<_>>();
     assert_eq!(variant_names, vec!["TFirst", "Choice2"]);
+  }
+
+  #[test]
+  fn preserves_overlapping_sibling_choice_group_branches_as_numbered_variants() {
+    let schema = Schema {
+      module_name: "test_module".to_string(),
+      target_namespace: "urn:test".to_string(),
+      prefix: "t".to_string(),
+      typed_namespace: "Test.Namespace".to_string(),
+      types: vec![
+        SchemaType {
+          name: "t:CT_A/t:a".to_string(),
+          class_name: "A".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_B/t:b".to_string(),
+          class_name: "B".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_D/t:d".to_string(),
+          class_name: "D".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Leaf,
+          ..Default::default()
+        },
+        SchemaType {
+          name: "t:CT_Holder/t:holder".to_string(),
+          class_name: "Holder".to_string(),
+          kind: crate::sdk_data::sdk_data_model::SchemaTypeKind::Composite,
+          composite_kind: SchemaTypeCompositeKind::OneSequence,
+          children: vec![SchemaTypeChild {
+            kind: SchemaTypeChildKind::Choice,
+            repeated: true,
+            children: vec![
+              SchemaTypeChild {
+                kind: SchemaTypeChildKind::Choice,
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_A/t:a".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    name: "t:CT_B/t:b".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              },
+              SchemaTypeChild {
+                kind: SchemaTypeChildKind::Choice,
+                children: vec![
+                  SchemaTypeChild {
+                    name: "t:CT_A/t:a".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                  SchemaTypeChild {
+                    name: "t:CT_D/t:d".to_string(),
+                    kind: SchemaTypeChildKind::Child,
+                    ..Default::default()
+                  },
+                ],
+                ..Default::default()
+              },
+            ],
+            ..Default::default()
+          }],
+          ..Default::default()
+        },
+      ],
+      ..Default::default()
+    };
+    let context = CodegenContext::new(std::slice::from_ref(&schema));
+
+    let ir = build_codegen_ir(&schema, &context).unwrap();
+
+    let holder_choice = ir
+      .types
+      .iter()
+      .find(|ty| ty.rust_name == "HolderChoice")
+      .unwrap();
+    let variant_names = holder_choice
+      .members
+      .iter()
+      .filter_map(member_variant_name)
+      .collect::<Vec<_>>();
+    assert_eq!(variant_names, vec!["Choice1", "Choice2"]);
+    assert!(ir.types.iter().any(|ty| {
+      ty.rust_name == "HolderChoice1"
+        && ty
+          .members
+          .iter()
+          .filter_map(member_variant_name)
+          .collect::<Vec<_>>()
+          == vec!["TA", "TB"]
+    }));
+    assert!(ir.types.iter().any(|ty| {
+      ty.rust_name == "HolderChoice2"
+        && ty
+          .members
+          .iter()
+          .filter_map(member_variant_name)
+          .collect::<Vec<_>>()
+          == vec!["TA", "TD"]
+    }));
   }
 
   fn expected_content_structure_from_schema_type(

@@ -519,6 +519,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       placement: None,
+      starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {
@@ -616,6 +617,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       placement: None,
+      starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![
@@ -750,6 +752,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       placement: None,
+      starts_after_last_rendered_page_break: false,
       borders: Some(crate::docx::TableBordersModel {
         inside_vertical: Some(crate::docx::BorderStyle::default()),
         ..crate::docx::TableBordersModel::default()
@@ -833,6 +836,7 @@ mod tests {
       indent_left_pt: 0.0,
       alignment: crate::docx::TableAlignment::Left,
       placement: None,
+      starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
       rows: vec![crate::docx::TableRow {

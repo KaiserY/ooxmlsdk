@@ -2061,6 +2061,26 @@ fn table_model(
     })
     .collect::<Vec<_>>();
   let row_count = rows.len();
+  let rows = {
+    let mut context = TableImportContext {
+      styles,
+      numbering,
+      images,
+      hyperlinks,
+      custom_xml_bindings,
+      form_widget_ids,
+      cell_margins,
+      table_style: &table_style,
+      table_look,
+      row_count,
+    };
+    rows
+      .iter()
+      .enumerate()
+      .map(|(row_index, row)| table_row_model(row, &mut context, row_index))
+      .collect::<Vec<_>>()
+  };
+  let starts_after_last_rendered_page_break = table_starts_after_last_rendered_page_break(&rows);
   Table {
     column_widths_pt: table
       .w_tbl_grid
@@ -2092,6 +2112,7 @@ fn table_model(
       .table_position_properties
       .as_ref()
       .map(table_position_placement),
+    starts_after_last_rendered_page_break,
     borders: properties
       .table_borders
       .as_deref()
@@ -2103,26 +2124,41 @@ fn table_model(
       .and_then(table_cell_spacing_to_points)
       .or(table_style.cell_spacing_pt)
       .unwrap_or(0.0),
-    rows: {
-      let mut context = TableImportContext {
-        styles,
-        numbering,
-        images,
-        hyperlinks,
-        custom_xml_bindings,
-        form_widget_ids,
-        cell_margins,
-        table_style: &table_style,
-        table_look,
-        row_count,
-      };
-      rows
-        .iter()
-        .enumerate()
-        .map(|(row_index, row)| table_row_model(row, &mut context, row_index))
-        .collect()
-    },
+    rows,
   }
+}
+
+fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
+  rows
+    .iter()
+    .flat_map(|row| &row.cells)
+    .flat_map(|cell| &cell.blocks)
+    .find_map(|block| match block {
+      Block::Paragraph(paragraph) if !paragraph_is_effectively_empty(paragraph) => {
+        Some(paragraph_starts_after_last_rendered_page_break(paragraph))
+      }
+      Block::Table(table) if !table.rows.is_empty() => {
+        Some(table_starts_after_last_rendered_page_break(&table.rows))
+      }
+      _ => None,
+    })
+    .unwrap_or(false)
+}
+
+fn paragraph_starts_after_last_rendered_page_break(paragraph: &Paragraph) -> bool {
+  let mut saw_last_rendered_page_break = false;
+  for inline in &paragraph.inlines {
+    match inline {
+      InlineItem::LastRenderedPageBreak => saw_last_rendered_page_break = true,
+      InlineItem::Text(run) if !run.text.trim().is_empty() => {
+        return saw_last_rendered_page_break;
+      }
+      InlineItem::Image(_) | InlineItem::Shape(_) => return saw_last_rendered_page_break,
+      InlineItem::PageBreak | InlineItem::ColumnBreak => return false,
+      InlineItem::Text(_) | InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => {}
+    }
+  }
+  false
 }
 
 fn table_position_placement(properties: &w::TablePositionProperties) -> FloatingFramePlacement {

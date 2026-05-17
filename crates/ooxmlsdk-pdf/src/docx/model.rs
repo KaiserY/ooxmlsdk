@@ -123,6 +123,7 @@ pub(crate) struct Table {
   pub indent_left_pt: f32,
   pub alignment: TableAlignment,
   pub placement: Option<FloatingFramePlacement>,
+  pub starts_after_last_rendered_page_break: bool,
   pub borders: Option<TableBordersModel>,
   pub cell_spacing_pt: f32,
   pub rows: Vec<TableRow>,

@@ -5874,6 +5874,14 @@ impl<'a> TextFrameLayout<'a> {
     }
     let mut x = line.x_pt.max(line_left);
     if let Some(label) = &paragraph.list_label {
+      let blank_list_label = label.chars().all(char::is_whitespace);
+      let mut list_label_style = paragraph.list_label_style.clone();
+      if blank_list_label && label.starts_with(' ') {
+        let base_line_style = paragraph_base_line_style(paragraph);
+        list_label_style.font_size_pt = list_label_style
+          .font_size_pt
+          .max(base_line_style.font_size_pt);
+      }
       if let Some(highlight) = paragraph.list_label_style.highlight {
         let highlight_left = flow.content_left_pt.min(first_line_left);
         let highlight_right = default_line_left.max(first_line_left);
@@ -5889,11 +5897,15 @@ impl<'a> TextFrameLayout<'a> {
         }
       }
       current.items.push(PageItem::Text(TextItem {
-        x_pt: first_line_left,
+        x_pt: if blank_list_label {
+          default_line_left
+        } else {
+          first_line_left
+        },
         y_pt: y,
         line_height_pt: line_height,
         text: label.clone(),
-        style: paragraph.list_label_style.clone(),
+        style: list_label_style,
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
         preserve_text_portion: false,
@@ -5903,9 +5915,7 @@ impl<'a> TextFrameLayout<'a> {
         pdf_text_segmentation: PdfTextSegmentation::Line,
       }));
       x = default_line_left;
-      if label.trim().is_empty()
-        && let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt
-      {
+      if blank_list_label && let Some(tab_stop_pt) = paragraph.list_label_tab_stop_pt {
         x = x.max(flow.content_left_pt + tab_stop_pt);
       }
     }

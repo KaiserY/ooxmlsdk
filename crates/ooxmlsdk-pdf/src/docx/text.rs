@@ -97,16 +97,25 @@ pub(super) fn paragraph_model_with_base(
         paragraph_mark_run_properties,
       )
     });
-  let list_label = numbering_label
+  let mut list_label = numbering_label
     .as_ref()
     .and_then(|label| label.text.clone());
   let list_label_tab_stop_pt = numbering_label.as_ref().and_then(|_| {
-    style_tab_stop_pt.or_else(|| {
-      (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
-        format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
-      )
-    })
+    style_tab_stop_pt
+      .or_else(|| {
+        numbering_label
+          .as_ref()
+          .and_then(|label| label.list_tab_stop_pt)
+      })
+      .or_else(|| {
+        (!has_direct_indentation && format.indent_left_pt > 0.0).then_some(
+          format.indent_left_pt + format.first_line_indent_pt.max(format.indent_left_pt) * 4.0,
+        )
+      })
   });
+  if list_label.as_deref() == Some("\t") && style_tab_stop_pt.is_some() && !has_direct_indentation {
+    list_label = Some(" \t".to_string());
+  }
   let mut list_label_style = numbering_label
     .as_ref()
     .map(|label| label.style.clone())

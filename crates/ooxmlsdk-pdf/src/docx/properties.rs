@@ -121,10 +121,16 @@ pub(super) fn merge_run_style(
     style.font_size_pt =
       (half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
-  if let Some(color) = properties.color()
-    && let Some(rgb) = resolve_run_color(color, theme_colors)
-  {
-    style.color = rgb;
+  if let Some(color) = properties.color() {
+    if matches!(&properties, RunProps::Numbering(_)) && color.val.eq_ignore_ascii_case("auto") {
+      style.color = super::RgbColor {
+        r: 255,
+        g: 255,
+        b: 255,
+      };
+    } else if let Some(rgb) = resolve_run_color(color, theme_colors) {
+      style.color = rgb;
+    }
   }
   if let Some(fill) = properties.text_fill()
     && let Some(resolved) = resolve_text_fill(fill, theme_colors)

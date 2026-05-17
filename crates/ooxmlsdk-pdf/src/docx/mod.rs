@@ -8393,10 +8393,20 @@ struct NumberingLevel {
   start: i32,
   format: w::NumberFormatValues,
   text: String,
+  suffix: NumberingSuffix,
+  list_tab_stop_pt: Option<f32>,
   picture_bullet_id: Option<i32>,
   is_legal: bool,
   format_properties: ParagraphFormat,
   symbol_run_properties: Option<w::NumberingSymbolRunProperties>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum NumberingSuffix {
+  #[default]
+  Tab,
+  Space,
+  Nothing,
 }
 
 #[derive(Clone, Debug)]
@@ -8404,6 +8414,7 @@ struct NumberingLabel {
   text: Option<String>,
   image: Option<InlineImage>,
   style: TextStyle,
+  list_tab_stop_pt: Option<f32>,
 }
 
 impl NumberingCatalog {
@@ -8538,6 +8549,7 @@ impl NumberingCatalog {
       text: if image.is_some() { None } else { Some(text) },
       image,
       style,
+      list_tab_stop_pt: level.list_tab_stop_pt,
     })
   }
 }
@@ -8569,11 +8581,35 @@ fn numbering_level_model(level: &w::Level) -> NumberingLevel {
       .and_then(|text| text.val.as_ref())
       .map(ToString::to_string)
       .unwrap_or_else(|| "%1.".to_string()),
+    suffix: level
+      .level_suffix
+      .as_ref()
+      .map(|suffix| match suffix.val {
+        w::LevelSuffixValues::Tab => NumberingSuffix::Tab,
+        w::LevelSuffixValues::Space => NumberingSuffix::Space,
+        w::LevelSuffixValues::Nothing => NumberingSuffix::Nothing,
+      })
+      .unwrap_or_default(),
+    list_tab_stop_pt: numbering_level_list_tab_stop_pt(level),
     picture_bullet_id: level.level_picture_bullet_id.as_ref().map(|id| id.val),
     is_legal: level.is_legal_numbering_style.is_some(),
     format_properties,
     symbol_run_properties: level.numbering_symbol_run_properties.as_deref().cloned(),
   }
+}
+
+fn numbering_level_list_tab_stop_pt(level: &w::Level) -> Option<f32> {
+  level
+    .previous_paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.tabs.as_ref())
+    .and_then(|tabs| {
+      tabs.w_tab.iter().find_map(|tab| {
+        (tab.val == w::TabStopValues::Number)
+          .then(|| signed_twips_measure_to_points(&tab.position))
+          .flatten()
+      })
+    })
 }
 
 fn numbering_picture_bullet_image(
@@ -8622,7 +8658,7 @@ fn format_numbering_label(
   counters: &HashMap<(i32, i32), i32>,
 ) -> String {
   if matches!(level.format, w::NumberFormatValues::Bullet) {
-    return format!("{} ", level.text);
+    return format!("{}{}", level.text, numbering_suffix_text(level.suffix));
   }
 
   let mut text = level.text.clone();
@@ -8652,7 +8688,15 @@ fn format_numbering_label(
       &format_numbering_value(value, format, level.is_legal && index < level_index),
     );
   }
-  format!("{text} ")
+  format!("{text}{}", numbering_suffix_text(level.suffix))
+}
+
+fn numbering_suffix_text(suffix: NumberingSuffix) -> &'static str {
+  match suffix {
+    NumberingSuffix::Tab => "\t",
+    NumberingSuffix::Space => " ",
+    NumberingSuffix::Nothing => "",
+  }
 }
 
 fn format_numbering_value(

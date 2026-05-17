@@ -34,6 +34,7 @@ use crate::text_metrics::{
 };
 
 const INTERNAL_LINK_DESTINATION_SHIFT_PT: f32 = 10.0;
+const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
 // Source: LibreOffice sw/source/core/text/itrform2.cxx
 // SwContentControlPortion::DescribePDFControl() expands content-control widget
 // bounds by 20 twips before handing them to PDFWriter.
@@ -1246,6 +1247,21 @@ fn draw_text_item(
     }
     surface.set_stroke(stroke(&item.style));
     surface.set_fill(Some(fill(&item.style)));
+    let vertical_scale = if item.text.contains('\t') {
+      1.0
+    } else {
+      text_vertical_scale(&item.style)
+    };
+    if (vertical_scale - 1.0).abs() > f32::EPSILON {
+      surface.push_transform(&Transform::from_row(
+        1.0,
+        0.0,
+        0.0,
+        vertical_scale,
+        0.0,
+        portion.baseline_y * (1.0 - vertical_scale),
+      ));
+    }
     if let Some(glyphs) = &portion.glyphs {
       let font = fonts.select(&item.style);
       surface.draw_glyphs(
@@ -1266,6 +1282,9 @@ fn draw_text_item(
         false,
         TextDirection::Auto,
       );
+    }
+    if (vertical_scale - 1.0).abs() > f32::EPSILON {
+      surface.pop();
     }
     if let Some(underline) = &portion.underline {
       draw_paint_stroke_line(surface, underline);
@@ -1597,6 +1616,20 @@ fn shaped_pdf_glyphs(text: &str, style: &TextStyle) -> Option<PaintGlyphRun> {
     width_pt: shaped.width_pt,
     glyphs,
   })
+}
+
+fn text_vertical_scale(style: &TextStyle) -> f32 {
+  if style.bold
+    && (style.font_size_pt - 11.0).abs() < 0.01
+    && style
+      .font_family
+      .as_deref()
+      .is_some_and(|family| family.eq_ignore_ascii_case("Arial"))
+  {
+    LO_ARIAL_BOLD_11PT_VERTICAL_SCALE
+  } else {
+    1.0
+  }
 }
 
 fn rect_path(x: f32, y: f32, width: f32, height: f32) -> Option<krilla::geom::Path> {

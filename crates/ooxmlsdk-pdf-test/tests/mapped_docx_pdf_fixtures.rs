@@ -871,20 +871,6 @@ fn assert_path_width_at_least_page_fraction(
   );
 }
 
-fn assert_horizontal_path_width_close(
-  summary: &PdfSummary,
-  page_index: usize,
-  expected_width: f32,
-) {
-  let bounds = horizontal_path_bounds_on_page(summary, page_index);
-  assert!(
-    bounds
-      .iter()
-      .any(|bounds| (bounds.width() - expected_width).abs() <= 0.75),
-    "missing page {page_index} horizontal path width {expected_width}pt; bounds={bounds:?}"
-  );
-}
-
 fn assert_horizontal_path_count_at_least(
   summary: &PdfSummary,
   page_index: usize,
@@ -2922,7 +2908,7 @@ fn mapped_fixture_inline_endnote_separator_keeps_word_separator_length() {
 fn mapped_fixture_endnote_cont_separator_spans_page_print_area() {
   let summary = render_summary("endnote-cont-separator.docx");
   assert_eq!(summary.page_count, 2);
-  assert_horizontal_path_width_close(&summary, 1, 468.0);
+  assert_path_geometry_width_close(&summary, 1, 468.0);
 }
 
 #[test]

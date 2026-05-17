@@ -62,6 +62,7 @@ const MIN_ESCAPEMENT_FONT_SIZE_PT: f32 = 1.0;
 const MIN_IMPORTED_LINE_HEIGHT_PT: f32 = 0.1;
 const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
 const COMMENT_REFERENCE_FONT_SCALE: f32 = 0.75;
+const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
 // Source: LibreOffice include/editeng/svxfont.hxx SMALL_CAPS_PERCENTAGE.
 const LO_SMALL_CAPS_FONT_SCALE: f32 = 0.80;
 
@@ -864,6 +865,7 @@ fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
       InlineItem::Text(run) => run.text.trim().is_empty(),
       InlineItem::Image(_) | InlineItem::Shape(_) => false,
       InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+      InlineItem::LastRenderedPageBreak => true,
       InlineItem::PageBreak | InlineItem::ColumnBreak => false,
     })
 }
@@ -878,6 +880,7 @@ fn paragraph_empty_font_size_pt(paragraph: &Paragraph) -> f32 {
       | InlineItem::Shape(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
@@ -2018,7 +2021,7 @@ fn margin_width_to_points(
   if !matches!(width_type, None | Some(w::TableWidthUnitValues::Dxa)) {
     return None;
   }
-  width.and_then(measurement_or_percent_to_points)
+  width.and_then(table_margin_measurement_to_points)
 }
 
 fn table_width_to_points(width: &w::TableWidth) -> Option<f32> {
@@ -2081,7 +2084,7 @@ fn table_indentation_to_points(indentation: &w::TableIndentation) -> Option<f32>
   indentation
     .width
     .as_ref()
-    .and_then(measurement_or_percent_to_points)
+    .and_then(table_margin_measurement_to_points)
 }
 
 fn table_alignment(justification: &w::TableJustification) -> TableAlignment {
@@ -3230,7 +3233,10 @@ fn push_run(
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
       // This is a cached layout artifact from Word, not an author-authored break.
-      w::RunChoice::WLastRenderedPageBreak => {}
+      w::RunChoice::WLastRenderedPageBreak => {
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        inlines.push(InlineItem::LastRenderedPageBreak);
+      }
       w::RunChoice::WSym(symbol) => {
         if let Some(symbol) = symbol_text(symbol) {
           text.push(symbol);
@@ -8959,14 +8965,27 @@ fn signed_twips_measure_to_points(value: &SignedTwipsMeasureValue) -> Option<f32
 }
 
 fn measurement_or_percent_to_points(value: &MeasurementOrPercentValue) -> Option<f32> {
+  measurement_or_percent_to_twips(value).map(units::twips_to_points)
+}
+
+fn table_margin_measurement_to_points(value: &MeasurementOrPercentValue) -> Option<f32> {
+  let twips = measurement_or_percent_to_twips(value)?;
+  (0.0..=MAX_WORD_TABLE_MARGIN_TWIPS)
+    .contains(&twips)
+    .then(|| units::twips_to_points(twips))
+}
+
+fn measurement_or_percent_to_twips(value: &MeasurementOrPercentValue) -> Option<f32> {
   match value {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-    ) => Some(units::twips_to_points(*value as f32)),
+    ) => Some(*value as f32),
     MeasurementOrPercentValue::DecimalNumberOrPercent(
       ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(_),
     ) => None,
-    MeasurementOrPercentValue::UniversalMeasure(value) => universal_measure_to_points(value),
+    MeasurementOrPercentValue::UniversalMeasure(value) => {
+      universal_measure_to_points(value).map(units::points_to_twips)
+    }
   }
 }
 
@@ -9919,6 +9938,7 @@ mod tests {
         | InlineItem::Shape(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
+        | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })
@@ -10235,6 +10255,7 @@ mod tests {
         | InlineItem::Shape(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
+        | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })

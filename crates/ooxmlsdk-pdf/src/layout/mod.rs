@@ -61,6 +61,7 @@ const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 = 40.0 / units::TWIPS_PE
 enum NoteSeparatorKind {
   Footnote,
   Endnote,
+  EndnoteContinuation,
 }
 
 fn inline_text_height(style: &TextStyle) -> f32 {
@@ -77,6 +78,7 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
       | InlineItem::Shape(_)
       | InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
@@ -548,6 +550,7 @@ struct FlowContext {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TextSegmentation {
   Body,
+  TableCell,
   DrawingLayer,
 }
 
@@ -953,6 +956,7 @@ impl<'a> RootFrameLayout<'a> {
     }
 
     if !self.document.endnotes.is_empty() {
+      let endnote_start_page_index = self.pages.len();
       self.y = layout_note_separator(
         NoteSeparatorKind::Endnote,
         note_setup,
@@ -975,12 +979,25 @@ impl<'a> RootFrameLayout<'a> {
           self.format_blocks_in_flow(blocks, note_flow);
         }
       }
+      add_endnote_continuation_separators(
+        note_setup,
+        &mut self.pages,
+        &mut self.current,
+        endnote_start_page_index,
+      );
     } else if !self.document.endnote_blocks.is_empty() {
+      let endnote_start_page_index = self.pages.len();
       self.format_note_block_sequence(
         NoteSeparatorKind::Endnote,
         note_setup,
         note_flow,
         &self.document.endnote_blocks,
+      );
+      add_endnote_continuation_separators(
+        note_setup,
+        &mut self.pages,
+        &mut self.current,
+        endnote_start_page_index,
       );
     }
 
@@ -1330,6 +1347,7 @@ fn paragraph_outline_text(paragraph: &crate::docx::Paragraph) -> String {
         | InlineItem::Shape(_)
         | InlineItem::FormWidgetStart(_)
         | InlineItem::FormWidgetEnd(_)
+        | InlineItem::LastRenderedPageBreak
         | InlineItem::PageBreak
         | InlineItem::ColumnBreak => None,
       })
@@ -2643,7 +2661,9 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         line_count += (shape.height_pt / line_height).ceil().max(1.0) as usize - 1;
         x = shape.width_pt;
       }
-      InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => {}
+      InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak => {}
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
         line_count += 1;
         x = 0.0;
@@ -2679,8 +2699,21 @@ fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -
   }
 }
 
-fn paragraph_spacing_before(previous: Option<&Block>, paragraph: &crate::docx::Paragraph) -> f32 {
-  if previous.is_none() {
+fn paragraph_spacing_before(
+  previous: Option<&Block>,
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+) -> f32 {
+  if previous.is_none()
+    && flow.text_segmentation == TextSegmentation::Body
+    && flow.section_index == 0
+  {
+    return 0.0;
+  }
+  if previous.is_none()
+    && flow.text_segmentation == TextSegmentation::TableCell
+    && paragraph_starts_with_last_rendered_page_break(paragraph)
+  {
     return 0.0;
   }
   if let Some(Block::Paragraph(previous)) = previous
@@ -2689,6 +2722,19 @@ fn paragraph_spacing_before(previous: Option<&Block>, paragraph: &crate::docx::P
     return 0.0;
   }
   paragraph.format.spacing_before_pt
+}
+
+fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Paragraph) -> bool {
+  paragraph
+    .inlines
+    .iter()
+    .find(|inline| {
+      !matches!(
+        inline,
+        InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_)
+      )
+    })
+    .is_some_and(|inline| matches!(inline, InlineItem::LastRenderedPageBreak))
 }
 
 fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
@@ -2727,6 +2773,9 @@ fn layout_document_block(
         return layout_floating_frame(&frame, flow, current, pages, y);
       }
       let mut flow = flow;
+      let ignore_top_margin_after_page_break = paragraph.format.page_break_before
+        && !current.items.is_empty()
+        && flow.text_segmentation == TextSegmentation::Body;
       if paragraph.format.page_break_before && !current.items.is_empty() {
         pages.push(std::mem::replace(
           current,
@@ -2745,7 +2794,9 @@ fn layout_document_block(
         y = flow.content_top_pt;
       }
 
-      y += paragraph_spacing_before(previous, paragraph);
+      if !ignore_top_margin_after_page_break {
+        y += paragraph_spacing_before(previous, paragraph, flow);
+      }
       let paragraph_flow = FlowContext {
         content_width: (flow.content_width
           - paragraph.format.indent_left_pt
@@ -2930,6 +2981,30 @@ fn restore_body_content_bottom(flow: FlowContext) -> FlowContext {
   }
 }
 
+fn add_endnote_continuation_separators(
+  setup: PageSetup,
+  pages: &mut [Page],
+  current: &mut Page,
+  endnote_start_page_index: usize,
+) {
+  for page in pages.iter_mut().skip(endnote_start_page_index + 1) {
+    add_note_separator_line(
+      NoteSeparatorKind::EndnoteContinuation,
+      setup,
+      page,
+      setup.margin_top_pt,
+    );
+  }
+  if pages.len() > endnote_start_page_index {
+    add_note_separator_line(
+      NoteSeparatorKind::EndnoteContinuation,
+      setup,
+      current,
+      setup.margin_top_pt,
+    );
+  }
+}
+
 fn layout_note_separator(
   kind: NoteSeparatorKind,
   setup: PageSetup,
@@ -2947,14 +3022,22 @@ fn layout_note_separator(
   }
 
   y += LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT;
+  add_note_separator_line(kind, setup, current, y);
+  let bottom_dist = match kind {
+    NoteSeparatorKind::Footnote => LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT,
+    NoteSeparatorKind::Endnote | NoteSeparatorKind::EndnoteContinuation => {
+      LO_ENDNOTE_SEPARATOR_BOTTOM_DIST_PT
+    }
+  };
+  y + bottom_dist
+}
+
+fn add_note_separator_line(kind: NoteSeparatorKind, setup: PageSetup, current: &mut Page, y: f32) {
   let content_width = (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(0.0);
   let separator_width = match kind {
     NoteSeparatorKind::Footnote => content_width * LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION,
     NoteSeparatorKind::Endnote => LO_ENDNOTE_SEPARATOR_WIDTH_PT.min(content_width),
-  };
-  let bottom_dist = match kind {
-    NoteSeparatorKind::Footnote => LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT,
-    NoteSeparatorKind::Endnote => LO_ENDNOTE_SEPARATOR_BOTTOM_DIST_PT,
+    NoteSeparatorKind::EndnoteContinuation => content_width,
   };
   current.items.push(PageItem::Line(LineItem {
     x1_pt: setup.margin_left_pt,
@@ -2965,7 +3048,6 @@ fn layout_note_separator(
     color: RgbColor { r: 0, g: 0, b: 0 },
     kind: LineItemKind::FilledRect,
   }));
-  y + bottom_dist
 }
 
 fn footnote_boss_reserve(
@@ -4803,7 +4885,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
-    text_segmentation: TextSegmentation::Body,
+    text_segmentation: TextSegmentation::TableCell,
   };
   let mut nested_page = empty_page(setup, current.section_index);
   let mut discarded_pages = Vec::new();
@@ -4968,7 +5050,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     content_width,
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
-    text_segmentation: TextSegmentation::Body,
+    text_segmentation: TextSegmentation::TableCell,
   };
   let content = cell
     .blocks
@@ -6038,6 +6120,10 @@ impl<'a> TextFrameLayout<'a> {
             active_form_widget_ids.truncate(position);
           }
         }
+        InlineItem::LastRenderedPageBreak => {
+          text_state.set_position(InlineCursor::after_inline(inline_index));
+          pending_tab = None;
+        }
         InlineItem::Image(image) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
           pending_tab = None;
@@ -6855,6 +6941,7 @@ fn flush_text(
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: match meta.segmentation {
       TextSegmentation::Body => PdfTextSegmentation::Line,
+      TextSegmentation::TableCell => PdfTextSegmentation::Line,
       TextSegmentation::DrawingLayer => PdfTextSegmentation::Portion,
     },
   }));

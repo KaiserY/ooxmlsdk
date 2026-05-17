@@ -177,6 +177,7 @@ fn validate_inline_fonts(
     | docx::InlineItem::Shape(_)
     | docx::InlineItem::FormWidgetStart(_)
     | docx::InlineItem::FormWidgetEnd(_)
+    | docx::InlineItem::LastRenderedPageBreak
     | docx::InlineItem::PageBreak
     | docx::InlineItem::ColumnBreak => Ok(()),
   }

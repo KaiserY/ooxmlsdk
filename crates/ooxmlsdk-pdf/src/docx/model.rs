@@ -422,6 +422,7 @@ pub(crate) enum InlineItem {
   Shape(InlineShape),
   FormWidgetStart(u32),
   FormWidgetEnd(u32),
+  LastRenderedPageBreak,
   PageBreak,
   ColumnBreak,
 }

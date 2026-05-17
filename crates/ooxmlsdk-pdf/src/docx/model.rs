@@ -143,6 +143,7 @@ pub(crate) struct TableRow {
   pub cell_spacing_pt: Option<f32>,
   pub grid_before: usize,
   pub grid_after: usize,
+  pub redline_color: Option<RgbColor>,
 }
 
 #[derive(Clone, Debug)]
@@ -374,6 +375,7 @@ pub(crate) struct TextRun {
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  pub preserve_text_portion: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -787,6 +787,8 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
   if current.pdf_text_segmentation != next.pdf_text_segmentation
     || current.form_widget_id.is_some()
     || next.form_widget_id.is_some()
+    || current.preserve_text_portion
+    || next.preserve_text_portion
   {
     return false;
   }

@@ -454,6 +454,7 @@ pub(crate) struct TextItem {
   pub dynamic_field: Option<DynamicFieldKind>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
+  pub preserve_text_portion: bool,
   pub decoration_span_start_x_pt: Option<f32>,
   pub pdf_text_segmentation: PdfTextSegmentation,
 }
@@ -3779,6 +3780,7 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           style: TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
           form_widget_id: None,
           paragraph_bidi: false,
           decoration_span_start_x_pt: None,
@@ -4148,6 +4150,15 @@ impl RowFrame<'_, '_> {
     let split = self.fragment_split(row_bottom, content_offset);
     let cell_spacing_pt = self.cell_spacing_pt();
     let mut cell_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
+    if let Some(color) = self.row.redline_color {
+      current.items.push(PageItem::Fill(FillItem {
+        x_pt: cell_left,
+        y_pt: row_top,
+        width_pt: self.table_frame.right_pt - cell_left,
+        height_pt: row_bottom - row_top,
+        color,
+      }));
+    }
     let mut grid_index = self.row.grid_before;
     for (cell_index, cell) in self.row.cells.iter().enumerate() {
       let cell_item_start = current.items.len();
@@ -5808,6 +5819,7 @@ impl<'a> TextFrameLayout<'a> {
         style: paragraph.list_label_style.clone(),
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
+        preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
         decoration_span_start_x_pt: None,
@@ -5820,6 +5832,7 @@ impl<'a> TextFrameLayout<'a> {
       paragraph.format.alignment == ParagraphAlignment::Justify && paragraph.list_label.is_none();
     let mut active_form_widget_ids = Vec::new();
     let mut line_has_form_widget = false;
+    let mut tab_over_margin_active = false;
 
     for (inline_index, item) in paragraph.inlines.iter().enumerate() {
       match item {
@@ -5831,6 +5844,7 @@ impl<'a> TextFrameLayout<'a> {
             dynamic_field: run.dynamic_field,
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
+            preserve_text_portion: run.preserve_text_portion,
             segmentation: flow.text_segmentation,
           };
 
@@ -5881,6 +5895,7 @@ impl<'a> TextFrameLayout<'a> {
               x = line_left;
               chunk_x = x;
               pending_tab = None;
+              tab_over_margin_active = false;
               emitted = true;
               continue;
             }
@@ -5900,7 +5915,7 @@ impl<'a> TextFrameLayout<'a> {
                 &run.style,
                 meta,
               );
-              let mut tab_stop = next_tab_stop(
+              let tab_stop = next_tab_stop(
                 x,
                 line_left,
                 &paragraph.format.tab_stops,
@@ -5908,35 +5923,7 @@ impl<'a> TextFrameLayout<'a> {
               );
               x = tab_stop.x_pt;
               if x > line_right {
-                (flow, text_frame, y, line_left, line_right) = self.advance_line(
-                  TextLineAdvance {
-                    current,
-                    pages,
-                    wrap_exclusions: &wrap_exclusions,
-                    state: &mut text_state,
-                    active: ActiveTextFrame {
-                      flow,
-                      frame: text_frame,
-                    },
-                    line_left,
-                    line_right,
-                    justify: justify_wrapped_lines,
-                    line_item_start_index: &mut line_item_start_index,
-                    line_has_form_widget: &mut line_has_form_widget,
-                  },
-                  y,
-                  &mut line_height,
-                );
-                default_line_right = text_frame.default_line_right;
-                paragraph_left = text_frame.paragraph_left;
-                base_line_height = text_frame.base_line_height;
-                tab_stop = next_tab_stop(
-                  line_left,
-                  line_left,
-                  &paragraph.format.tab_stops,
-                  flow.default_tab_stop_pt,
-                );
-                x = tab_stop.x_pt;
+                tab_over_margin_active = true;
               }
               chunk_x = x;
               pending_tab = Some(tab_stop);
@@ -5953,9 +5940,10 @@ impl<'a> TextFrameLayout<'a> {
             {
               x = aligned_tab_x(tab_stop, width, line_left, line_right);
               chunk_x = x;
+              tab_over_margin_active |= tab_stop.x_pt > line_right;
             }
 
-            if x + width > line_right && x > line_left {
+            if x + width > line_right && x > line_left && !tab_over_margin_active {
               flush_text(
                 current,
                 TextPlacement {
@@ -5992,6 +5980,7 @@ impl<'a> TextFrameLayout<'a> {
               x = line_left;
               chunk_x = x;
               pending_tab = None;
+              tab_over_margin_active = false;
               if whitespace {
                 emitted = true;
                 continue;
@@ -6132,6 +6121,7 @@ impl<'a> TextFrameLayout<'a> {
             line_height = include_text_height(line_height, text_frame, &run.style);
             line_has_form_widget |= meta.form_widget_id.is_some();
             emitted = true;
+            tab_over_margin_active = false;
             if flow.text_segmentation == TextSegmentation::DrawingLayer {
               flush_text(
                 current,
@@ -6696,14 +6686,14 @@ fn aligned_tab_x(
   tab_stop: ResolvedTabStop,
   text_width: f32,
   line_left: f32,
-  line_right: f32,
+  _line_right: f32,
 ) -> f32 {
   let x = match tab_stop.alignment {
     TabStopAlignment::Left => tab_stop.x_pt,
     TabStopAlignment::Center => tab_stop.x_pt - text_width / 2.0,
     TabStopAlignment::Right => tab_stop.x_pt - text_width,
   };
-  x.clamp(line_left, line_right)
+  x.max(line_left)
 }
 
 fn line_bounds_for_y(
@@ -6964,6 +6954,7 @@ struct TextChunkMeta<'a> {
   dynamic_field: Option<DynamicFieldKind>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
+  preserve_text_portion: bool,
   segmentation: TextSegmentation,
 }
 
@@ -6988,6 +6979,7 @@ fn flush_text(
     dynamic_field: meta.dynamic_field,
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
+    preserve_text_portion: meta.preserve_text_portion,
     decoration_span_start_x_pt: None,
     pdf_text_segmentation: match meta.segmentation {
       TextSegmentation::Body => PdfTextSegmentation::Line,
@@ -7145,6 +7137,7 @@ mod tests {
         style: TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       })],
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
@@ -7238,6 +7231,7 @@ mod tests {
       style: TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let blocks = vec![Block::Paragraph(Paragraph {
       inlines: vec![InlineItem::Text(run.clone())],
@@ -7334,6 +7328,7 @@ mod tests {
           cell_spacing_pt: None,
           grid_before: 0,
           grid_after: 0,
+          redline_color: None,
         },
         TableRow {
           cells: vec![cell(true, None)],
@@ -7344,6 +7339,7 @@ mod tests {
           cell_spacing_pt: None,
           grid_before: 0,
           grid_after: 0,
+          redline_color: None,
         },
         TableRow {
           cells: vec![cell(true, None)],
@@ -7354,6 +7350,7 @@ mod tests {
           cell_spacing_pt: None,
           grid_before: 0,
           grid_after: 0,
+          redline_color: None,
         },
       ],
     };
@@ -7390,6 +7387,7 @@ mod tests {
         cell_spacing_pt: spacing_pt,
         grid_before: 0,
         grid_after: 0,
+        redline_color: None,
       }
     }
 

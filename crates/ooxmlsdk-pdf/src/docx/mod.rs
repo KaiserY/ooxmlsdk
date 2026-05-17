@@ -430,6 +430,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
       style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     })],
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
@@ -1489,6 +1490,7 @@ fn prepend_note_marker(paragraph: &mut Paragraph, label: &NoteLabel) {
       style: note_reference_style(&base_style),
       hyperlink_url: label.hyperlink_url.clone(),
       dynamic_field: None,
+      preserve_text_portion: false,
     }),
   );
 }
@@ -1719,6 +1721,7 @@ fn table_row_model(
     cell_spacing_pt: row_style.cell_spacing_pt,
     grid_before,
     grid_after,
+    redline_color: table_row_redline_color(row.table_row_properties.as_deref()),
     cells: {
       let cells = row
         .table_row_choice
@@ -1756,6 +1759,11 @@ fn table_row_model(
         .collect()
     },
   }
+}
+
+fn table_row_redline_color(properties: Option<&w::TableRowProperties>) -> Option<RgbColor> {
+  let properties = properties?;
+  (properties.w_ins.is_some() || properties.w_del.is_some()).then_some(redline_author_color())
 }
 
 fn table_row_style_for(
@@ -2784,6 +2792,7 @@ fn push_dynamic_field(
     style,
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field: Some(kind),
+    preserve_text_portion: false,
   }));
 }
 
@@ -3343,6 +3352,32 @@ fn push_run(
   flush_run_text(inlines, &mut text, style, hyperlink_url);
 }
 
+fn push_redline_run(
+  run: &w::Run,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+  hyperlink_url: Option<&str>,
+) {
+  let start = inlines.len();
+  push_run(
+    run,
+    inlines,
+    base_style,
+    styles,
+    images,
+    hyperlinks,
+    hyperlink_url,
+  );
+  for inline in &mut inlines[start..] {
+    if let InlineItem::Text(run) = inline {
+      run.preserve_text_portion = true;
+    }
+  }
+}
+
 fn push_ruby_base(
   ruby: &w::Ruby,
   inlines: &mut Vec<InlineItem>,
@@ -3603,7 +3638,7 @@ fn push_inserted_run(
   redline_style.color = redline_author_color();
   for choice in &inserted.inserted_run_choice {
     match choice {
-      w::InsertedRunChoice::WR(run) => push_run(
+      w::InsertedRunChoice::WR(run) => push_redline_run(
         run,
         inlines,
         redline_style.clone(),
@@ -3673,7 +3708,7 @@ fn push_deleted_run(
   base_style.color = redline_author_color();
   for choice in &deleted.deleted_run_choice {
     match choice {
-      w::DeletedRunChoice::WR(run) => push_run(
+      w::DeletedRunChoice::WR(run) => push_redline_run(
         run,
         inlines,
         base_style.clone(),
@@ -3732,11 +3767,11 @@ fn push_move_from_run(
   hyperlinks: &HyperlinkCatalog,
   hyperlink_url: Option<&str>,
 ) {
-  base_style.color = redline_author_color();
+  base_style.color = moved_redline_color();
   base_style.strikethrough = true;
   for choice in &moved.move_from_run_choice {
     match choice {
-      w::MoveFromRunChoice::WR(run) => push_run(
+      w::MoveFromRunChoice::WR(run) => push_redline_run(
         run,
         inlines,
         base_style.clone(),
@@ -3798,7 +3833,7 @@ fn push_move_to_run(
   base_style.color = moved_redline_color();
   for choice in &moved.move_to_run_choice {
     match choice {
-      w::MoveToRunChoice::WR(run) => push_run(
+      w::MoveToRunChoice::WR(run) => push_redline_run(
         run,
         inlines,
         base_style.clone(),
@@ -3878,6 +3913,7 @@ fn push_note_reference(
     style: note_reference_style(&style),
     hyperlink_url,
     dynamic_field: None,
+    preserve_text_portion: false,
   }));
 }
 
@@ -3915,6 +3951,7 @@ fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextSt
     },
     hyperlink_url: None,
     dynamic_field: None,
+    preserve_text_portion: false,
   }));
 }
 
@@ -3930,6 +3967,7 @@ fn flush_run_text(
       style,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
+      preserve_text_portion: false,
     }));
   }
 }
@@ -4520,6 +4558,9 @@ fn push_drawing_textboxes_impl(
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
+  if drawing_image_properties(graphic_data, &styles.theme_colors).is_some() {
+    return;
+  }
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
@@ -4558,6 +4599,7 @@ fn push_drawing_textboxes_impl(
         style: base_style.clone(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       }));
     }
   }
@@ -6239,6 +6281,7 @@ fn push_textbox_content(
           style: base_style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         }));
       }
       Block::Table(table) => push_table_text(&table, inlines, base_style.clone()),
@@ -6303,6 +6346,7 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
           style: style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         }));
       }
       for block in &cell.blocks {
@@ -6328,6 +6372,7 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
       style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     }));
   }
 }

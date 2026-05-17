@@ -74,10 +74,14 @@ pub(super) fn paragraph_model_with_base(
   let list_label = numbering_label
     .as_ref()
     .and_then(|label| label.text.clone());
-  let list_label_style = numbering_label
+  let mut list_label_style = numbering_label
     .as_ref()
     .map(|label| label.style.clone())
     .unwrap_or_default();
+  if paragraph_mark_is_inserted(paragraph) && numbering_label.is_some() {
+    list_label_style.color = redline_author_color();
+    list_label_style.underline = true;
+  }
   let mut inlines = paragraph_inlines(
     paragraph,
     run_style.clone(),
@@ -95,6 +99,7 @@ pub(super) fn paragraph_model_with_base(
       style: run_style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     }));
   }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
@@ -130,6 +135,14 @@ fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {
     .as_deref()
     .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
     .is_some_and(|properties| properties.deleted.is_some() || properties.move_from.is_some())
+}
+
+fn paragraph_mark_is_inserted(paragraph: &w::Paragraph) -> bool {
+  paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref())
+    .is_some_and(|properties| properties.inserted.is_some() || properties.move_to.is_some())
 }
 
 fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {

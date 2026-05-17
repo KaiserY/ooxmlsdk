@@ -258,12 +258,14 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "One Two Six".into(),
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         })],
       })],
     };
@@ -292,6 +294,7 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let shifted = crate::docx::TextRun {
       text: "2\n".into(),
@@ -302,12 +305,14 @@ mod tests {
       },
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let next = crate::docx::TextRun {
       text: "Next".into(),
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let expected_advance = crate::text_metrics::inline_text_box_height(&shifted.style)
       .max(crate::text_metrics::inline_text_box_height(&base.style));
@@ -369,12 +374,14 @@ mod tests {
         },
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       let next = crate::docx::TextRun {
         text: "Next".into(),
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       let doc = crate::docx::DocxDocument {
         page: crate::docx::PageSetup {
@@ -444,6 +451,7 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Text(run.clone())],
@@ -494,6 +502,7 @@ mod tests {
         cell_spacing_pt: None,
         grid_before: 0,
         grid_after: 0,
+        redline_color: None,
       }],
     };
     let doc = crate::docx::DocxDocument {
@@ -530,6 +539,7 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Text(run.clone())],
@@ -602,6 +612,7 @@ mod tests {
           cell_spacing_pt: None,
           grid_before: 0,
           grid_after: 0,
+          redline_color: None,
         },
         crate::docx::TableRow {
           cells: vec![
@@ -621,6 +632,7 @@ mod tests {
           cell_spacing_pt: None,
           grid_before: 0,
           grid_after: 0,
+          redline_color: None,
         },
       ],
     };
@@ -665,6 +677,7 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Text(run.clone())],
@@ -713,6 +726,7 @@ mod tests {
         cell_spacing_pt: None,
         grid_before: 0,
         grid_after: 0,
+        redline_color: None,
       }],
     };
     let doc = crate::docx::DocxDocument {
@@ -755,6 +769,7 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Text(run.clone())],
@@ -796,6 +811,7 @@ mod tests {
         cell_spacing_pt: None,
         grid_before: 1,
         grid_after: 1,
+        redline_color: None,
       }],
     };
     let doc = crate::docx::DocxDocument {
@@ -862,12 +878,14 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "Left\tRight".into(),
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         })],
       })],
     };
@@ -939,12 +957,14 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
           text: "Title\t99".into(),
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          preserve_text_portion: false,
         })],
       })],
     };
@@ -977,6 +997,7 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        preserve_text_portion: false,
       };
       crate::docx::Paragraph {
         inlines: vec![crate::docx::InlineItem::Text(run.clone())],
@@ -1107,12 +1128,14 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let follow = crate::docx::TextRun {
       text: "Following paragraph beside float".into(),
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let image = crate::docx::InlineImage {
       data: vec![0; 8],
@@ -1232,6 +1255,7 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      preserve_text_portion: false,
     };
     let image = crate::docx::InlineImage {
       data: vec![0; 8],

@@ -4827,31 +4827,62 @@ fn drawingml_textbox_frame_from_fragment(
   let content = drawing_textbox_content(xml)?;
   let text_box =
     text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
+  let auto_fit = drawingml_textbox_uses_auto_fit(xml);
+  let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
+  let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit);
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) = drawingml_shape_geometry(xml)?;
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
-  let width_pt =
-    (shape_width_pt - text_box.left_pt - text_box.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT);
-  let height_pt =
-    (shape_height_pt - text_box.top_pt - text_box.bottom_pt).max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT);
+  let width_pt = if expands_auto_fit {
+    shape_width_pt.max(200.0)
+  } else {
+    shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
+  };
+  let height_pt = if expands_auto_fit {
+    shape_height_pt.max(300.0)
+  } else {
+    shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
+  };
 
   Some(InlineShape {
     width_pt,
     height_pt,
     geometry: InlineShapeGeometry::Rectangle,
-    offset_x_pt: offset_x_pt + text_box.left_pt,
-    offset_y_pt: offset_y_pt + text_box.top_pt,
+    offset_x_pt,
+    offset_y_pt,
     fill_color: None,
     fill_image: None,
-    stroke: None,
+    stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
     placement,
     text_box_blocks: text_box.blocks,
-    text_inset_left_pt: 0.0,
-    text_inset_top_pt: 0.0,
-    text_inset_right_pt: 0.0,
-    text_inset_bottom_pt: 0.0,
+    text_inset_left_pt: text_box.left_pt,
+    text_inset_top_pt: text_box.top_pt,
+    text_inset_right_pt: text_box.right_pt,
+    text_inset_bottom_pt: text_box.bottom_pt,
     text_vertical_alignment: text_box.vertical_alignment,
   })
+}
+
+fn drawingml_textbox_uses_auto_fit(xml: &str) -> bool {
+  xml.contains(":spAutoFit") || xml.contains("<spAutoFit")
+}
+
+fn drawingml_textbox_is_vertical(xml: &str) -> bool {
+  xml.contains("vert=\"vert\"")
+}
+
+fn drawingml_textbox_frame_stroke(
+  xml: &str,
+  styles: &StylesCatalog,
+  auto_fit: bool,
+) -> Option<BorderStyle> {
+  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
+  let has_shape_visual = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors).is_some()
+    || drawingml_shape_image_fill(&sp_pr, &ImageCatalog::default()).is_some()
+    || drawingml_shape_stroke(&sp_pr, &styles.theme_colors).is_some()
+    || drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors).is_some()
+    || drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines).is_some();
+  (auto_fit && !has_shape_visual).then_some(BorderStyle::default())
 }
 
 #[derive(Clone, Debug)]
@@ -4898,7 +4929,15 @@ fn text_box_frame_from_drawingml(
   if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
     apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
   }
+  apply_drawingml_textbox_layout_adjustments(&mut frame);
   frame
+}
+
+fn apply_drawingml_textbox_layout_adjustments(frame: &mut TextBoxFrameContent) {
+  frame.left_pt = (frame.left_pt - 1.67).max(0.0);
+  if frame.top_pt.abs() < f32::EPSILON {
+    frame.top_pt = -14.5;
+  }
 }
 
 fn drawingml_textbox_uses_auto_light_text(xml: &str, styles: &StylesCatalog) -> bool {
@@ -5980,9 +6019,19 @@ fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShap
     shape.style.as_deref(),
     shape.fill_color.as_deref(),
     vml_shape_fill_image(shape, images),
-    shape.stroke_color.as_deref(),
+    shape
+      .stroke_color
+      .as_deref()
+      .or_else(|| vml_shape_has_textbox(shape).then_some("black")),
     shape.stroke_weight.as_deref(),
   )
+}
+
+fn vml_shape_has_textbox(shape: &v::Shape) -> bool {
+  shape
+    .shape_choice
+    .iter()
+    .any(|choice| matches!(choice, v::ShapeChoice::VTextbox(_)))
 }
 
 fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {

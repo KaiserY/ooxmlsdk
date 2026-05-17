@@ -6474,14 +6474,14 @@ impl<'a> TextFrameLayout<'a> {
               let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
               let (shape_x, shape_y) =
                 floating_image_position(placement, flow, x, y, width, height);
-              place_shape(
-                current,
-                flow,
+              let (shape_x, shape_y) = keep_floating_shape_inside_page(
                 shape_x + shape.offset_x_pt,
                 shape_y + shape.offset_y_pt,
                 width,
                 height,
+                flow,
               );
+              place_shape(current, flow, shape_x, shape_y, width, height);
             }
             crate::docx::ImagePlacement::Inline => {
               if x + shape.width_pt > line_right && x > line_left {
@@ -6622,6 +6622,26 @@ impl<'a> TextFrameLayout<'a> {
 
     (flow, y)
   }
+}
+
+fn keep_floating_shape_inside_page(
+  x_pt: f32,
+  y_pt: f32,
+  width_pt: f32,
+  height_pt: f32,
+  flow: FlowContext,
+) -> (f32, f32) {
+  let stroke_padding_pt = 1.0;
+  (
+    x_pt.clamp(
+      stroke_padding_pt,
+      (flow.setup.width_pt - width_pt - stroke_padding_pt).max(stroke_padding_pt),
+    ),
+    y_pt.clamp(
+      stroke_padding_pt,
+      (flow.setup.height_pt - height_pt - stroke_padding_pt).max(stroke_padding_pt),
+    ),
+  )
 }
 
 fn text_segments(text: &str) -> Vec<String> {

@@ -14,7 +14,7 @@ use krilla::image::{BitsPerComponent, CustomImage, Image, ImageColorspace};
 use krilla::num::NormalizedF32;
 use krilla::outline::{Outline, OutlineNode};
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, FillRule, Stroke};
+use krilla::paint::{Fill, FillRule, LineJoin, Stroke};
 use krilla::surface::Surface;
 use krilla::text::{Font, GlyphId, KrillaGlyph, TextDirection};
 use krilla::{Document, SerializeSettings};
@@ -26,7 +26,7 @@ use crate::error::{PdfError, Result};
 use crate::fonts::load_text_face;
 use crate::layout::{
   FillItem, FollowFrameKind, ImageItem, LayoutDocument, LineItem, LineItemKind, OutlineEntry,
-  PageItem, PdfTextSegmentation, RectItem, TextItem,
+  PageItem, PdfTextSegmentation, PolylineItem, RectItem, TextItem,
 };
 use crate::options::PdfOptions;
 use crate::text_metrics::{
@@ -228,7 +228,11 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
                   .is_none_or(|link| link.width_pt >= 0.0 && link.height_pt >= 0.0)
             })
         }
-        PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Fill(_) | PaintItem::Line(_) => true,
+        PaintItem::Image(_)
+        | PaintItem::Rect(_)
+        | PaintItem::Fill(_)
+        | PaintItem::Line(_)
+        | PaintItem::Polyline(_) => true,
       })
   }));
   let mut pdf = Document::new_with(serialize_settings(options));
@@ -514,6 +518,7 @@ enum PaintItem {
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
+  Polyline(PolylineItem),
 }
 
 #[derive(Clone, Debug)]
@@ -624,7 +629,11 @@ impl InternalLinkTargets {
                 });
             }
           }
-          PaintItem::Image(_) | PaintItem::Rect(_) | PaintItem::Fill(_) | PaintItem::Line(_) => {}
+          PaintItem::Image(_)
+          | PaintItem::Rect(_)
+          | PaintItem::Fill(_)
+          | PaintItem::Line(_)
+          | PaintItem::Polyline(_) => {}
         }
       }
     }
@@ -741,6 +750,7 @@ impl PaintDocument {
             PageItem::Rect(rect) => PaintItem::Rect(*rect),
             PageItem::Fill(fill) => PaintItem::Fill(*fill),
             PageItem::Line(line) => PaintItem::Line(*line),
+            PageItem::Polyline(polyline) => PaintItem::Polyline(polyline.clone()),
           })
           .collect();
         PaintPage {
@@ -1131,6 +1141,7 @@ fn draw_paint_item(
       }
     }
     PaintItem::Line(line) => draw_line_item(surface, line),
+    PaintItem::Polyline(polyline) => draw_polyline_item(surface, polyline),
   }
 }
 
@@ -1182,6 +1193,12 @@ fn paint_item_bounds(item: &PaintItem) -> Option<(f32, f32, f32, f32)> {
         line.y1_pt.max(line.y2_pt) + half_width,
       ))
     }
+    PaintItem::Polyline(polyline) => Some((
+      polyline.x_pt,
+      polyline.y_pt,
+      polyline.x_pt + polyline.width_pt,
+      polyline.y_pt + polyline.height_pt,
+    )),
   }
 }
 
@@ -1423,6 +1440,45 @@ fn draw_line_item(surface: &mut Surface<'_>, line: &LineItem) {
       path.line_to(line.x2_pt, line.y2_pt);
       path.close();
     }
+  }
+  if let Some(path) = path.finish() {
+    surface.draw_path(&path);
+  }
+}
+
+fn draw_polyline_item(surface: &mut Surface<'_>, polyline: &PolylineItem) {
+  if polyline.points.len() < 2 {
+    return;
+  }
+
+  if let Some(fill_color) = polyline.fill_color {
+    surface.set_fill(Some(Fill {
+      paint: rgb::Color::new(fill_color.r, fill_color.g, fill_color.b).into(),
+      opacity: NormalizedF32::ONE,
+      rule: FillRule::EvenOdd,
+    }));
+  } else {
+    surface.set_fill(None);
+  }
+  if let Some(stroke) = polyline.stroke {
+    surface.set_stroke(Some(Stroke {
+      width: stroke.width_pt,
+      paint: rgb::Color::new(stroke.color.r, stroke.color.g, stroke.color.b).into(),
+      line_join: LineJoin::Bevel,
+      ..Default::default()
+    }));
+  } else {
+    surface.set_stroke(None);
+  }
+
+  let mut path = PathBuilder::new();
+  let (first_x, first_y) = polyline.points[0];
+  path.move_to(polyline.x_pt + first_x, polyline.y_pt + first_y);
+  for &(x, y) in &polyline.points[1..] {
+    path.line_to(polyline.x_pt + x, polyline.y_pt + y);
+  }
+  if polyline.closed {
+    path.close();
   }
   if let Some(path) = path.finish() {
     surface.draw_path(&path);

@@ -474,10 +474,14 @@ pub(crate) struct InlineShapeImageFill {
   pub flip_vertical: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InlineShapeGeometry {
   Rectangle,
   Line,
+  Polyline {
+    points: Vec<(f32, f32)>,
+    closed: bool,
+  },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

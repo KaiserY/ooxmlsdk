@@ -46,11 +46,22 @@ const LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION: f32 = 0.25;
 const LO_FOOTNOTE_SEPARATOR_STROKE_PT: f32 = 10.0 / units::TWIPS_PER_POINT;
 const LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
 const LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT: f32 = 57.0 / units::TWIPS_PER_POINT;
+// Source: LibreOffice sw/qa/core/layout/paintfrm.cxx and ftnfrm.cxx
+// Word-style endnote separators are 2 inches wide, and inline endnotes keep
+// 269 twips of separator area above the endnote text.
+const LO_ENDNOTE_SEPARATOR_WIDTH_PT: f32 = 2880.0 / units::TWIPS_PER_POINT;
+const LO_ENDNOTE_SEPARATOR_BOTTOM_DIST_PT: f32 = 269.0 / units::TWIPS_PER_POINT;
 // Source: LibreOffice sw/source/core/text/itrform2.cxx keeps the laid-out
 // SwLineLayout real height separate from the content-control GetCharRect()
 // widget rectangle, whose block is expanded by 20 twips on both vertical
 // sides in SwContentControlPortion::DescribePDFControl().
 const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 = 40.0 / units::TWIPS_PER_POINT;
+
+#[derive(Clone, Copy, Debug)]
+enum NoteSeparatorKind {
+  Footnote,
+  Endnote,
+}
 
 fn inline_text_height(style: &TextStyle) -> f32 {
   inline_text_box_height(style)
@@ -427,6 +438,7 @@ pub(crate) enum PageItem {
   Rect(RectItem),
   Fill(FillItem),
   Line(LineItem),
+  Polyline(PolylineItem),
 }
 
 #[derive(Clone, Debug)]
@@ -496,6 +508,18 @@ pub(crate) struct LineItem {
   pub width_pt: f32,
   pub color: RgbColor,
   pub kind: LineItemKind,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PolylineItem {
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+  pub points: Vec<(f32, f32)>,
+  pub closed: bool,
+  pub fill_color: Option<RgbColor>,
+  pub stroke: Option<BorderStyle>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -920,11 +944,17 @@ impl<'a> RootFrameLayout<'a> {
     );
 
     if self.document.footnotes.is_empty() && !self.document.footnote_blocks.is_empty() {
-      self.format_note_block_sequence(note_setup, note_flow, &self.document.footnote_blocks);
+      self.format_note_block_sequence(
+        NoteSeparatorKind::Footnote,
+        note_setup,
+        note_flow,
+        &self.document.footnote_blocks,
+      );
     }
 
     if !self.document.endnotes.is_empty() {
       self.y = layout_note_separator(
+        NoteSeparatorKind::Endnote,
         note_setup,
         &mut self.current,
         &mut self.pages,
@@ -946,16 +976,33 @@ impl<'a> RootFrameLayout<'a> {
         }
       }
     } else if !self.document.endnote_blocks.is_empty() {
-      self.format_note_block_sequence(note_setup, note_flow, &self.document.endnote_blocks);
+      self.format_note_block_sequence(
+        NoteSeparatorKind::Endnote,
+        note_setup,
+        note_flow,
+        &self.document.endnote_blocks,
+      );
     }
 
     if !self.document.comment_blocks.is_empty() {
-      self.format_note_block_sequence(note_setup, note_flow, &self.document.comment_blocks);
+      self.format_note_block_sequence(
+        NoteSeparatorKind::Endnote,
+        note_setup,
+        note_flow,
+        &self.document.comment_blocks,
+      );
     }
   }
 
-  fn format_note_block_sequence(&mut self, setup: PageSetup, flow: FlowContext, blocks: &[Block]) {
+  fn format_note_block_sequence(
+    &mut self,
+    separator_kind: NoteSeparatorKind,
+    setup: PageSetup,
+    flow: FlowContext,
+    blocks: &[Block],
+  ) {
     self.y = layout_note_separator(
+      separator_kind,
       setup,
       &mut self.current,
       &mut self.pages,
@@ -2257,7 +2304,11 @@ fn item_line_y(item: &PageItem) -> Option<f32> {
   match item {
     PageItem::Text(text) => Some(text.y_pt),
     PageItem::Image(image) if !image.floating => Some(image.y_pt),
-    PageItem::Image(_) | PageItem::Rect(_) | PageItem::Fill(_) | PageItem::Line(_) => None,
+    PageItem::Image(_)
+    | PageItem::Rect(_)
+    | PageItem::Fill(_)
+    | PageItem::Line(_)
+    | PageItem::Polyline(_) => None,
   }
 }
 
@@ -2299,6 +2350,12 @@ fn item_bounds(item: &PageItem) -> Option<(f32, f32, f32, f32)> {
         line.y1_pt.max(line.y2_pt) + half_width,
       ))
     }
+    PageItem::Polyline(polyline) => Some((
+      polyline.x_pt,
+      polyline.y_pt,
+      polyline.x_pt + polyline.width_pt,
+      polyline.y_pt + polyline.height_pt,
+    )),
   }
 }
 
@@ -2874,6 +2931,7 @@ fn restore_body_content_bottom(flow: FlowContext) -> FlowContext {
 }
 
 fn layout_note_separator(
+  kind: NoteSeparatorKind,
   setup: PageSetup,
   current: &mut Page,
   pages: &mut Vec<Page>,
@@ -2890,16 +2948,24 @@ fn layout_note_separator(
 
   y += LO_FOOTNOTE_SEPARATOR_TOP_DIST_PT;
   let content_width = (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(0.0);
+  let separator_width = match kind {
+    NoteSeparatorKind::Footnote => content_width * LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION,
+    NoteSeparatorKind::Endnote => LO_ENDNOTE_SEPARATOR_WIDTH_PT.min(content_width),
+  };
+  let bottom_dist = match kind {
+    NoteSeparatorKind::Footnote => LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT,
+    NoteSeparatorKind::Endnote => LO_ENDNOTE_SEPARATOR_BOTTOM_DIST_PT,
+  };
   current.items.push(PageItem::Line(LineItem {
     x1_pt: setup.margin_left_pt,
     y1_pt: y,
-    x2_pt: setup.margin_left_pt + content_width * LO_FOOTNOTE_SEPARATOR_WIDTH_FRACTION,
+    x2_pt: setup.margin_left_pt + separator_width,
     y2_pt: y + LO_FOOTNOTE_SEPARATOR_STROKE_PT,
     width_pt: LO_FOOTNOTE_SEPARATOR_STROKE_PT,
     color: RgbColor { r: 0, g: 0, b: 0 },
     kind: LineItemKind::FilledRect,
   }));
-  y + LO_FOOTNOTE_SEPARATOR_BOTTOM_DIST_PT
+  y + bottom_dist
 }
 
 fn footnote_boss_reserve(
@@ -3034,6 +3100,7 @@ fn footnote_boss_format(
     };
     if needs_separator {
       y = layout_note_separator(
+        NoteSeparatorKind::Footnote,
         footnote_flow.setup,
         current,
         pages,
@@ -4789,7 +4856,7 @@ fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom:
     PageItem::Text(text) => text.y_pt + text.line_height_pt >= top && text.y_pt <= bottom,
     PageItem::Image(image) => image.y_pt + image.height_pt >= top && image.y_pt <= bottom,
     PageItem::Rect(rect) => rect.y_pt + rect.height_pt >= top && rect.y_pt <= bottom,
-    PageItem::Fill(_) | PageItem::Line(_) => true,
+    PageItem::Fill(_) | PageItem::Line(_) | PageItem::Polyline(_) => true,
   }
 }
 
@@ -6153,6 +6220,19 @@ impl<'a> TextFrameLayout<'a> {
               );
               return;
             }
+            if let InlineShapeGeometry::Polyline { points, closed } = &shape.geometry {
+              current.items.push(PageItem::Polyline(PolylineItem {
+                x_pt,
+                y_pt,
+                width_pt,
+                height_pt,
+                points: points.clone(),
+                closed: *closed,
+                fill_color: shape.fill_color,
+                stroke: shape.stroke,
+              }));
+              return;
+            }
             if shape.fill_color.is_some() || shape.stroke.is_some() {
               current.items.push(PageItem::Rect(RectItem {
                 x_pt,
@@ -6657,6 +6737,7 @@ fn item_y(item: &PageItem) -> Option<f32> {
     PageItem::Rect(rect) => Some(rect.y_pt),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
+    PageItem::Polyline(_) => None,
   }
 }
 
@@ -6667,6 +6748,7 @@ fn item_horizontal_bounds(item: &PageItem) -> Option<(f32, f32)> {
     PageItem::Rect(rect) => Some((rect.x_pt, rect.width_pt)),
     PageItem::Fill(_) => None,
     PageItem::Line(_) => None,
+    PageItem::Polyline(_) => None,
   }
 }
 
@@ -6677,6 +6759,7 @@ fn shift_item_x(item: &mut PageItem, offset: f32) {
     PageItem::Rect(rect) => rect.x_pt += offset,
     PageItem::Fill(_) => {}
     PageItem::Line(_) => {}
+    PageItem::Polyline(_) => {}
   }
 }
 

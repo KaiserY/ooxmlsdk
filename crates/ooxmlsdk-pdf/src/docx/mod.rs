@@ -5034,7 +5034,7 @@ fn drawingml_shape_from_fragment(
 
   let geometry = drawingml_shape_geometry_kind(&sp_pr);
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    drawingml_geometry_from_sp_pr(&sp_pr, geometry)?;
+    drawingml_geometry_from_sp_pr(&sp_pr, &geometry)?;
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
@@ -5059,7 +5059,7 @@ fn drawingml_shape_from_fragment(
 
 fn drawingml_shape_geometry(xml: &str) -> Option<(f32, f32, f32, f32)> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  drawingml_geometry_from_sp_pr(&sp_pr, drawingml_shape_geometry_kind(&sp_pr))
+  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr))
 }
 
 fn drawingml_group_transform_from_fragment(xml: &str) -> Option<DrawingMlGroupXfrm> {
@@ -5141,7 +5141,7 @@ fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
 
 fn drawingml_geometry_from_sp_pr(
   sp_pr: &str,
-  geometry: InlineShapeGeometry,
+  geometry: &InlineShapeGeometry,
 ) -> Option<(f32, f32, f32, f32)> {
   let mut reader = Reader::from_str(sp_pr);
   reader.config_mut().trim_text(false);
@@ -5180,7 +5180,9 @@ fn drawingml_geometry_from_sp_pr(
   match geometry {
     InlineShapeGeometry::Rectangle if width_pt <= 0.0 || height_pt <= 0.0 => return None,
     InlineShapeGeometry::Line if width_pt <= 0.0 && height_pt <= 0.0 => return None,
-    InlineShapeGeometry::Rectangle | InlineShapeGeometry::Line => {}
+    InlineShapeGeometry::Rectangle
+    | InlineShapeGeometry::Line
+    | InlineShapeGeometry::Polyline { .. } => {}
   }
 
   Some((offset_x_pt, offset_y_pt, width_pt, height_pt))
@@ -5546,6 +5548,11 @@ fn push_picture_choice_shapes(
         inlines.push(InlineItem::Shape(shape));
       }
     }
+    w::PictureChoice::VPolyline(polyline) => {
+      if let Some(shape) = vml_polyline_shape(polyline) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
     _ => {}
   }
 }
@@ -5561,6 +5568,11 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
       }
       v::GroupChoice::VShape(shape) => {
         if let Some(shape) = vml_shape_shape(shape, images) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::VPolyline(polyline) => {
+        if let Some(shape) = vml_polyline_shape(polyline) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -5587,6 +5599,76 @@ fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShap
     shape.stroke_color.as_deref(),
     shape.stroke_weight.as_deref(),
   )
+}
+
+fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
+  if vml_style_is_hidden(polyline.style.as_deref()) {
+    return None;
+  }
+  let points = vml_polyline_points(polyline.points.as_deref()?)?;
+  let (min_x, min_y, max_x, max_y) = polyline_bounds(&points)?;
+  let width_pt = max_x - min_x;
+  let height_pt = max_y - min_y;
+  if width_pt <= f32::EPSILON || height_pt <= f32::EPSILON {
+    return None;
+  }
+  let closed = points
+    .first()
+    .zip(points.last())
+    .is_some_and(|(first, last)| {
+      (first.0 - last.0).abs() <= 0.01 && (first.1 - last.1).abs() <= 0.01
+    });
+  let relative_points = points
+    .into_iter()
+    .map(|(x, y)| (x - min_x, y - min_y))
+    .collect();
+  let filled = polyline.filled.is_none_or(|value| value.as_bool());
+  let stroked = polyline.stroked.is_none_or(|value| value.as_bool());
+  let fill_color = filled
+    .then(|| polyline.fill_color.as_deref().and_then(parse_vml_color))
+    .flatten();
+  let stroke = if stroked {
+    Some(BorderStyle {
+      width_pt: polyline
+        .stroke_weight
+        .as_deref()
+        .and_then(vml_measure_to_points)
+        .unwrap_or_else(|| units::emu_to_points(VML_DEFAULT_STROKE_WEIGHT_EMU)),
+      spacing_pt: 0.0,
+      color: polyline
+        .stroke_color
+        .as_deref()
+        .and_then(parse_vml_color)
+        .unwrap_or(RgbColor { r: 0, g: 0, b: 0 }),
+      compound: false,
+    })
+  } else {
+    None
+  };
+  if fill_color.is_none() && stroke.is_none() {
+    return None;
+  }
+  let style = vml_image_style(polyline.style.as_deref());
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    geometry: InlineShapeGeometry::Polyline {
+      points: relative_points,
+      closed,
+    },
+    offset_x_pt: min_x,
+    offset_y_pt: min_y,
+    fill_color,
+    fill_image: None,
+    stroke,
+    placement: style.placement(),
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
 }
 
 fn vml_rectangle_fill_image(
@@ -5760,8 +5842,52 @@ fn parse_vml_color(value: &str) -> Option<RgbColor> {
   if let Some(hex) = base.strip_prefix('#') {
     parse_hex_color(hex)
   } else {
-    parse_hex_color(base)
+    parse_hex_color(base).or_else(|| vml_named_color(base))
   }
+}
+
+fn vml_named_color(value: &str) -> Option<RgbColor> {
+  match value.to_ascii_lowercase().as_str() {
+    "black" => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    "teal" => Some(RgbColor {
+      r: 0,
+      g: 128,
+      b: 128,
+    }),
+    "white" => Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }),
+    _ => None,
+  }
+}
+
+fn vml_polyline_points(value: &str) -> Option<Vec<(f32, f32)>> {
+  let values = value
+    .split(',')
+    .map(|part| vml_measure_to_points(part.trim()))
+    .collect::<Option<Vec<_>>>()?;
+  let mut points = Vec::new();
+  for pair in values.chunks_exact(2) {
+    points.push((pair[0], pair[1]));
+  }
+  (points.len() >= 2).then_some(points)
+}
+
+fn polyline_bounds(points: &[(f32, f32)]) -> Option<(f32, f32, f32, f32)> {
+  let &(first_x, first_y) = points.first()?;
+  let mut min_x = first_x;
+  let mut min_y = first_y;
+  let mut max_x = first_x;
+  let mut max_y = first_y;
+  for &(x, y) in points {
+    min_x = min_x.min(x);
+    min_y = min_y.min(y);
+    max_x = max_x.max(x);
+    max_y = max_y.max(y);
+  }
+  Some((min_x, min_y, max_x, max_y))
 }
 
 fn pict_image_impl(picture: &w::Picture, images: &ImageCatalog) -> Option<InlineImage> {

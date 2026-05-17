@@ -1247,6 +1247,14 @@ fn draw_text_item(
     }
     surface.set_stroke(stroke(&item.style));
     surface.set_fill(Some(fill(&item.style)));
+    let rotated = item.style.rotation_deg.abs() > f32::EPSILON;
+    if rotated {
+      surface.push_transform(&Transform::from_rotate_at(
+        item.style.rotation_deg,
+        portion.x_pt,
+        portion.baseline_y,
+      ));
+    }
     let vertical_scale = if item.text.contains('\t') {
       1.0
     } else {
@@ -1284,6 +1292,9 @@ fn draw_text_item(
       );
     }
     if (vertical_scale - 1.0).abs() > f32::EPSILON {
+      surface.pop();
+    }
+    if rotated {
       surface.pop();
     }
     if let Some(underline) = &portion.underline {

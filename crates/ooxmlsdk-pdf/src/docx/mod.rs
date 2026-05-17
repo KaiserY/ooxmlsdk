@@ -202,14 +202,16 @@ fn chart_text_blocks(
       continue;
     };
     let color = chart_label_color(&xml, &styles.theme_colors).unwrap_or_default();
+    let vertical_axis_labels = chart_vertical_multilevel_axis_labels(&xml);
     let mut texts = chart_visible_texts(&xml);
     texts.extend(chart_derived_axis_labels(&texts));
     for text in texts {
       for segment in chart_visible_text_segments(text) {
-        blocks.push(chart_text_block(
-          segment,
-          text_style_with_color(styles, color),
-        ));
+        let mut style = text_style_with_color(styles, color);
+        if vertical_axis_labels.iter().any(|label| label == &segment) {
+          style.rotation_deg = -90.0;
+        }
+        blocks.push(chart_text_block(segment, style));
       }
     }
   }
@@ -278,6 +280,113 @@ fn chart_derived_axis_labels(texts: &[String]) -> Vec<String> {
     .then_some(label)
     .into_iter()
     .collect()
+}
+
+fn chart_vertical_multilevel_axis_labels(xml: &str) -> Vec<String> {
+  if !chart_has_vertical_multilevel_category_axis(xml) {
+    return Vec::new();
+  }
+
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_multilevel_label = false;
+  let mut level_index = 0usize;
+  let mut in_rotated_level = false;
+  let mut in_text = false;
+  let mut current = String::new();
+  let mut labels = Vec::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) => {
+        let name = event.name().as_ref().to_vec();
+        if qname_ends_with(&name, b"multiLvlStrRef") {
+          in_multilevel_label = true;
+          level_index = 0;
+          in_rotated_level = false;
+        } else if in_multilevel_label && qname_ends_with(&name, b"lvl") {
+          in_rotated_level = level_index > 0;
+          level_index += 1;
+        }
+        if in_multilevel_label && in_rotated_level && qname_ends_with(&name, b"v") {
+          in_text = true;
+          current.clear();
+        }
+      }
+      Ok(Event::Empty(_)) => {}
+      Ok(Event::End(event)) => {
+        if in_multilevel_label && qname_ends_with(event.name().as_ref(), b"v") {
+          push_unique_chart_text(&mut labels, &current);
+          current.clear();
+          in_text = false;
+        }
+        if qname_ends_with(event.name().as_ref(), b"multiLvlStrRef") {
+          in_multilevel_label = false;
+        }
+        if qname_ends_with(event.name().as_ref(), b"lvl") {
+          in_rotated_level = false;
+        }
+      }
+      Ok(Event::Text(event)) if in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  labels
+}
+
+fn chart_has_vertical_multilevel_category_axis(xml: &str) -> bool {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  let mut in_cat_axis = false;
+  let mut axis_has_vertical_text = false;
+  let mut axis_has_multilevel_labels = false;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"catAx") => {
+        in_cat_axis = true;
+        axis_has_vertical_text = false;
+        axis_has_multilevel_labels = false;
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"catAx") => {
+        if axis_has_vertical_text && axis_has_multilevel_labels {
+          return true;
+        }
+        in_cat_axis = false;
+      }
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if in_cat_axis && qname_ends_with(event.name().as_ref(), b"bodyPr") =>
+      {
+        axis_has_vertical_text |= attr_value(&event, b"rot")
+          .and_then(|value| value.parse::<i32>().ok())
+          .is_some_and(|rotation| rotation.abs() >= 54_000_000);
+      }
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if in_cat_axis && qname_ends_with(event.name().as_ref(), b"noMultiLvlLbl") =>
+      {
+        axis_has_multilevel_labels |= attr_value(&event, b"val").as_deref() != Some("1");
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  false
 }
 
 fn diagram_text_blocks(

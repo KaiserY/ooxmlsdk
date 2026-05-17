@@ -56,7 +56,7 @@ pub(super) fn paragraph_model_with_base(
       .map(ParagraphProps::Direct),
   );
   let mut run_style =
-    properties::paragraph_run_style(styles, style_id, base.run_style, base.run_overrides);
+    properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);
   if paragraph_mark_is_deleted(paragraph) {
     run_style.color = redline_author_color();
     run_style.strikethrough = true;
@@ -66,10 +66,24 @@ pub(super) fn paragraph_model_with_base(
     .as_deref()
     .and_then(|properties| properties.numbering_properties.as_deref());
   let style_numbering = styles.paragraph_numbering_properties(style_id);
+  let paragraph_mark_run_properties = paragraph
+    .paragraph_properties
+    .as_deref()
+    .and_then(|properties| properties.paragraph_mark_run_properties.as_deref());
+  let mut numbering_base_style = run_style.clone();
+  numbering_base_style.bold = false;
+  numbering_base_style.italic = false;
+  numbering_base_style.underline = false;
   let numbering_label = direct_numbering
     .or(style_numbering.as_ref())
     .and_then(|properties| {
-      numbering.next_label(properties, &mut format, styles, run_style.clone())
+      numbering.next_label(
+        properties,
+        &mut format,
+        styles,
+        numbering_base_style.clone(),
+        paragraph_mark_run_properties,
+      )
     });
   let list_label = numbering_label
     .as_ref()

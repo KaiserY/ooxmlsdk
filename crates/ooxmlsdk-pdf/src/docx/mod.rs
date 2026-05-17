@@ -7603,6 +7603,12 @@ theme_color_choice_value!(
 );
 
 pub(super) fn resolve_run_color(color: &w::Color, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  if color.theme_shade.is_some()
+    && let Some(resolved) = parse_hex_color(&color.val)
+  {
+    return Some(resolved);
+  }
+
   let has_theme_transform = color.theme_tint.is_some() || color.theme_shade.is_some();
 
   if !has_theme_transform && let Some(resolved) = parse_hex_color(&color.val) {
@@ -8454,6 +8460,7 @@ impl NumberingCatalog {
     format: &mut ParagraphFormat,
     styles: &StylesCatalog,
     base_style: TextStyle,
+    paragraph_mark_run_properties: Option<&w::ParagraphMarkRunProperties>,
   ) -> Option<NumberingLabel> {
     let num_id = properties.numbering_id.as_ref()?.val;
     let level_index = properties
@@ -8502,6 +8509,18 @@ impl NumberingCatalog {
       &styles.theme_fonts,
       &styles.theme_colors,
     );
+    if paragraph_mark_run_properties.is_some() {
+      style = properties::paragraph_mark_run_style(paragraph_mark_run_properties, style, styles);
+      properties::merge_run_style(
+        &mut style,
+        level
+          .symbol_run_properties
+          .as_ref()
+          .map(RunProps::Numbering),
+        &styles.theme_fonts,
+        &styles.theme_colors,
+      );
+    }
     let image = level
       .picture_bullet_id
       .and_then(|id| self.picture_bullets.get(&id).cloned());
@@ -8817,6 +8836,7 @@ pub(super) enum RunProps<'a> {
   Style(&'a w::StyleRunProperties),
   BaseStyle(&'a w::RunPropertiesBaseStyle),
   Numbering(&'a w::NumberingSymbolRunProperties),
+  ParagraphMark(&'a w::ParagraphMarkRunProperties),
 }
 
 impl<'a> RunProps<'a> {
@@ -8826,6 +8846,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.run_fonts.as_ref(),
       Self::BaseStyle(properties) => properties.run_fonts.as_ref(),
       Self::Numbering(properties) => properties.run_fonts.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_r_fonts.as_ref(),
     }
   }
 
@@ -8835,6 +8856,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.bold.as_ref(),
       Self::BaseStyle(properties) => properties.bold.as_ref(),
       Self::Numbering(properties) => properties.bold.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_b.as_ref(),
     }
   }
 
@@ -8844,6 +8866,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.italic.as_ref(),
       Self::BaseStyle(properties) => properties.italic.as_ref(),
       Self::Numbering(properties) => properties.italic.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_i.as_ref(),
     }
   }
 
@@ -8853,6 +8876,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.font_size.as_ref(),
       Self::BaseStyle(properties) => properties.font_size.as_ref(),
       Self::Numbering(properties) => properties.font_size.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_sz.as_ref(),
     }
   }
 
@@ -8862,6 +8886,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.color.as_ref(),
       Self::BaseStyle(properties) => properties.color.as_ref(),
       Self::Numbering(properties) => properties.color.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_color.as_ref(),
     }
   }
 
@@ -8871,6 +8896,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.underline.as_ref(),
       Self::BaseStyle(properties) => properties.underline.as_ref(),
       Self::Numbering(properties) => properties.underline.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_u.as_ref(),
     }
   }
 
@@ -8880,6 +8906,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.strike.as_ref(),
       Self::BaseStyle(properties) => properties.strike.as_ref(),
       Self::Numbering(properties) => properties.strike.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_strike.as_ref(),
     }
   }
 
@@ -8889,6 +8916,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.double_strike.as_ref(),
       Self::BaseStyle(properties) => properties.double_strike.as_ref(),
       Self::Numbering(properties) => properties.double_strike.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_dstrike.as_ref(),
     }
   }
 
@@ -8898,6 +8926,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.caps.as_ref(),
       Self::BaseStyle(properties) => properties.caps.as_ref(),
       Self::Numbering(properties) => properties.caps.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_caps.as_ref(),
     }
   }
 
@@ -8907,6 +8936,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.small_caps.as_ref(),
       Self::BaseStyle(properties) => properties.small_caps.as_ref(),
       Self::Numbering(properties) => properties.small_caps.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_small_caps.as_ref(),
     }
   }
 
@@ -8916,6 +8946,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.vanish.as_ref(),
       Self::BaseStyle(properties) => properties.vanish.as_ref(),
       Self::Numbering(properties) => properties.vanish.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_vanish.as_ref(),
     }
   }
 
@@ -8925,6 +8956,7 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.vertical_text_alignment.as_ref(),
       Self::BaseStyle(properties) => properties.vertical_text_alignment.as_ref(),
       Self::Numbering(properties) => properties.vertical_text_alignment.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_vert_align.as_ref(),
     }
   }
 
@@ -8934,12 +8966,14 @@ impl<'a> RunProps<'a> {
       Self::Style(properties) => properties.spacing.as_ref(),
       Self::BaseStyle(properties) => properties.spacing.as_ref(),
       Self::Numbering(properties) => properties.spacing.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_spacing.as_ref(),
     }
   }
 
   fn text_fill(&self) -> Option<&'a w14::FillTextEffect> {
     match self {
       Self::Direct(properties) => properties.fill_text_effect.as_deref(),
+      Self::ParagraphMark(properties) => properties.w14_text_fill.as_deref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -8947,6 +8981,7 @@ impl<'a> RunProps<'a> {
   fn text_outline(&self) -> Option<&'a w14::TextOutlineEffect> {
     match self {
       Self::Direct(properties) => properties.text_outline_effect.as_deref(),
+      Self::ParagraphMark(properties) => properties.w14_text_outline.as_deref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }
@@ -8954,6 +8989,7 @@ impl<'a> RunProps<'a> {
   fn highlight(&self) -> Option<&'a w::Highlight> {
     match self {
       Self::Direct(properties) => properties.highlight.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_highlight.as_ref(),
       Self::Style(_) | Self::BaseStyle(_) | Self::Numbering(_) => None,
     }
   }

@@ -56,6 +56,32 @@ pub(super) fn run_style(
   style
 }
 
+pub(super) fn paragraph_mark_run_style(
+  properties: Option<&w::ParagraphMarkRunProperties>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> TextStyle {
+  let mut style = base_style;
+  let Some(properties) = properties else {
+    return style;
+  };
+
+  style = styles.character_run_style(
+    properties
+      .w_r_style
+      .as_ref()
+      .map(|run_style| run_style.val.as_str()),
+    style,
+  );
+  merge_run_style(
+    &mut style,
+    Some(RunProps::ParagraphMark(properties)),
+    &styles.theme_fonts,
+    &styles.theme_colors,
+  );
+  style
+}
+
 pub(super) fn merge_run_style(
   style: &mut TextStyle,
   properties: Option<RunProps<'_>>,

@@ -3849,7 +3849,29 @@ fn push_run_xml_any(
     return;
   }
 
+  if let Some(drawing_xml) = first_named_xml_fragment(xml, b"drawing")
+    && let Ok(drawing) = w::Drawing::from_bytes(drawing_xml.as_bytes())
+  {
+    if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
+      inlines.push(InlineItem::Image(image));
+    }
+    drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
+    drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
+    return;
+  }
+
   if let Ok(picture) = w::Picture::from_bytes(xml.as_bytes()) {
+    if let Some(image) = drawing::pict_image(&picture, images) {
+      inlines.push(InlineItem::Image(image));
+    }
+    drawing::push_pict_shapes(&picture, inlines, images);
+    drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
+    return;
+  }
+
+  if let Some(picture_xml) = first_named_xml_fragment(xml, b"pict")
+    && let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes())
+  {
     if let Some(image) = drawing::pict_image(&picture, images) {
       inlines.push(InlineItem::Image(image));
     }
@@ -5213,6 +5235,7 @@ fn push_drawing_shapes_impl(
   let Some(graphic_data) = drawing_graphic_data(drawing) else {
     return;
   };
+  let is_top_level_picture = drawing_image_properties(graphic_data, &styles.theme_colors).is_some();
 
   let placement = match drawing.drawing_choice.as_ref() {
     Some(w::DrawingChoice::WpInline(_)) => ImagePlacement::Inline,
@@ -5221,6 +5244,16 @@ fn push_drawing_shapes_impl(
     }
     None => return,
   };
+
+  if let Some(w::DrawingChoice::WpAnchor(anchor)) = drawing.drawing_choice.as_ref()
+    && let Some(shape) = anchor_wrap_polygon_shape(anchor, placement)
+  {
+    inlines.push(InlineItem::Shape(shape));
+  }
+
+  if is_top_level_picture {
+    return;
+  }
 
   for xml in &graphic_data.xml_children {
     if let Some(chart_shapes) =
@@ -5533,6 +5566,75 @@ fn drawingml_shapes_from_xml(
   shapes
 }
 
+fn anchor_wrap_polygon_shape(
+  anchor: &wp::Anchor,
+  placement: ImagePlacement,
+) -> Option<InlineShape> {
+  let extent = anchor.extent.as_ref();
+  let width_pt = units::emu_to_points(extent.cx);
+  let height_pt = units::emu_to_points(extent.cy);
+  let geometry = anchor_wrap_polygon_geometry(anchor, width_pt, height_pt)?;
+
+  Some(InlineShape {
+    width_pt,
+    height_pt,
+    geometry,
+    offset_x_pt: 0.0,
+    offset_y_pt: 0.0,
+    fill_color: None,
+    fill_image: None,
+    stroke: None,
+    placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  })
+}
+
+fn anchor_wrap_polygon_geometry(
+  anchor: &wp::Anchor,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<InlineShapeGeometry> {
+  let polygon = match anchor.anchor_choice.as_ref()? {
+    wp::AnchorChoice::WpWrapTight(tight) => tight.wrap_polygon.as_ref(),
+    wp::AnchorChoice::WpWrapThrough(through) => through.wrap_polygon.as_ref(),
+    _ => return None,
+  };
+  let mut points = Vec::with_capacity(polygon.wp_line_to.len() + 2);
+  points.push(wrap_polygon_point(
+    polygon.start_point.x,
+    polygon.start_point.y,
+    width_pt,
+    height_pt,
+  ));
+  for point in &polygon.wp_line_to {
+    points.push(wrap_polygon_point(point.x, point.y, width_pt, height_pt));
+  }
+  if points.len() < 3 {
+    return None;
+  }
+  if points.last() != points.first() {
+    points.push(points[0]);
+  }
+
+  Some(InlineShapeGeometry::Polyline {
+    points,
+    closed: true,
+  })
+}
+
+fn wrap_polygon_point(x: i64, y: i64, width_pt: f32, height_pt: f32) -> (f32, f32) {
+  const WRAP_POLYGON_COORDINATE_SCALE: f32 = 21_600.0;
+  (
+    x as f32 / WRAP_POLYGON_COORDINATE_SCALE * width_pt,
+    y as f32 / WRAP_POLYGON_COORDINATE_SCALE * height_pt,
+  )
+}
+
 fn drawingml_group_child_placement(placement: ImagePlacement) -> ImagePlacement {
   match placement {
     ImagePlacement::Floating(mut placement) => {
@@ -5585,9 +5687,21 @@ fn drawingml_shape_from_fragment(
     return None;
   }
 
-  let geometry = drawingml_shape_geometry_kind(&sp_pr);
+  let mut geometry = drawingml_shape_geometry_kind(&sp_pr);
+  let has_custom_geometry = drawingml_has_custom_geometry(&sp_pr);
+  if geometry == InlineShapeGeometry::Rectangle && has_custom_geometry {
+    geometry = InlineShapeGeometry::Polyline {
+      points: Vec::new(),
+      closed: false,
+    };
+  }
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     drawingml_geometry_from_sp_pr(&sp_pr, &geometry, transform.raw_coordinates)?;
+  if has_custom_geometry
+    && let Some(custom_geometry) = drawingml_custom_geometry(&sp_pr, width_pt, height_pt)
+  {
+    geometry = custom_geometry;
+  }
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
@@ -5699,6 +5813,98 @@ fn drawingml_shape_geometry_kind(sp_pr: &str) -> InlineShapeGeometry {
   }
 
   InlineShapeGeometry::Rectangle
+}
+
+fn drawingml_has_custom_geometry(sp_pr: &str) -> bool {
+  let mut reader = Reader::from_str(sp_pr);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"custGeom") =>
+      {
+        return true;
+      }
+      Ok(Event::Eof) | Err(_) => return false,
+      _ => {}
+    }
+  }
+}
+
+fn drawingml_custom_geometry(
+  sp_pr: &str,
+  width_pt: f32,
+  height_pt: f32,
+) -> Option<InlineShapeGeometry> {
+  let mut reader = Reader::from_str(sp_pr);
+  reader.config_mut().trim_text(false);
+  let mut in_path = false;
+  let mut path_width = 0.0f32;
+  let mut path_height = 0.0f32;
+  let mut points = Vec::new();
+  let mut closed = false;
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"path") => {
+        in_path = true;
+        path_width = attr_value(&event, b"w")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(width_pt);
+        path_height = attr_value(&event, b"h")
+          .and_then(|value| value.parse::<f32>().ok())
+          .unwrap_or(height_pt);
+      }
+      Event::Empty(event) if in_path && qname_ends_with(event.name().as_ref(), b"pt") => {
+        let x = attr_value(&event, b"x")?.parse::<f32>().ok()?;
+        let y = attr_value(&event, b"y")?.parse::<f32>().ok()?;
+        points.push(drawingml_custom_geometry_point(
+          x,
+          y,
+          path_width,
+          path_height,
+          width_pt,
+          height_pt,
+        ));
+      }
+      Event::Empty(event) if in_path && qname_ends_with(event.name().as_ref(), b"close") => {
+        closed = true;
+      }
+      Event::End(event) if in_path && qname_ends_with(event.name().as_ref(), b"path") => {
+        break;
+      }
+      Event::Eof => break,
+      _ => {}
+    }
+  }
+
+  if points.len() == 2 && !closed {
+    return Some(InlineShapeGeometry::Line);
+  }
+
+  (points.len() >= 2).then_some(InlineShapeGeometry::Polyline { points, closed })
+}
+
+fn drawingml_custom_geometry_point(
+  x: f32,
+  y: f32,
+  path_width: f32,
+  path_height: f32,
+  width_pt: f32,
+  height_pt: f32,
+) -> (f32, f32) {
+  let scaled_x = if path_width == 0.0 {
+    0.0
+  } else {
+    x / path_width * width_pt
+  };
+  let scaled_y = if path_height == 0.0 {
+    0.0
+  } else {
+    y / path_height * height_pt
+  };
+  (scaled_x, scaled_y)
 }
 
 fn drawingml_geometry_from_sp_pr(
@@ -9833,6 +10039,44 @@ mod tests {
     assert!((frame.width_pt - 53.1).abs() < 0.001);
     assert!((frame.height_pt - 51.3).abs() < 0.001);
     assert_eq!(frame.text_box_blocks.len(), 1);
+  }
+
+  #[test]
+  fn wps_custom_geometry_line_imports_as_line_shape() {
+    // Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf100072
+    let xml = r#"<wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5760720" cy="0"/></a:xfrm><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr></wps:wsp>"#;
+    let shape = drawingml_shape_from_fragment(
+      xml,
+      ImagePlacement::Inline,
+      DrawingMlGroupTransform::identity(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+    )
+    .expect("custom geometry shape");
+
+    assert_eq!(shape.geometry, InlineShapeGeometry::Line);
+    assert_eq!(shape.stroke.expect("stroke").color.r, 0xff);
+  }
+
+  #[test]
+  fn alternate_content_drawing_imports_choice_shape() {
+    // Source: ../core/sw/qa/extras/ooxmlimport/ooxmlimport.cxx:testTdf100072
+    let xml = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><mc:Choice Requires="wps"><w:drawing><wp:anchor behindDoc="1" distT="0" distB="0" distL="114300" distR="114300" simplePos="0" locked="0" layoutInCell="1" allowOverlap="1" relativeHeight="2"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>1080135</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>1260475</wp:posOffset></wp:positionV><wp:extent cx="5760720" cy="0"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="1" name="Freeform 2"/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr/><wps:spPr><a:custGeom><a:pathLst><a:path w="8504" h="0"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="8504" y="0"/></a:lnTo></a:path></a:pathLst></a:custGeom><a:noFill/><a:ln w="6480"><a:solidFill><a:srgbClr val="ff0101"/></a:solidFill></a:ln></wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict/></mc:Fallback></mc:AlternateContent>"#;
+    let mut inlines = Vec::new();
+
+    push_run_xml_any(
+      xml,
+      &mut inlines,
+      TextStyle::default(),
+      TextStyle::default(),
+      &StylesCatalog::default(),
+      &ImageCatalog::default(),
+      &HyperlinkCatalog::default(),
+    );
+
+    assert!(inlines
+      .iter()
+      .any(|inline| matches!(inline, InlineItem::Shape(shape) if shape.geometry == InlineShapeGeometry::Line)));
   }
 
   #[test]

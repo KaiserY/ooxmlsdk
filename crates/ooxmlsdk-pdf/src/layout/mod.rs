@@ -545,6 +545,7 @@ struct FlowContext {
   default_tab_stop_pt: f32,
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
+  paragraph_spacing_context: ParagraphSpacingContext,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -552,6 +553,12 @@ enum TextSegmentation {
   Body,
   TableCell,
   DrawingLayer,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ParagraphSpacingContext {
+  Normal,
+  SectionStart,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -741,7 +748,11 @@ impl<'a> RootFrameLayout<'a> {
         section.columns,
       ));
       self.y = self.y.max(flow.content_top_pt);
-      self.format_block_sequence(&section.blocks, flow);
+      let previous_section_block = section_index
+        .checked_sub(1)
+        .and_then(|index| self.document.sections.get(index))
+        .and_then(|section| section.blocks.last());
+      self.format_block_sequence_with_previous(&section.blocks, flow, previous_section_block);
     }
   }
 
@@ -815,6 +826,27 @@ impl<'a> RootFrameLayout<'a> {
       let previous = index.checked_sub(1).and_then(|index| blocks.get(index));
       let next = blocks.get(index + 1);
       self.format_block(index, previous, block, next, &mut flow);
+    }
+  }
+
+  fn format_block_sequence_with_previous(
+    &mut self,
+    blocks: &[Block],
+    mut flow: FlowContext,
+    previous_block: Option<&Block>,
+  ) {
+    for (index, block) in blocks.iter().enumerate() {
+      self.record_layout_checkpoint(index, flow);
+      let previous = index
+        .checked_sub(1)
+        .and_then(|index| blocks.get(index))
+        .or_else(|| (index == 0).then_some(previous_block).flatten());
+      let next = blocks.get(index + 1);
+      if index == 0 && previous_block.is_some() {
+        flow.paragraph_spacing_context = ParagraphSpacingContext::SectionStart;
+      }
+      self.format_block(index, previous, block, next, &mut flow);
+      flow.paragraph_spacing_context = ParagraphSpacingContext::Normal;
     }
   }
 
@@ -2454,6 +2486,7 @@ fn flow_context(
     default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::Body,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
   }
 }
 
@@ -2716,12 +2749,27 @@ fn paragraph_spacing_before(
   {
     return 0.0;
   }
+  if flow.paragraph_spacing_context == ParagraphSpacingContext::SectionStart
+    && let Some(Block::Paragraph(previous)) = previous
+  {
+    return section_start_spacing_before(previous, paragraph);
+  }
   if let Some(Block::Paragraph(previous)) = previous
     && suppress_contextual_spacing(previous, paragraph)
   {
     return 0.0;
   }
   paragraph.format.spacing_before_pt
+}
+
+fn section_start_spacing_before(
+  previous: &crate::docx::Paragraph,
+  paragraph: &crate::docx::Paragraph,
+) -> f32 {
+  if paragraph.format.contextual_spacing {
+    return 0.0;
+  }
+  (paragraph.format.spacing_before_pt - previous.format.spacing_after_pt).max(0.0)
 }
 
 fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Paragraph) -> bool {
@@ -2971,6 +3019,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     default_tab_stop_pt: area.default_tab_stop_pt,
     repeating_slots: area.repeating_slots,
     text_segmentation: TextSegmentation::Body,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
   }
 }
 
@@ -3330,6 +3379,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           default_tab_stop_pt: document.default_tab_stop_pt,
           repeating_slots: RepeatingSlotState::default(),
           text_segmentation: TextSegmentation::Body,
+          paragraph_spacing_context: ParagraphSpacingContext::Normal,
         },
       );
     }
@@ -3356,6 +3406,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           default_tab_stop_pt: document.default_tab_stop_pt,
           repeating_slots: RepeatingSlotState::default(),
           text_segmentation: TextSegmentation::Body,
+          paragraph_spacing_context: ParagraphSpacingContext::Normal,
         },
       );
     }
@@ -4886,6 +4937,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
   let mut nested_page = empty_page(setup, current.section_index);
   let mut discarded_pages = Vec::new();
@@ -4978,6 +5030,7 @@ fn layout_shape_text_box(
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::DrawingLayer,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
   let content_height = shape
     .text_box_blocks
@@ -5051,6 +5104,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
   let content = cell
     .blocks
@@ -6891,11 +6945,7 @@ fn force_page_break(
   };
   pages.push(std::mem::replace(
     current,
-    empty_section_page(
-      flow.setup,
-      current.section_index,
-      next_flow.section_page_index,
-    ),
+    empty_section_page(flow.setup, flow.section_index, next_flow.section_page_index),
   ));
   next_flow = body_flow_for_page(flow_with_column(next_flow, 0), pages.len() + 1);
   (next_flow, next_flow.content_top_pt)

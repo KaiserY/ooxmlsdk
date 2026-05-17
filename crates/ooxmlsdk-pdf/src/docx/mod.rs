@@ -662,6 +662,8 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
       style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     })],
     footnote_reference_ids: Vec::new(),
@@ -669,6 +671,8 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     #[cfg(test)]
     runs: Vec::new(),
     format: Box::new(ParagraphFormat::default()),
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
@@ -721,6 +725,8 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
     #[cfg(test)]
     runs: Vec::new(),
     format: Box::new(ParagraphFormat::default()),
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
     list_label: None,
     list_label_style: TextStyle::default(),
     list_label_hyperlink_url: None,
@@ -1776,6 +1782,8 @@ fn prepend_note_marker(paragraph: &mut Paragraph, label: &NoteLabel) {
       style: note_reference_style(&base_style),
       hyperlink_url: label.hyperlink_url.clone(),
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     }),
   );
@@ -3096,12 +3104,69 @@ fn flush_unclosed_complex_field(
 }
 
 fn dynamic_field_kind(instr: &str) -> Option<DynamicFieldKind> {
-  let name = instr.split_whitespace().next()?.to_ascii_uppercase();
+  let tokens = field_instruction_tokens(instr);
+  let name = tokens.first()?.to_ascii_uppercase();
   match name.as_str() {
     "PAGE" => Some(DynamicFieldKind::Page),
     "NUMPAGES" => Some(DynamicFieldKind::NumPages),
+    "STYLEREF" => style_ref_field_kind(&tokens[1..]),
     _ => None,
   }
+}
+
+fn style_ref_field_kind(tokens: &[String]) -> Option<DynamicFieldKind> {
+  let mut style_name = None;
+  let mut from_bottom = false;
+  let mut skip_switch_arg = false;
+  for token in tokens {
+    if skip_switch_arg {
+      skip_switch_arg = false;
+      continue;
+    }
+    if let Some(switch) = token.strip_prefix('\\') {
+      if switch.eq_ignore_ascii_case("l") {
+        from_bottom = true;
+      } else if switch.len() > 1 && switch.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        skip_switch_arg = true;
+      } else if style_name.is_none() && switch.len() == 1 && switch.as_bytes()[0].is_ascii_digit() {
+        style_name = Some(switch.to_string());
+      }
+      continue;
+    }
+    if style_name.is_none() {
+      style_name = Some(token.clone());
+    }
+  }
+  style_name.map(|style_name| DynamicFieldKind::StyleRef {
+    style_name: Arc::<str>::from(style_name),
+    from_bottom,
+  })
+}
+
+fn field_instruction_tokens(instr: &str) -> Vec<String> {
+  let mut tokens = Vec::new();
+  let mut current = String::new();
+  let mut quoted = false;
+  for ch in instr.chars() {
+    match ch {
+      '"' => {
+        if quoted || !current.is_empty() {
+          tokens.push(std::mem::take(&mut current));
+        }
+        quoted = !quoted;
+      }
+      ch if ch.is_whitespace() && !quoted => {
+        if !current.is_empty() {
+          tokens.push(std::mem::take(&mut current));
+        }
+      }
+      _ => current.push(ch),
+    }
+  }
+  if !current.is_empty() {
+    tokens.push(current);
+  }
+  tokens
 }
 
 fn push_dynamic_field(
@@ -3115,6 +3180,8 @@ fn push_dynamic_field(
     style,
     hyperlink_url: hyperlink_url.map(ToString::to_string),
     dynamic_field: Some(kind),
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -3534,7 +3601,14 @@ fn push_run(
   hyperlink_url: Option<&str>,
 ) {
   let style = properties::run_style(run.run_properties.as_deref(), base_style.clone(), styles);
+  let style_ref_keys = run
+    .run_properties
+    .as_deref()
+    .and_then(run_properties_style_id)
+    .map(|style_id| styles.style_ref_keys(style_id))
+    .unwrap_or_default();
   if style.hidden {
+    push_hidden_style_ref_run(run, inlines, style, hyperlink_url, &style_ref_keys);
     return;
   }
   let mut text = String::new();
@@ -3555,18 +3629,36 @@ fn push_run(
       w::RunChoice::WCr => text.push('\n'),
       w::RunChoice::WBr(br) => match br.r#type {
         Some(w::BreakValues::Page) => {
-          flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+          flush_run_text(
+            inlines,
+            &mut text,
+            style.clone(),
+            hyperlink_url,
+            &style_ref_keys,
+          );
           inlines.push(InlineItem::PageBreak);
         }
         Some(w::BreakValues::Column) => {
-          flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+          flush_run_text(
+            inlines,
+            &mut text,
+            style.clone(),
+            hyperlink_url,
+            &style_ref_keys,
+          );
           inlines.push(InlineItem::ColumnBreak);
         }
         Some(w::BreakValues::TextWrapping) | None => text.push('\n'),
       },
       // This is a cached layout artifact from Word, not an author-authored break.
       w::RunChoice::WLastRenderedPageBreak => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         inlines.push(InlineItem::LastRenderedPageBreak);
       }
       w::RunChoice::WSym(symbol) => {
@@ -3575,7 +3667,13 @@ fn push_run(
         }
       }
       w::RunChoice::WPgNum => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_dynamic_field(
           inlines,
           DynamicFieldKind::Page,
@@ -3586,7 +3684,13 @@ fn push_run(
       w::RunChoice::WNoBreakHyphen => text.push('\u{2011}'),
       w::RunChoice::WSoftHyphen => text.push('\u{00ad}'),
       w::RunChoice::WFootnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_note_reference(
           inlines,
           reference.id,
@@ -3595,7 +3699,13 @@ fn push_run(
         );
       }
       w::RunChoice::WEndnoteReference(reference) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_note_reference(
           inlines,
           reference.id,
@@ -3604,11 +3714,23 @@ fn push_run(
         );
       }
       w::RunChoice::WCommentReference(reference) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_comment_reference(inlines, &reference.id, style.clone());
       }
       w::RunChoice::WDrawing(drawing) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         if let Some(image) = drawing::inline_image(drawing, styles, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
@@ -3623,7 +3745,13 @@ fn push_run(
         );
       }
       w::RunChoice::WPict(picture) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         if let Some(image) = drawing::pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
@@ -3638,14 +3766,26 @@ fn push_run(
         );
       }
       w::RunChoice::WObject(object) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         if let Some(image) = embedded_object_image(object, images) {
           inlines.push(InlineItem::Image(image));
         }
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::XmlAny(xml) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_run_xml_any(
           xml,
           inlines,
@@ -3657,7 +3797,13 @@ fn push_run(
         );
       }
       w::RunChoice::WRuby(ruby) => {
-        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        flush_run_text(
+          inlines,
+          &mut text,
+          style.clone(),
+          hyperlink_url,
+          &style_ref_keys,
+        );
         push_ruby_base(
           ruby,
           inlines,
@@ -3672,7 +3818,75 @@ fn push_run(
     }
   }
 
-  flush_run_text(inlines, &mut text, style, hyperlink_url);
+  flush_run_text(inlines, &mut text, style, hyperlink_url, &style_ref_keys);
+}
+
+fn push_hidden_style_ref_run(
+  run: &w::Run,
+  inlines: &mut Vec<InlineItem>,
+  style: TextStyle,
+  hyperlink_url: Option<&str>,
+  style_ref_keys: &[Arc<str>],
+) {
+  if style_ref_keys.is_empty() {
+    return;
+  }
+  let text = hidden_run_text(run);
+  let text = text.trim();
+  if text.is_empty() {
+    return;
+  }
+  inlines.push(InlineItem::Text(TextRun {
+    text: String::new(),
+    style,
+    hyperlink_url: hyperlink_url.map(ToString::to_string),
+    dynamic_field: None,
+    style_ref_keys: style_ref_keys.to_vec(),
+    style_ref_text: Some(Arc::<str>::from(text)),
+    preserve_text_portion: false,
+  }));
+}
+
+fn hidden_run_text(run: &w::Run) -> String {
+  let mut text = String::new();
+  for choice in &run.run_choice {
+    match choice {
+      w::RunChoice::WT(text_node) => {
+        if let Some(content) = &text_node.xml_content {
+          text.push_str(content);
+        }
+      }
+      w::RunChoice::WDelText(text_node) => {
+        if let Some(content) = &text_node.xml_content {
+          text.push_str(content);
+        }
+      }
+      w::RunChoice::WTab | w::RunChoice::WPtab(_) => text.push('\t'),
+      w::RunChoice::WCr => text.push('\n'),
+      w::RunChoice::WBr(br)
+        if !matches!(
+          br.r#type,
+          Some(w::BreakValues::Page | w::BreakValues::Column)
+        ) =>
+      {
+        text.push('\n');
+      }
+      w::RunChoice::WSym(symbol) => {
+        if let Some(symbol) = symbol_text(symbol) {
+          text.push(symbol);
+        }
+      }
+      _ => {}
+    }
+  }
+  text
+}
+
+fn run_properties_style_id(properties: &w::RunProperties) -> Option<&str> {
+  properties
+    .run_style
+    .as_ref()
+    .map(|run_style| run_style.val.as_str())
 }
 
 fn push_redline_run(
@@ -4258,6 +4472,8 @@ fn push_note_reference(
     style: note_reference_style(&style),
     hyperlink_url,
     dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -4296,6 +4512,8 @@ fn push_comment_reference(inlines: &mut Vec<InlineItem>, id: &str, style: TextSt
     },
     hyperlink_url: None,
     dynamic_field: None,
+    style_ref_keys: Vec::new(),
+    style_ref_text: None,
     preserve_text_portion: false,
   }));
 }
@@ -4305,13 +4523,17 @@ fn flush_run_text(
   text: &mut String,
   style: TextStyle,
   hyperlink_url: Option<&str>,
+  style_ref_keys: &[Arc<str>],
 ) {
   if !text.is_empty() {
+    let text = run_display_text(std::mem::take(text), style.clone());
     inlines.push(InlineItem::Text(TextRun {
-      text: run_display_text(std::mem::take(text), style.clone()),
+      text,
       style,
       hyperlink_url: hyperlink_url.map(ToString::to_string),
       dynamic_field: None,
+      style_ref_keys: style_ref_keys.to_vec(),
+      style_ref_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -4948,6 +5170,8 @@ fn push_drawing_textboxes_impl(
         style: base_style.clone(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       }));
     }
@@ -7418,6 +7642,8 @@ fn push_textbox_content(
           style: base_style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         }));
       }
@@ -7497,6 +7723,8 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
           style: style.clone(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         }));
       }
@@ -7523,6 +7751,8 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
       style: style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -8271,6 +8501,7 @@ pub(super) struct ResolvedColor {
 #[derive(Clone, Debug, Default)]
 struct StyleEntry {
   style_type: Option<w::StyleValues>,
+  name: Option<String>,
   based_on: Option<String>,
   paragraph_format: ParagraphFormat,
   paragraph_numbering: Option<Box<w::NumberingProperties>>,
@@ -8389,6 +8620,10 @@ impl StylesCatalog {
       }
       let mut entry = StyleEntry {
         style_type: style.r#type,
+        name: style
+          .style_name
+          .as_ref()
+          .map(|style_name| style_name.val.to_string()),
         based_on: style
           .based_on
           .as_ref()
@@ -8502,6 +8737,23 @@ impl StylesCatalog {
       merge_builtin_character_style(&mut style, style_id);
     }
     style
+  }
+
+  fn style_ref_keys(&self, style_id: &str) -> Vec<Arc<str>> {
+    let mut keys = Vec::new();
+    push_unique_style_ref_key(&mut keys, style_id);
+    if let Some(entry) = self.styles.get(style_id) {
+      if let Some(name) = &entry.name {
+        push_unique_style_ref_key(&mut keys, name);
+        if matches!(entry.style_type, Some(w::StyleValues::Paragraph)) {
+          push_unique_style_ref_key(&mut keys, &format!("{name} Character"));
+        }
+      }
+      if matches!(entry.style_type, Some(w::StyleValues::Paragraph)) {
+        push_unique_style_ref_key(&mut keys, &format!("{style_id}Character"));
+      }
+    }
+    keys
   }
 
   fn table_style(&self, style_id: Option<&str>) -> TableStyleModel {
@@ -9330,6 +9582,13 @@ fn table_look_model(look: &w::TableLook) -> TableLookModel {
     model.vertical_banding = !value.as_bool();
   }
   model
+}
+
+fn push_unique_style_ref_key(keys: &mut Vec<Arc<str>>, key: &str) {
+  if key.is_empty() || keys.iter().any(|existing| existing.as_ref() == key) {
+    return;
+  }
+  keys.push(Arc::<str>::from(key));
 }
 
 fn merge_builtin_character_style(style: &mut TextStyle, style_id: &str) {

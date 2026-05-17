@@ -107,6 +107,8 @@ pub(crate) struct Paragraph {
   #[cfg(test)]
   pub runs: Vec<TextRun>,
   pub format: Box<ParagraphFormat>,
+  pub style_ref_keys: Vec<Arc<str>>,
+  pub style_ref_text: Option<Arc<str>>,
   pub list_label: Option<String>,
   pub list_label_style: TextStyle,
   pub list_label_hyperlink_url: Option<String>,
@@ -376,6 +378,8 @@ pub(crate) struct TextRun {
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  pub style_ref_keys: Vec<Arc<str>>,
+  pub style_ref_text: Option<Arc<str>>,
   pub preserve_text_portion: bool,
 }
 
@@ -412,10 +416,14 @@ impl FormWidgetIdAllocator {
   }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum DynamicFieldKind {
   Page,
   NumPages,
+  StyleRef {
+    style_name: Arc<str>,
+    from_bottom: bool,
+  },
 }
 
 #[derive(Clone, Debug)]

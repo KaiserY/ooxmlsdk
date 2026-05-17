@@ -199,7 +199,7 @@ pub(crate) fn render(document: &LayoutDocument, options: &PdfOptions) -> Result<
             && text.width_pt >= 0.0
             && !text.portions.is_empty()
             && text.portions.iter().all(|portion| {
-              match portion.kind {
+              match &portion.kind {
                 PaintTextPortionKind::Field(kind) => {
                   let _field_kind = kind;
                 }
@@ -970,8 +970,11 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
   if text.text.is_empty() {
     return Vec::new();
   }
-  if let Some(kind) = text.dynamic_field {
-    return vec![(PaintTextPortionKind::Field(kind), 0..text.text.len())];
+  if let Some(kind) = &text.dynamic_field {
+    return vec![(
+      PaintTextPortionKind::Field(kind.clone()),
+      0..text.text.len(),
+    )];
   }
   let split_portions = text.pdf_text_segmentation == PdfTextSegmentation::Portion
     || (text.preserve_text_portion && (text.style.underline || text.style.strikethrough));

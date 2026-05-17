@@ -248,6 +248,8 @@ mod tests {
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -259,6 +261,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
@@ -266,6 +270,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         })],
       })],
@@ -295,6 +301,8 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let shifted = crate::docx::TextRun {
@@ -306,6 +314,8 @@ mod tests {
       },
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let next = crate::docx::TextRun {
@@ -313,6 +323,8 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let expected_advance = crate::text_metrics::inline_text_box_height(&shifted.style)
@@ -351,6 +363,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![base, shifted, next],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -376,6 +390,8 @@ mod tests {
         },
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       let next = crate::docx::TextRun {
@@ -383,6 +399,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       let doc = crate::docx::DocxDocument {
@@ -422,6 +440,8 @@ mod tests {
             line_height_rule: rule,
             ..Default::default()
           }),
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           list_label: None,
           list_label_style: crate::docx::TextStyle::default(),
           list_label_hyperlink_url: None,
@@ -454,6 +474,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       crate::docx::Paragraph {
@@ -462,6 +484,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![run],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -543,6 +567,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       crate::docx::Paragraph {
@@ -551,6 +577,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![run],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -682,6 +710,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       crate::docx::Paragraph {
@@ -690,6 +720,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![run],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -775,6 +807,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       crate::docx::Paragraph {
@@ -783,6 +817,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![run],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -875,6 +911,8 @@ mod tests {
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -886,6 +924,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
@@ -893,6 +933,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         })],
       })],
@@ -955,6 +997,8 @@ mod tests {
       comment_blocks: Vec::new(),
       blocks: vec![crate::docx::Block::Paragraph(crate::docx::Paragraph {
         format: Box::new(format),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -966,6 +1010,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         }],
         inlines: vec![crate::docx::InlineItem::Text(crate::docx::TextRun {
@@ -973,6 +1019,8 @@ mod tests {
           style: crate::docx::TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
         })],
       })],
@@ -1006,6 +1054,8 @@ mod tests {
         style: crate::docx::TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       };
       crate::docx::Paragraph {
@@ -1017,6 +1067,8 @@ mod tests {
           page_break_before,
           ..Default::default()
         }),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -1106,6 +1158,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: Vec::new(),
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,
@@ -1139,6 +1193,8 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let follow = crate::docx::TextRun {
@@ -1146,6 +1202,8 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let image = crate::docx::InlineImage {
@@ -1204,6 +1262,8 @@ mod tests {
       endnote_reference_ids: Vec::new(),
       runs: vec![intro],
       format: Box::new(crate::docx::ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       list_label: None,
       list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -1215,6 +1275,8 @@ mod tests {
       endnote_reference_ids: Vec::new(),
       runs: vec![follow],
       format: Box::new(crate::docx::ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       list_label: None,
       list_label_style: crate::docx::TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -1268,6 +1330,8 @@ mod tests {
       style: crate::docx::TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let image = crate::docx::InlineImage {
@@ -1341,6 +1405,8 @@ mod tests {
         endnote_reference_ids: Vec::new(),
         runs: vec![run],
         format: Box::new(crate::docx::ParagraphFormat::default()),
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         list_label: None,
         list_label_style: crate::docx::TextStyle::default(),
         list_label_hyperlink_url: None,

@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, options::LineBreakOptions};
 
@@ -428,6 +429,7 @@ pub(crate) struct Page {
   pub section_index: usize,
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
+  preserve_empty: bool,
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
   wrap_exclusions: Vec<WrapExclusion>,
@@ -452,6 +454,8 @@ pub(crate) struct TextItem {
   pub style: TextStyle,
   pub hyperlink_url: Option<String>,
   pub dynamic_field: Option<DynamicFieldKind>,
+  pub style_ref_keys: Vec<Arc<str>>,
+  pub style_ref_text: Option<Arc<str>>,
   pub form_widget_id: Option<u32>,
   pub paragraph_bidi: bool,
   pub preserve_text_portion: bool,
@@ -760,6 +764,11 @@ impl<'a> RootFrameLayout<'a> {
         .checked_sub(1)
         .and_then(|index| self.document.sections.get(index))
         .and_then(|section| section.blocks.last());
+      if !blocks_have_visible_body_content(&section.blocks)
+        && section_has_repeating_blocks(&section)
+      {
+        self.current.preserve_empty = true;
+      }
       self.format_block_sequence_with_previous(&section.blocks, flow, previous_section_block);
     }
   }
@@ -782,9 +791,27 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
-    if section_index > 0
+    let current_page_has_body_progress = self.current_page_has_body_progress();
+    let reuse_empty_page = self.current.items.is_empty()
+      && (section_index == 0
+        || section.break_kind == SectionBreakKind::Continuous
+        || (section.break_kind == SectionBreakKind::NextPage
+          && self.current.section_page_index > 0)
+        || (!starts_new_page(section.break_kind) && !current_page_has_body_progress));
+    if reuse_empty_page {
+      self.current.setup = section.page;
+      self.current.section_index = section_index;
+      self.current.section_page_index = 0;
+      self.y = body_content_limits_for_page(
+        section.page,
+        repeating_slot_state(self.document, section_index),
+        self.pages.len() + 1,
+        0,
+      )
+      .0;
+    } else if section_index > 0
       && starts_new_page(section.break_kind)
-      && self.current_page_has_body_progress()
+      && current_page_has_body_progress
     {
       self.push_current_page(empty_page(section.page, section_index));
       let mut section_page_index = 0;
@@ -798,17 +825,6 @@ impl<'a> RootFrameLayout<'a> {
         repeating_slot_state(self.document, section_index),
         self.pages.len() + 1,
         section_page_index,
-      )
-      .0;
-    } else if self.current.items.is_empty() {
-      self.current.setup = section.page;
-      self.current.section_index = section_index;
-      self.current.section_page_index = 0;
-      self.y = body_content_limits_for_page(
-        section.page,
-        repeating_slot_state(self.document, section_index),
-        self.pages.len() + 1,
-        0,
       )
       .0;
     }
@@ -1003,6 +1019,8 @@ impl<'a> RootFrameLayout<'a> {
         style,
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
@@ -1255,7 +1273,7 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn finish_current_page(&mut self) {
-    if !self.current.items.is_empty() || self.pages.is_empty() {
+    if !self.current.items.is_empty() || self.current.preserve_empty || self.pages.is_empty() {
       self.pages.push(std::mem::replace(
         &mut self.current,
         empty_page(self.document.page, 0),
@@ -2528,6 +2546,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_index,
     section_page_index,
     items: Vec::new(),
+    preserve_empty: false,
     frame_fragments: Vec::new(),
     frame_influences: Vec::new(),
     wrap_exclusions: Vec::new(),
@@ -3489,6 +3508,34 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
   }
 }
 
+fn section_has_repeating_blocks(section: &crate::docx::ImportedSection) -> bool {
+  !section.header_blocks.is_empty()
+    || !section.footer_blocks.is_empty()
+    || !section.first_header_blocks.is_empty()
+    || !section.first_footer_blocks.is_empty()
+    || !section.even_header_blocks.is_empty()
+    || !section.even_footer_blocks.is_empty()
+}
+
+fn blocks_have_visible_body_content(blocks: &[Block]) -> bool {
+  blocks.iter().any(block_has_visible_body_content)
+}
+
+fn block_has_visible_body_content(block: &Block) -> bool {
+  match block {
+    Block::Paragraph(paragraph) => paragraph.inlines.iter().any(|inline| match inline {
+      InlineItem::Text(run) => !run.text.trim().is_empty(),
+      InlineItem::Image(_) | InlineItem::Shape(_) => true,
+      InlineItem::FormWidgetStart(_)
+      | InlineItem::FormWidgetEnd(_)
+      | InlineItem::LastRenderedPageBreak
+      | InlineItem::PageBreak
+      | InlineItem::ColumnBreak => false,
+    }),
+    Block::Table(_) | Block::Frame(_) => true,
+  }
+}
+
 fn apply_page_backgrounds(pages: &mut [Page]) {
   for page in pages {
     let Some(color) = page.setup.background else {
@@ -3595,19 +3642,137 @@ fn page_border_reference_rect(setup: PageSetup) -> (f32, f32, f32, f32) {
 
 fn resolve_dynamic_fields(pages: &mut [Page]) {
   let total_pages = pages.len().to_string();
+  let style_ref_candidates = style_ref_candidates_by_page(pages);
   for (page_index, page) in pages.iter_mut().enumerate() {
     let page_number = (page_index + 1).to_string();
     for item in &mut page.items {
       let PageItem::Text(text) = item else {
         continue;
       };
-      match text.dynamic_field {
+      match &text.dynamic_field {
         Some(DynamicFieldKind::Page) => text.text.clone_from(&page_number),
         Some(DynamicFieldKind::NumPages) => text.text.clone_from(&total_pages),
+        Some(DynamicFieldKind::StyleRef {
+          style_name,
+          from_bottom,
+        }) => {
+          if let Some(value) =
+            resolve_style_ref(&style_ref_candidates, page_index, style_name, *from_bottom)
+          {
+            text.text = value;
+          }
+        }
         None => {}
       }
     }
   }
+}
+
+#[derive(Clone, Debug)]
+struct StyleRefCandidate {
+  y_pt: f32,
+  keys: Vec<Arc<str>>,
+  text: Arc<str>,
+}
+
+fn style_ref_candidates_by_page(pages: &[Page]) -> Vec<Vec<StyleRefCandidate>> {
+  pages
+    .iter()
+    .map(|page| {
+      let mut candidates = Vec::new();
+      for item in &page.items {
+        let PageItem::Text(text) = item else {
+          continue;
+        };
+        if text.style_ref_keys.is_empty() || text.dynamic_field.is_some() {
+          continue;
+        }
+        let Some(style_ref_text) = &text.style_ref_text else {
+          continue;
+        };
+        if candidates.iter().any(|candidate: &StyleRefCandidate| {
+          f32::abs(candidate.y_pt - text.y_pt) < 0.01
+            && candidate.keys == text.style_ref_keys
+            && candidate.text == *style_ref_text
+        }) {
+          continue;
+        }
+        candidates.push(StyleRefCandidate {
+          y_pt: text.y_pt,
+          keys: text.style_ref_keys.clone(),
+          text: style_ref_text.clone(),
+        });
+      }
+      candidates.sort_by(|a, b| a.y_pt.total_cmp(&b.y_pt));
+      candidates
+    })
+    .collect()
+}
+
+fn resolve_style_ref(
+  pages: &[Vec<StyleRefCandidate>],
+  page_index: usize,
+  style_name: &str,
+  from_bottom: bool,
+) -> Option<String> {
+  if let Some(text) = resolve_style_ref_on_page(&pages[page_index], style_name, from_bottom) {
+    return Some(text);
+  }
+  for previous_index in (0..page_index).rev() {
+    if let Some(text) = resolve_style_ref_on_page(&pages[previous_index], style_name, true) {
+      return Some(text);
+    }
+  }
+  for next_page in pages.iter().skip(page_index + 1) {
+    if let Some(text) = resolve_style_ref_on_page(next_page, style_name, false) {
+      return Some(text);
+    }
+  }
+  None
+}
+
+fn resolve_style_ref_on_page(
+  candidates: &[StyleRefCandidate],
+  style_name: &str,
+  from_bottom: bool,
+) -> Option<String> {
+  let iter: Box<dyn Iterator<Item = &StyleRefCandidate> + '_> = if from_bottom {
+    Box::new(candidates.iter().rev())
+  } else {
+    Box::new(candidates.iter())
+  };
+  iter
+    .filter(|candidate| style_ref_candidate_matches(candidate, style_name))
+    .map(|candidate| candidate.text.to_string())
+    .next()
+}
+
+fn style_ref_candidate_matches(candidate: &StyleRefCandidate, style_name: &str) -> bool {
+  let target = normalized_style_ref_name(style_name);
+  candidate
+    .keys
+    .iter()
+    .any(|key| normalized_style_ref_name(key) == target)
+}
+
+fn normalized_style_ref_name(name: &str) -> String {
+  let name = match name.trim() {
+    "1" => "Heading 1",
+    "2" => "Heading 2",
+    "3" => "Heading 3",
+    "4" => "Heading 4",
+    "5" => "Heading 5",
+    "6" => "Heading 6",
+    "7" => "Heading 7",
+    "8" => "Heading 8",
+    "9" => "Heading 9",
+    other => other,
+  };
+  name
+    .chars()
+    .filter(|ch| !ch.is_whitespace() && *ch != '-' && *ch != '_')
+    .flat_map(char::to_lowercase)
+    .collect()
 }
 
 fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: &[LayoutFrame]) {
@@ -3853,6 +4018,8 @@ pub(crate) fn text_pages(pages: Vec<(PageSetup, Vec<String>)>) -> LayoutDocument
           style: TextStyle::default(),
           hyperlink_url: None,
           dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
           preserve_text_portion: false,
           form_widget_id: None,
           paragraph_bidi: false,
@@ -5946,6 +6113,8 @@ impl<'a> TextFrameLayout<'a> {
         style: list_label_style,
         hyperlink_url: paragraph.list_label_hyperlink_url.clone(),
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
         form_widget_id: None,
         paragraph_bidi: false,
@@ -5971,7 +6140,16 @@ impl<'a> TextFrameLayout<'a> {
           let mut chunk_x = x;
           let meta = TextChunkMeta {
             hyperlink_url: run.hyperlink_url.as_deref(),
-            dynamic_field: run.dynamic_field,
+            dynamic_field: run.dynamic_field.clone(),
+            style_ref_keys: if run.style_ref_keys.is_empty() {
+              paragraph.style_ref_keys.clone()
+            } else {
+              run.style_ref_keys.clone()
+            },
+            style_ref_text: run
+              .style_ref_text
+              .clone()
+              .or_else(|| paragraph.style_ref_text.clone()),
             form_widget_id: active_form_widget_ids.last().copied(),
             paragraph_bidi: paragraph.format.bidi,
             preserve_text_portion: run.preserve_text_portion,
@@ -5998,7 +6176,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta,
+                meta.clone(),
               );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
@@ -6043,7 +6221,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta,
+                meta.clone(),
               );
               let tab_stop = next_tab_stop(
                 x,
@@ -6083,7 +6261,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta,
+                meta.clone(),
               );
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
@@ -6138,7 +6316,7 @@ impl<'a> TextFrameLayout<'a> {
                         },
                         &mut chunk,
                         &run.style,
-                        meta,
+                        meta.clone(),
                       );
                       (flow, text_frame, y, line_left, line_right) = self.advance_line(
                         TextLineAdvance {
@@ -6194,7 +6372,7 @@ impl<'a> TextFrameLayout<'a> {
                     },
                     &mut chunk,
                     &run.style,
-                    meta,
+                    meta.clone(),
                   );
                   (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
@@ -6262,7 +6440,7 @@ impl<'a> TextFrameLayout<'a> {
                 },
                 &mut chunk,
                 &run.style,
-                meta,
+                meta.clone(),
               );
             }
           }
@@ -6276,7 +6454,7 @@ impl<'a> TextFrameLayout<'a> {
             },
             &mut chunk,
             &run.style,
-            meta,
+            meta.clone(),
           );
         }
         InlineItem::FormWidgetStart(widget_id) => {
@@ -7109,10 +7287,10 @@ fn force_page_break(
     section_page_index: flow.section_page_index + 1,
     ..flow
   };
-  pages.push(std::mem::replace(
-    current,
-    empty_section_page(flow.setup, flow.section_index, next_flow.section_page_index),
-  ));
+  let mut next_page =
+    empty_section_page(flow.setup, flow.section_index, next_flow.section_page_index);
+  next_page.preserve_empty = true;
+  pages.push(std::mem::replace(current, next_page));
   next_flow = body_flow_for_page(flow_with_column(next_flow, 0), pages.len() + 1);
   (next_flow, next_flow.content_top_pt)
 }
@@ -7124,10 +7302,12 @@ struct TextPlacement {
   line_height_pt: f32,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct TextChunkMeta<'a> {
   hyperlink_url: Option<&'a str>,
   dynamic_field: Option<DynamicFieldKind>,
+  style_ref_keys: Vec<Arc<str>>,
+  style_ref_text: Option<Arc<str>>,
   form_widget_id: Option<u32>,
   paragraph_bidi: bool,
   preserve_text_portion: bool,
@@ -7153,6 +7333,8 @@ fn flush_text(
     style: style.clone(),
     hyperlink_url: meta.hyperlink_url.map(ToString::to_string),
     dynamic_field: meta.dynamic_field,
+    style_ref_keys: meta.style_ref_keys,
+    style_ref_text: meta.style_ref_text,
     form_widget_id: meta.form_widget_id,
     paragraph_bidi: meta.paragraph_bidi,
     preserve_text_portion: meta.preserve_text_portion,
@@ -7313,6 +7495,8 @@ mod tests {
         style: TextStyle::default(),
         hyperlink_url: None,
         dynamic_field: None,
+        style_ref_keys: Vec::new(),
+        style_ref_text: None,
         preserve_text_portion: false,
       })],
       footnote_reference_ids: Vec::new(),
@@ -7324,6 +7508,8 @@ mod tests {
         line_height_pt: Some(2.0),
         ..Default::default()
       }),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,
@@ -7408,6 +7594,8 @@ mod tests {
       style: TextStyle::default(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     };
     let blocks = vec![Block::Paragraph(Paragraph {
@@ -7417,6 +7605,8 @@ mod tests {
       #[cfg(test)]
       runs: vec![run],
       format: Box::new(ParagraphFormat::default()),
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       list_label: None,
       list_label_style: TextStyle::default(),
       list_label_hyperlink_url: None,

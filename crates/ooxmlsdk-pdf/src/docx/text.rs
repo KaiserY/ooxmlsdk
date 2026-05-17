@@ -1,4 +1,5 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use std::sync::Arc;
 
 use super::{
   FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog, Paragraph,
@@ -140,12 +141,19 @@ pub(super) fn paragraph_model_with_base(
   if let Some(image) = numbering_label.and_then(|label| label.image) {
     inlines.insert(0, super::InlineItem::Image(image));
   }
+  fill_character_style_ref_texts(&mut inlines);
+  let style_ref_keys = style_id
+    .map(|style_id| styles.style_ref_keys(style_id))
+    .unwrap_or_default();
+  let style_ref_text = paragraph_style_ref_text(&inlines, list_label.as_deref());
   if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
     inlines.push(super::InlineItem::Text(TextRun {
       text: String::new(),
       style: run_style.clone(),
       hyperlink_url: None,
       dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
       preserve_text_portion: false,
     }));
   }
@@ -170,11 +178,79 @@ pub(super) fn paragraph_model_with_base(
     #[cfg(test)]
     runs,
     format: Box::new(format),
+    style_ref_keys,
+    style_ref_text,
     list_label,
     list_label_style,
     list_label_hyperlink_url: None,
     list_label_tab_stop_pt,
   }
+}
+
+fn paragraph_style_ref_text(
+  inlines: &[super::InlineItem],
+  list_label: Option<&str>,
+) -> Option<Arc<str>> {
+  let mut text = String::new();
+  if let Some(label) = list_label
+    && !label.chars().all(char::is_whitespace)
+  {
+    text.push_str(label);
+  }
+  for item in inlines {
+    if let super::InlineItem::Text(run) = item
+      && run.dynamic_field.is_none()
+    {
+      if let Some(style_ref_text) = &run.style_ref_text {
+        text.push_str(style_ref_text);
+      } else {
+        text.push_str(&run.text);
+      }
+    }
+  }
+  let text = text.trim();
+  (!text.is_empty()).then(|| Arc::<str>::from(text))
+}
+
+fn fill_character_style_ref_texts(inlines: &mut [super::InlineItem]) {
+  let mut index = 0;
+  while index < inlines.len() {
+    let Some(keys) = text_run_style_ref_keys(&inlines[index]) else {
+      index += 1;
+      continue;
+    };
+    let start = index;
+    let mut text = String::new();
+    while index < inlines.len()
+      && text_run_style_ref_keys(&inlines[index]).is_some_and(|run_keys| run_keys == keys)
+    {
+      if let super::InlineItem::Text(run) = &inlines[index] {
+        if let Some(style_ref_text) = &run.style_ref_text {
+          text.push_str(style_ref_text);
+        } else {
+          text.push_str(&run.text);
+        }
+      }
+      index += 1;
+    }
+    let text = text.trim();
+    if text.is_empty() {
+      continue;
+    }
+    let text = Arc::<str>::from(text);
+    for item in &mut inlines[start..index] {
+      if let super::InlineItem::Text(run) = item {
+        run.style_ref_text = Some(text.clone());
+      }
+    }
+  }
+}
+
+fn text_run_style_ref_keys(item: &super::InlineItem) -> Option<&[Arc<str>]> {
+  let super::InlineItem::Text(run) = item else {
+    return None;
+  };
+  (!run.style_ref_keys.is_empty() && run.dynamic_field.is_none()).then_some(&run.style_ref_keys)
 }
 
 fn paragraph_mark_is_deleted(paragraph: &w::Paragraph) -> bool {

@@ -4063,7 +4063,7 @@ fn layout_table(
   if table.placement.is_some() {
     return layout_floating_table(table, flow, current, pages, y);
   }
-  TableFrameLayout::new(table, block_area(flow))
+  TableFrameLayout::new(table, block_area(flow), false)
     .map_or((flow, y), |layout| layout.format(current, pages, y))
 }
 
@@ -4077,7 +4077,7 @@ fn layout_floating_table(
   let Some(placement) = table.placement else {
     return (flow, y);
   };
-  let Some(layout) = TableFrameLayout::new(table, block_area(flow)) else {
+  let Some(layout) = TableFrameLayout::new(table, block_area(flow), true) else {
     return (flow, y);
   };
   let table_width = (layout.frame.right_pt - layout.frame.left_pt).max(DEFAULT_FONT_SIZE_PT);
@@ -4092,7 +4092,7 @@ fn layout_floating_table(
   };
   let mut frame_page = empty_page(flow.setup, current.section_index);
   let mut frame_pages = Vec::new();
-  let (_, bottom_y) = TableFrameLayout::new(table, block_area(frame_flow))
+  let (_, bottom_y) = TableFrameLayout::new(table, block_area(frame_flow), true)
     .map_or((frame_flow, frame_y), |layout| {
       layout.format(&mut frame_page, &mut frame_pages, frame_y)
     });
@@ -4121,7 +4121,7 @@ struct PendingBorderSegment {
 }
 
 impl<'a> TableFrameLayout<'a> {
-  fn new(table: &'a Table, area: BlockArea) -> Option<Self> {
+  fn new(table: &'a Table, area: BlockArea, allow_width_overflow: bool) -> Option<Self> {
     let column_count = table_column_count(table);
     if column_count == 0 {
       return None;
@@ -4131,13 +4131,17 @@ impl<'a> TableFrameLayout<'a> {
     let available_width = (area.content_width
       - max_cell_spacing_pt * column_count.saturating_sub(1) as f32)
       .max(DEFAULT_FONT_SIZE_PT);
-    let column_widths = table_column_widths(table, column_count, available_width);
+    let column_widths =
+      table_column_widths(table, column_count, available_width, allow_width_overflow);
     let table_width = column_widths.iter().sum::<f32>()
       + max_cell_spacing_pt * column_count.saturating_sub(1) as f32;
     let left_pt = table_left_position(table, area.content_left_pt, area.content_width, table_width);
+    let full_width_horizontal_borders =
+      allow_width_overflow || table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let repeating_header_count = table_repeating_header_count(table);
     let repeating_header_height =
       table_repeating_header_height(table, repeating_header_count, &column_widths);
+    let coalesce_row_shading = table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
 
     Some(Self {
       table,
@@ -4146,6 +4150,8 @@ impl<'a> TableFrameLayout<'a> {
         column_widths,
         left_pt,
         right_pt: left_pt + table_width,
+        full_width_horizontal_borders,
+        coalesce_row_shading,
         repeating_header_count,
         repeating_header_height,
       },
@@ -4170,7 +4176,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
-            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(current, y, remaining_height);
@@ -4197,7 +4203,7 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
-            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(current, y, remaining_height);
@@ -4216,7 +4222,7 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut left_border_segment);
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
-        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow)) {
+        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
           layout = next_layout;
         }
         y = layout.format_repeated_header_rows(current, y, row_height);
@@ -4350,6 +4356,8 @@ struct TableFrame {
   column_widths: Vec<f32>,
   left_pt: f32,
   right_pt: f32,
+  full_width_horizontal_borders: bool,
+  coalesce_row_shading: bool,
   repeating_header_count: usize,
   repeating_header_height: f32,
 }
@@ -4391,6 +4399,17 @@ impl RowFrame<'_, '_> {
     let cell_spacing_pt = self.cell_spacing_pt();
     let mut cell_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     if let Some(color) = self.row.redline_color {
+      current.items.push(PageItem::Fill(FillItem {
+        x_pt: cell_left,
+        y_pt: row_top,
+        width_pt: self.table_frame.right_pt - cell_left,
+        height_pt: row_bottom - row_top,
+        color,
+      }));
+    }
+    if self.table_frame.coalesce_row_shading
+      && let Some(color) = self.coalesced_row_shading()
+    {
       current.items.push(PageItem::Fill(FillItem {
         x_pt: cell_left,
         y_pt: row_top,
@@ -4503,7 +4522,51 @@ impl RowFrame<'_, '_> {
     vertical_merge_origin_cell(self.table, self.row_index, grid_start)
   }
 
+  fn coalesced_row_shading(&self) -> Option<RgbColor> {
+    let mut color = None;
+    for cell in &self.row.cells {
+      if cell.vertical_merge_continue {
+        return None;
+      }
+      match (color, cell.shading) {
+        (None, Some(cell_color)) => color = Some(cell_color),
+        (Some(color), Some(cell_color)) if color == cell_color => {}
+        _ => return None,
+      }
+    }
+    color
+  }
+
   fn paint_horizontal_borders(&self, current: &mut Page, row_top: f32, row_bottom: f32) {
+    if self.table_frame.full_width_horizontal_borders {
+      if self.row_index == 0
+        && let Some(border) = self.table.borders.and_then(|borders| borders.top)
+      {
+        let inset = border.width_pt / 2.0;
+        push_styled_line(
+          current,
+          self.table_frame.left_pt + inset,
+          row_top,
+          self.table_frame.right_pt - inset,
+          row_top,
+          border,
+        );
+      }
+      if self.row_index + 1 == self.table.rows.len()
+        && let Some(border) = self.table.borders.and_then(|borders| borders.bottom)
+      {
+        let inset = border.width_pt / 2.0;
+        push_styled_line(
+          current,
+          self.table_frame.left_pt + inset,
+          row_bottom,
+          self.table_frame.right_pt - inset,
+          row_bottom,
+          border,
+        );
+      }
+    }
+
     let cell_spacing_pt = self.cell_spacing_pt();
     let mut left_pt = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     let mut grid_index = self.row.grid_before;
@@ -4528,7 +4591,9 @@ impl RowFrame<'_, '_> {
         && let Some(border) =
           cell_horizontal_border(self.table, self.row_index, grid_index, cell, true)
       {
-        push_styled_line(current, left_pt, row_top, right_pt, row_top, border);
+        let (border_left, border_right) =
+          self.inset_horizontal_border_for_bounds(left_pt, right_pt, border);
+        push_styled_line(current, border_left, row_top, border_right, row_top, border);
       }
 
       let continues_into_next = self
@@ -4542,6 +4607,8 @@ impl RowFrame<'_, '_> {
           cell_horizontal_border(self.table, self.row_index, grid_index, cell, false)
       {
         let (border_left, border_right) = self.inset_inside_horizontal_border(left_pt, right_pt);
+        let (border_left, border_right) =
+          self.inset_horizontal_border_for_bounds(border_left, border_right, border);
         push_styled_line(
           current,
           border_left,
@@ -4609,6 +4676,22 @@ impl RowFrame<'_, '_> {
       right_pt -= border.width_pt;
     }
     (left_pt.min(right_pt), right_pt)
+  }
+
+  fn inset_horizontal_border_for_bounds(
+    &self,
+    left_pt: f32,
+    right_pt: f32,
+    border: BorderStyle,
+  ) -> (f32, f32) {
+    if !self.table_frame.full_width_horizontal_borders {
+      return (left_pt, right_pt);
+    }
+    let inset = border.width_pt;
+    (
+      (left_pt + inset).min(right_pt),
+      (right_pt - inset).max(left_pt),
+    )
   }
 }
 
@@ -4962,8 +5045,13 @@ fn border_has_priority(candidate: BorderStyle, current: BorderStyle) -> bool {
     || (candidate.width_pt == current.width_pt && current.compound && !candidate.compound)
 }
 
-fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -> Vec<f32> {
-  let preferred_width = table_preferred_width(table, content_width);
+fn table_column_widths(
+  table: &Table,
+  column_count: usize,
+  content_width: f32,
+  allow_width_overflow: bool,
+) -> Vec<f32> {
+  let preferred_width = table_preferred_width(table, content_width, allow_width_overflow);
   if table.column_widths_pt.len() >= column_count {
     let mut widths = table.column_widths_pt[..column_count].to_vec();
     if let Some(preferred) = preferred_width
@@ -4971,7 +5059,9 @@ fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -
     {
       scale_widths_to_total(&mut widths, preferred);
     }
-    clamp_widths_to_content(&mut widths, content_width);
+    if !allow_width_overflow {
+      clamp_widths_to_content(&mut widths, content_width);
+    }
     return widths;
   }
 
@@ -4979,11 +5069,17 @@ fn table_column_widths(table: &Table, column_count: usize, content_width: f32) -
     if let Some(preferred) = preferred_width {
       scale_widths_to_total(&mut widths, preferred);
     }
-    clamp_widths_to_content(&mut widths, content_width);
+    if !allow_width_overflow {
+      clamp_widths_to_content(&mut widths, content_width);
+    }
     return widths;
   }
 
-  let width = preferred_width.unwrap_or(content_width).min(content_width);
+  let width = if allow_width_overflow {
+    preferred_width.unwrap_or(content_width)
+  } else {
+    preferred_width.unwrap_or(content_width).min(content_width)
+  };
   vec![width / column_count as f32; column_count]
 }
 
@@ -5078,11 +5174,21 @@ fn clamp_widths_to_content(widths: &mut [f32], content_width: f32) {
   }
 }
 
-fn table_preferred_width(table: &Table, content_width: f32) -> Option<f32> {
+fn table_preferred_width(
+  table: &Table,
+  content_width: f32,
+  allow_width_overflow: bool,
+) -> Option<f32> {
   table
     .preferred_width_pt
     .or_else(|| table.preferred_width_pct.map(|pct| content_width * pct))
-    .map(|width| width.min(content_width).max(0.0))
+    .map(|width| {
+      if allow_width_overflow {
+        width.max(0.0)
+      } else {
+        width.min(content_width).max(0.0)
+      }
+    })
 }
 
 fn table_left_position(

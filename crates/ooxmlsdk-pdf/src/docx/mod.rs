@@ -75,6 +75,7 @@ pub(crate) fn extract(
   let mut numbering = NumberingCatalog::load(package, &main)?;
   let images = ImageCatalog::load(package, &main);
   let hyperlinks = HyperlinkCatalog::load(package, &main);
+  let custom_xml_bindings = CustomXmlBindings::load(package, &main);
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
@@ -98,6 +99,7 @@ pub(crate) fn extract(
         &mut numbering,
         &images,
         &hyperlinks,
+        &custom_xml_bindings,
         &mut form_widget_ids,
       )
     })
@@ -117,7 +119,14 @@ pub(crate) fn extract(
     section.page.background = page_background;
     section.page.mirror_margins = mirror_margins;
   }
-  resolve_section_repeating_blocks(package, &main, &styles, &mut sections, &mut form_widget_ids);
+  resolve_section_repeating_blocks(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut sections,
+    &mut form_widget_ids,
+  );
   let page = sections
     .first()
     .map(|section| section.page)
@@ -142,11 +151,29 @@ pub(crate) fn extract(
     .first()
     .map(|section| section.first_footer_blocks.clone())
     .unwrap_or_default();
-  let footnotes = footnotes(package, &main, &styles, &mut form_widget_ids)?;
+  let footnotes = footnotes(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut form_widget_ids,
+  )?;
   let footnote_blocks = flatten_note_blocks(&footnotes);
-  let endnotes = endnotes(package, &main, &styles, &mut form_widget_ids)?;
+  let endnotes = endnotes(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut form_widget_ids,
+  )?;
   let endnote_blocks = flatten_note_blocks(&endnotes);
-  let comment_blocks = comment_blocks(package, &main, &styles, &mut form_widget_ids)?;
+  let comment_blocks = comment_blocks(
+    package,
+    &main,
+    &styles,
+    &custom_xml_bindings,
+    &mut form_widget_ids,
+  )?;
   let title_page = sections
     .first()
     .map(|section| section.title_page)
@@ -932,10 +959,166 @@ fn mirror_margins(package: &mut WordprocessingDocument, main: &MainDocumentPart)
     .unwrap_or(false)
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CustomXmlBindings {
+  entries: Vec<CustomXmlBindingEntry>,
+}
+
+#[derive(Clone, Debug)]
+struct CustomXmlBindingEntry {
+  store_item_id: Option<String>,
+  xml: String,
+}
+
+impl CustomXmlBindings {
+  fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
+    let parts = main.custom_xml_parts(package).collect::<Vec<_>>();
+    let entries = parts
+      .iter()
+      .filter_map(|part| {
+        let store_item_id = part
+          .custom_xml_properties_part(package)
+          .and_then(|props| props.root_element(package).ok())
+          .map(|props| props.item_id.clone());
+        let xml = part.data_as_str(package).ok().flatten()?.to_owned();
+        Some(CustomXmlBindingEntry { store_item_id, xml })
+      })
+      .collect();
+    Self { entries }
+  }
+
+  fn value_for_sdt(&self, properties: &w::SdtProperties) -> Option<String> {
+    if let Some(binding) = sdt_data_binding(properties)
+      && let Some(value) = self.value(&binding.store_item_id, &binding.x_path)
+    {
+      return Some(value);
+    }
+
+    let tag = sdt_tag(properties)?;
+    self.value("", &format!("//*[@ref='{tag}']/@text"))
+  }
+
+  fn value(&self, store_item_id: &str, xpath: &str) -> Option<String> {
+    if let Some(value) = self
+      .entries
+      .iter()
+      .filter(|entry| {
+        !store_item_id.is_empty()
+          && entry
+            .store_item_id
+            .as_deref()
+            .is_some_and(|id| id.eq_ignore_ascii_case(store_item_id))
+      })
+      .find_map(|entry| custom_xml_xpath_value(&entry.xml, xpath))
+    {
+      return Some(value);
+    }
+
+    self
+      .entries
+      .iter()
+      .find_map(|entry| custom_xml_xpath_value(&entry.xml, xpath))
+  }
+}
+
+fn sdt_data_binding(properties: &w::SdtProperties) -> Option<&w::DataBinding> {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::SdtPropertiesChoice::WDataBinding(binding) => Some(binding.as_ref()),
+      _ => None,
+    })
+}
+
+fn sdt_tag(properties: &w::SdtProperties) -> Option<&str> {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::SdtPropertiesChoice::WTag(tag) if !tag.val.is_empty() => Some(tag.val.as_str()),
+      _ => None,
+    })
+}
+
+fn custom_xml_xpath_value(xml: &str, xpath: &str) -> Option<String> {
+  let attr_name = xpath.rsplit_once("/@")?.1;
+  if attr_name.is_empty()
+    || attr_name
+      .bytes()
+      .any(|byte| !(byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-' || byte == b':'))
+  {
+    return None;
+  }
+  let predicates = xpath_attr_predicates(xpath);
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(true);
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) | Ok(Event::Empty(event)) => {
+        let decoder = reader.decoder();
+        if !predicates.iter().all(|(name, value)| {
+          xml_event_attr_value(&event, name.as_bytes(), decoder).as_deref() == Some(value.as_str())
+        }) {
+          continue;
+        }
+        if let Some(value) = xml_event_attr_value(&event, attr_name.as_bytes(), decoder)
+          && !value.is_empty()
+        {
+          return Some(value);
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+  None
+}
+
+fn xpath_attr_predicates(xpath: &str) -> Vec<(String, String)> {
+  let mut predicates = Vec::new();
+  let mut rest = xpath;
+  while let Some(index) = rest.find('@') {
+    rest = &rest[index + 1..];
+    let Some(eq_index) = rest.find('=') else {
+      break;
+    };
+    let name = rest[..eq_index].trim();
+    let value_start = rest[eq_index + 1..].trim_start();
+    let Some(value_body) = value_start.strip_prefix('\'') else {
+      rest = value_start;
+      continue;
+    };
+    let Some(value_end) = value_body.find('\'') else {
+      break;
+    };
+    if !name.is_empty() {
+      predicates.push((name.to_owned(), value_body[..value_end].to_owned()));
+    }
+    rest = &value_body[value_end + 1..];
+  }
+  predicates
+}
+
+fn xml_event_attr_value(
+  event: &quick_xml::events::BytesStart<'_>,
+  key: &[u8],
+  decoder: quick_xml::Decoder,
+) -> Option<String> {
+  event
+    .attributes()
+    .with_checks(false)
+    .filter_map(|attr| attr.ok())
+    .find(|attr| qname_ends_with(attr.key.as_ref(), key))
+    .and_then(|attr| decode_xml_attr_value(&attr, decoder))
+}
+
 fn resolve_section_repeating_blocks(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   sections: &mut [ImportedSection],
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) {
@@ -967,6 +1150,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Default,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_default_header.clone());
@@ -976,6 +1160,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Default,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_default_footer.clone());
@@ -985,6 +1170,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::First,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_first_header.clone());
@@ -994,6 +1180,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::First,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_first_footer.clone());
@@ -1003,6 +1190,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Even,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_even_header.clone());
@@ -1012,6 +1200,7 @@ fn resolve_section_repeating_blocks(
       section_properties,
       styles,
       w::HeaderFooterValues::Even,
+      custom_xml_bindings,
       form_widget_ids,
     )
     .unwrap_or_else(|| previous_even_footer.clone());
@@ -1031,6 +1220,7 @@ fn body_sections(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
@@ -1046,6 +1236,7 @@ fn body_sections(
           numbering,
           images,
           hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         );
         model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
@@ -1078,6 +1269,7 @@ fn body_sections(
         numbering,
         images,
         hyperlinks,
+        custom_xml_bindings,
         form_widget_ids,
       ))),
       w::BodyChoice::WSdt(sdt) => {
@@ -1087,6 +1279,7 @@ fn body_sections(
           numbering,
           images,
           hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         ));
       }
@@ -1395,6 +1588,7 @@ fn sdt_block_blocks(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<Block> {
   let Some(content) = sdt.sdt_content_block.as_ref() else {
@@ -1411,6 +1605,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        custom_xml_bindings,
         form_widget_ids,
       ))]),
       w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
@@ -1419,6 +1614,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        custom_xml_bindings,
         form_widget_ids,
       ))]),
       w::SdtContentBlockChoice::WSdt(sdt) => Some(sdt_block_blocks(
@@ -1427,6 +1623,7 @@ fn sdt_block_blocks(
         numbering,
         images,
         hyperlinks,
+        custom_xml_bindings,
         form_widget_ids,
       )),
       _ => None,
@@ -1441,6 +1638,7 @@ fn header_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   header_type: w::HeaderFooterValues,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
   let relationship_id =
@@ -1473,6 +1671,7 @@ fn header_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         ))),
         w::HeaderChoice::WTbl(table) => Some(Block::Table(table_model(
@@ -1481,6 +1680,7 @@ fn header_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         ))),
         _ => None,
@@ -1495,9 +1695,18 @@ fn referenced_header_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   header_type: w::HeaderFooterValues,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
-  header_blocks(package, main, section, styles, header_type, form_widget_ids)
+  header_blocks(
+    package,
+    main,
+    section,
+    styles,
+    header_type,
+    custom_xml_bindings,
+    form_widget_ids,
+  )
 }
 
 fn footer_blocks(
@@ -1506,6 +1715,7 @@ fn footer_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   footer_type: w::HeaderFooterValues,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
   let relationship_id =
@@ -1538,6 +1748,7 @@ fn footer_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         ))),
         w::FooterChoice::WTbl(table) => Some(Block::Table(table_model(
@@ -1546,6 +1757,7 @@ fn footer_blocks(
           &mut numbering,
           &images,
           &hyperlinks,
+          custom_xml_bindings,
           form_widget_ids,
         ))),
         _ => None,
@@ -1560,15 +1772,25 @@ fn referenced_footer_blocks(
   section: &w::SectionProperties,
   styles: &StylesCatalog,
   footer_type: w::HeaderFooterValues,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Option<Vec<Block>> {
-  footer_blocks(package, main, section, styles, footer_type, form_widget_ids)
+  footer_blocks(
+    package,
+    main,
+    section,
+    styles,
+    footer_type,
+    custom_xml_bindings,
+    form_widget_ids,
+  )
 }
 
 fn footnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.footnotes_part(package) else {
@@ -1583,6 +1805,7 @@ fn footnotes(
     numbering: &mut numbering,
     images: &images,
     hyperlinks: &hyperlinks,
+    custom_xml_bindings,
     form_widget_ids,
   };
   let mut notes = BTreeMap::new();
@@ -1622,6 +1845,7 @@ fn endnotes(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<BTreeMap<i64, Vec<Block>>> {
   let Some(part) = main.endnotes_part(package) else {
@@ -1636,6 +1860,7 @@ fn endnotes(
     numbering: &mut numbering,
     images: &images,
     hyperlinks: &hyperlinks,
+    custom_xml_bindings,
     form_widget_ids,
   };
   let mut notes = BTreeMap::new();
@@ -1682,6 +1907,7 @@ fn comment_blocks(
   package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Result<Vec<Block>> {
   let Some(part) = main.wordprocessing_comments_part(package) else {
@@ -1696,6 +1922,7 @@ fn comment_blocks(
     numbering: &mut numbering,
     images: &images,
     hyperlinks: &hyperlinks,
+    custom_xml_bindings,
     form_widget_ids,
   };
   let mut blocks = Vec::new();
@@ -1738,6 +1965,7 @@ struct NoteImportContext<'a> {
   numbering: &'a mut NumberingCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
 }
 
@@ -1755,6 +1983,7 @@ fn append_note_blocks<'a>(
       context.numbering,
       context.images,
       context.hyperlinks,
+      context.custom_xml_bindings,
       context.form_widget_ids,
     );
     if is_first_paragraph {
@@ -1803,6 +2032,7 @@ fn table_model(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Table {
   let properties = table.w_tbl_pr.as_ref();
@@ -1879,6 +2109,7 @@ fn table_model(
         numbering,
         images,
         hyperlinks,
+        custom_xml_bindings,
         form_widget_ids,
         cell_margins,
         table_style: &table_style,
@@ -2159,6 +2390,7 @@ fn table_cell_model(
           format: style.paragraph_format.clone(),
           run_style: style.run_style.clone(),
           run_overrides: style.run_overrides,
+          custom_xml_bindings: Some(context.custom_xml_bindings),
         },
       ))),
       w::TableCellChoice::WTbl(table) => Some(Block::Table(table_model(
@@ -2167,6 +2399,7 @@ fn table_cell_model(
         context.numbering,
         context.images,
         context.hyperlinks,
+        context.custom_xml_bindings,
         context.form_widget_ids,
       ))),
       _ => None,
@@ -2861,6 +3094,7 @@ fn paragraph_inlines(
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Vec<InlineItem> {
   let mut inlines = Vec::new();
@@ -2868,6 +3102,7 @@ fn paragraph_inlines(
     styles,
     images,
     hyperlinks,
+    custom_xml_bindings,
     form_widget_ids,
   };
   let mut complex_field = None;
@@ -2889,15 +3124,7 @@ fn paragraph_inlines(
         );
       }
       w::ParagraphChoice::WFldSimple(field) => {
-        push_simple_field(
-          field,
-          &mut inlines,
-          base_style.clone(),
-          inline_context.styles,
-          inline_context.images,
-          inline_context.hyperlinks,
-          inline_context.form_widget_ids,
-        );
+        push_simple_field(field, &mut inlines, base_style.clone(), &mut inline_context);
       }
       w::ParagraphChoice::WHyperlink(hyperlink) => {
         push_hyperlink_content(
@@ -2988,6 +3215,7 @@ struct InlineImportContext<'a> {
   styles: &'a StylesCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
 }
 
@@ -3218,15 +3446,9 @@ fn push_hyperlink_content(
         hyperlink_url.as_deref(),
         complex_field,
       ),
-      w::HyperlinkChoice::WFldSimple(field) => push_simple_field(
-        field,
-        inlines,
-        base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
-        context.form_widget_ids,
-      ),
+      w::HyperlinkChoice::WFldSimple(field) => {
+        push_simple_field(field, inlines, base_style.clone(), context)
+      }
       w::HyperlinkChoice::WHyperlink(nested) => push_hyperlink_content(
         nested,
         inlines,
@@ -3533,31 +3755,22 @@ fn push_simple_field(
   field: &w::SimpleField,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  form_widget_ids: &mut FormWidgetIdAllocator,
+  context: &mut InlineImportContext<'_>,
 ) {
   if let Some(kind) = dynamic_field_kind(&field.instruction) {
     push_dynamic_field(inlines, kind, base_style, None);
     return;
   }
 
-  let mut inline_context = InlineImportContext {
-    styles,
-    images,
-    hyperlinks,
-    form_widget_ids,
-  };
   for choice in &field.simple_field_choice {
     match choice {
       w::SimpleFieldChoice::WR(run) => push_run(
         run,
         inlines,
         base_style.clone(),
-        styles,
-        images,
-        hyperlinks,
+        context.styles,
+        context.images,
+        context.hyperlinks,
         None,
       ),
       w::SimpleFieldChoice::WHyperlink(hyperlink) => {
@@ -3567,24 +3780,16 @@ fn push_simple_field(
           inlines,
           base_style.clone(),
           None,
-          &mut inline_context,
+          context,
           &mut complex_field,
         );
         flush_unclosed_complex_field(inlines, &mut complex_field);
       }
       w::SimpleFieldChoice::WFldSimple(field) => {
-        push_simple_field(
-          field,
-          inlines,
-          base_style.clone(),
-          inline_context.styles,
-          inline_context.images,
-          inline_context.hyperlinks,
-          inline_context.form_widget_ids,
-        );
+        push_simple_field(field, inlines, base_style.clone(), context);
       }
       w::SimpleFieldChoice::WSdt(sdt) => {
-        push_sdt_run(sdt, inlines, base_style.clone(), None, &mut inline_context)
+        push_sdt_run(sdt, inlines, base_style.clone(), None, context)
       }
       _ => {}
     }
@@ -4002,6 +4207,25 @@ fn push_sdt_run(
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetStart(widget_id));
   }
+  if let Some(value) = sdt
+    .sdt_properties
+    .as_ref()
+    .and_then(|properties| context.custom_xml_bindings.value_for_sdt(properties))
+  {
+    inlines.push(InlineItem::Text(TextRun {
+      text: format!("*{value}*"),
+      style: base_style,
+      hyperlink_url: hyperlink_url.map(str::to_owned),
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      preserve_text_portion: false,
+    }));
+    if let Some(widget_id) = widget_id {
+      inlines.push(InlineItem::FormWidgetEnd(widget_id));
+    }
+    return;
+  }
 
   for choice in &content.sdt_content_run_choice {
     match choice {
@@ -4015,15 +4239,7 @@ fn push_sdt_run(
         hyperlink_url,
       ),
       w::SdtContentRunChoice::WFldSimple(field) => {
-        push_simple_field(
-          field.as_ref(),
-          inlines,
-          base_style.clone(),
-          context.styles,
-          context.images,
-          context.hyperlinks,
-          context.form_widget_ids,
-        );
+        push_simple_field(field.as_ref(), inlines, base_style.clone(), context);
       }
       w::SdtContentRunChoice::WHyperlink(hyperlink) => {
         let mut complex_field = None;
@@ -7680,6 +7896,7 @@ fn textbox_blocks_with_base(
   let mut blocks = Vec::new();
   let mut numbering = NumberingCatalog::default();
   let mut form_widget_ids = FormWidgetIdAllocator::default();
+  let custom_xml_bindings = CustomXmlBindings::default();
   for choice in &content.text_box_content_choice {
     match choice {
       w::TextBoxContentChoice::WP(paragraph) => {
@@ -7692,6 +7909,7 @@ fn textbox_blocks_with_base(
           &mut form_widget_ids,
           ParagraphImportBase {
             run_style: base_style.clone(),
+            custom_xml_bindings: Some(&custom_xml_bindings),
             ..Default::default()
           },
         );
@@ -7704,6 +7922,7 @@ fn textbox_blocks_with_base(
           &mut numbering,
           images,
           hyperlinks,
+          &custom_xml_bindings,
           &mut form_widget_ids,
         );
         blocks.push(Block::Table(table));
@@ -8558,6 +8777,7 @@ struct TableImportContext<'a> {
   numbering: &'a mut NumberingCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   cell_margins: CellMargins,
   table_style: &'a TableStyleModel,
@@ -11332,6 +11552,7 @@ mod tests {
         format: base_format,
         run_style: base_run_style,
         run_overrides: base_run_overrides,
+        ..Default::default()
       },
     );
 
@@ -11388,11 +11609,13 @@ mod tests {
     let styles = StylesCatalog::default();
     let images = ImageCatalog::default();
     let hyperlinks = HyperlinkCatalog::default();
+    let custom_xml_bindings = CustomXmlBindings::default();
     let mut context = TableImportContext {
       styles: &styles,
       numbering: &mut numbering,
       images: &images,
       hyperlinks: &hyperlinks,
+      custom_xml_bindings: &custom_xml_bindings,
       form_widget_ids: &mut form_widget_ids,
       cell_margins: CellMargins::default(),
       table_style: &TableStyleModel::default(),
@@ -11429,16 +11652,20 @@ mod tests {
       instruction: " PAGE ".into(),
       ..Default::default()
     };
+    let styles = StylesCatalog::default();
+    let images = ImageCatalog::default();
+    let hyperlinks = HyperlinkCatalog::default();
+    let custom_xml_bindings = CustomXmlBindings::default();
+    let mut form_widget_ids = FormWidgetIdAllocator::default();
+    let mut context = InlineImportContext {
+      styles: &styles,
+      images: &images,
+      hyperlinks: &hyperlinks,
+      custom_xml_bindings: &custom_xml_bindings,
+      form_widget_ids: &mut form_widget_ids,
+    };
 
-    push_simple_field(
-      &field,
-      &mut inlines,
-      TextStyle::default(),
-      &StylesCatalog::default(),
-      &ImageCatalog::default(),
-      &HyperlinkCatalog::default(),
-      &mut FormWidgetIdAllocator::default(),
-    );
+    push_simple_field(&field, &mut inlines, TextStyle::default(), &mut context);
 
     let InlineItem::Text(run) = &inlines[0] else {
       panic!("expected dynamic field text");
@@ -11778,6 +12005,7 @@ mod tests {
       &mut numbering,
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),
+      &CustomXmlBindings::default(),
       &mut FormWidgetIdAllocator::default(),
     );
 

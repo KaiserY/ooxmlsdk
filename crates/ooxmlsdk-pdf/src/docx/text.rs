@@ -2,16 +2,17 @@ use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as 
 use std::sync::Arc;
 
 use super::{
-  FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog, Paragraph,
-  ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
+  CustomXmlBindings, FormWidgetIdAllocator, HyperlinkCatalog, ImageCatalog, NumberingCatalog,
+  Paragraph, ParagraphFormat, ParagraphProps, RunStyleOverrides, StylesCatalog, TextRun, TextStyle,
   paragraph_inlines, paragraph_note_reference_ids, properties, redline_author_color,
 };
 
 #[derive(Clone, Debug, Default)]
-pub(super) struct ParagraphImportBase {
+pub(super) struct ParagraphImportBase<'a> {
   pub(super) format: ParagraphFormat,
   pub(super) run_style: TextStyle,
   pub(super) run_overrides: RunStyleOverrides,
+  pub(super) custom_xml_bindings: Option<&'a CustomXmlBindings>,
 }
 
 pub(super) fn paragraph_model(
@@ -20,6 +21,7 @@ pub(super) fn paragraph_model(
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
+  custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
 ) -> Paragraph {
   paragraph_model_with_base(
@@ -29,19 +31,29 @@ pub(super) fn paragraph_model(
     images,
     hyperlinks,
     form_widget_ids,
-    ParagraphImportBase::default(),
+    ParagraphImportBase {
+      custom_xml_bindings: Some(custom_xml_bindings),
+      ..Default::default()
+    },
   )
 }
 
-pub(super) fn paragraph_model_with_base(
+pub(super) fn paragraph_model_with_base<'a>(
   paragraph: &w::Paragraph,
   styles: &StylesCatalog,
   numbering: &mut NumberingCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
   form_widget_ids: &mut FormWidgetIdAllocator,
-  base: ParagraphImportBase,
+  base: ParagraphImportBase<'a>,
 ) -> Paragraph {
+  let default_custom_xml_bindings;
+  let custom_xml_bindings = if let Some(custom_xml_bindings) = base.custom_xml_bindings {
+    custom_xml_bindings
+  } else {
+    default_custom_xml_bindings = CustomXmlBindings::default();
+    &default_custom_xml_bindings
+  };
   let paragraph_properties = paragraph.paragraph_properties.as_deref();
   let previous_paragraph_properties = paragraph_properties
     .and_then(|properties| properties.paragraph_properties_change.as_deref())
@@ -136,6 +148,7 @@ pub(super) fn paragraph_model_with_base(
     styles,
     images,
     hyperlinks,
+    custom_xml_bindings,
     form_widget_ids,
   );
   if let Some(image) = numbering_label.and_then(|label| label.image) {

@@ -3230,7 +3230,7 @@ fn push_run(
         if let Some(image) = drawing::pict_image(picture, images) {
           inlines.push(InlineItem::Image(image));
         }
-        drawing::push_pict_shapes(picture, inlines);
+        drawing::push_pict_shapes(picture, inlines, images);
         drawing::push_pict_textboxes(
           picture,
           inlines,
@@ -3239,6 +3239,12 @@ fn push_run(
           images,
           hyperlinks,
         );
+      }
+      w::RunChoice::WObject(object) => {
+        flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
+        if let Some(image) = embedded_object_image(object, images) {
+          inlines.push(InlineItem::Image(image));
+        }
       }
       w::RunChoice::WPtab(_) => text.push('\t'),
       w::RunChoice::XmlAny(xml) => {
@@ -3514,7 +3520,7 @@ fn push_run_xml_any(
     if let Some(image) = drawing::pict_image(&picture, images) {
       inlines.push(InlineItem::Image(image));
     }
-    drawing::push_pict_shapes(&picture, inlines);
+    drawing::push_pict_shapes(&picture, inlines, images);
     drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
   }
 }
@@ -4579,6 +4585,7 @@ fn drawingml_textbox_frame_from_fragment(
     offset_x_pt: offset_x_pt + text_box.left_pt,
     offset_y_pt: offset_y_pt + text_box.top_pt,
     fill_color: None,
+    fill_image: None,
     stroke: None,
     placement,
     text_box_blocks: text_box.blocks,
@@ -4886,7 +4893,7 @@ fn drawingml_shapes_from_xml(
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
           && let Some(shape) =
-            drawingml_shape_from_fragment(&fragment, placement, transform, styles)
+            drawingml_shape_from_fragment(&fragment, placement, transform, styles, images)
         {
           shapes.push(InlineItem::Shape(shape));
         }
@@ -4910,7 +4917,7 @@ fn drawingml_shapes_from_xml(
         if writer.write_event(Event::Empty(event.into_owned())).is_ok()
           && let Ok(fragment) = String::from_utf8(writer.into_inner())
           && let Some(shape) =
-            drawingml_shape_from_fragment(&fragment, placement, transform, styles)
+            drawingml_shape_from_fragment(&fragment, placement, transform, styles, images)
         {
           shapes.push(InlineItem::Shape(shape));
         }
@@ -4950,13 +4957,15 @@ fn drawingml_shape_from_fragment(
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
   styles: &StylesCatalog,
+  images: &ImageCatalog,
 ) -> Option<InlineShape> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
   let fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors)
     .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors));
+  let fill_image = drawingml_shape_image_fill(&sp_pr, images);
   let stroke = drawingml_shape_stroke(&sp_pr, &styles.theme_colors)
     .or_else(|| drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines));
-  if fill_color.is_none() && stroke.is_none() {
+  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
     return None;
   }
 
@@ -4973,6 +4982,7 @@ fn drawingml_shape_from_fragment(
     offset_x_pt,
     offset_y_pt,
     fill_color,
+    fill_image,
     stroke,
     placement,
     text_box_blocks: Vec::new(),
@@ -5129,6 +5139,7 @@ fn drawingml_picture_frame_from_fragment(
     offset_x_pt,
     offset_y_pt,
     fill_color: None,
+    fill_image: None,
     stroke: None,
     placement,
     text_box_blocks: Vec::new(),
@@ -5174,6 +5185,21 @@ fn drawingml_picture_image_from_fragment(
     alt_text: drawingml_picture_alt_text(xml),
     hyperlink_url,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
+  })
+}
+
+fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
+  let properties = drawing_image_properties_from_xml(sp_pr)?;
+  let relationship_id = properties.relationship_id?;
+  let resource = images.by_relationship_id.get(&relationship_id)?;
+
+  Some(InlineShapeImageFill {
+    data: resource.data.clone(),
+    content_type: resource.content_type.clone(),
+    crop: properties.crop,
+    rotation_deg: properties.rotation_deg,
+    flip_horizontal: properties.flip_horizontal,
+    flip_vertical: properties.flip_vertical,
   })
 }
 
@@ -5335,22 +5361,30 @@ fn drawingml_color_from_named_fragment(
   }
 }
 
-fn push_pict_shapes_impl(picture: &w::Picture, inlines: &mut Vec<InlineItem>) {
+fn push_pict_shapes_impl(
+  picture: &w::Picture,
+  inlines: &mut Vec<InlineItem>,
+  images: &ImageCatalog,
+) {
   for choice in &picture.picture_choice {
-    push_picture_choice_shapes(choice, inlines);
+    push_picture_choice_shapes(choice, inlines, images);
   }
 }
 
-fn push_picture_choice_shapes(choice: &w::PictureChoice, inlines: &mut Vec<InlineItem>) {
+fn push_picture_choice_shapes(
+  choice: &w::PictureChoice,
+  inlines: &mut Vec<InlineItem>,
+  images: &ImageCatalog,
+) {
   match choice {
-    w::PictureChoice::VGroup(group) => push_group_shapes(group, inlines),
+    w::PictureChoice::VGroup(group) => push_group_shapes(group, inlines, images),
     w::PictureChoice::VRect(rectangle) => {
-      if let Some(shape) = vml_rectangle_shape(rectangle) {
+      if let Some(shape) = vml_rectangle_shape(rectangle, images) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
     w::PictureChoice::VShape(shape) => {
-      if let Some(shape) = vml_shape_shape(shape) {
+      if let Some(shape) = vml_shape_shape(shape, images) {
         inlines.push(InlineItem::Shape(shape));
       }
     }
@@ -5358,17 +5392,17 @@ fn push_picture_choice_shapes(choice: &w::PictureChoice, inlines: &mut Vec<Inlin
   }
 }
 
-fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>) {
+fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &ImageCatalog) {
   for choice in &group.group_choice {
     match choice {
-      v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines),
+      v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines, images),
       v::GroupChoice::VRect(rectangle) => {
-        if let Some(shape) = vml_rectangle_shape(rectangle) {
+        if let Some(shape) = vml_rectangle_shape(rectangle, images) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
       v::GroupChoice::VShape(shape) => {
-        if let Some(shape) = vml_shape_shape(shape) {
+        if let Some(shape) = vml_shape_shape(shape, images) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -5377,27 +5411,69 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>) {
   }
 }
 
-fn vml_rectangle_shape(rectangle: &v::Rectangle) -> Option<InlineShape> {
+fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineShape> {
   vml_inline_shape(
     rectangle.style.as_deref(),
     rectangle.fill_color.as_deref(),
+    vml_rectangle_fill_image(rectangle, images),
     rectangle.stroke_color.as_deref(),
     rectangle.stroke_weight.as_deref(),
   )
 }
 
-fn vml_shape_shape(shape: &v::Shape) -> Option<InlineShape> {
+fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShape> {
   vml_inline_shape(
     shape.style.as_deref(),
     shape.fill_color.as_deref(),
+    vml_shape_fill_image(shape, images),
     shape.stroke_color.as_deref(),
     shape.stroke_weight.as_deref(),
   )
 }
 
+fn vml_rectangle_fill_image(
+  rectangle: &v::Rectangle,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  rectangle
+    .rectangle_choice
+    .iter()
+    .find_map(|choice| match choice {
+      v::RectangleChoice::VFill(fill) => vml_fill_image(fill, rectangle.style.as_deref(), images),
+      _ => None,
+    })
+}
+
+fn vml_shape_fill_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
+  shape.shape_choice.iter().find_map(|choice| match choice {
+    v::ShapeChoice::VFill(fill) => vml_fill_image(fill, shape.style.as_deref(), images),
+    _ => None,
+  })
+}
+
+fn vml_fill_image(
+  fill: &v::Fill,
+  shape_style: Option<&str>,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  let relationship_id = fill.relationship_id.as_ref().or(fill.id.as_ref())?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let style = vml_image_style(shape_style);
+
+  Some(InlineShapeImageFill {
+    data: resource.data.clone(),
+    content_type: resource.content_type.clone(),
+    crop: ImageCrop::default(),
+    rotation_deg: style.rotation_deg,
+    flip_horizontal: style.flip_horizontal,
+    flip_vertical: style.flip_vertical,
+  })
+}
+
 fn vml_inline_shape(
   style: Option<&str>,
   fill_color: Option<&str>,
+  fill_image: Option<InlineShapeImageFill>,
   stroke_color: Option<&str>,
   stroke_weight: Option<&str>,
 ) -> Option<InlineShape> {
@@ -5418,7 +5494,7 @@ fn vml_inline_shape(
       color,
       compound: false,
     });
-  if fill_color.is_none() && stroke.is_none() {
+  if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
     return None;
   }
 
@@ -5429,6 +5505,7 @@ fn vml_inline_shape(
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color,
+    fill_image,
     stroke,
     placement: style.placement(),
     text_box_blocks: Vec::new(),
@@ -5470,6 +5547,7 @@ fn vml_textbox_frame(
     offset_x_pt: frame.left_pt,
     offset_y_pt: frame.top_pt,
     fill_color: None,
+    fill_image: None,
     stroke: None,
     placement: style.placement(),
     text_box_blocks: frame.blocks,
@@ -5563,6 +5641,19 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
     w::PictureChoice::VShape(shape) => shape_image(shape, images),
     _ => None,
   }
+}
+
+fn embedded_object_image(object: &w::EmbeddedObject, images: &ImageCatalog) -> Option<InlineImage> {
+  object
+    .embedded_object_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      w::EmbeddedObjectChoice::VGroup(group) => group_image(group, images),
+      w::EmbeddedObjectChoice::VImage(image) => image_file_image(image, images),
+      w::EmbeddedObjectChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+      w::EmbeddedObjectChoice::VShape(shape) => shape_image(shape, images),
+      _ => None,
+    })
 }
 
 fn push_picture_choice_textboxes(
@@ -6273,7 +6364,12 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
       Event::Empty(event) | Event::Start(event)
         if qname_ends_with(event.name().as_ref(), b"srcRect") =>
       {
-        properties.crop = image_crop_from_src_rect(&event, reader.decoder());
+        properties.crop = image_crop_from_relative_rect(&event, reader.decoder());
+      }
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"fillRect") =>
+      {
+        properties.crop = image_crop_from_relative_rect(&event, reader.decoder());
       }
       Event::Empty(event) | Event::Start(event)
         if qname_ends_with(event.name().as_ref(), b"xfrm") =>
@@ -6286,7 +6382,7 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
   }
 }
 
-fn image_crop_from_src_rect(
+fn image_crop_from_relative_rect(
   event: &quick_xml::events::BytesStart<'_>,
   decoder: quick_xml::Decoder,
 ) -> ImageCrop {

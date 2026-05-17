@@ -6121,6 +6121,24 @@ impl<'a> TextFrameLayout<'a> {
                              y_pt: f32,
                              width_pt: f32,
                              height_pt: f32| {
+            if let Some(fill_image) = &shape.fill_image {
+              current.items.push(PageItem::Image(ImageItem {
+                x_pt,
+                y_pt,
+                width_pt,
+                height_pt,
+                crop: fill_image.crop,
+                rotation_deg: fill_image.rotation_deg,
+                flip_horizontal: fill_image.flip_horizontal,
+                flip_vertical: fill_image.flip_vertical,
+                data: fill_image.data.clone(),
+                content_type: fill_image.content_type.clone(),
+                alt_text: None,
+                hyperlink_url: None,
+                floating: matches!(shape.placement, crate::docx::ImagePlacement::Floating(_)),
+                behind_text: false,
+              }));
+            }
             if shape.geometry == InlineShapeGeometry::Line
               && shape.fill_color.is_none()
               && let Some(stroke) = shape.stroke

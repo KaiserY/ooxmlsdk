@@ -46,6 +46,10 @@ pub(super) fn push_pict_textboxes(
   super::push_pict_textboxes_impl(picture, inlines, base_style, styles, images, hyperlinks);
 }
 
-pub(super) fn push_pict_shapes(picture: &w::Picture, inlines: &mut Vec<InlineItem>) {
-  super::push_pict_shapes_impl(picture, inlines);
+pub(super) fn push_pict_shapes(
+  picture: &w::Picture,
+  inlines: &mut Vec<InlineItem>,
+  images: &ImageCatalog,
+) {
+  super::push_pict_shapes_impl(picture, inlines, images);
 }

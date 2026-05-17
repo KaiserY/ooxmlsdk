@@ -491,7 +491,7 @@ fn path_geometry_bounds_all_pages(summary: &PdfSummary) -> Vec<PdfBounds> {
   summary
     .paths
     .iter()
-    .filter_map(|path| path_geometry_bounds(path))
+    .filter_map(path_geometry_bounds)
     .collect()
 }
 

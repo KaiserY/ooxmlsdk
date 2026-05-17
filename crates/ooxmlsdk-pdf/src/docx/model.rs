@@ -453,6 +453,7 @@ pub(crate) struct InlineShape {
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
   pub fill_color: Option<RgbColor>,
+  pub fill_image: Option<InlineShapeImageFill>,
   pub stroke: Option<BorderStyle>,
   pub placement: ImagePlacement,
   pub text_box_blocks: Vec<Block>,
@@ -461,6 +462,16 @@ pub(crate) struct InlineShape {
   pub text_inset_right_pt: f32,
   pub text_inset_bottom_pt: f32,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InlineShapeImageFill {
+  pub data: Vec<u8>,
+  pub content_type: Option<String>,
+  pub crop: ImageCrop,
+  pub rotation_deg: f32,
+  pub flip_horizontal: bool,
+  pub flip_vertical: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

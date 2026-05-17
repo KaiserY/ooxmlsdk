@@ -40,6 +40,7 @@ const LAYOUT_EPSILON_PT: f32 = 0.1;
 // sets OOXML document defaults to proportional line spacing 115.
 const LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT: f32 = 115.0;
 const PERCENT_SCALE: f32 = 100.0;
+const LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE: f32 = 340.0 / 220.0;
 // Source: LibreOffice sw/source/core/layout/pagedesc.cxx
 // SwPageFootnoteInfo defaults: line width 10 twips, relative width 25%,
 // top/bottom distance 57 twips.
@@ -102,6 +103,11 @@ fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &T
 
 fn word_auto_line_height(style: &TextStyle) -> f32 {
   style.font_size_pt * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT / PERCENT_SCALE
+}
+
+fn libreoffice_empty_paragraph_first_line_height(style: &TextStyle) -> f32 {
+  // Source: LibreOffice sw/qa/extras/ooxmlimport/ooxmlimport.cxx testTdf105143.
+  style.font_size_pt * LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE
 }
 
 fn include_text_height(line_height: f32, text_frame: TextFrame, style: &TextStyle) -> f32 {
@@ -6307,6 +6313,8 @@ impl<'a> TextFrameLayout<'a> {
     let mut text_state = TextFrameState::new();
     let line = LineFrame::first(text_frame, y, paragraph.list_label.is_some());
     y = line.y_pt;
+    let vml_anchor_line_height =
+      libreoffice_empty_paragraph_first_line_height(&paragraph_base_line_style(paragraph));
     let mut base_line_height = text_frame.base_line_height;
     let mut line_height = line.height_pt;
     let (mut line_left, mut line_right) =
@@ -6953,13 +6961,24 @@ impl<'a> TextFrameLayout<'a> {
               let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
               let (shape_x, shape_y) =
                 floating_image_position(placement, flow, x, y, width, height);
-              let (shape_x, shape_y) = keep_floating_shape_inside_page(
-                shape_x + shape.offset_x_pt,
-                shape_y + shape.offset_y_pt,
-                width,
-                height,
-                flow,
-              );
+              let shape_x = shape_x + shape.offset_x_pt;
+              let vml_text_anchor_offset = if shape.allow_outside_page {
+                match placement.vertical_relative_to {
+                  crate::docx::VerticalImageReference::Paragraph
+                  | crate::docx::VerticalImageReference::Line => vml_anchor_line_height,
+                  crate::docx::VerticalImageReference::TopMargin
+                  | crate::docx::VerticalImageReference::BottomMargin => line_height,
+                  _ => 0.0,
+                }
+              } else {
+                0.0
+              };
+              let shape_y = shape_y + shape.offset_y_pt + vml_text_anchor_offset;
+              let (shape_x, shape_y) = if shape.allow_outside_page {
+                (shape_x, shape_y)
+              } else {
+                keep_floating_shape_inside_page(shape_x, shape_y, width, height, flow)
+              };
               place_shape(current, flow, shape_x, shape_y, width, height);
             }
             crate::docx::ImagePlacement::Inline => {
@@ -6992,7 +7011,13 @@ impl<'a> TextFrameLayout<'a> {
                 current,
                 flow,
                 x + shape.offset_x_pt,
-                y + shape.offset_y_pt,
+                y + shape.offset_y_pt
+                  + if shape.inline_anchor_after_line {
+                    base_line_height.max(line_height) * LO_DOCUMENT_DEFAULT_LINE_SPACING_PERCENT
+                      / PERCENT_SCALE
+                  } else {
+                    0.0
+                  },
                 shape.width_pt,
                 shape.height_pt,
               );

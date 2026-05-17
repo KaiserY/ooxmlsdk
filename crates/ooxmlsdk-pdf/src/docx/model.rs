@@ -470,6 +470,8 @@ pub(crate) struct InlineShape {
   pub fill_image: Option<InlineShapeImageFill>,
   pub stroke: Option<BorderStyle>,
   pub suppress_zero_relative_background: bool,
+  pub allow_outside_page: bool,
+  pub inline_anchor_after_line: bool,
   pub placement: ImagePlacement,
   pub text_box_blocks: Vec<Block>,
   pub text_inset_left_pt: f32,

@@ -5571,6 +5571,8 @@ fn drawingml_textbox_frame_from_fragment(
     fill_image: None,
     stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
     suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline),
     placement,
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
@@ -6120,6 +6122,8 @@ fn chart_shape(
     fill_image: None,
     stroke,
     suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6316,6 +6320,8 @@ fn anchor_wrap_polygon_shape(
     fill_image: None,
     stroke: None,
     suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6461,6 +6467,9 @@ fn drawingml_shape_from_fragment(
     fill_image,
     stroke,
     suppress_zero_relative_background: explicit_fill_color.is_some(),
+    allow_outside_page: false,
+    inline_anchor_after_line: matches!(placement, ImagePlacement::Inline)
+      && drawing_textbox_content(xml).is_some(),
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6742,6 +6751,8 @@ fn drawingml_picture_frame_from_fragment(
     fill_image: None,
     stroke: None,
     suppress_zero_relative_background: false,
+    allow_outside_page: false,
+    inline_anchor_after_line: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6956,6 +6967,10 @@ fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<R
             return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
               .map(|color| color.color);
           }
+          if depth == 1 && qname_ends_with(event.name().as_ref(), b"gradFill") {
+            let fragment = read_outer_xml_fragment(&mut reader, event)?;
+            return drawingml_first_fill_color(&fragment, theme_colors);
+          }
         }
       }
       Event::Empty(event)
@@ -6972,6 +6987,14 @@ fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<R
         return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
           .map(|color| color.color);
       }
+      Event::Empty(event)
+        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"gradFill") =>
+      {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Empty(event.into_owned())).ok()?;
+        let fragment = String::from_utf8(writer.into_inner()).ok()?;
+        return drawingml_first_fill_color(&fragment, theme_colors);
+      }
       Event::End(_) if in_root => {
         if depth == 0 {
           return None;
@@ -6982,6 +7005,12 @@ fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<R
       _ => {}
     }
   }
+}
+
+fn drawingml_first_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  drawingml_color_from_named_fragment(xml, b"srgbClr", theme_colors)
+    .or_else(|| drawingml_color_from_named_fragment(xml, b"schemeClr", theme_colors))
+    .map(|color| color.color)
 }
 
 fn drawingml_shape_has_no_fill(xml: &str) -> bool {
@@ -7163,6 +7192,11 @@ fn push_picture_choice_shapes(
         inlines.push(InlineItem::Shape(shape));
       }
     }
+    w::PictureChoice::VRoundrect(round_rectangle) => {
+      if let Some(shape) = vml_round_rectangle_shape(round_rectangle) {
+        inlines.push(InlineItem::Shape(shape));
+      }
+    }
     w::PictureChoice::VShape(shape) => {
       if let Some(shape) = vml_shape_shape(shape, images) {
         inlines.push(InlineItem::Shape(shape));
@@ -7183,6 +7217,11 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
       v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines, images),
       v::GroupChoice::VRect(rectangle) => {
         if let Some(shape) = vml_rectangle_shape(rectangle, images) {
+          inlines.push(InlineItem::Shape(shape));
+        }
+      }
+      v::GroupChoice::VRoundrect(round_rectangle) => {
+        if let Some(shape) = vml_round_rectangle_shape(round_rectangle) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -7212,7 +7251,29 @@ fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Optio
   )
 }
 
+fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<InlineShape> {
+  let filled = round_rectangle.filled.is_none_or(|value| value.as_bool());
+  let stroked = round_rectangle.stroked.is_none_or(|value| value.as_bool());
+  vml_inline_shape(
+    round_rectangle.style.as_deref(),
+    filled
+      .then_some(round_rectangle.fill_color.as_deref())
+      .flatten(),
+    None,
+    stroked
+      .then_some(round_rectangle.stroke_color.as_deref())
+      .flatten(),
+    round_rectangle.stroke_weight.as_deref(),
+    None,
+  )
+}
+
 fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShape> {
+  let has_path = shape
+    .edge_path
+    .as_deref()
+    .is_some_and(|path| !path.trim().is_empty());
+  let stroked = shape.stroked.is_none_or(|value| value.as_bool());
   vml_inline_shape(
     shape.style.as_deref(),
     shape.fill_color.as_deref(),
@@ -7220,6 +7281,7 @@ fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShap
     shape
       .stroke_color
       .as_deref()
+      .or_else(|| (has_path && stroked).then_some("black"))
       .or_else(|| vml_shape_has_textbox(shape).then_some("black")),
     shape.stroke_weight.as_deref(),
     vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()),
@@ -7307,6 +7369,8 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     fill_image: None,
     stroke,
     suppress_zero_relative_background: false,
+    allow_outside_page: style.absolute_position,
+    inline_anchor_after_line: false,
     placement: style.placement(),
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -7396,6 +7460,8 @@ fn vml_inline_shape(
     fill_image,
     stroke,
     suppress_zero_relative_background: false,
+    allow_outside_page: style.absolute_position,
+    inline_anchor_after_line: false,
     placement: style.placement(),
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -7440,6 +7506,8 @@ fn vml_textbox_frame(
     fill_image: None,
     stroke: None,
     suppress_zero_relative_background: false,
+    allow_outside_page: style.absolute_position,
+    inline_anchor_after_line: false,
     placement: style.placement(),
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
@@ -7583,6 +7651,7 @@ fn picture_choice_image(choice: &w::PictureChoice, images: &ImageCatalog) -> Opt
     w::PictureChoice::VGroup(group) => group_image(group, images),
     w::PictureChoice::VImage(image) => image_file_image(image, images),
     w::PictureChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+    w::PictureChoice::VRoundrect(_) => None,
     w::PictureChoice::VShape(shape) => shape_image(shape, images),
     _ => None,
   }
@@ -7621,6 +7690,17 @@ fn push_picture_choice_textboxes(
         rectangle, None, inlines, base_style, styles, images, hyperlinks,
       );
     }
+    w::PictureChoice::VRoundrect(round_rectangle) => {
+      push_round_rectangle_textboxes(
+        round_rectangle,
+        None,
+        inlines,
+        base_style,
+        styles,
+        images,
+        hyperlinks,
+      );
+    }
     w::PictureChoice::VShape(shape) => {
       push_shape_textboxes(shape, None, inlines, base_style, styles, images, hyperlinks);
     }
@@ -7633,6 +7713,7 @@ fn group_image(group: &v::Group, images: &ImageCatalog) -> Option<InlineImage> {
     v::GroupChoice::VGroup(group) => group_image(group, images),
     v::GroupChoice::VImage(image) => image_file_image(image, images),
     v::GroupChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+    v::GroupChoice::VRoundrect(_) => None,
     v::GroupChoice::VShape(shape) => shape_image(shape, images),
     _ => None,
   })
@@ -7676,6 +7757,19 @@ fn push_group_textboxes(
           transform.and_then(|transform| transform.child_style(rectangle.style.as_deref()));
         push_rectangle_textboxes(
           rectangle,
+          style.as_deref(),
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
+      v::GroupChoice::VRoundrect(round_rectangle) => {
+        let style =
+          transform.and_then(|transform| transform.child_style(round_rectangle.style.as_deref()));
+        push_round_rectangle_textboxes(
+          round_rectangle,
           style.as_deref(),
           inlines,
           base_style.clone(),
@@ -7787,6 +7881,38 @@ fn push_rectangle_textboxes(
 
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
+      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
+        inlines.push(InlineItem::Shape(frame));
+      } else {
+        push_vml_textbox(
+          textbox,
+          inlines,
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
+    }
+  }
+}
+
+fn push_round_rectangle_textboxes(
+  round_rectangle: &v::RoundRectangle,
+  style_override: Option<&str>,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) {
+  let style = style_override.or(round_rectangle.style.as_deref());
+  if vml_style_is_hidden(style) {
+    return;
+  }
+
+  for choice in &round_rectangle.round_rectangle_choice {
+    if let v::RoundRectangleChoice::VTextbox(textbox) = choice {
       if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
         inlines.push(InlineItem::Shape(frame));
       } else {
@@ -8052,6 +8178,7 @@ struct VmlImageStyle {
   absolute_position: bool,
   horizontal_relative_to: HorizontalImageReference,
   vertical_relative_to: VerticalImageReference,
+  vertical_alignment: Option<VerticalImageAlignment>,
   horizontal_offset_pt: f32,
   vertical_offset_pt: f32,
   wrap: ImageWrapMode,
@@ -8143,6 +8270,7 @@ impl Default for VmlImageStyle {
       absolute_position: false,
       horizontal_relative_to: HorizontalImageReference::Column,
       vertical_relative_to: VerticalImageReference::Paragraph,
+      vertical_alignment: None,
       horizontal_offset_pt: 0.0,
       vertical_offset_pt: 0.0,
       wrap: ImageWrapMode::Square,
@@ -8162,7 +8290,7 @@ impl VmlImageStyle {
         horizontal_relative_to: self.horizontal_relative_to,
         vertical_relative_to: self.vertical_relative_to,
         horizontal_alignment: None,
-        vertical_alignment: None,
+        vertical_alignment: self.vertical_alignment,
         horizontal_offset_pt: self.horizontal_offset_pt,
         vertical_offset_pt: self.vertical_offset_pt,
         wrap: self.wrap,
@@ -8260,6 +8388,10 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
         output.vertical_relative_to = vml_vertical_reference(value);
         output.absolute_position = true;
       }
+      "mso-position-vertical" => {
+        output.vertical_alignment = vml_vertical_alignment(value);
+        output.absolute_position = true;
+      }
       "mso-wrap-style" => output.wrap = vml_wrap_mode(value),
       "mso-wrap-distance-left" => {
         output.margin_left_pt = vml_measure_to_points(value).unwrap_or(0.0);
@@ -8300,8 +8432,21 @@ fn vml_vertical_reference(value: &str) -> VerticalImageReference {
   match value.trim().to_ascii_lowercase().as_str() {
     "page" => VerticalImageReference::Page,
     "margin" => VerticalImageReference::Margin,
+    "top-margin-area" => VerticalImageReference::TopMargin,
+    "bottom-margin-area" => VerticalImageReference::BottomMargin,
     "line" => VerticalImageReference::Line,
     _ => VerticalImageReference::Paragraph,
+  }
+}
+
+fn vml_vertical_alignment(value: &str) -> Option<VerticalImageAlignment> {
+  match value.trim().to_ascii_lowercase().as_str() {
+    "top" => Some(VerticalImageAlignment::Top),
+    "center" => Some(VerticalImageAlignment::Center),
+    "bottom" => Some(VerticalImageAlignment::Bottom),
+    "inside" => Some(VerticalImageAlignment::Inside),
+    "outside" => Some(VerticalImageAlignment::Outside),
+    _ => None,
   }
 }
 

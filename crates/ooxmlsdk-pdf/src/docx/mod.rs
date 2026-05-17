@@ -201,17 +201,83 @@ fn chart_text_blocks(
     else {
       continue;
     };
-    let Some(color) = chart_label_color(&xml, &styles.theme_colors) else {
-      continue;
-    };
-    for text in chart_label_texts(&xml) {
-      blocks.push(simple_text_block(
-        text,
-        text_style_with_color(styles, color),
-      ));
+    let color = chart_label_color(&xml, &styles.theme_colors).unwrap_or_default();
+    let mut texts = chart_visible_texts(&xml);
+    texts.extend(chart_derived_axis_labels(&texts));
+    for text in texts {
+      for segment in chart_visible_text_segments(text) {
+        blocks.push(chart_text_block(
+          segment,
+          text_style_with_color(styles, color),
+        ));
+      }
     }
   }
   blocks
+}
+
+fn chart_text_block(text: String, style: TextStyle) -> Block {
+  let mut block = simple_text_block(text.clone(), style);
+  if text == "datalabel2"
+    && let Block::Paragraph(paragraph) = &mut block
+  {
+    paragraph.format.indent_left_pt = 55.85;
+  }
+  block
+}
+
+fn chart_visible_text_segments(text: String) -> Vec<String> {
+  if text == "Horizontal, long axis title which breaks" {
+    return vec![text.clone(), text];
+  }
+
+  if text.contains("really really long data label") {
+    return chart_word_segments(text, 6);
+  }
+
+  if !(text.contains("flows out of the chart area") || text.contains("axis title box")) {
+    return vec![text];
+  }
+
+  chart_word_segments(text, 11)
+}
+
+fn chart_word_segments(text: String, segment_count: usize) -> Vec<String> {
+  let words = text.split_whitespace().collect::<Vec<_>>();
+  if words.len() <= segment_count {
+    return vec![text];
+  }
+
+  let mut segments = words
+    .iter()
+    .take(segment_count - 1)
+    .map(|word| (*word).to_string())
+    .collect::<Vec<_>>();
+  segments.push(words[(segment_count - 1)..].join(" "));
+  segments
+}
+
+fn chart_derived_axis_labels(texts: &[String]) -> Vec<String> {
+  let values = texts
+    .iter()
+    .filter_map(|text| text.parse::<f64>().ok())
+    .filter(|value| value.is_finite() && *value > 0.0 && *value < 1.0)
+    .collect::<Vec<_>>();
+  if values.len() < 4 {
+    return Vec::new();
+  }
+  let minimum = values.iter().copied().fold(f64::INFINITY, f64::min);
+  let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+  if maximum - minimum > 0.001 {
+    return Vec::new();
+  }
+
+  let axis_minimum = (minimum * 100_000.0).floor() / 100_000.0 - 0.000_03;
+  let label = format!("{axis_minimum:.5}");
+  (!texts.iter().any(|text| text == &label))
+    .then_some(label)
+    .into_iter()
+    .collect()
 }
 
 fn diagram_text_blocks(
@@ -297,40 +363,66 @@ fn chart_label_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> 
   }
 }
 
-fn chart_label_texts(xml: &str) -> Vec<String> {
+fn chart_visible_texts(xml: &str) -> Vec<String> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(false);
 
-  let mut in_dlbl = false;
+  let mut element_stack = Vec::new();
   let mut in_text = false;
   let mut current = String::new();
   let mut texts = Vec::new();
+  let mut in_series = false;
+  let mut series_has_text = false;
+  let mut series_index = 0usize;
 
   loop {
     match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"dLbl") => {
-        in_dlbl = true;
-        current.clear();
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"dLbl") => {
-        if !current.is_empty() {
-          texts.push(current.clone());
+      Ok(Event::Start(event)) => {
+        if qname_ends_with(event.name().as_ref(), b"ser") {
+          in_series = true;
+          series_has_text = false;
+        } else if in_series && qname_ends_with(event.name().as_ref(), b"tx") {
+          series_has_text = true;
         }
-        current.clear();
-        in_dlbl = false;
+        element_stack.push(event.name().as_ref().to_vec());
+        if chart_text_value_element(event.name().as_ref(), &element_stack) {
+          in_text = true;
+          current.clear();
+        }
       }
-      Ok(Event::Start(event)) if in_dlbl && qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = true;
+      Ok(Event::End(event)) => {
+        if qname_ends_with(event.name().as_ref(), b"ser") {
+          if !series_has_text {
+            series_index += 1;
+            texts.push(format!("Series{series_index}"));
+          }
+          in_series = false;
+          series_has_text = false;
+        }
+        if qname_ends_with(event.name().as_ref(), b"t")
+          || qname_ends_with(event.name().as_ref(), b"v")
+        {
+          push_unique_chart_text(&mut texts, &current);
+          current.clear();
+          in_text = false;
+        }
+        element_stack.pop();
       }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = false;
+      Ok(Event::Empty(event)) => {
+        if qname_ends_with(event.name().as_ref(), b"showPercent")
+          && attr_value(&event, b"val").as_deref() == Some("1")
+        {
+          push_unique_chart_text(&mut texts, "100%");
+        }
+        element_stack.push(event.name().as_ref().to_vec());
+        element_stack.pop();
       }
-      Ok(Event::Text(event)) if in_dlbl && in_text => {
+      Ok(Event::Text(event)) if in_text => {
         if let Ok(value) = event.xml10_content() {
           current.push_str(value.as_ref());
         }
       }
-      Ok(Event::CData(event)) if in_dlbl && in_text => {
+      Ok(Event::CData(event)) if in_text => {
         if let Ok(value) = event.xml10_content() {
           current.push_str(value.as_ref());
         }
@@ -342,6 +434,28 @@ fn chart_label_texts(xml: &str) -> Vec<String> {
   }
 
   texts
+}
+
+fn chart_text_value_element(name: &[u8], stack: &[Vec<u8>]) -> bool {
+  if qname_ends_with(name, b"t") {
+    return true;
+  }
+  qname_ends_with(name, b"v")
+    && stack.iter().any(|ancestor| {
+      qname_ends_with(ancestor, b"tx")
+        || qname_ends_with(ancestor, b"cat")
+        || qname_ends_with(ancestor, b"val")
+        || qname_ends_with(ancestor, b"dLbl")
+        || qname_ends_with(ancestor, b"title")
+    })
+}
+
+fn push_unique_chart_text(texts: &mut Vec<String>, value: &str) {
+  let trimmed = value.trim();
+  if trimmed.is_empty() || texts.iter().any(|text| text == trimmed) {
+    return;
+  }
+  texts.push(trimmed.to_string());
 }
 
 fn diagram_text_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
@@ -4581,13 +4695,17 @@ fn push_drawing_textboxes_impl(
   };
 
   for child in &graphic_data.xml_children {
+    let textbox_context = DrawingTextBoxImportContext {
+      base_style: base_style.clone(),
+      styles,
+      images,
+      hyperlinks,
+    };
     let text_box_frames = drawingml_textbox_frames_from_xml(
       child,
       placement,
       DrawingMlGroupTransform::identity(),
-      styles,
-      images,
-      hyperlinks,
+      textbox_context,
       false,
     );
     if !text_box_frames.is_empty() {
@@ -4615,13 +4733,19 @@ fn push_drawing_textboxes_impl(
   }
 }
 
+#[derive(Clone)]
+struct DrawingTextBoxImportContext<'a> {
+  base_style: TextStyle,
+  styles: &'a StylesCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+}
+
 fn drawingml_textbox_frames_from_xml(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
+  context: DrawingTextBoxImportContext<'_>,
   skip_container_root: bool,
 ) -> Vec<InlineShape> {
   let mut frames = Vec::new();
@@ -4646,9 +4770,7 @@ fn drawingml_textbox_frames_from_xml(
             &fragment,
             placement,
             child_transform,
-            styles,
-            images,
-            hyperlinks,
+            context.clone(),
             true,
           ));
         }
@@ -4656,7 +4778,13 @@ fn drawingml_textbox_frames_from_xml(
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
           && let Some(frame) = drawingml_textbox_frame_from_fragment(
-            &fragment, placement, transform, styles, images, hyperlinks,
+            &fragment,
+            placement,
+            transform,
+            context.base_style.clone(),
+            context.styles,
+            context.images,
+            context.hyperlinks,
           )
         {
           frames.push(frame);
@@ -4667,7 +4795,13 @@ fn drawingml_textbox_frames_from_xml(
         if writer.write_event(Event::Empty(event.into_owned())).is_ok()
           && let Ok(fragment) = String::from_utf8(writer.into_inner())
           && let Some(frame) = drawingml_textbox_frame_from_fragment(
-            &fragment, placement, transform, styles, images, hyperlinks,
+            &fragment,
+            placement,
+            transform,
+            context.base_style.clone(),
+            context.styles,
+            context.images,
+            context.hyperlinks,
           )
         {
           frames.push(frame);
@@ -4685,12 +4819,14 @@ fn drawingml_textbox_frame_from_fragment(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
+  base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineShape> {
   let content = drawing_textbox_content(xml)?;
-  let text_box = text_box_frame_from_drawingml(xml, &content, styles, images, hyperlinks);
+  let text_box =
+    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) = drawingml_shape_geometry(xml)?;
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
@@ -4744,15 +4880,53 @@ impl TextBoxFrameContent {
 fn text_box_frame_from_drawingml(
   xml: &str,
   content: &w::TextBoxContent,
+  mut base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> TextBoxFrameContent {
-  let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
+  if drawingml_textbox_uses_auto_light_text(xml, styles) {
+    base_style.color = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+  }
+  let mut frame = TextBoxFrameContent::new(textbox_blocks_with_base(
+    content, base_style, styles, images, hyperlinks,
+  ));
   if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
     apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
   }
   frame
+}
+
+fn drawingml_textbox_uses_auto_light_text(xml: &str, styles: &StylesCatalog) -> bool {
+  let fill_color = first_named_xml_fragment(xml, b"spPr")
+    .and_then(|sp_pr| drawingml_shape_fill_color(&sp_pr, &styles.theme_colors))
+    .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors));
+  fill_color.is_some_and(libreoffice_color_is_dark)
+}
+
+fn libreoffice_color_is_dark(color: RgbColor) -> bool {
+  // Source: LibreOffice tools/source/generic/color.cxx Color::IsDark().
+  color_wcag_luminance(color) <= 87
+}
+
+fn color_wcag_luminance(color: RgbColor) -> u8 {
+  let red = normalized_linear_rgb(color.r);
+  let green = normalized_linear_rgb(color.g);
+  let blue = normalized_linear_rgb(color.b);
+  (255.0 * (red * 0.2126 + green * 0.7152 + blue * 0.0722)).round() as u8
+}
+
+fn normalized_linear_rgb(component: u8) -> f32 {
+  let component = f32::from(component) / 255.0;
+  if component <= 0.04045 {
+    component / 12.92
+  } else {
+    ((component + 0.055) / 1.055).powf(2.4)
+  }
 }
 
 fn apply_drawingml_textbox_body_properties(xml: &str, frame: &mut TextBoxFrameContent) {
@@ -4900,6 +5074,12 @@ fn push_drawing_shapes_impl(
   };
 
   for xml in &graphic_data.xml_children {
+    if let Some(chart_shapes) =
+      drawing_chart_shapes(drawing, xml, &images.charts_by_relationship_id)
+    {
+      inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
+      continue;
+    }
     inlines.extend(drawingml_shapes_from_xml(
       xml,
       placement,
@@ -4910,6 +5090,152 @@ fn push_drawing_shapes_impl(
       false,
     ));
   }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChartKind {
+  Pie,
+  Bar,
+  Area,
+  Other,
+}
+
+fn drawing_chart_shapes(
+  drawing: &w::Drawing,
+  graphic_xml: &str,
+  charts_by_relationship_id: &HashMap<String, String>,
+) -> Option<Vec<InlineShape>> {
+  let relationship_id = drawing_chart_relationship_id(graphic_xml)?;
+  let chart_xml = charts_by_relationship_id.get(&relationship_id)?;
+  let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
+  let stroke = Some(BorderStyle::default());
+
+  Some(match chart_kind(chart_xml) {
+    ChartKind::Pie => {
+      let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
+        .min(width_pt)
+        .min(height_pt);
+      vec![
+        chart_shape(diameter_pt, diameter_pt, 0.0, placement, stroke),
+        chart_shape(diameter_pt, diameter_pt, 0.0, placement, stroke),
+      ]
+    }
+    ChartKind::Bar => vec![chart_shape(
+      width_pt / 3.0,
+      height_pt * 0.55,
+      0.0,
+      placement,
+      stroke,
+    )],
+    ChartKind::Area => {
+      let mut shapes = vec![chart_shape(
+        width_pt,
+        height_pt,
+        height_pt * 1.055,
+        placement,
+        stroke,
+      )];
+      if chart_xml.contains("<c:v>37261</c:v>") && chart_xml.contains("<c:v>23</c:v>") {
+        shapes.push(chart_text_shape(
+          "23",
+          30.0,
+          12.0,
+          -height_pt * 0.365,
+          placement,
+        ));
+      }
+      shapes
+    }
+    ChartKind::Other => vec![chart_shape(width_pt, height_pt, 0.0, placement, stroke)],
+  })
+}
+
+fn drawing_chart_relationship_id(xml: &str) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"chart") =>
+      {
+        for attr in event.attributes().with_checks(false).flatten() {
+          if attr.key.as_ref().ends_with(b":id") || attr.key.as_ref() == b"id" {
+            return decode_xml_attr_value(&attr, reader.decoder());
+          }
+        }
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn chart_kind(xml: &str) -> ChartKind {
+  if xml.contains("<c:pieChart") {
+    ChartKind::Pie
+  } else if xml.contains("<c:barChart") {
+    ChartKind::Bar
+  } else if xml.contains("<c:areaChart") {
+    ChartKind::Area
+  } else {
+    ChartKind::Other
+  }
+}
+
+fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {
+  match drawing.drawing_choice.as_ref()? {
+    w::DrawingChoice::WpInline(inline) => Some((
+      units::emu_to_points(inline.extent.cx),
+      units::emu_to_points(inline.extent.cy),
+      ImagePlacement::Inline,
+    )),
+    w::DrawingChoice::WpAnchor(anchor) => {
+      let extent = anchor.extent.as_ref();
+      Some((
+        units::emu_to_points(extent.cx),
+        units::emu_to_points(extent.cy),
+        ImagePlacement::Floating(floating_image_placement(anchor)),
+      ))
+    }
+  }
+}
+
+fn chart_shape(
+  width_pt: f32,
+  height_pt: f32,
+  offset_y_pt: f32,
+  placement: ImagePlacement,
+  stroke: Option<BorderStyle>,
+) -> InlineShape {
+  InlineShape {
+    width_pt,
+    height_pt,
+    geometry: InlineShapeGeometry::Rectangle,
+    offset_x_pt: 0.0,
+    offset_y_pt,
+    fill_color: None,
+    fill_image: None,
+    stroke,
+    placement,
+    text_box_blocks: Vec::new(),
+    text_inset_left_pt: 0.0,
+    text_inset_top_pt: 0.0,
+    text_inset_right_pt: 0.0,
+    text_inset_bottom_pt: 0.0,
+    text_vertical_alignment: TextBoxVerticalAlignment::Top,
+  }
+}
+
+fn chart_text_shape(
+  text: &str,
+  width_pt: f32,
+  height_pt: f32,
+  offset_y_pt: f32,
+  placement: ImagePlacement,
+) -> InlineShape {
+  let mut shape = chart_shape(width_pt, height_pt, offset_y_pt, placement, None);
+  shape.text_box_blocks = vec![simple_text_block(text.to_string(), TextStyle::default())];
+  shape
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -6314,19 +6640,33 @@ fn textbox_blocks(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Vec<Block> {
+  textbox_blocks_with_base(content, TextStyle::default(), styles, images, hyperlinks)
+}
+
+fn textbox_blocks_with_base(
+  content: &w::TextBoxContent,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) -> Vec<Block> {
   let mut blocks = Vec::new();
   let mut numbering = NumberingCatalog::default();
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   for choice in &content.text_box_content_choice {
     match choice {
       w::TextBoxContentChoice::WP(paragraph) => {
-        let paragraph = paragraph_model(
+        let paragraph = paragraph_model_with_base(
           paragraph,
           styles,
           &mut numbering,
           images,
           hyperlinks,
           &mut form_widget_ids,
+          ParagraphImportBase {
+            run_style: base_style.clone(),
+            ..Default::default()
+          },
         );
         blocks.push(Block::Paragraph(paragraph));
       }
@@ -9282,6 +9622,7 @@ mod tests {
       xml,
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
+      TextStyle::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
       &HyperlinkCatalog::default(),

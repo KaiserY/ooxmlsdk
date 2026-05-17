@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
-  endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
-  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
-  numbering_definitions_part::NumberingDefinitionsPart,
+  chart_part::ChartPart, endnotes_part::EndnotesPart, footer_part::FooterPart,
+  footnotes_part::FootnotesPart, header_part::HeaderPart, image_part::ImagePart,
+  main_document_part::MainDocumentPart, numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -13,6 +13,7 @@ use ooxmlsdk::sdk::SdkPart;
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
+  pub(super) charts_by_relationship_id: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -54,9 +55,14 @@ pub(super) struct ImageResource {
 
 impl ImageCatalog {
   pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
-    Self::from_image_parts(package, main.image_parts(package), |image_part| {
+    let mut catalog = Self::from_image_parts(package, main.image_parts(package), |image_part| {
       main.get_id_of_part(package, image_part)
-    })
+    });
+    catalog.charts_by_relationship_id =
+      Self::chart_parts(package, main.chart_parts(package), |chart_part| {
+        main.get_id_of_part(package, chart_part)
+      });
+    catalog
   }
 
   pub(super) fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
@@ -129,6 +135,30 @@ impl ImageCatalog {
       );
     }
 
-    Self { by_relationship_id }
+    Self {
+      by_relationship_id,
+      charts_by_relationship_id: HashMap::new(),
+    }
+  }
+
+  fn chart_parts<'a>(
+    package: &WordprocessingDocument,
+    chart_parts: impl Iterator<Item = ChartPart> + 'a,
+    relationship_id: impl Fn(&ChartPart) -> Option<&'a str>,
+  ) -> HashMap<String, String> {
+    let mut by_relationship_id = HashMap::new();
+    for chart_part in chart_parts {
+      let Some(relationship_id) = relationship_id(&chart_part) else {
+        continue;
+      };
+      let Some(data) = chart_part.data_to_vec(package) else {
+        continue;
+      };
+      let Ok(xml) = String::from_utf8(data) else {
+        continue;
+      };
+      by_relationship_id.insert(relationship_id.to_string(), xml);
+    }
+    by_relationship_id
   }
 }

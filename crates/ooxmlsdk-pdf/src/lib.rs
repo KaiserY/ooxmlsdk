@@ -1448,6 +1448,55 @@ mod tests {
     assert_eq!(laid_out_images, 3);
   }
 
+  #[test]
+  fn pdfexport_fixture_tdf100072_extracts_zero_height_custom_geometry_line() {
+    let path = fixture_path("test-data/ooxmlsdk-pdf-test/libreoffice/tdf100072.docx");
+    let settings = OpenSettings {
+      markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+        process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+        target_file_format_version: FileFormatVersion::Microsoft365,
+      },
+      ..Default::default()
+    };
+    let mut package =
+      WordprocessingDocument::new_with_settings(File::open(path).unwrap(), settings).unwrap();
+    let doc = crate::docx::extract(&mut package, &PdfOptions::default()).unwrap();
+    let shape_count = doc
+      .blocks
+      .iter()
+      .filter_map(|block| match block {
+        crate::docx::Block::Paragraph(paragraph) => Some(paragraph),
+        _ => None,
+      })
+      .flat_map(|paragraph| &paragraph.inlines)
+      .filter(|inline| matches!(inline, crate::docx::InlineItem::Shape(_)))
+      .count();
+    let section_shape_count = doc
+      .sections
+      .iter()
+      .flat_map(|section| &section.blocks)
+      .filter_map(|block| match block {
+        crate::docx::Block::Paragraph(paragraph) => Some(paragraph),
+        _ => None,
+      })
+      .flat_map(|paragraph| &paragraph.inlines)
+      .filter(|inline| matches!(inline, crate::docx::InlineItem::Shape(_)))
+      .count();
+
+    assert_eq!(shape_count, 1);
+    assert_eq!(section_shape_count, 1);
+
+    let layout = crate::layout::layout(&doc, &PdfOptions::default()).unwrap();
+    let line_count = layout
+      .pages
+      .iter()
+      .flat_map(|page| &page.items)
+      .filter(|item| matches!(item, crate::layout::PageItem::Line(_)))
+      .count();
+
+    assert_eq!(line_count, 1);
+  }
+
   fn fixture_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .join("../..")

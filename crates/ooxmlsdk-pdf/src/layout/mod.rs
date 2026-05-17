@@ -6,7 +6,7 @@ use crate::docx::{
   Block, BorderStyle, DocxDocument, DynamicFieldKind, FloatingFrame, FloatingFramePlacement,
   FloatingImagePlacement, FrameHeightRule, FrameHorizontalAlignment, FrameHorizontalAnchor,
   FrameVerticalAlignment, FrameVerticalAnchor, FrameWrapMode, HorizontalImageAlignment,
-  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem,
+  HorizontalImageReference, ImageCrop, ImageWrapMode, ImageWrapSide, InlineItem, InlineShape,
   InlineShapeGeometry, LineHeightRule, PageSetup, ParagraphAlignment, RgbColor, SectionBreakKind,
   SectionColumns, TabStop, TabStopAlignment, Table, TableAlignment, TableCell,
   TableCellVerticalAlignment, TableRow, TextBoxVerticalAlignment, TextStyle,
@@ -5417,6 +5417,19 @@ fn relative_floating_height(placement: FloatingImagePlacement, flow: FlowContext
   Some((vertical_reference_height(reference, flow) * pct).max(0.0))
 }
 
+fn floating_shape_is_zero_relative_background(
+  placement: FloatingImagePlacement,
+  shape: &InlineShape,
+) -> bool {
+  shape.suppress_zero_relative_background
+    && placement.relative_width_pct.is_some_and(|pct| pct <= 0.0)
+    && placement.relative_height_pct.is_some_and(|pct| pct <= 0.0)
+    && shape.fill_color.is_some()
+    && shape.fill_image.is_none()
+    && shape.stroke.is_none()
+    && shape.text_box_blocks.is_empty()
+}
+
 fn horizontal_reference_width(reference: HorizontalImageReference, flow: FlowContext) -> f32 {
   match reference {
     HorizontalImageReference::Page => flow.setup.width_pt,
@@ -6478,6 +6491,19 @@ impl<'a> TextFrameLayout<'a> {
                 fill_color: shape.fill_color,
                 stroke: shape.stroke,
               }));
+              for color in &shape.additional_fill_colors {
+                current.items.push(PageItem::Polyline(PolylineItem {
+                  x_pt,
+                  y_pt,
+                  width_pt,
+                  height_pt,
+                  points: points.clone(),
+                  closed: *closed,
+                  fill_color: Some(*color),
+                  stroke: None,
+                }));
+              }
+              layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
               return;
             }
             if shape.fill_color.is_some() || shape.stroke.is_some() {
@@ -6490,11 +6516,24 @@ impl<'a> TextFrameLayout<'a> {
                 stroke: shape.stroke,
               }));
             }
+            for color in &shape.additional_fill_colors {
+              current.items.push(PageItem::Rect(RectItem {
+                x_pt,
+                y_pt,
+                width_pt,
+                height_pt,
+                fill_color: Some(*color),
+                stroke: None,
+              }));
+            }
             layout_shape_text_box(current, shape_flow, shape, x_pt, y_pt, width_pt, height_pt);
           };
 
           match shape.placement {
             crate::docx::ImagePlacement::Floating(placement) => {
+              if floating_shape_is_zero_relative_background(placement, shape) {
+                continue;
+              }
               let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
               let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
               let (shape_x, shape_y) =

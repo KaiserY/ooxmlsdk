@@ -84,6 +84,10 @@ pub(crate) fn extract(
     .document_background
     .as_deref()
     .and_then(document_background_color);
+  let page_background_image = document
+    .document_background
+    .as_deref()
+    .and_then(|background| document_background_image(background, &images));
   let mut sections = document
     .body
     .as_deref()
@@ -100,6 +104,11 @@ pub(crate) fn extract(
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
   let supplemental_graphic_blocks = supplemental_graphic_blocks(package, &main, &styles);
   if let Some(first_section) = sections.first_mut() {
+    if let Some(image) = page_background_image {
+      first_section
+        .blocks
+        .insert(0, page_background_image_block(image, first_section.page));
+    }
     first_section
       .blocks
       .extend(supplemental_graphic_blocks.iter().cloned());
@@ -654,6 +663,58 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
       hyperlink_url: None,
       dynamic_field: None,
       preserve_text_portion: false,
+    })],
+    footnote_reference_ids: Vec::new(),
+    endnote_reference_ids: Vec::new(),
+    #[cfg(test)]
+    runs: Vec::new(),
+    format: Box::new(ParagraphFormat::default()),
+    list_label: None,
+    list_label_style: TextStyle::default(),
+    list_label_hyperlink_url: None,
+    list_label_tab_stop_pt: None,
+  })
+}
+
+fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> Block {
+  Block::Paragraph(Paragraph {
+    inlines: vec![InlineItem::Image(InlineImage {
+      data: image.data,
+      content_type: image.content_type,
+      width_pt: page.width_pt,
+      height_pt: page.height_pt,
+      effect_left_pt: 0.0,
+      effect_top_pt: 0.0,
+      effect_right_pt: 0.0,
+      effect_bottom_pt: 0.0,
+      crop: image.crop,
+      rotation_deg: image.rotation_deg,
+      flip_horizontal: image.flip_horizontal,
+      flip_vertical: image.flip_vertical,
+      alt_text: None,
+      hyperlink_url: None,
+      placement: ImagePlacement::Floating(FloatingImagePlacement {
+        horizontal_relative_to: HorizontalImageReference::Page,
+        vertical_relative_to: VerticalImageReference::Page,
+        horizontal_alignment: None,
+        vertical_alignment: None,
+        horizontal_offset_pt: 0.0,
+        vertical_offset_pt: 0.0,
+        wrap: ImageWrapMode::None,
+        wrap_side: ImageWrapSide::BothSides,
+        behind_text: true,
+        layout_in_cell: true,
+        allow_overlap: true,
+        relative_height: 0,
+        relative_width_to: None,
+        relative_width_pct: None,
+        relative_height_to: None,
+        relative_height_pct: None,
+        margin_top_pt: 0.0,
+        margin_right_pt: 0.0,
+        margin_bottom_pt: 0.0,
+        margin_left_pt: 0.0,
+      }),
     })],
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
@@ -2566,7 +2627,36 @@ fn border_value_is_compound(value: w::BorderValues) -> bool {
 }
 
 fn document_background_color(background: &w::DocumentBackground) -> Option<RgbColor> {
-  background.color.as_deref().and_then(parse_hex_color)
+  background
+    .background
+    .as_deref()
+    .and_then(vml_background_pattern_color)
+    .or_else(|| background.color.as_deref().and_then(parse_hex_color))
+}
+
+fn document_background_image(
+  background: &w::DocumentBackground,
+  images: &ImageCatalog,
+) -> Option<InlineShapeImageFill> {
+  background.color.as_ref()?;
+  let fill = background.background.as_deref()?.fill.as_deref()?;
+  if fill.r#type != Some(v::FillTypeValues::Frame) {
+    return None;
+  }
+  vml_fill_image(fill, None, images)
+}
+
+fn vml_background_pattern_color(background: &v::Background) -> Option<RgbColor> {
+  let fill = background.fill.as_deref()?;
+  if fill.r#type != Some(v::FillTypeValues::Pattern) {
+    return None;
+  }
+  fill
+    .color2
+    .as_deref()
+    .and_then(parse_vml_color)
+    .or_else(|| fill.color.as_deref().and_then(parse_vml_color))
+    .or_else(|| background.fillcolor.as_deref().and_then(parse_vml_color))
 }
 
 fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<ParagraphProps<'_>>) {
@@ -4960,7 +5050,7 @@ fn drawingml_textbox_frame_from_fragment(
     text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
   let auto_fit = drawingml_textbox_uses_auto_fit(xml);
   let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
-  let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit);
+  let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit, placement);
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     drawingml_shape_geometry_with_transform(xml, transform)?;
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
@@ -4975,16 +5065,36 @@ fn drawingml_textbox_frame_from_fragment(
   } else {
     shape_height_pt.max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT)
   };
+  let mut wordart_fill_colors = if drawingml_textbox_has_fontwork_warp(xml) {
+    drawingml_text_fill_colors(xml, &styles.theme_colors)
+  } else {
+    Vec::new()
+  };
+  if wordart_fill_colors.is_empty()
+    && drawingml_textbox_has_fontwork_warp(xml)
+    && let Some(color) = first_text_color_in_blocks(&text_box.blocks)
+  {
+    wordart_fill_colors.push(color);
+  }
+  let fill_color = wordart_fill_colors.first().copied();
+  let additional_fill_colors = wordart_fill_colors.into_iter().skip(1).collect();
+  let geometry = if drawingml_textbox_has_fontwork_warp(xml) {
+    fontwork_warp_geometry()
+  } else {
+    InlineShapeGeometry::Rectangle
+  };
 
   Some(InlineShape {
     width_pt,
     height_pt,
-    geometry: InlineShapeGeometry::Rectangle,
+    geometry,
     offset_x_pt,
     offset_y_pt,
-    fill_color: None,
+    fill_color,
+    additional_fill_colors,
     fill_image: None,
     stroke: frame_stroke.or_else(|| expands_auto_fit.then_some(BorderStyle::default())),
+    suppress_zero_relative_background: false,
     placement,
     text_box_blocks: text_box.blocks,
     text_inset_left_pt: text_box.left_pt,
@@ -5003,18 +5113,140 @@ fn drawingml_textbox_is_vertical(xml: &str) -> bool {
   xml.contains("vert=\"vert\"")
 }
 
+fn drawingml_textbox_has_fontwork_warp(xml: &str) -> bool {
+  first_named_xml_fragment(xml, b"prstTxWarp").is_some_and(|fragment| {
+    !fragment.contains("prst=\"textPlain\"")
+      && !fragment.contains("prst='textPlain'")
+      && !fragment.contains("prst=\"textNoShape\"")
+      && !fragment.contains("prst='textNoShape'")
+  })
+}
+
+fn fontwork_warp_geometry() -> InlineShapeGeometry {
+  const SEGMENTS: usize = 16;
+  let mut points = Vec::with_capacity(SEGMENTS * 2 + 1);
+  for index in 0..=SEGMENTS {
+    let t = index as f32 / SEGMENTS as f32;
+    let y = 0.12 + (t * std::f32::consts::PI).sin() * 0.18;
+    points.push((t, y));
+  }
+  for index in (0..=SEGMENTS).rev() {
+    let t = index as f32 / SEGMENTS as f32;
+    let y = 0.88 - (t * std::f32::consts::PI).sin() * 0.18;
+    points.push((t, y));
+  }
+  if points.last() != points.first() {
+    points.push(points[0]);
+  }
+  InlineShapeGeometry::Polyline {
+    points,
+    closed: true,
+  }
+}
+
+fn drawingml_text_fill_colors(xml: &str, theme_colors: &ThemeColors) -> Vec<RgbColor> {
+  let Some(fragment) = first_named_xml_fragment(xml, b"textFill") else {
+    return Vec::new();
+  };
+  let mut reader = Reader::from_str(&fragment);
+  reader.config_mut().trim_text(false);
+  let mut colors = Vec::new();
+
+  loop {
+    match reader.read_event().ok() {
+      Some(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        if let Some(color) = color_attr_local(&event, b"val") {
+          push_unique_color(&mut colors, color);
+        }
+      }
+      Some(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"srgbClr") => {
+        if let Some(color) = color_attr_local(&event, b"val") {
+          push_unique_color(&mut colors, color);
+        }
+      }
+      Some(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        if let Some(value) = attr_value_local(&event, b"val")
+          && let Some(color) = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)
+        {
+          push_unique_color(&mut colors, color);
+        }
+      }
+      Some(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        if let Some(value) = attr_value_local(&event, b"val")
+          && let Some(color) = resolve_drawingml_scheme_color_name(value.as_ref(), theme_colors)
+        {
+          push_unique_color(&mut colors, color);
+        }
+      }
+      Some(Event::Eof) | None => break,
+      _ => {}
+    }
+  }
+
+  colors
+}
+
+fn push_unique_color(colors: &mut Vec<RgbColor>, color: RgbColor) {
+  if !colors.contains(&color) {
+    colors.push(color);
+  }
+}
+
+fn attr_value_local(
+  event: &quick_xml::events::BytesStart<'_>,
+  local_name: &[u8],
+) -> Option<Box<str>> {
+  event
+    .attributes()
+    .flatten()
+    .find(|attribute| qname_ends_with(attribute.key.as_ref(), local_name))
+    .and_then(|attribute| String::from_utf8(attribute.value.into_owned()).ok())
+    .map(String::into_boxed_str)
+}
+
+fn color_attr_local(
+  event: &quick_xml::events::BytesStart<'_>,
+  local_name: &[u8],
+) -> Option<RgbColor> {
+  parse_hex_color(attr_value_local(event, local_name)?.as_ref())
+}
+
+fn first_text_color_in_blocks(blocks: &[Block]) -> Option<RgbColor> {
+  blocks.iter().find_map(first_text_color_in_block)
+}
+
+fn first_text_color_in_block(block: &Block) -> Option<RgbColor> {
+  match block {
+    Block::Paragraph(paragraph) => paragraph.inlines.iter().find_map(|inline| match inline {
+      InlineItem::Text(run) if !run.text.is_empty() => Some(run.style.color),
+      InlineItem::Shape(shape) => first_text_color_in_blocks(&shape.text_box_blocks),
+      _ => None,
+    }),
+    Block::Table(table) => table
+      .rows
+      .iter()
+      .flat_map(|row| &row.cells)
+      .find_map(|cell| first_text_color_in_blocks(&cell.blocks)),
+    Block::Frame(frame) => first_text_color_in_blocks(&frame.blocks),
+  }
+}
+
 fn drawingml_textbox_frame_stroke(
   xml: &str,
-  styles: &StylesCatalog,
+  _styles: &StylesCatalog,
   auto_fit: bool,
+  placement: ImagePlacement,
 ) -> Option<BorderStyle> {
-  let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  let has_shape_visual = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors).is_some()
-    || drawingml_shape_image_fill(&sp_pr, &ImageCatalog::default()).is_some()
-    || drawingml_shape_stroke(&sp_pr, &styles.theme_colors).is_some()
-    || drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors).is_some()
-    || drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines).is_some();
-  (auto_fit && !has_shape_visual).then_some(BorderStyle::default())
+  let _ = first_named_xml_fragment(xml, b"spPr")?;
+  let suppress_zero_width_relative_frame = matches!(
+    placement,
+    ImagePlacement::Floating(FloatingImagePlacement {
+      relative_width_pct: Some(width_pct),
+      relative_height_pct: Some(height_pct),
+      ..
+    }) if width_pct <= 0.0 && height_pct > 0.0
+  );
+  (auto_fit && !suppress_zero_width_relative_frame).then_some(BorderStyle::default())
 }
 
 #[derive(Clone, Debug)]
@@ -5255,6 +5487,8 @@ fn push_drawing_shapes_impl(
     return;
   }
 
+  let transform =
+    DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
   for xml in &graphic_data.xml_children {
     if let Some(chart_shapes) =
       drawing_chart_shapes(drawing, xml, &images.charts_by_relationship_id)
@@ -5263,13 +5497,7 @@ fn push_drawing_shapes_impl(
       continue;
     }
     inlines.extend(drawingml_shapes_from_xml(
-      xml,
-      placement,
-      DrawingMlGroupTransform::identity(),
-      styles,
-      images,
-      hyperlinks,
-      false,
+      xml, placement, transform, styles, images, hyperlinks, false,
     ));
   }
 }
@@ -5382,6 +5610,22 @@ fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32,
   }
 }
 
+fn drawing_extent_size(drawing: &w::Drawing) -> Option<(f32, f32)> {
+  match drawing.drawing_choice.as_ref()? {
+    w::DrawingChoice::WpInline(inline) => Some((
+      units::emu_to_points(inline.extent.cx),
+      units::emu_to_points(inline.extent.cy),
+    )),
+    w::DrawingChoice::WpAnchor(anchor) => {
+      let extent = anchor.extent.as_ref();
+      Some((
+        units::emu_to_points(extent.cx),
+        units::emu_to_points(extent.cy),
+      ))
+    }
+  }
+}
+
 fn chart_shape(
   width_pt: f32,
   height_pt: f32,
@@ -5396,8 +5640,10 @@ fn chart_shape(
     offset_x_pt: 0.0,
     offset_y_pt,
     fill_color: None,
+    additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
+    suppress_zero_relative_background: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -5427,6 +5673,7 @@ struct DrawingMlGroupTransform {
   translate_x_pt: f32,
   translate_y_pt: f32,
   raw_coordinates: bool,
+  fallback_size: Option<(f32, f32)>,
 }
 
 impl DrawingMlGroupTransform {
@@ -5437,7 +5684,13 @@ impl DrawingMlGroupTransform {
       translate_x_pt: 0.0,
       translate_y_pt: 0.0,
       raw_coordinates: false,
+      fallback_size: None,
     }
+  }
+
+  fn with_fallback_size(mut self, fallback_size: Option<(f32, f32)>) -> Self {
+    self.fallback_size = fallback_size;
+    self
   }
 
   fn child(self, xfrm: DrawingMlGroupXfrm) -> Self {
@@ -5463,6 +5716,7 @@ impl DrawingMlGroupTransform {
       translate_x_pt: offset_x_pt - self.scale_x * xfrm.child_offset_x * scale_x,
       translate_y_pt: offset_y_pt - self.scale_y * xfrm.child_offset_y * scale_y,
       raw_coordinates: true,
+      fallback_size: None,
     }
   }
 
@@ -5582,8 +5836,10 @@ fn anchor_wrap_polygon_shape(
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color: None,
+    additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    suppress_zero_relative_background: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -5678,11 +5934,20 @@ fn drawingml_shape_from_fragment(
   images: &ImageCatalog,
 ) -> Option<InlineShape> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  let fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors)
-    .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors));
+  let explicit_fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors);
+  let fill_color = if drawingml_shape_has_no_fill(&sp_pr) {
+    None
+  } else {
+    explicit_fill_color
+      .or_else(|| drawingml_shape_style_color(xml, b"fillRef", &styles.theme_colors))
+  };
   let fill_image = drawingml_shape_image_fill(&sp_pr, images);
-  let stroke = drawingml_shape_stroke(&sp_pr, &styles.theme_colors)
-    .or_else(|| drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines));
+  let stroke = if drawingml_shape_has_no_line(&sp_pr) {
+    None
+  } else {
+    drawingml_shape_stroke(&sp_pr, &styles.theme_colors)
+      .or_else(|| drawingml_shape_style_stroke(xml, &styles.theme_colors, &styles.theme_lines))
+  };
   if fill_color.is_none() && fill_image.is_none() && stroke.is_none() {
     return None;
   }
@@ -5695,8 +5960,12 @@ fn drawingml_shape_from_fragment(
       closed: false,
     };
   }
-  let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
-    drawingml_geometry_from_sp_pr(&sp_pr, &geometry, transform.raw_coordinates)?;
+  let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_geometry_from_sp_pr(
+    &sp_pr,
+    &geometry,
+    transform.raw_coordinates,
+    transform.fallback_size,
+  )?;
   if has_custom_geometry
     && let Some(custom_geometry) = drawingml_custom_geometry(&sp_pr, width_pt, height_pt)
   {
@@ -5712,8 +5981,10 @@ fn drawingml_shape_from_fragment(
     offset_x_pt,
     offset_y_pt,
     fill_color,
+    additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
+    suppress_zero_relative_background: explicit_fill_color.is_some(),
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -5727,7 +5998,7 @@ fn drawingml_shape_from_fragment(
 #[cfg(test)]
 fn drawingml_shape_geometry(xml: &str) -> Option<(f32, f32, f32, f32)> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
-  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr), false)
+  drawingml_geometry_from_sp_pr(&sp_pr, &drawingml_shape_geometry_kind(&sp_pr), false, None)
 }
 
 fn drawingml_shape_geometry_with_transform(
@@ -5739,6 +6010,7 @@ fn drawingml_shape_geometry_with_transform(
     &sp_pr,
     &drawingml_shape_geometry_kind(&sp_pr),
     transform.raw_coordinates,
+    None,
   )
 }
 
@@ -5911,6 +6183,7 @@ fn drawingml_geometry_from_sp_pr(
   sp_pr: &str,
   geometry: &InlineShapeGeometry,
   raw_coordinates: bool,
+  fallback_size: Option<(f32, f32)>,
 ) -> Option<(f32, f32, f32, f32)> {
   let mut reader = Reader::from_str(sp_pr);
   reader.config_mut().trim_text(false);
@@ -5918,6 +6191,7 @@ fn drawingml_geometry_from_sp_pr(
   let mut offset_y_pt = 0.0f32;
   let mut width_pt = 0.0f32;
   let mut height_pt = 0.0f32;
+  let mut saw_ext = false;
 
   loop {
     match reader.read_event() {
@@ -5932,6 +6206,7 @@ fn drawingml_geometry_from_sp_pr(
           .unwrap_or(offset_y_pt);
       }
       Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"ext") => {
+        saw_ext = true;
         width_pt = attr_value(&event, b"cx")
           .and_then(|value| value.parse::<i64>().ok())
           .map(|value| drawingml_coordinate_to_points(value, raw_coordinates))
@@ -5944,6 +6219,11 @@ fn drawingml_geometry_from_sp_pr(
       Ok(Event::Eof) | Err(_) => break,
       _ => {}
     }
+  }
+
+  if !saw_ext && let Some((fallback_width_pt, fallback_height_pt)) = fallback_size {
+    width_pt = fallback_width_pt;
+    height_pt = fallback_height_pt;
   }
 
   match geometry {
@@ -5982,8 +6262,10 @@ fn drawingml_picture_frame_from_fragment(
     offset_x_pt,
     offset_y_pt,
     fill_color: None,
+    additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    suppress_zero_relative_background: false,
     placement,
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6181,7 +6463,80 @@ fn drawingml_child_placement(
 }
 
 fn drawingml_shape_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  drawingml_color_from_named_fragment(xml, b"solidFill", theme_colors).map(|color| color.color)
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  let mut depth = 0usize;
+  let mut in_root = false;
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) => {
+        if !in_root {
+          in_root = true;
+        } else {
+          depth += 1;
+          if depth == 1 && qname_ends_with(event.name().as_ref(), b"solidFill") {
+            let fragment = read_outer_xml_fragment(&mut reader, event)?;
+            return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
+              .map(|color| color.color);
+          }
+        }
+      }
+      Event::Empty(event)
+        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"noFill") =>
+      {
+        return None;
+      }
+      Event::Empty(event)
+        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"solidFill") =>
+      {
+        let mut writer = Writer::new(Vec::new());
+        writer.write_event(Event::Empty(event.into_owned())).ok()?;
+        let fragment = String::from_utf8(writer.into_inner()).ok()?;
+        return drawingml_color_from_named_fragment(&fragment, b"solidFill", theme_colors)
+          .map(|color| color.color);
+      }
+      Event::End(_) if in_root => {
+        if depth == 0 {
+          return None;
+        }
+        depth -= 1;
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn drawingml_shape_has_no_fill(xml: &str) -> bool {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  let mut in_root = false;
+  let mut depth = 0usize;
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(_)) if !in_root => {
+        in_root = true;
+      }
+      Ok(Event::Start(_)) if in_root => {
+        depth += 1;
+      }
+      Ok(Event::Empty(event))
+        if in_root && depth == 0 && qname_ends_with(event.name().as_ref(), b"noFill") =>
+      {
+        return true;
+      }
+      Ok(Event::End(_)) if in_root => {
+        if depth == 0 {
+          return false;
+        }
+        depth -= 1;
+      }
+      Ok(Event::Eof) | Err(_) => return false,
+      _ => {}
+    }
+  }
 }
 
 fn drawingml_shape_style_color(
@@ -6226,6 +6581,9 @@ fn drawingml_style_ref_index(xml: &str) -> Option<usize> {
 
 fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<BorderStyle> {
   let line_fragment = first_named_xml_fragment(xml, b"ln")?;
+  if drawingml_shape_has_no_fill(&line_fragment) {
+    return None;
+  }
   let mut width_pt = units::emu_to_points(DRAWINGML_DEFAULT_LINE_WIDTH_EMU);
   let mut reader = Reader::from_str(&line_fragment);
   reader.config_mut().trim_text(false);
@@ -6252,6 +6610,13 @@ fn drawingml_shape_stroke(xml: &str, theme_colors: &ThemeColors) -> Option<Borde
     color: drawingml_color_from_named_fragment(&line_fragment, b"solidFill", theme_colors)?.color,
     compound: false,
   })
+}
+
+fn drawingml_shape_has_no_line(xml: &str) -> bool {
+  let Some(line_fragment) = first_named_xml_fragment(xml, b"ln") else {
+    return false;
+  };
+  drawingml_shape_has_no_fill(&line_fragment)
 }
 
 fn drawingml_color_from_named_fragment(
@@ -6367,6 +6732,7 @@ fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Optio
     vml_rectangle_fill_image(rectangle, images),
     rectangle.stroke_color.as_deref(),
     rectangle.stroke_weight.as_deref(),
+    None,
   )
 }
 
@@ -6380,6 +6746,7 @@ fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShap
       .as_deref()
       .or_else(|| vml_shape_has_textbox(shape).then_some("black")),
     shape.stroke_weight.as_deref(),
+    vml_fontwork_shape_geometry(shape.r#type.as_deref(), shape.id.as_deref()),
   )
 }
 
@@ -6388,6 +6755,18 @@ fn vml_shape_has_textbox(shape: &v::Shape) -> bool {
     .shape_choice
     .iter()
     .any(|choice| matches!(choice, v::ShapeChoice::VTextbox(_)))
+}
+
+fn vml_fontwork_shape_geometry(
+  shape_type: Option<&str>,
+  shape_id: Option<&str>,
+) -> Option<InlineShapeGeometry> {
+  let value = shape_type.or(shape_id)?;
+  let is_legacy_fontwork = (25..=31).any(|index| {
+    let marker = format!("_x0000_t{index}");
+    value.contains(&marker)
+  });
+  is_legacy_fontwork.then(fontwork_warp_geometry)
 }
 
 fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
@@ -6448,8 +6827,10 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     offset_x_pt: min_x,
     offset_y_pt: min_y,
     fill_color,
+    additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke,
+    suppress_zero_relative_background: false,
     placement: style.placement(),
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6505,6 +6886,7 @@ fn vml_inline_shape(
   fill_image: Option<InlineShapeImageFill>,
   stroke_color: Option<&str>,
   stroke_weight: Option<&str>,
+  geometry_override: Option<InlineShapeGeometry>,
 ) -> Option<InlineShape> {
   if vml_style_is_hidden(style) {
     return None;
@@ -6530,12 +6912,14 @@ fn vml_inline_shape(
   Some(InlineShape {
     width_pt,
     height_pt,
-    geometry: InlineShapeGeometry::Rectangle,
+    geometry: geometry_override.unwrap_or(InlineShapeGeometry::Rectangle),
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
     fill_color,
+    additional_fill_colors: Vec::new(),
     fill_image,
     stroke,
+    suppress_zero_relative_background: false,
     placement: style.placement(),
     text_box_blocks: Vec::new(),
     text_inset_left_pt: 0.0,
@@ -6576,8 +6960,10 @@ fn vml_textbox_frame(
     offset_x_pt: frame.left_pt,
     offset_y_pt: frame.top_pt,
     fill_color: None,
+    additional_fill_colors: Vec::new(),
     fill_image: None,
     stroke: None,
+    suppress_zero_relative_background: false,
     placement: style.placement(),
     text_box_blocks: frame.blocks,
     text_inset_left_pt: 0.0,
@@ -6638,6 +7024,11 @@ fn parse_vml_color(value: &str) -> Option<RgbColor> {
 fn vml_named_color(value: &str) -> Option<RgbColor> {
   match value.to_ascii_lowercase().as_str() {
     "black" => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    "silver" => Some(RgbColor {
+      r: 192,
+      g: 192,
+      b: 192,
+    }),
     "teal" => Some(RgbColor {
       r: 0,
       g: 128,
@@ -6647,6 +7038,11 @@ fn vml_named_color(value: &str) -> Option<RgbColor> {
       r: 255,
       g: 255,
       b: 255,
+    }),
+    "yellow" => Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 0,
     }),
     _ => None,
   }
@@ -10048,10 +10444,12 @@ mod tests {
     )
     .expect("wps textbox frame");
 
-    assert!((frame.offset_x_pt - 7.2).abs() < 0.001);
-    assert!((frame.offset_y_pt - 3.6).abs() < 0.001);
-    assert!((frame.width_pt - 53.1).abs() < 0.001);
-    assert!((frame.height_pt - 51.3).abs() < 0.001);
+    assert!((frame.offset_x_pt - 0.0).abs() < 0.001);
+    assert!((frame.offset_y_pt - 0.0).abs() < 0.001);
+    assert!((frame.width_pt - 67.5).abs() < 0.001);
+    assert!((frame.height_pt - 58.5).abs() < 0.001);
+    assert!((frame.text_inset_left_pt - 5.53).abs() < 0.001);
+    assert!((frame.text_inset_top_pt - 3.6).abs() < 0.001);
     assert_eq!(frame.text_box_blocks.len(), 1);
   }
 
@@ -10069,6 +10467,7 @@ mod tests {
     .expect("custom geometry shape");
 
     assert_eq!(shape.geometry, InlineShapeGeometry::Line);
+    assert!(shape.fill_color.is_none());
     assert_eq!(shape.stroke.expect("stroke").color.r, 0xff);
   }
 

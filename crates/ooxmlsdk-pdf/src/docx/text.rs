@@ -66,11 +66,18 @@ pub(super) fn paragraph_model_with_base(
     .as_deref()
     .and_then(|properties| properties.numbering_properties.as_deref());
   let style_numbering = styles.paragraph_numbering_properties(style_id);
-  let (list_label, list_label_style) = direct_numbering
+  let numbering_label = direct_numbering
     .or(style_numbering.as_ref())
-    .and_then(|properties| numbering.next_label(properties, &mut format, styles, run_style.clone()))
-    .map(|(text, style)| (Some(text), style))
-    .unwrap_or_else(|| (None, TextStyle::default()));
+    .and_then(|properties| {
+      numbering.next_label(properties, &mut format, styles, run_style.clone())
+    });
+  let list_label = numbering_label
+    .as_ref()
+    .and_then(|label| label.text.clone());
+  let list_label_style = numbering_label
+    .as_ref()
+    .map(|label| label.style.clone())
+    .unwrap_or_default();
   let mut inlines = paragraph_inlines(
     paragraph,
     run_style.clone(),
@@ -79,6 +86,9 @@ pub(super) fn paragraph_model_with_base(
     hyperlinks,
     form_widget_ids,
   );
+  if let Some(image) = numbering_label.and_then(|label| label.image) {
+    inlines.insert(0, super::InlineItem::Image(image));
+  }
   if inlines.is_empty() && paragraph_requires_placeholder_run(paragraph) {
     inlines.push(super::InlineItem::Text(TextRun {
       text: String::new(),

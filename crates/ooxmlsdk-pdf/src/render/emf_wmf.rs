@@ -7,6 +7,11 @@ use image::{ColorType, ImageEncoder};
 const EMF_HEADER_SIZE: usize = 108;
 const EMF_RECORD_HEADER_SIZE: usize = 8;
 const EMR_EOF: u32 = 14;
+const EMR_POLYGON: u32 = 3;
+const EMR_SET_WINDOW_EXT_EX: u32 = 9;
+const EMR_SET_WINDOW_ORG_EX: u32 = 11;
+const EMR_SELECT_OBJECT: u32 = 37;
+const EMR_CREATE_BRUSH_INDIRECT: u32 = 39;
 const EMR_SET_DIBITS_TO_DEVICE: u32 = 80;
 const EMR_STRETCH_DIBITS: u32 = 81;
 const EMR_BITMAP_INFO_OFFSET_OFFSET: usize = 48;
@@ -75,17 +80,12 @@ fn decode_emf_as_jpeg(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
       ));
     }
 
-    if matches!(record_type, EMR_SET_DIBITS_TO_DEVICE | EMR_STRETCH_DIBITS) {
-      if bitmap_record
+    if matches!(record_type, EMR_SET_DIBITS_TO_DEVICE | EMR_STRETCH_DIBITS)
+      && bitmap_record
         .replace((record_type, pos, record_size))
         .is_some()
-      {
-        return Err("multiple EMF bitmap records are not supported yet".into());
-      }
-    } else if record_type != EMR_EOF {
-      return Err(format!(
-        "unsupported EMF record type 0x{record_type:08x} at offset {pos}"
-      ));
+    {
+      return Err("multiple EMF bitmap records are not supported yet".into());
     }
 
     pos += record_size;
@@ -94,9 +94,174 @@ fn decode_emf_as_jpeg(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
     }
   }
 
-  let (record_type, record_offset, record_size) =
-    bitmap_record.ok_or_else(|| "EMF contains no bitmap record".to_string())?;
+  let (record_type, record_offset, record_size) = match bitmap_record {
+    Some(record) => record,
+    None => return decode_vector_emf_as_jpeg(data).map(Some),
+  };
   decode_bitmap_record_as_jpeg(data, record_type, record_offset, record_size).map(Some)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EmfColor {
+  r: u8,
+  g: u8,
+  b: u8,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EmfPoint {
+  x: i32,
+  y: i32,
+}
+
+#[derive(Clone, Debug)]
+struct EmfVectorState {
+  width: usize,
+  height: usize,
+  window_org_x: i32,
+  window_org_y: i32,
+  window_ext_x: i32,
+  window_ext_y: i32,
+  brush_colors: std::collections::HashMap<u32, EmfColor>,
+  current_brush: Option<EmfColor>,
+  rgb: Vec<u8>,
+}
+
+impl EmfVectorState {
+  fn new(data: &[u8]) -> Result<Self, String> {
+    let left = read_i32(data, 8)?;
+    let top = read_i32(data, 12)?;
+    let right = read_i32(data, 16)?;
+    let bottom = read_i32(data, 20)?;
+    let width = (right - left + 1).max(1) as usize;
+    let height = (bottom - top + 1).max(1) as usize;
+
+    Ok(Self {
+      width,
+      height,
+      window_org_x: 0,
+      window_org_y: 0,
+      window_ext_x: width as i32,
+      window_ext_y: height as i32,
+      brush_colors: std::collections::HashMap::new(),
+      current_brush: None,
+      rgb: vec![255; width * height * RGB_BYTES_PER_PIXEL],
+    })
+  }
+
+  fn map_point(&self, point: EmfPoint) -> (f32, f32) {
+    let scale_x = self.width as f32 / self.window_ext_x.max(1) as f32;
+    let scale_y = self.height as f32 / self.window_ext_y.max(1) as f32;
+    (
+      (point.x - self.window_org_x) as f32 * scale_x,
+      (point.y - self.window_org_y) as f32 * scale_y,
+    )
+  }
+
+  fn fill_polygon(&mut self, points: &[EmfPoint]) {
+    let Some(color) = self.current_brush else {
+      return;
+    };
+    if points.len() < 3 {
+      return;
+    }
+
+    let mapped = points
+      .iter()
+      .map(|point| self.map_point(*point))
+      .collect::<Vec<_>>();
+    for y in 0..self.height {
+      let scan_y = y as f32 + 0.5;
+      let mut intersections = Vec::new();
+      for index in 0..mapped.len() {
+        let (x1, y1) = mapped[index];
+        let (x2, y2) = mapped[(index + 1) % mapped.len()];
+        if (y1 <= scan_y && y2 > scan_y) || (y2 <= scan_y && y1 > scan_y) {
+          let t = (scan_y - y1) / (y2 - y1);
+          intersections.push(x1 + t * (x2 - x1));
+        }
+      }
+      intersections.sort_by(|a, b| a.total_cmp(b));
+      for pair in intersections.chunks_exact(2) {
+        let start = pair[0].floor().max(0.0) as usize;
+        let end = pair[1].ceil().min(self.width as f32) as usize;
+        for x in start..end {
+          let offset = (y * self.width + x) * RGB_BYTES_PER_PIXEL;
+          self.rgb[offset] = color.r;
+          self.rgb[offset + 1] = color.g;
+          self.rgb[offset + 2] = color.b;
+        }
+      }
+    }
+  }
+}
+
+fn decode_vector_emf_as_jpeg(data: &[u8]) -> Result<Vec<u8>, String> {
+  let mut state = EmfVectorState::new(data)?;
+  let mut pos = EMF_HEADER_SIZE;
+
+  while pos + EMF_RECORD_HEADER_SIZE <= data.len() {
+    let record_type = read_u32(data, pos)?;
+    let record_size = read_u32(data, pos + 4)? as usize;
+    if record_size < EMF_RECORD_HEADER_SIZE || pos + record_size > data.len() {
+      return Err(format!(
+        "invalid EMF record at offset {pos}: type=0x{record_type:08x} size={record_size}"
+      ));
+    }
+
+    match record_type {
+      EMR_SET_WINDOW_ORG_EX if record_size >= 16 => {
+        state.window_org_x = read_i32(data, pos + 8)?;
+        state.window_org_y = read_i32(data, pos + 12)?;
+      }
+      EMR_SET_WINDOW_EXT_EX if record_size >= 16 => {
+        state.window_ext_x = read_i32(data, pos + 8)?.abs().max(1);
+        state.window_ext_y = read_i32(data, pos + 12)?.abs().max(1);
+      }
+      EMR_CREATE_BRUSH_INDIRECT if record_size >= 24 => {
+        let object_id = read_u32(data, pos + 8)?;
+        let color_ref = read_u32(data, pos + 16)?;
+        state.brush_colors.insert(
+          object_id,
+          EmfColor {
+            r: (color_ref & 0xff) as u8,
+            g: ((color_ref >> 8) & 0xff) as u8,
+            b: ((color_ref >> 16) & 0xff) as u8,
+          },
+        );
+      }
+      EMR_SELECT_OBJECT if record_size >= 12 => {
+        let object_id = read_u32(data, pos + 8)?;
+        if let Some(brush) = state.brush_colors.get(&object_id).copied() {
+          state.current_brush = Some(brush);
+        }
+      }
+      EMR_POLYGON if record_size >= 28 => {
+        let count = read_u32(data, pos + 24)? as usize;
+        let points_start = pos + 28;
+        let points_end = points_start
+          .checked_add(count * 8)
+          .ok_or_else(|| "EMF polygon points overflow".to_string())?;
+        if points_end <= pos + record_size {
+          let mut points = Vec::with_capacity(count);
+          for index in 0..count {
+            let point_offset = points_start + index * 8;
+            points.push(EmfPoint {
+              x: read_i32(data, point_offset)?,
+              y: read_i32(data, point_offset + 4)?,
+            });
+          }
+          state.fill_polygon(&points);
+        }
+      }
+      EMR_EOF => break,
+      _ => {}
+    }
+
+    pos += record_size;
+  }
+
+  rgb_to_jpeg(&state.rgb, state.width as u32, state.height as u32)
 }
 
 fn decode_bitmap_record_as_jpeg(
@@ -299,5 +464,28 @@ mod tests {
     let decoded = image::load_from_memory(&jpeg).unwrap();
     assert_eq!(decoded.width(), 884);
     assert_eq!(decoded.height(), 925);
+  }
+
+  #[test]
+  fn emf_bitmap_record_fixture_decodes_to_jpeg() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .join("../../test-data/ooxmlsdk-pdf-test/libreoffice/tdf136841.docx");
+    let package = WordprocessingDocument::new_from_file(path).unwrap();
+    let image = package
+      .get_all_parts()
+      .find_map(|part| match part {
+        PartRef::ImagePart(image) if image.path(&package) == Some("word/media/image1.emf") => {
+          Some(image)
+        }
+        _ => None,
+      })
+      .unwrap();
+    let emf = image.data(&package).unwrap();
+    let content_type = image.content_type(&package);
+
+    let jpeg = decode_metafile_as_jpeg(emf, content_type).unwrap().unwrap();
+    let decoded = image::load_from_memory(&jpeg).unwrap();
+    assert_eq!(decoded.width(), 76);
+    assert_eq!(decoded.height(), 76);
   }
 }

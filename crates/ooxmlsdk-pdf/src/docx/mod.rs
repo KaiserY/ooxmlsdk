@@ -6,8 +6,11 @@ mod table;
 mod text;
 
 use std::collections::{BTreeMap, HashMap};
+use std::io::Cursor;
 use std::sync::Arc;
 
+use image::codecs::png::PngEncoder;
+use image::{ColorType, ImageEncoder};
 use ooxmlsdk::parts::{
   main_document_part::MainDocumentPart, wordprocessing_document::WordprocessingDocument,
 };
@@ -475,14 +478,16 @@ fn resolve_scheme_color_from_reader(
       Event::Start(event) | Event::Empty(event) => {
         if qname_ends_with(event.name().as_ref(), b"tint") {
           if let Some(value) = percent_attr(&event, b"val") {
-            let mut hsl = HslColor::from_rgb(color);
-            hsl.apply_tint(value);
-            color = hsl.to_rgb();
+            color = apply_drawingml_tint(color, value);
           }
         } else if qname_ends_with(event.name().as_ref(), b"shade") {
           if let Some(value) = percent_attr(&event, b"val") {
+            color = apply_drawingml_shade(color, value);
+          }
+        } else if qname_ends_with(event.name().as_ref(), b"satMod") {
+          if let Some(value) = drawingml_percent_attr(&event, b"val") {
             let mut hsl = HslColor::from_rgb(color);
-            hsl.apply_shade(value);
+            hsl.apply_saturation_mod(value);
             color = hsl.to_rgb();
           }
         } else if qname_ends_with(event.name().as_ref(), b"lumMod") {
@@ -507,6 +512,53 @@ fn resolve_scheme_color_from_reader(
   }
 
   Some(ResolvedColor { color, opacity })
+}
+
+fn apply_drawingml_shade(color: RgbColor, amount: f32) -> RgbColor {
+  let red = drawingml_rgb_component_to_crgb(color.r);
+  let green = drawingml_rgb_component_to_crgb(color.g);
+  let blue = drawingml_rgb_component_to_crgb(color.b);
+  RgbColor {
+    r: drawingml_crgb_component_to_rgb(((red as f32) * amount) as i32),
+    g: drawingml_crgb_component_to_rgb(((green as f32) * amount) as i32),
+    b: drawingml_crgb_component_to_rgb(((blue as f32) * amount) as i32),
+  }
+}
+
+fn apply_drawingml_tint(color: RgbColor, amount: f32) -> RgbColor {
+  let red = drawingml_rgb_component_to_crgb(color.r);
+  let green = drawingml_rgb_component_to_crgb(color.g);
+  let blue = drawingml_rgb_component_to_crgb(color.b);
+  RgbColor {
+    r: drawingml_crgb_component_to_rgb(
+      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - red as f32) * amount)
+        as i32,
+    ),
+    g: drawingml_crgb_component_to_rgb(
+      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - green as f32) * amount)
+        as i32,
+    ),
+    b: drawingml_crgb_component_to_rgb(
+      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - blue as f32) * amount)
+        as i32,
+    ),
+  }
+}
+
+fn drawingml_rgb_component_to_crgb(value: u8) -> i32 {
+  let component = i32::from(value) * units::DRAWINGML_PERCENT_SCALE as i32 / 255;
+  drawingml_gamma(component, 2.3)
+}
+
+fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
+  let component = drawingml_gamma(value, 1.0 / 2.3);
+  (component * 255 / units::DRAWINGML_PERCENT_SCALE as i32).clamp(0, 255) as u8
+}
+
+fn drawingml_gamma(value: i32, gamma: f64) -> i32 {
+  ((f64::from(value) / f64::from(units::DRAWINGML_PERCENT_SCALE)).powf(gamma)
+    * f64::from(units::DRAWINGML_PERCENT_SCALE)
+    + 0.5) as i32
 }
 
 fn resolve_drawingml_scheme_color_name(
@@ -548,6 +600,13 @@ fn percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option
     .parse::<f32>()
     .ok()
     .map(|value| (value / units::DRAWINGML_PERCENT_SCALE).clamp(0.0, 1.0))
+}
+
+fn drawingml_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
+  attr_value(event, key)?
+    .parse::<f32>()
+    .ok()
+    .map(|value| value / units::DRAWINGML_PERCENT_SCALE)
 }
 
 fn alpha_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> f32 {
@@ -3212,7 +3271,7 @@ fn push_run(
       }
       w::RunChoice::WDrawing(drawing) => {
         flush_run_text(inlines, &mut text, style.clone(), hyperlink_url);
-        if let Some(image) = drawing::inline_image(drawing, images, hyperlinks) {
+        if let Some(image) = drawing::inline_image(drawing, styles, images, hyperlinks) {
           inlines.push(InlineItem::Image(image));
         }
         drawing::push_drawing_shapes(drawing, inlines, styles, images, hyperlinks);
@@ -3508,7 +3567,7 @@ fn push_run_xml_any(
   hyperlinks: &HyperlinkCatalog,
 ) {
   if let Ok(drawing) = w::Drawing::from_bytes(xml.as_bytes()) {
-    if let Some(image) = drawing::inline_image(&drawing, images, hyperlinks) {
+    if let Some(image) = drawing::inline_image(&drawing, styles, images, hyperlinks) {
       inlines.push(InlineItem::Image(image));
     }
     drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
@@ -4065,6 +4124,7 @@ fn wingdings_symbol(code: u32) -> Option<char> {
 
 fn inline_image_impl(
   drawing: &w::Drawing,
+  styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
@@ -4074,9 +4134,11 @@ fn inline_image_impl(
 
   match drawing.drawing_choice.as_ref()? {
     w::DrawingChoice::WpInline(inline) => {
-      let properties = drawing_image_properties(&inline.graphic.graphic_data)?;
-      let relationship_id = properties.relationship_id?;
-      let resource = images.by_relationship_id.get(&relationship_id)?;
+      let properties =
+        drawing_image_properties(&inline.graphic.graphic_data, &styles.theme_colors)?;
+      let relationship_id = properties.relationship_id.as_deref()?;
+      let resource = images.by_relationship_id.get(relationship_id)?;
+      let image_data = image_data_with_effects(resource, &properties);
       let hyperlink_url = inline
         .doc_properties
         .hyperlink_on_click
@@ -4091,8 +4153,8 @@ fn inline_image_impl(
         })
         .map(ToString::to_string);
       Some(InlineImage {
-        data: resource.data.clone(),
-        content_type: resource.content_type.clone(),
+        data: image_data.data,
+        content_type: image_data.content_type,
         width_pt: units::emu_to_points(inline.extent.cx),
         height_pt: units::emu_to_points(inline.extent.cy),
         effect_left_pt: effect_extent_left(inline.effect_extent.as_ref()),
@@ -4111,9 +4173,10 @@ fn inline_image_impl(
     w::DrawingChoice::WpAnchor(anchor) => {
       let graphic = anchor.a_graphic.as_ref();
       let extent = anchor.extent.as_ref();
-      let properties = drawing_image_properties(&graphic.graphic_data)?;
-      let relationship_id = properties.relationship_id?;
-      let resource = images.by_relationship_id.get(&relationship_id)?;
+      let properties = drawing_image_properties(&graphic.graphic_data, &styles.theme_colors)?;
+      let relationship_id = properties.relationship_id.as_deref()?;
+      let resource = images.by_relationship_id.get(relationship_id)?;
+      let image_data = image_data_with_effects(resource, &properties);
       let hyperlink_url = anchor
         .wp_doc_pr
         .hyperlink_on_click
@@ -4128,8 +4191,8 @@ fn inline_image_impl(
         })
         .map(ToString::to_string);
       Some(InlineImage {
-        data: resource.data.clone(),
-        content_type: resource.content_type.clone(),
+        data: image_data.data,
+        content_type: image_data.content_type,
         width_pt: units::emu_to_points(extent.cx),
         height_pt: units::emu_to_points(extent.cy),
         effect_left_pt: effect_extent_left(anchor.effect_extent.as_ref()),
@@ -4901,7 +4964,7 @@ fn drawingml_shapes_from_xml(
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pic") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
           if let Some(image) = drawingml_picture_image_from_fragment(
-            &fragment, placement, transform, images, hyperlinks,
+            &fragment, placement, transform, styles, images, hyperlinks,
           ) {
             shapes.push(InlineItem::Image(image));
           }
@@ -5155,12 +5218,14 @@ fn drawingml_picture_image_from_fragment(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
+  styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
-  let properties = drawing_image_properties_from_xml(xml)?;
-  let relationship_id = properties.relationship_id?;
-  let resource = images.by_relationship_id.get(&relationship_id)?;
+  let properties = drawing_image_properties_from_xml(xml, &styles.theme_colors)?;
+  let relationship_id = properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &properties);
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) = drawingml_shape_geometry(xml)?;
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
@@ -5170,8 +5235,8 @@ fn drawingml_picture_image_from_fragment(
     .and_then(|relationship_id| hyperlinks.target(relationship_id))
     .map(ToString::to_string);
   Some(InlineImage {
-    data: resource.data.clone(),
-    content_type: resource.content_type.clone(),
+    data: image_data.data,
+    content_type: image_data.content_type,
     width_pt,
     height_pt,
     effect_left_pt: 0.0,
@@ -5189,18 +5254,111 @@ fn drawingml_picture_image_from_fragment(
 }
 
 fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
-  let properties = drawing_image_properties_from_xml(sp_pr)?;
-  let relationship_id = properties.relationship_id?;
-  let resource = images.by_relationship_id.get(&relationship_id)?;
+  let properties = drawing_image_properties_from_xml(sp_pr, &ThemeColors::default())?;
+  let relationship_id = properties.relationship_id.as_deref()?;
+  let resource = images.by_relationship_id.get(relationship_id)?;
+  let image_data = image_data_with_effects(resource, &properties);
 
   Some(InlineShapeImageFill {
-    data: resource.data.clone(),
-    content_type: resource.content_type.clone(),
+    data: image_data.data,
+    content_type: image_data.content_type,
     crop: properties.crop,
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
     flip_vertical: properties.flip_vertical,
   })
+}
+
+struct ImportedImageData {
+  data: Vec<u8>,
+  content_type: Option<String>,
+}
+
+fn image_data_with_effects(
+  resource: &package::ImageResource,
+  properties: &DrawingImageProperties,
+) -> ImportedImageData {
+  if properties.effects == ImageEffects::default() {
+    return ImportedImageData {
+      data: resource.data.clone(),
+      content_type: resource.content_type.clone(),
+    };
+  }
+
+  let Some(data) = apply_image_effects(&resource.data, properties.effects) else {
+    return ImportedImageData {
+      data: resource.data.clone(),
+      content_type: resource.content_type.clone(),
+    };
+  };
+
+  ImportedImageData {
+    data,
+    content_type: Some("image/png".into()),
+  }
+}
+
+fn apply_image_effects(data: &[u8], effects: ImageEffects) -> Option<Vec<u8>> {
+  let mut image = image::load_from_memory(data).ok()?.to_rgba8();
+
+  for pixel in image.pixels_mut() {
+    let [mut r, mut g, mut b, a] = pixel.0;
+    if effects.grayscale {
+      let luminance = image_luminance(r, g, b);
+      r = luminance;
+      g = luminance;
+      b = luminance;
+    }
+    if let Some((color1, color2)) = effects.duotone {
+      let luminance = image_luminance(r, g, b) as u16;
+      r = duotone_component(luminance, color1.r, color2.r);
+      g = duotone_component(luminance, color1.g, color2.g);
+      b = duotone_component(luminance, color1.b, color2.b);
+    }
+    if effects.brightness.is_some() || effects.contrast.is_some() {
+      let brightness = effects.brightness.unwrap_or(0);
+      let contrast = effects.contrast.unwrap_or(0);
+      r = mso_brightness_contrast_component(r, brightness, contrast);
+      g = mso_brightness_contrast_component(g, brightness, contrast);
+      b = mso_brightness_contrast_component(b, brightness, contrast);
+    }
+    pixel.0 = [r, g, b, a];
+  }
+
+  let mut output = Vec::new();
+  let encoder = PngEncoder::new(Cursor::new(&mut output));
+  encoder
+    .write_image(
+      image.as_raw(),
+      image.width(),
+      image.height(),
+      ColorType::Rgba8.into(),
+    )
+    .ok()?;
+  Some(output)
+}
+
+fn image_luminance(r: u8, g: u8, b: u8) -> u8 {
+  ((u16::from(b) * 29 + u16::from(g) * 151 + u16::from(r) * 76) >> 8) as u8
+}
+
+fn duotone_component(luminance: u16, color1: u8, color2: u8) -> u8 {
+  let light = u16::from(color2) * luminance / 255;
+  let dark = u16::from(color1) * (255 - luminance) / 255;
+  (light + dark) as u8
+}
+
+fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) -> u8 {
+  let contrast = contrast.clamp(-100, 100) as f32;
+  let slope = if contrast >= 0.0 {
+    128.0 / (128.0 - 1.27 * contrast)
+  } else {
+    (128.0 + 1.27 * contrast) / 128.0
+  };
+  let offset = brightness.clamp(-100, 100) as f32 * 2.55;
+  ((f32::from(value) + offset / 2.0 - 128.0) * slope + 128.0 + offset / 2.0)
+    .round()
+    .clamp(0.0, 255.0) as u8
 }
 
 fn drawingml_picture_alt_text(xml: &str) -> Option<String> {
@@ -5669,13 +5827,15 @@ fn push_picture_choice_textboxes(
       push_group_textboxes(group, inlines, base_style, styles, images, hyperlinks);
     }
     w::PictureChoice::VImage(image) => {
-      push_image_file_textboxes(image, inlines, base_style, styles, images, hyperlinks);
+      push_image_file_textboxes(image, None, inlines, base_style, styles, images, hyperlinks);
     }
     w::PictureChoice::VRect(rectangle) => {
-      push_rectangle_textboxes(rectangle, inlines, base_style, styles, images, hyperlinks);
+      push_rectangle_textboxes(
+        rectangle, None, inlines, base_style, styles, images, hyperlinks,
+      );
     }
     w::PictureChoice::VShape(shape) => {
-      push_shape_textboxes(shape, inlines, base_style, styles, images, hyperlinks);
+      push_shape_textboxes(shape, None, inlines, base_style, styles, images, hyperlinks);
     }
     _ => {}
   }
@@ -5699,6 +5859,7 @@ fn push_group_textboxes(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
+  let transform = VmlGroupTransform::from_group(group);
   for choice in &group.group_choice {
     match choice {
       v::GroupChoice::VGroup(group) => {
@@ -5712,8 +5873,10 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::VImage(image) => {
+        let style = transform.and_then(|transform| transform.child_style(image.style.as_deref()));
         push_image_file_textboxes(
           image,
+          style.as_deref(),
           inlines,
           base_style.clone(),
           styles,
@@ -5722,8 +5885,11 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::VRect(rectangle) => {
+        let style =
+          transform.and_then(|transform| transform.child_style(rectangle.style.as_deref()));
         push_rectangle_textboxes(
           rectangle,
+          style.as_deref(),
           inlines,
           base_style.clone(),
           styles,
@@ -5732,8 +5898,10 @@ fn push_group_textboxes(
         );
       }
       v::GroupChoice::VShape(shape) => {
+        let style = transform.and_then(|transform| transform.child_style(shape.style.as_deref()));
         push_shape_textboxes(
           shape,
+          style.as_deref(),
           inlines,
           base_style.clone(),
           styles,
@@ -5767,21 +5935,21 @@ fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<Inlin
 
 fn push_image_file_textboxes(
   image: &v::ImageFile,
+  style_override: Option<&str>,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  if vml_style_is_hidden(image.style.as_deref()) {
+  let style = style_override.or(image.style.as_deref());
+  if vml_style_is_hidden(style) {
     return;
   }
 
   for choice in &image.image_file_choice {
     if let v::ImageFileChoice::VTextbox(textbox) = choice {
-      if let Some(frame) =
-        vml_textbox_frame(image.style.as_deref(), textbox, styles, images, hyperlinks)
-      {
+      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -5818,25 +5986,21 @@ fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<In
 
 fn push_rectangle_textboxes(
   rectangle: &v::Rectangle,
+  style_override: Option<&str>,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  if vml_style_is_hidden(rectangle.style.as_deref()) {
+  let style = style_override.or(rectangle.style.as_deref());
+  if vml_style_is_hidden(style) {
     return;
   }
 
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
-      if let Some(frame) = vml_textbox_frame(
-        rectangle.style.as_deref(),
-        textbox,
-        styles,
-        images,
-        hyperlinks,
-      ) {
+      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -5870,21 +6034,21 @@ fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
 
 fn push_shape_textboxes(
   shape: &v::Shape,
+  style_override: Option<&str>,
   inlines: &mut Vec<InlineItem>,
   base_style: TextStyle,
   styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) {
-  if vml_style_is_hidden(shape.style.as_deref()) {
+  let style = style_override.or(shape.style.as_deref());
+  if vml_style_is_hidden(style) {
     return;
   }
 
   for choice in &shape.shape_choice {
     if let v::ShapeChoice::VTextbox(textbox) = choice {
-      if let Some(frame) =
-        vml_textbox_frame(shape.style.as_deref(), textbox, styles, images, hyperlinks)
-      {
+      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -6083,6 +6247,77 @@ struct VmlImageStyle {
   margin_right_pt: f32,
   margin_bottom_pt: f32,
   margin_left_pt: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct VmlGroupTransform {
+  origin_x: f32,
+  origin_y: f32,
+  scale_x: f32,
+  scale_y: f32,
+}
+
+impl VmlGroupTransform {
+  fn from_group(group: &v::Group) -> Option<Self> {
+    let style = vml_image_style(group.style.as_deref());
+    let (width_pt, height_pt) = style.size_pt?;
+    let (coord_width, coord_height) = vml_coordinate_pair(group.coordinate_size.as_deref())?;
+    if coord_width.abs() <= f32::EPSILON || coord_height.abs() <= f32::EPSILON {
+      return None;
+    }
+    let (origin_x, origin_y) =
+      vml_coordinate_pair(group.coordinate_origin.as_deref()).unwrap_or((0.0, 0.0));
+
+    Some(Self {
+      origin_x,
+      origin_y,
+      scale_x: width_pt / coord_width,
+      scale_y: height_pt / coord_height,
+    })
+  }
+
+  fn child_style(self, style: Option<&str>) -> Option<String> {
+    let style = style?;
+    let mut output = Vec::new();
+    for declaration in style.split(';') {
+      let Some((name, value)) = declaration.split_once(':') else {
+        output.push(declaration.to_string());
+        continue;
+      };
+      let name = name.trim();
+      let value = value.trim();
+      let transformed = match name.to_ascii_lowercase().as_str() {
+        "left" => vml_raw_coordinate(value).map(|coord| (coord - self.origin_x) * self.scale_x),
+        "top" => vml_raw_coordinate(value).map(|coord| (coord - self.origin_y) * self.scale_y),
+        "width" => vml_raw_coordinate(value).map(|coord| coord * self.scale_x),
+        "height" => vml_raw_coordinate(value).map(|coord| coord * self.scale_y),
+        _ => None,
+      };
+      if let Some(value_pt) = transformed {
+        output.push(format!("{name}:{value_pt}pt"));
+      } else {
+        output.push(declaration.to_string());
+      }
+    }
+    Some(output.join(";"))
+  }
+}
+
+fn vml_coordinate_pair(value: Option<&str>) -> Option<(f32, f32)> {
+  let mut parts = value?.split(',').map(str::trim);
+  let x = parts.next()?.parse::<f32>().ok()?;
+  let y = parts.next()?.parse::<f32>().ok()?;
+  Some((x, y))
+}
+
+fn vml_raw_coordinate(value: &str) -> Option<f32> {
+  let value = value.trim();
+  (!value.is_empty()
+    && value
+      .chars()
+      .all(|c| c.is_ascii_digit() || matches!(c, '-' | '.' | '+')))
+  .then(|| value.parse::<f32>().ok())
+  .flatten()
 }
 
 impl Default for VmlImageStyle {
@@ -6317,13 +6552,23 @@ struct DrawingImageProperties {
   relationship_id: Option<String>,
   hyperlink_relationship_id: Option<String>,
   crop: ImageCrop,
+  effects: ImageEffects,
   rotation_deg: f32,
   flip_horizontal: bool,
   flip_vertical: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ImageEffects {
+  grayscale: bool,
+  brightness: Option<i32>,
+  contrast: Option<i32>,
+  duotone: Option<(RgbColor, RgbColor)>,
+}
+
 fn drawing_image_properties(
   graphic_data: &ooxmlsdk::schemas::a::GraphicData,
+  theme_colors: &ThemeColors,
 ) -> Option<DrawingImageProperties> {
   if graphic_data.uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
     return None;
@@ -6331,7 +6576,7 @@ fn drawing_image_properties(
   graphic_data
     .xml_children
     .iter()
-    .find_map(|child| drawing_image_properties_from_xml(child))
+    .find_map(|child| drawing_image_properties_from_xml(child, theme_colors))
 }
 
 fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> Option<String> {
@@ -6339,7 +6584,10 @@ fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> O
   Some(unescape(&decoded).ok()?.into_owned())
 }
 
-fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties> {
+fn drawing_image_properties_from_xml(
+  xml: &str,
+  theme_colors: &ThemeColors,
+) -> Option<DrawingImageProperties> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(true);
   let mut properties = DrawingImageProperties::default();
@@ -6375,6 +6623,23 @@ fn drawing_image_properties_from_xml(xml: &str) -> Option<DrawingImageProperties
         if qname_ends_with(event.name().as_ref(), b"xfrm") =>
       {
         apply_image_transform_attrs(&mut properties, &event, reader.decoder());
+      }
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"lum") =>
+      {
+        apply_image_luminance_attrs(&mut properties, &event, reader.decoder());
+      }
+      Event::Empty(event) | Event::Start(event)
+        if qname_ends_with(event.name().as_ref(), b"grayscl") =>
+      {
+        properties.effects.grayscale = true;
+      }
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"duotone") => {
+        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
+          && let Some(duotone) = image_duotone_colors(&fragment, theme_colors)
+        {
+          properties.effects.duotone = Some(duotone);
+        }
       }
       Event::Eof => return properties.relationship_id.is_some().then_some(properties),
       _ => {}
@@ -6423,6 +6688,57 @@ fn apply_image_transform_attrs(
       b"flipV" => properties.flip_vertical = value.as_deref().is_some_and(xml_bool),
       _ => {}
     }
+  }
+}
+
+fn apply_image_luminance_attrs(
+  properties: &mut DrawingImageProperties,
+  event: &quick_xml::events::BytesStart<'_>,
+  decoder: quick_xml::Decoder,
+) {
+  for attr in event.attributes().with_checks(false).flatten() {
+    let value = decode_xml_attr_value(&attr, decoder).and_then(|value| value.parse::<i32>().ok());
+    match attr.key.as_ref() {
+      b"bright" => properties.effects.brightness = value.map(|value| value / 1000),
+      b"contrast" => properties.effects.contrast = value.map(|value| value / 1000),
+      _ => {}
+    }
+  }
+}
+
+fn image_duotone_colors(xml: &str, theme_colors: &ThemeColors) -> Option<(RgbColor, RgbColor)> {
+  let mut colors = Vec::new();
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        colors.push(resolve_scheme_color_from_reader(&mut reader, event, theme_colors)?.color);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
+        colors.push(resolve_empty_scheme_color(&event, theme_colors)?.color);
+      }
+      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"prstClr") => {
+        colors.push(drawingml_preset_color(&event)?);
+      }
+      Event::Eof => break,
+      _ => {}
+    }
+  }
+
+  Some((colors.first().copied()?, colors.get(1).copied()?))
+}
+
+fn drawingml_preset_color(event: &quick_xml::events::BytesStart<'_>) -> Option<RgbColor> {
+  match attr_value(event, b"val")?.as_ref() {
+    "white" => Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }),
+    "black" => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    _ => None,
   }
 }
 
@@ -7316,6 +7632,10 @@ impl HslColor {
     self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
   }
 
+  fn apply_saturation_mod(&mut self, amount: f32) {
+    self.saturation = (self.saturation * amount).clamp(0.0, 1.0);
+  }
+
   fn apply_luminance_mod(&mut self, amount: f32) {
     self.luminance = (self.luminance * amount).clamp(0.0, 1.0);
   }
@@ -7854,6 +8174,7 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
 struct NumberingCatalog {
   nums: HashMap<i32, NumberingInstance>,
   abstract_nums: HashMap<i32, AbstractNumbering>,
+  picture_bullets: HashMap<i32, InlineImage>,
   counters: HashMap<(i32, i32), i32>,
 }
 
@@ -7879,9 +8200,17 @@ struct NumberingLevel {
   start: i32,
   format: w::NumberFormatValues,
   text: String,
+  picture_bullet_id: Option<i32>,
   is_legal: bool,
   format_properties: ParagraphFormat,
   symbol_run_properties: Option<w::NumberingSymbolRunProperties>,
+}
+
+#[derive(Clone, Debug)]
+struct NumberingLabel {
+  text: Option<String>,
+  image: Option<InlineImage>,
+  style: TextStyle,
 }
 
 impl NumberingCatalog {
@@ -7889,8 +8218,17 @@ impl NumberingCatalog {
     let Some(numbering_part) = main.numbering_definitions_part(package) else {
       return Ok(Self::default());
     };
+    let numbering_images = ImageCatalog::load_from_numbering(package, &numbering_part);
     let numbering = numbering_part.root_element(package)?;
     let mut catalog = Self::default();
+
+    for picture_bullet in &numbering.w_num_pic_bullet {
+      if let Some(image) = numbering_picture_bullet_image(picture_bullet, &numbering_images) {
+        catalog
+          .picture_bullets
+          .insert(picture_bullet.numbering_picture_bullet_id, image);
+      }
+    }
 
     for abstract_num in &numbering.w_abstract_num {
       let mut entry = AbstractNumbering::default();
@@ -7939,7 +8277,7 @@ impl NumberingCatalog {
     format: &mut ParagraphFormat,
     styles: &StylesCatalog,
     base_style: TextStyle,
-  ) -> Option<(String, TextStyle)> {
+  ) -> Option<NumberingLabel> {
     let num_id = properties.numbering_id.as_ref()?.val;
     let level_index = properties
       .numbering_level_reference
@@ -7969,7 +8307,7 @@ impl NumberingCatalog {
       self.counters.remove(&(num_id, key_level));
     }
 
-    let label = format_numbering_label(
+    let text = format_numbering_label(
       level,
       num_id,
       level_index,
@@ -7987,7 +8325,14 @@ impl NumberingCatalog {
       &styles.theme_fonts,
       &styles.theme_colors,
     );
-    Some((label, style))
+    let image = level
+      .picture_bullet_id
+      .and_then(|id| self.picture_bullets.get(&id).cloned());
+    Some(NumberingLabel {
+      text: if image.is_some() { None } else { Some(text) },
+      image,
+      style,
+    })
   }
 }
 
@@ -8018,10 +8363,48 @@ fn numbering_level_model(level: &w::Level) -> NumberingLevel {
       .and_then(|text| text.val.as_ref())
       .map(ToString::to_string)
       .unwrap_or_else(|| "%1.".to_string()),
+    picture_bullet_id: level.level_picture_bullet_id.as_ref().map(|id| id.val),
     is_legal: level.is_legal_numbering_style.is_some(),
     format_properties,
     symbol_run_properties: level.numbering_symbol_run_properties.as_deref().cloned(),
   }
+}
+
+fn numbering_picture_bullet_image(
+  picture_bullet: &w::NumberingPictureBullet,
+  images: &ImageCatalog,
+) -> Option<InlineImage> {
+  match picture_bullet.numbering_picture_bullet_choice.as_ref()? {
+    w::NumberingPictureBulletChoice::WPict(picture) => {
+      picture_bullet_base_image(picture, images).map(normalize_picture_bullet_image_size)
+    }
+    w::NumberingPictureBulletChoice::WDrawing(_) => None,
+  }
+}
+
+fn picture_bullet_base_image(
+  picture: &w::PictureBulletBase,
+  images: &ImageCatalog,
+) -> Option<InlineImage> {
+  picture
+    .picture_bullet_base_choice
+    .iter()
+    .find_map(|choice| match choice {
+      w::PictureBulletBaseChoice::VGroup(group) => group_image(group, images),
+      w::PictureBulletBaseChoice::VImage(image) => image_file_image(image, images),
+      w::PictureBulletBaseChoice::VRect(rectangle) => rectangle_image(rectangle, images),
+      w::PictureBulletBaseChoice::VShape(shape) => shape_image(shape, images),
+      _ => None,
+    })
+}
+
+fn normalize_picture_bullet_image_size(mut image: InlineImage) -> InlineImage {
+  if image.width_pt > 0.0 && image.height_pt > 0.0 {
+    let height_pt = 14.0;
+    image.width_pt = height_pt * image.width_pt / image.height_pt;
+    image.height_pt = height_pt;
+  }
+  image
 }
 
 fn format_numbering_label(
@@ -8569,7 +8952,8 @@ mod tests {
   fn drawing_image_properties_preserve_crop_and_transform() {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
-    let properties = drawing_image_properties_from_xml(xml).expect("image properties");
+    let properties =
+      drawing_image_properties_from_xml(xml, &ThemeColors::default()).expect("image properties");
 
     assert_eq!(properties.relationship_id.as_deref(), Some("rId7"));
     assert!((properties.crop.left - 0.1).abs() < 0.001);

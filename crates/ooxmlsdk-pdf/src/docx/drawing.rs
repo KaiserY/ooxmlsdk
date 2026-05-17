@@ -4,10 +4,11 @@ use super::{HyperlinkCatalog, ImageCatalog, InlineImage, InlineItem, StylesCatal
 
 pub(super) fn inline_image(
   drawing: &w::Drawing,
+  styles: &StylesCatalog,
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
-  super::inline_image_impl(drawing, images, hyperlinks)
+  super::inline_image_impl(drawing, styles, images, hyperlinks)
 }
 
 pub(super) fn push_drawing_textboxes(

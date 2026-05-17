@@ -4,6 +4,7 @@ use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
   endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
   header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
@@ -94,6 +95,15 @@ impl ImageCatalog {
   ) -> Self {
     Self::from_image_parts(package, comments.image_parts(package), |image_part| {
       comments.get_id_of_part(package, image_part)
+    })
+  }
+
+  pub(super) fn load_from_numbering(
+    package: &WordprocessingDocument,
+    numbering: &NumberingDefinitionsPart,
+  ) -> Self {
+    Self::from_image_parts(package, numbering.image_parts(package), |image_part| {
+      numbering.get_id_of_part(package, image_part)
     })
   }
 

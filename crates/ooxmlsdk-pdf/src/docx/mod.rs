@@ -45,6 +45,7 @@ const DEFAULT_TAB_STOP_PT: f32 = 36.0;
 const DEFAULT_SECTION_COLUMN_GAP_PT: f32 = 720.0 / units::TWIPS_PER_POINT;
 const DEFAULT_TEXTBOX_MIN_WIDTH_PT: f32 = 11.0;
 const DEFAULT_TEXTBOX_MIN_HEIGHT_PT: f32 = 14.0;
+const DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT: f32 = 200.0;
 // LibreOffice oox/source/shape/WpsContext.cxx uses the OOXML spec defaults:
 // left/right 91440 EMU, top/bottom 45720 EMU.
 const DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT: f32 = 91_440.0 / units::EMUS_PER_POINT;
@@ -696,6 +697,7 @@ fn simple_text_block(text: String, style: TextStyle) -> Block {
     })],
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
+    starts_after_last_rendered_page_break: false,
     #[cfg(test)]
     runs: Vec::new(),
     format: Box::new(ParagraphFormat::default()),
@@ -750,6 +752,7 @@ fn page_background_image_block(image: InlineShapeImageFill, page: PageSetup) -> 
     })],
     footnote_reference_ids: Vec::new(),
     endnote_reference_ids: Vec::new(),
+    starts_after_last_rendered_page_break: false,
     #[cfg(test)]
     runs: Vec::new(),
     format: Box::new(ParagraphFormat::default()),
@@ -2199,7 +2202,7 @@ fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
     .flat_map(|cell| &cell.blocks)
     .find_map(|block| match block {
       Block::Paragraph(paragraph) if !paragraph_is_effectively_empty(paragraph) => {
-        Some(paragraph_starts_after_last_rendered_page_break(paragraph))
+        Some(paragraph.starts_after_last_rendered_page_break)
       }
       Block::Table(table) if !table.rows.is_empty() => {
         Some(table_starts_after_last_rendered_page_break(&table.rows))
@@ -2209,9 +2212,9 @@ fn table_starts_after_last_rendered_page_break(rows: &[TableRow]) -> bool {
     .unwrap_or(false)
 }
 
-fn paragraph_starts_after_last_rendered_page_break(paragraph: &Paragraph) -> bool {
+pub(super) fn paragraph_starts_after_last_rendered_page_break(inlines: &[InlineItem]) -> bool {
   let mut saw_last_rendered_page_break = false;
-  for inline in &paragraph.inlines {
+  for inline in inlines {
     match inline {
       InlineItem::LastRenderedPageBreak => saw_last_rendered_page_break = true,
       InlineItem::Text(run) if !run.text.trim().is_empty() => {
@@ -5608,6 +5611,14 @@ struct DrawingTextBoxImportContext<'a> {
   hyperlinks: &'a HyperlinkCatalog,
 }
 
+#[derive(Clone, Copy)]
+struct DrawingShapeImportContext<'a> {
+  effect_extent: DrawingEffectExtent,
+  styles: &'a StylesCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+}
+
 fn drawingml_textbox_frames_from_xml(
   xml: &str,
   placement: ImagePlacement,
@@ -5702,7 +5713,7 @@ fn drawingml_textbox_frame_from_fragment(
   let (offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, shape_width_pt, shape_height_pt);
   let width_pt = if expands_auto_fit {
-    shape_width_pt.max(200.0)
+    shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
   } else {
     shape_width_pt.max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
   };
@@ -5729,10 +5740,19 @@ fn drawingml_textbox_frame_from_fragment(
   } else {
     InlineShapeGeometry::Rectangle
   };
+  let placement = if auto_fit {
+    autofit_textbox_placement(placement)
+  } else {
+    placement
+  };
 
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry,
     offset_x_pt,
     offset_y_pt,
@@ -5749,8 +5769,22 @@ fn drawingml_textbox_frame_from_fragment(
     text_inset_top_pt: text_box.top_pt,
     text_inset_right_pt: text_box.right_pt,
     text_inset_bottom_pt: text_box.bottom_pt,
+    text_box_auto_fit: auto_fit,
     text_vertical_alignment: text_box.vertical_alignment,
   })
+}
+
+fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
+  match placement {
+    ImagePlacement::Floating(mut placement) => {
+      // Source: LibreOffice keeps the Writer fly frame that carries textbox
+      // content inside the owning draw shape (SwTextBoxHelper), so text flow
+      // must not be wrapped into the shape's textbox area.
+      placement.wrap = ImageWrapMode::TopBottom;
+      ImagePlacement::Floating(placement)
+    }
+    ImagePlacement::Inline => ImagePlacement::Inline,
+  }
 }
 
 fn drawingml_textbox_uses_auto_fit(xml: &str) -> bool {
@@ -6194,6 +6228,7 @@ fn push_drawing_shapes_impl(
 
   let transform =
     DrawingMlGroupTransform::identity().with_fallback_size(drawing_extent_size(drawing));
+  let effect_extent = drawing_effect_extent(drawing);
   for xml in &graphic_data.xml_children {
     if let Some(chart_shapes) =
       drawing_chart_shapes(drawing, xml, &images.charts_by_relationship_id)
@@ -6202,7 +6237,16 @@ fn push_drawing_shapes_impl(
       continue;
     }
     inlines.extend(drawingml_shapes_from_xml(
-      xml, placement, transform, styles, images, hyperlinks, false,
+      xml,
+      placement,
+      transform,
+      DrawingShapeImportContext {
+        effect_extent,
+        styles,
+        images,
+        hyperlinks,
+      },
+      false,
     ));
   }
 }
@@ -6331,6 +6375,20 @@ fn drawing_extent_size(drawing: &w::Drawing) -> Option<(f32, f32)> {
   }
 }
 
+fn drawing_effect_extent(drawing: &w::Drawing) -> DrawingEffectExtent {
+  let extent = match drawing.drawing_choice.as_ref() {
+    Some(w::DrawingChoice::WpInline(inline)) => inline.effect_extent.as_ref(),
+    Some(w::DrawingChoice::WpAnchor(anchor)) => anchor.effect_extent.as_ref(),
+    None => None,
+  };
+  DrawingEffectExtent {
+    left_pt: effect_extent_left(extent),
+    top_pt: effect_extent_top(extent),
+    right_pt: effect_extent_right(extent),
+    bottom_pt: effect_extent_bottom(extent),
+  }
+}
+
 fn chart_shape(
   width_pt: f32,
   height_pt: f32,
@@ -6341,6 +6399,10 @@ fn chart_shape(
   InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt: 0.0,
     offset_y_pt,
@@ -6357,6 +6419,7 @@ fn chart_shape(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   }
 }
@@ -6381,6 +6444,14 @@ struct DrawingMlGroupTransform {
   translate_y_pt: f32,
   raw_coordinates: bool,
   fallback_size: Option<(f32, f32)>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct DrawingEffectExtent {
+  left_pt: f32,
+  top_pt: f32,
+  right_pt: f32,
+  bottom_pt: f32,
 }
 
 impl DrawingMlGroupTransform {
@@ -6453,9 +6524,7 @@ fn drawingml_shapes_from_xml(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
-  styles: &StylesCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
+  context: DrawingShapeImportContext<'_>,
   skip_container_root: bool,
 ) -> Vec<InlineItem> {
   let mut shapes = Vec::new();
@@ -6480,17 +6549,24 @@ fn drawingml_shapes_from_xml(
             &fragment,
             drawingml_group_child_placement(placement),
             child_transform,
-            styles,
-            images,
-            hyperlinks,
+            DrawingShapeImportContext {
+              effect_extent: DrawingEffectExtent::default(),
+              ..context
+            },
             true,
           ));
         }
       }
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(shape) =
-            drawingml_shape_from_fragment(&fragment, placement, transform, styles, images)
+          && let Some(shape) = drawingml_shape_from_fragment(
+            &fragment,
+            placement,
+            transform,
+            context.effect_extent,
+            context.styles,
+            context.images,
+          )
         {
           shapes.push(InlineItem::Shape(shape));
         }
@@ -6498,7 +6574,12 @@ fn drawingml_shapes_from_xml(
       Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pic") => {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event) {
           if let Some(image) = drawingml_picture_image_from_fragment(
-            &fragment, placement, transform, styles, images, hyperlinks,
+            &fragment,
+            placement,
+            transform,
+            context.styles,
+            context.images,
+            context.hyperlinks,
           ) {
             shapes.push(InlineItem::Image(image));
           }
@@ -6513,8 +6594,14 @@ fn drawingml_shapes_from_xml(
         let mut writer = Writer::new(Vec::new());
         if writer.write_event(Event::Empty(event.into_owned())).is_ok()
           && let Ok(fragment) = String::from_utf8(writer.into_inner())
-          && let Some(shape) =
-            drawingml_shape_from_fragment(&fragment, placement, transform, styles, images)
+          && let Some(shape) = drawingml_shape_from_fragment(
+            &fragment,
+            placement,
+            transform,
+            context.effect_extent,
+            context.styles,
+            context.images,
+          )
         {
           shapes.push(InlineItem::Shape(shape));
         }
@@ -6539,6 +6626,10 @@ fn anchor_wrap_polygon_shape(
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry,
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
@@ -6555,6 +6646,7 @@ fn anchor_wrap_polygon_shape(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
@@ -6639,6 +6731,7 @@ fn drawingml_shape_from_fragment(
   xml: &str,
   placement: ImagePlacement,
   transform: DrawingMlGroupTransform,
+  effect_extent: DrawingEffectExtent,
   styles: &StylesCatalog,
   images: &ImageCatalog,
 ) -> Option<InlineShape> {
@@ -6686,6 +6779,10 @@ fn drawingml_shape_from_fragment(
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: effect_extent.left_pt,
+    effect_top_pt: effect_extent.top_pt,
+    effect_right_pt: effect_extent.right_pt,
+    effect_bottom_pt: effect_extent.bottom_pt,
     geometry,
     offset_x_pt,
     offset_y_pt,
@@ -6703,6 +6800,7 @@ fn drawingml_shape_from_fragment(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
@@ -6970,6 +7068,10 @@ fn drawingml_picture_frame_from_fragment(
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt,
     offset_y_pt,
@@ -6986,6 +7088,7 @@ fn drawingml_picture_frame_from_fragment(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
@@ -7585,6 +7688,10 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry: InlineShapeGeometry::Polyline {
       points: relative_points,
       closed,
@@ -7604,6 +7711,7 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
@@ -7679,6 +7787,10 @@ fn vml_inline_shape(
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry: geometry_override.unwrap_or(InlineShapeGeometry::Rectangle),
     offset_x_pt: 0.0,
     offset_y_pt: 0.0,
@@ -7695,6 +7807,7 @@ fn vml_inline_shape(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
   })
 }
@@ -7717,14 +7830,25 @@ fn vml_textbox_frame(
   let (shape_width_pt, shape_height_pt) = style.size_pt?;
   let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
   apply_vml_textbox_properties(textbox, &mut frame);
-  let width_pt =
-    (shape_width_pt - frame.left_pt - frame.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT);
+  let auto_fit = vml_textbox_fits_shape_to_text(textbox);
+  let width_pt = if auto_fit {
+    // Source: LibreOffice keeps VML mso-fit-shape-to-text text boxes as fly
+    // frames that can grow horizontally instead of wrapping on the narrow
+    // imported shape width.
+    shape_width_pt.max(DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT)
+  } else {
+    (shape_width_pt - frame.left_pt - frame.right_pt).max(DEFAULT_TEXTBOX_MIN_WIDTH_PT)
+  };
   let height_pt =
     (shape_height_pt - frame.top_pt - frame.bottom_pt).max(DEFAULT_TEXTBOX_MIN_HEIGHT_PT);
 
   Some(InlineShape {
     width_pt,
     height_pt,
+    effect_left_pt: 0.0,
+    effect_top_pt: 0.0,
+    effect_right_pt: 0.0,
+    effect_bottom_pt: 0.0,
     geometry: InlineShapeGeometry::Rectangle,
     offset_x_pt: frame.left_pt,
     offset_y_pt: frame.top_pt,
@@ -7741,7 +7865,23 @@ fn vml_textbox_frame(
     text_inset_top_pt: 0.0,
     text_inset_right_pt: 0.0,
     text_inset_bottom_pt: 0.0,
+    text_box_auto_fit: auto_fit,
     text_vertical_alignment: frame.vertical_alignment,
+  })
+}
+
+fn vml_textbox_fits_shape_to_text(textbox: &v::TextBox) -> bool {
+  textbox.style.as_deref().is_some_and(|style| {
+    style.split(';').any(|declaration| {
+      let Some((name, value)) = declaration.split_once(':') else {
+        return false;
+      };
+      name.trim().eq_ignore_ascii_case("mso-fit-shape-to-text")
+        && matches!(
+          value.trim().to_ascii_lowercase().as_str(),
+          "t" | "true" | "1"
+        )
+    })
   })
 }
 
@@ -11253,7 +11393,10 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
   if let Some(margin) = &section.w_pg_mar {
     if let Some(top) = margin.top.as_ref().and_then(signed_twips_measure_to_twips) {
       setup.top_margin_was_negative = top < 0.0;
-      setup.margin_top_pt = units::twips_to_points(top.max(0.0));
+      // Source: LibreOffice writerfilter/dmapper/PropertyMap.hxx::SetTopMargin()
+      // stores the absolute page margin and uses the sign only to disable
+      // dynamic header height / convert header content to a fly frame.
+      setup.margin_top_pt = units::twips_to_points(top.abs());
     }
     if let Some(right) = margin.right.as_ref().and_then(twips_measure_to_points) {
       setup.margin_right_pt = right;
@@ -11264,7 +11407,8 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
       .and_then(signed_twips_measure_to_twips)
     {
       setup.bottom_margin_was_negative = bottom < 0.0;
-      setup.margin_bottom_pt = units::twips_to_points(bottom.max(0.0));
+      // Source: LibreOffice writerfilter/dmapper/PropertyMap.hxx::SetBottomMargin().
+      setup.margin_bottom_pt = units::twips_to_points(bottom.abs());
     }
     if let Some(left) = margin.left.as_ref().and_then(twips_measure_to_points) {
       setup.margin_left_pt = left;
@@ -11385,6 +11529,7 @@ mod tests {
       xml,
       ImagePlacement::Inline,
       DrawingMlGroupTransform::identity(),
+      DrawingEffectExtent::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
     )

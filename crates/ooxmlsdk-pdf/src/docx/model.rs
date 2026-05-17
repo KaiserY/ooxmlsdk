@@ -104,6 +104,7 @@ pub(crate) struct Paragraph {
   pub inlines: Vec<InlineItem>,
   pub footnote_reference_ids: Vec<i64>,
   pub endnote_reference_ids: Vec<i64>,
+  pub starts_after_last_rendered_page_break: bool,
   #[cfg(test)]
   pub runs: Vec<TextRun>,
   pub format: Box<ParagraphFormat>,
@@ -464,6 +465,10 @@ pub(crate) struct InlineImage {
 pub(crate) struct InlineShape {
   pub width_pt: f32,
   pub height_pt: f32,
+  pub effect_left_pt: f32,
+  pub effect_top_pt: f32,
+  pub effect_right_pt: f32,
+  pub effect_bottom_pt: f32,
   pub geometry: InlineShapeGeometry,
   pub offset_x_pt: f32,
   pub offset_y_pt: f32,
@@ -480,6 +485,7 @@ pub(crate) struct InlineShape {
   pub text_inset_top_pt: f32,
   pub text_inset_right_pt: f32,
   pub text_inset_bottom_pt: f32,
+  pub text_box_auto_fit: bool,
   pub text_vertical_alignment: TextBoxVerticalAlignment,
 }
 

@@ -171,6 +171,8 @@ pub(super) fn paragraph_model_with_base<'a>(
     }));
   }
   let (footnote_reference_ids, endnote_reference_ids) = paragraph_note_reference_ids(paragraph);
+  let starts_after_last_rendered_page_break =
+    super::paragraph_starts_after_last_rendered_page_break(&inlines);
   #[cfg(test)]
   let runs = inlines
     .iter()
@@ -188,6 +190,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     inlines,
     footnote_reference_ids,
     endnote_reference_ids,
+    starts_after_last_rendered_page_break,
     #[cfg(test)]
     runs,
     format: Box::new(format),

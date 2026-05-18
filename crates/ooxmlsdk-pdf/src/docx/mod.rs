@@ -5341,19 +5341,27 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     .as_ref()
     .is_some_and(|value| value.as_bool())
     .then_some(anchor.simple_position.as_ref());
+  let horizontal_relative_to = simple_position
+    .map(|_| HorizontalImageReference::Page)
+    .or_else(|| {
+      Some(horizontal_image_reference(
+        anchor.horizontal_position.as_ref(),
+      ))
+    })
+    .unwrap_or_default();
+  let vertical_relative_to = simple_position
+    .map(|_| VerticalImageReference::Page)
+    .or_else(|| Some(vertical_image_reference(anchor.vertical_position.as_ref())))
+    .unwrap_or_default();
+  let layout_in_cell = anchor.layout_in_cell.as_bool()
+    || (!simple_position.is_some()
+      && matches!(
+        (horizontal_relative_to, vertical_relative_to),
+        (HorizontalImageReference::Character, _) | (_, VerticalImageReference::Line)
+      ));
   FloatingImagePlacement {
-    horizontal_relative_to: simple_position
-      .map(|_| HorizontalImageReference::Page)
-      .or_else(|| {
-        Some(horizontal_image_reference(
-          anchor.horizontal_position.as_ref(),
-        ))
-      })
-      .unwrap_or_default(),
-    vertical_relative_to: simple_position
-      .map(|_| VerticalImageReference::Page)
-      .or_else(|| Some(vertical_image_reference(anchor.vertical_position.as_ref())))
-      .unwrap_or_default(),
+    horizontal_relative_to,
+    vertical_relative_to,
     horizontal_alignment: simple_position
       .map(|_| None)
       .unwrap_or_else(|| horizontal_position_alignment(anchor.horizontal_position.as_ref())),
@@ -5379,7 +5387,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
       .map(image_wrap_side)
       .unwrap_or_default(),
     behind_text: anchor.behind_doc.as_bool(),
-    layout_in_cell: anchor.layout_in_cell.as_bool(),
+    layout_in_cell,
     allow_overlap: anchor.allow_overlap.as_bool(),
     relative_height: anchor.relative_height,
     relative_width_to: anchor

@@ -623,6 +623,16 @@ struct WrapExclusion {
   side: ImageWrapSide,
 }
 
+impl WrapExclusion {
+  fn overlaps_vertical_span(&self, top_pt: f32, bottom_pt: f32) -> bool {
+    bottom_pt > self.top_pt && top_pt < self.bottom_pt
+  }
+
+  fn overlaps_horizontal_span(&self, left_pt: f32, right_pt: f32) -> bool {
+    right_pt > self.left_pt && left_pt < self.right_pt
+  }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct BlockArea {
   setup: PageSetup,
@@ -3041,6 +3051,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
   };
   let mut line_height = base_line_height;
   let mut content_height = 0.0;
+  let mut floating_bottom: f32 = 0.0;
   let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
   let finish_line = |content_height: &mut f32, line_height: &mut f32| {
     *content_height += line_real_height(paragraph, *line_height, false);
@@ -3068,6 +3079,23 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         }
       }
       InlineItem::Image(image) => {
+        if let crate::docx::ImagePlacement::Floating(placement) = image.placement
+          && (placement.layout_in_cell || flow.text_segmentation == TextSegmentation::RepeatingSlot)
+          && matches!(
+            flow.text_segmentation,
+            TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
+          )
+        {
+          let frame_width =
+            relative_floating_width(placement, flow).unwrap_or_else(|| image_frame_width(image));
+          let frame_height =
+            relative_floating_height(placement, flow).unwrap_or_else(|| image_frame_height(image));
+          let (width, height) = fit_image_to_line(frame_width, frame_height, flow.content_width);
+          let (_, image_y) =
+            floating_image_position(placement, flow, x, content_height, width, height);
+          floating_bottom = floating_bottom.max(image_y + height + placement.margin_bottom_pt);
+          continue;
+        }
         let (width, height) = fit_image_to_line(
           visible_image_width(image),
           visible_image_height(image),
@@ -3080,6 +3108,20 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         x = width;
       }
       InlineItem::Shape(shape) => {
+        if let crate::docx::ImagePlacement::Floating(placement) = shape.placement
+          && (placement.layout_in_cell || flow.text_segmentation == TextSegmentation::RepeatingSlot)
+          && matches!(
+            flow.text_segmentation,
+            TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
+          )
+        {
+          let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
+          let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
+          let (_, shape_y) =
+            floating_image_position(placement, flow, x, content_height, width, height);
+          floating_bottom = floating_bottom.max(shape_y + height + placement.margin_bottom_pt);
+          continue;
+        }
         if x + shape.width_pt > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height);
         }
@@ -3096,6 +3138,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
     }
   }
   finish_line(&mut content_height, &mut line_height);
+  content_height = content_height.max(floating_bottom);
 
   paragraph.format.spacing_before_pt
     + content_height
@@ -3869,7 +3912,12 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
       );
     }
 
+    let item_offset = page.items.len();
+    offset_page_frame_records(&mut adornment, item_offset);
     page.items.extend(adornment.items);
+    page.frame_fragments.extend(adornment.frame_fragments);
+    page.frame_influences.extend(adornment.frame_influences);
+    page.wrap_exclusions.extend(adornment.wrap_exclusions);
   }
 }
 
@@ -4873,6 +4921,7 @@ impl<'a> TableFrameLayout<'a> {
   fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> (FlowContext, f32) {
     let mut flow = flow_from_block_area(self.frame.block);
     let mut layout = self.clone();
+    y = layout.dodge_wrap_exclusions(current, y, layout.frame.total_height);
     if !layout.frame.split_allowed
       && y > layout.frame.block.content_top_pt + LAYOUT_EPSILON_PT
       && y + layout.frame.total_height > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT
@@ -4896,6 +4945,25 @@ impl<'a> TableFrameLayout<'a> {
       let format_until = problem_row_index.unwrap_or(self.table.rows.len());
       while row_index < format_until {
         let row = &self.table.rows[row_index];
+        y = layout.dodge_wrap_exclusions(
+          current,
+          y,
+          layout
+            .frame
+            .row_heights
+            .get(row_index)
+            .copied()
+            .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT),
+        );
+        if y > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT {
+          flush_border_segment(current, &mut left_border_segment);
+          flush_border_segment(current, &mut right_border_segment);
+          (flow, y) = advance_section_flow(flow, current, pages);
+          if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+            layout = next_layout;
+          }
+          y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+        }
         let row_frame = layout.row_frame(row, row_index, y);
         let row_top = y;
         y = row_frame.format(current, pages);
@@ -4919,6 +4987,25 @@ impl<'a> TableFrameLayout<'a> {
       }
 
       let row = &self.table.rows[row_index];
+      y = layout.dodge_wrap_exclusions(
+        current,
+        y,
+        layout
+          .frame
+          .row_heights
+          .get(row_index)
+          .copied()
+          .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT),
+      );
+      if y > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT {
+        flush_border_segment(current, &mut left_border_segment);
+        flush_border_segment(current, &mut right_border_segment);
+        (flow, y) = advance_section_flow(flow, current, pages);
+        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+          layout = next_layout;
+        }
+        y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+      }
       let mut row_frame = layout.row_frame(row, row_index, y);
       let row_height = row_frame.height_pt;
       if layout.should_split_row(&row_frame, table_row_keep, allow_split_of_keep_row) {
@@ -5286,6 +5373,61 @@ impl<'a> TableFrameLayout<'a> {
         + row_top_border_space_extent(self.table, row_index, row)
         + row_bottom_border_spacing_extent(self.table, row_index, row)
     })
+  }
+
+  fn dodge_wrap_exclusions(&self, current: &Page, mut y: f32, height_pt: f32) -> f32 {
+    let height_pt = height_pt.max(TABLE_ROW_MIN_HEIGHT_PT);
+    loop {
+      let Some(exclusion) = self.blocking_wrap_exclusion(current, y, y + height_pt) else {
+        return y;
+      };
+      let next_y = exclusion.bottom_pt;
+      if next_y <= y + LAYOUT_EPSILON_PT {
+        return y;
+      }
+      y = next_y;
+    }
+  }
+
+  fn blocking_wrap_exclusion(
+    &self,
+    current: &Page,
+    top_pt: f32,
+    bottom_pt: f32,
+  ) -> Option<WrapExclusion> {
+    current
+      .wrap_exclusions
+      .iter()
+      .copied()
+      .filter(|exclusion| {
+        exclusion.overlaps_vertical_span(top_pt, bottom_pt)
+          && exclusion.overlaps_horizontal_span(self.frame.left_pt, self.frame.right_pt)
+          && self.table_needs_vertical_dodge(*exclusion)
+      })
+      .min_by(|a, b| {
+        a.bottom_pt
+          .partial_cmp(&b.bottom_pt)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      })
+  }
+
+  fn table_needs_vertical_dodge(&self, exclusion: WrapExclusion) -> bool {
+    let table_width = self.frame.right_pt - self.frame.left_pt;
+    let block_left = self.frame.block.content_left_pt;
+    let block_right = block_left + self.frame.block.content_width;
+    let left_space = (exclusion.left_pt - block_left).max(0.0);
+    let right_space = (block_right - exclusion.right_pt).max(0.0);
+
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::CalcFlyOffsets() shifts the table down for no-wrap flys and
+    // only keeps side wrapping when the table print area can fit beside the fly.
+    match exclusion.side {
+      ImageWrapSide::Left => left_space + LAYOUT_EPSILON_PT < table_width,
+      ImageWrapSide::Right => right_space + LAYOUT_EPSILON_PT < table_width,
+      ImageWrapSide::BothSides | ImageWrapSide::Largest => {
+        left_space.max(right_space) + LAYOUT_EPSILON_PT < table_width
+      }
+    }
   }
 }
 
@@ -6814,11 +6956,16 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     column_index: 0,
     columns: SectionColumns::default(),
     content_top_pt: 0.0,
-    content_left_pt: 0.0,
+    content_left_pt: cell.margins.left_pt,
     content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
     body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
     content_width,
-    layout_cell_bounds: None,
+    layout_cell_bounds: Some(FrameBounds {
+      x_pt: 0.0,
+      y_pt: 0.0,
+      width_pt: cell_width,
+      height_pt: 0.0,
+    }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,

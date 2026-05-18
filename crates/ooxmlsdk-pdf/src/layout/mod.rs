@@ -96,6 +96,7 @@ fn text_run_affects_line_height(text: &str) -> bool {
 
 fn paragraph_ignored_blank_line_style(paragraph: &crate::docx::Paragraph) -> Option<TextStyle> {
   let mut style = paragraph.base_style.clone();
+  style.font_size_pt = TextStyle::default().font_size_pt;
   let mut found = false;
   for inline in &paragraph.inlines {
     let InlineItem::Text(run) = inline else {
@@ -611,6 +612,7 @@ struct FlowContext {
   body_content_bottom_pt: f32,
   content_width: f32,
   layout_cell_bounds: Option<FrameBounds>,
+  layout_cell_print_bounds: Option<FrameBounds>,
   default_tab_stop_pt: f32,
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
@@ -2034,11 +2036,12 @@ fn push_page_fragment(page: &mut Page, fragment: PageFragmentRecord) {
     cell_index,
     item_start,
     item_end,
+    bounds,
   } = fragment;
   if item_start >= item_end {
     return;
   }
-  let bounds = frame_bounds_for_items(&page.items[item_start..item_end]);
+  let bounds = bounds.or_else(|| frame_bounds_for_items(&page.items[item_start..item_end]));
   page.frame_fragments.push(FrameFragment {
     kind,
     split,
@@ -2059,6 +2062,7 @@ struct PageFragmentRecord {
   cell_index: Option<usize>,
   item_start: usize,
   item_end: usize,
+  bounds: Option<FrameBounds>,
 }
 
 fn push_page_influence(
@@ -2972,6 +2976,7 @@ fn flow_context(
     body_content_bottom_pt: setup.height_pt - setup.margin_bottom_pt,
     content_width: column_width.max(DEFAULT_FONT_SIZE_PT),
     layout_cell_bounds: None,
+    layout_cell_print_bounds: None,
     default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::Body,
@@ -3165,6 +3170,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
   let mut line_height = base_line_height;
   let mut content_height = 0.0;
   let mut floating_bottom: f32 = 0.0;
+  let mut has_flow_content = paragraph.list_label.is_some();
   let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
   let finish_line = |content_height: &mut f32, line_height: &mut f32| {
     *content_height += line_real_height(paragraph, *line_height, false);
@@ -3180,6 +3186,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
             x = 0.0;
             continue;
           }
+          has_flow_content = true;
           let width = measure_text(&segment, &run.style);
           if x + width > content_width && x > 0.0 {
             finish_line(&mut content_height, &mut line_height);
@@ -3199,6 +3206,9 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
             TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
           )
         {
+          if placement.behind_text {
+            continue;
+          }
           let frame_width =
             relative_floating_width(placement, flow).unwrap_or_else(|| image_frame_width(image));
           let frame_height =
@@ -3214,6 +3224,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
           visible_image_height(image),
           content_width,
         );
+        has_flow_content = true;
         if x + width > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height);
         }
@@ -3228,6 +3239,9 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
             TextSegmentation::TableCell | TextSegmentation::RepeatingSlot
           )
         {
+          if placement.behind_text {
+            continue;
+          }
           let width = relative_floating_width(placement, flow).unwrap_or(shape.width_pt);
           let height = relative_floating_height(placement, flow).unwrap_or(shape.height_pt);
           let (_, shape_y) =
@@ -3238,6 +3252,7 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
         if x + shape.width_pt > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height);
         }
+        has_flow_content = true;
         line_height = line_height.max(shape.height_pt);
         x = shape.width_pt;
       }
@@ -3250,7 +3265,9 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
       }
     }
   }
-  finish_line(&mut content_height, &mut line_height);
+  if has_flow_content || floating_bottom > 0.0 {
+    finish_line(&mut content_height, &mut line_height);
+  }
   content_height = content_height.max(floating_bottom);
 
   paragraph.format.spacing_before_pt
@@ -3610,6 +3627,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     body_content_bottom_pt: area.body_content_bottom_pt,
     content_width: area.content_width,
     layout_cell_bounds: None,
+    layout_cell_print_bounds: None,
     default_tab_stop_pt: area.default_tab_stop_pt,
     repeating_slots: area.repeating_slots,
     text_segmentation: TextSegmentation::Body,
@@ -3968,6 +3986,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
       content_width,
       layout_cell_bounds: None,
+      layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
       repeating_slots: repeating_slot_state(document, page.section_index),
       text_segmentation: TextSegmentation::RepeatingSlot,
@@ -3998,6 +4017,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
       content_width,
       layout_cell_bounds: None,
+      layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
       repeating_slots: repeating_slot_state(document, page.section_index),
       text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4136,6 +4156,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
         content_width,
         layout_cell_bounds: None,
+        layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4166,6 +4187,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
         content_width,
         layout_cell_bounds: None,
+        layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4715,6 +4737,7 @@ fn measured_repeating_blocks_height(
     body_content_bottom_pt: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
     content_width,
     layout_cell_bounds: None,
+    layout_cell_print_bounds: None,
     default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::RepeatingSlot,
@@ -5865,12 +5888,14 @@ impl RowFrame<'_, '_> {
           cell_index: Some(cell_index),
           item_start: cell_item_start,
           item_end: current.items.len(),
+          bounds: None,
         },
       );
       cell_left += cell_frame.width_pt + cell_spacing_pt;
     }
 
     self.paint_horizontal_borders(current, row_top, row_bottom);
+    let row_left = row_grid_left(self.table_frame, self.row, cell_spacing_pt);
     push_page_fragment(
       current,
       PageFragmentRecord {
@@ -5881,6 +5906,12 @@ impl RowFrame<'_, '_> {
         cell_index: None,
         item_start: row_item_start,
         item_end: current.items.len(),
+        bounds: Some(FrameBounds {
+          x_pt: row_left,
+          y_pt: row_top,
+          width_pt: self.table_frame.right_pt - row_left,
+          height_pt: row_bottom - row_top,
+        }),
       },
     );
   }
@@ -6135,14 +6166,12 @@ impl CellFrame<'_, '_> {
     content_offset: f32,
   ) {
     let fragment_height = (row_bottom - row_top).max(0.0);
-    let content_height = self.content_height();
-    let cell_fragment_height = if content_offset > LAYOUT_EPSILON_PT
-      || fragment_height + LAYOUT_EPSILON_PT < content_height
-    {
-      fragment_height
-    } else {
-      content_height
-    };
+    let cell_fragment_height =
+      if table_cell_has_vertical_merge_follow(self.table, self.row_index, self.grid_start) {
+        self.content_height().max(fragment_height)
+      } else {
+        fragment_height
+      };
     self.paint_vertical_merge_bounds(current, row_top, fragment_height);
     self.paint_background(current, row_top, fragment_height);
     self.paint_leading_border(current, row_top, row_bottom);
@@ -6157,6 +6186,8 @@ impl CellFrame<'_, '_> {
       y: row_top,
       width: self.width_pt,
       height: cell_fragment_height,
+      row_top_margin_pt: row_top_cell_margin_extent(self.row),
+      row_bottom_margin_pt: row_bottom_cell_margin_extent(self.row),
       content_offset,
     });
   }
@@ -6760,10 +6791,16 @@ fn table_row_height_with_widths(
 ) -> f32 {
   let mut grid_index = row.grid_before;
   let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
+  let row_top_margin = row_top_cell_margin_extent(row);
+  let row_bottom_margin = row_bottom_cell_margin_extent(row);
   for cell in &row.cells {
     let width = spanned_cell_width(cell, column_widths, &mut grid_index);
     if !cell.vertical_merge_continue {
-      content_height = content_height.max(table_cell_content_height(cell, width));
+      let cell_height =
+        table_cell_content_height(cell, width) - cell.margins.top_pt - cell.margins.bottom_pt
+          + row_top_margin
+          + row_bottom_margin;
+      content_height = content_height.max(cell_height);
     }
   }
   match (row.height_pt, row.exact_height) {
@@ -6882,6 +6919,8 @@ struct TableCellLayout<'a> {
   y: f32,
   width: f32,
   height: f32,
+  row_top_margin_pt: f32,
+  row_bottom_margin_pt: f32,
   content_offset: f32,
 }
 
@@ -6896,6 +6935,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     y,
     width,
     height,
+    row_top_margin_pt,
+    row_bottom_margin_pt,
     content_offset,
   } = fragment;
   let content_width =
@@ -6906,23 +6947,25 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let first_line_baseline_offset = baseline_offset_in_line(&first_line_style, first_line_height);
   let split_fragment =
     content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
+  let top_margin_for_lowers = row_top_margin_pt.max(cell.margins.top_pt);
+  let bottom_margin_for_lowers = row_bottom_margin_pt.max(cell.margins.bottom_pt);
   let aligned_content_top = if split_fragment {
-    y + cell.margins.top_pt
+    y + top_margin_for_lowers
   } else {
     match cell.vertical_alignment {
-      TableCellVerticalAlignment::Top => y + cell.margins.top_pt,
+      TableCellVerticalAlignment::Top => y + top_margin_for_lowers,
       TableCellVerticalAlignment::Center => {
-        y + ((height - content_height) / 2.0).max(cell.margins.top_pt)
+        y + ((height - content_height) / 2.0).max(top_margin_for_lowers)
       }
       TableCellVerticalAlignment::Bottom => {
-        y + (height - cell.margins.bottom_pt - content_height).max(cell.margins.top_pt)
+        y + (height - bottom_margin_for_lowers - content_height).max(top_margin_for_lowers)
       }
     }
   };
   let mut text_y = aligned_content_top + first_line_baseline_offset - content_offset;
   let content_start_y = text_y;
   let text_left = x + cell.margins.left_pt;
-  let text_bottom = y + height - cell.margins.bottom_pt;
+  let text_bottom = y + height - bottom_margin_for_lowers;
   let following_text_flow_bottom = following_text_flow_cell_bottom(current, text_bottom);
   let flow_bottom = if split_fragment {
     text_bottom
@@ -6945,6 +6988,12 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       y_pt: y,
       width_pt: width,
       height_pt: height,
+    }),
+    layout_cell_print_bounds: Some(FrameBounds {
+      x_pt: text_left,
+      y_pt: y + top_margin_for_lowers,
+      width_pt: content_width,
+      height_pt: (height - top_margin_for_lowers - bottom_margin_for_lowers).max(0.0),
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
@@ -7111,6 +7160,7 @@ fn layout_shape_text_box(
     body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
     content_width,
     layout_cell_bounds: parent_flow.layout_cell_bounds,
+    layout_cell_print_bounds: parent_flow.layout_cell_print_bounds,
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -7254,6 +7304,12 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
       width_pt: cell_width,
       height_pt: 0.0,
     }),
+    layout_cell_print_bounds: Some(FrameBounds {
+      x_pt: cell.margins.left_pt,
+      y_pt: cell.margins.top_pt,
+      width_pt: content_width,
+      height_pt: 0.0,
+    }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -7318,6 +7374,12 @@ fn floating_image_position(
       width_pt: flow.content_width,
       height_pt: 0.0,
     });
+    let cell_print_bounds = flow.layout_cell_print_bounds.unwrap_or(FrameBounds {
+      x_pt: flow.content_left_pt,
+      y_pt: current_y,
+      width_pt: flow.content_width,
+      height_pt: 0.0,
+    });
     let (base_x, reference_width) = match placement.horizontal_relative_to {
       HorizontalImageReference::Column | HorizontalImageReference::Character => {
         (flow.content_left_pt, flow.content_width)
@@ -7331,8 +7393,8 @@ fn floating_image_position(
     };
     let (base_y, reference_height) = match placement.vertical_relative_to {
       VerticalImageReference::Paragraph | VerticalImageReference::Line => (current_y, 0.0),
-      VerticalImageReference::Page
-      | VerticalImageReference::Margin
+      VerticalImageReference::Page => (cell_print_bounds.y_pt, cell_print_bounds.height_pt),
+      VerticalImageReference::Margin
       | VerticalImageReference::TopMargin
       | VerticalImageReference::BottomMargin
       | VerticalImageReference::InsideMargin
@@ -7965,6 +8027,7 @@ impl<'a> TextFrameLayout<'a> {
         cell_index: None,
         item_start: *advance.line_item_start_index,
         item_end: advance.current.items.len(),
+        bounds: None,
       },
     );
     let real_height = line_real_height(self.paragraph, *line_height, *advance.line_has_form_widget);
@@ -8064,6 +8127,7 @@ impl<'a> TextFrameLayout<'a> {
       .filter(|exclusion| exclusion.bottom_pt > y)
       .collect::<Vec<_>>();
     let mut emitted = paragraph.list_label.is_some();
+    let mut behind_text_floating_only = false;
     let mut pending_tab: Option<ResolvedTabStop> = None;
     let mut text_state = TextFrameState::new();
     let line = LineFrame::first(text_frame, y, paragraph.list_label.is_some());
@@ -8594,7 +8658,11 @@ impl<'a> TextFrameLayout<'a> {
               | ImageWrapMode::Square
               | ImageWrapMode::Tight => {}
             }
-            emitted = true;
+            if placement.behind_text {
+              behind_text_floating_only = true;
+            } else {
+              emitted = true;
+            }
             continue;
           }
           let (width, height) = fit_image_to_line(
@@ -8851,18 +8919,18 @@ impl<'a> TextFrameLayout<'a> {
                       shape_item_end,
                       influence_bounds,
                     );
-                  }
-                  y = y.max(shape_y + height + placement.margin_bottom_pt);
-                  if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
-                    (flow, y) = advance_section_flow(flow, current, pages);
-                    text_frame = TextFrame::new(self.paragraph, flow);
-                    text_state.note_page_follow(pages.len(), y);
-                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
-                    default_line_right = text_frame.default_line_right;
-                    paragraph_left = text_frame.paragraph_left;
-                    base_line_height = text_frame.base_line_height;
-                    line_height = base_line_height;
-                    line_item_start_index = current.items.len();
+                    y = y.max(shape_y + height + placement.margin_bottom_pt);
+                    if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                      (flow, y) = advance_section_flow(flow, current, pages);
+                      text_frame = TextFrame::new(self.paragraph, flow);
+                      text_state.note_page_follow(pages.len(), y);
+                      reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                      default_line_right = text_frame.default_line_right;
+                      paragraph_left = text_frame.paragraph_left;
+                      base_line_height = text_frame.base_line_height;
+                      line_height = base_line_height;
+                      line_item_start_index = current.items.len();
+                    }
                   }
                   (line_left, line_right) =
                     self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
@@ -8942,7 +9010,14 @@ impl<'a> TextFrameLayout<'a> {
               line_height = line_height.max(shape.height_pt);
             }
           }
-          emitted = true;
+          if matches!(
+            shape.placement,
+            crate::docx::ImagePlacement::Floating(placement) if placement.behind_text
+          ) {
+            behind_text_floating_only = true;
+          } else {
+            emitted = true;
+          }
         }
         InlineItem::PageBreak => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
@@ -8995,11 +9070,15 @@ impl<'a> TextFrameLayout<'a> {
           cell_index: None,
           item_start: line_item_start_index,
           item_end: current.items.len(),
+          bounds: None,
         },
       );
       let real_height = line_real_height(paragraph, line_height, line_has_form_widget);
       text_state.finish_paragraph(y, real_height, emitted);
       paragraph_bottom = y + real_height;
+      y = paragraph_bottom + self.spacing_after_pt;
+    } else if behind_text_floating_only {
+      paragraph_bottom = y;
       y = paragraph_bottom + self.spacing_after_pt;
     } else {
       paragraph_bottom = y + base_line_height;
@@ -9167,6 +9246,10 @@ fn push_line_segments(text: &str, segments: &mut Vec<String>) {
   if text.is_empty() {
     return;
   }
+  if libreoffice_preserves_latin_line_token(text) {
+    push_text_line_segment(text, segments);
+    return;
+  }
 
   thread_local! {
     static LINE_SEGMENTER: LineSegmenterBorrowed<'static> =
@@ -9191,7 +9274,27 @@ fn push_line_segments(text: &str, segments: &mut Vec<String>) {
   });
 }
 
+fn libreoffice_preserves_latin_line_token(text: &str) -> bool {
+  // Source: LibreOffice sw/source/core/text/guess.cxx asks the break iterator
+  // for a break around the current cut position. A Latin token made of letters,
+  // numbers and inline punctuation has no internal line break opportunity, even
+  // when ICU's generic line segmenter reports punctuation-adjacent boundaries.
+  text
+    .chars()
+    .all(|ch| ch.is_ascii_graphic() && ch != '\n' && ch != '\t')
+}
+
 fn push_text_line_segment(text: &str, segments: &mut Vec<String>) {
+  if !segments.is_empty()
+    && text
+      .chars()
+      .next()
+      .is_some_and(libreoffice_forbidden_line_start_after_text)
+  {
+    let previous = segments.last_mut().unwrap();
+    previous.push_str(text);
+    return;
+  }
   if segments.last().is_some_and(|segment| {
     segment
       .chars()
@@ -9208,6 +9311,38 @@ fn libreoffice_forbidden_line_end_before_text(ch: char) -> bool {
   // Source: LibreOffice uses i18npool breakiterator forbidden end-character
   // handling, so opening quotation marks don't remain alone at line end.
   matches!(ch, '“' | '‘')
+}
+
+fn libreoffice_forbidden_line_start_after_text(ch: char) -> bool {
+  // Source: LibreOffice sw/source/core/text/guess.cxx passes forbidden
+  // begin-line characters to i18npool getLineBreak(), preventing punctuation
+  // portions such as "," from starting their own line.
+  matches!(
+    ch,
+    ','
+      | '.'
+      | ';'
+      | ':'
+      | '!'
+      | '?'
+      | ')'
+      | ']'
+      | '}'
+      | '”'
+      | '’'
+      | '，'
+      | '。'
+      | '、'
+      | '；'
+      | '：'
+      | '！'
+      | '？'
+      | '）'
+      | '］'
+      | '｝'
+      | '」'
+      | '』'
+  )
 }
 
 fn next_tab_stop(

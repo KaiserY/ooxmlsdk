@@ -2610,6 +2610,15 @@ fn table_cell_model(
             in_header_footer: false,
           },
         ))),
+        w::TableCellChoice::WSdt(sdt) => blocks.extend(sdt_block_blocks(
+          sdt,
+          context.styles,
+          context.numbering,
+          context.images,
+          context.hyperlinks,
+          context.custom_xml_bindings,
+          context.form_widget_ids,
+        )),
         _ => {}
       }
       blocks

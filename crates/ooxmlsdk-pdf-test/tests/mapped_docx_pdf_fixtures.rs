@@ -1,6 +1,6 @@
 use ooxmlsdk_pdf_test::{
-  PdfBounds, PdfSummary, assert_pdf_rect_close, parse_pdf_rect, pdf_summary_for_fixture,
-  pdfexport_fixture_dir, rendered_page_image_for_fixture,
+  PdfBounds, PdfSummary, assert_pdf_rect_close, docx_layout_summary_for_fixture, parse_pdf_rect,
+  pdf_summary_for_fixture, pdfexport_fixture_dir, rendered_page_image_for_fixture,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -9,6 +9,10 @@ fn fixture(name: &str) -> std::path::PathBuf {
 
 fn render_summary(name: &str) -> PdfSummary {
   pdf_summary_for_fixture(&fixture(name)).unwrap()
+}
+
+fn layout_summary(name: &str) -> ooxmlsdk_pdf_test::DocxLayoutSummary {
+  docx_layout_summary_for_fixture(&fixture(name)).unwrap()
 }
 
 fn page_text(summary: &PdfSummary, page_index: usize) -> String {
@@ -1020,36 +1024,6 @@ fn assert_text_height_close(summary: &PdfSummary, page_index: usize, expected_he
   );
 }
 
-fn assert_any_text_height_less_than(summary: &PdfSummary, page_index: usize, maximum_height: f32) {
-  let bounds = summary
-    .text_segments
-    .iter()
-    .filter(|segment| segment.page_index == page_index)
-    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
-    .collect::<Vec<_>>();
-  assert!(
-    bounds.iter().any(|bounds| bounds.height() < maximum_height),
-    "missing page {page_index} text height less than {maximum_height}pt; bounds={bounds:?}"
-  );
-}
-
-fn assert_any_text_height_greater_than(
-  summary: &PdfSummary,
-  page_index: usize,
-  minimum_height: f32,
-) {
-  let bounds = summary
-    .text_segments
-    .iter()
-    .filter(|segment| segment.page_index == page_index)
-    .filter_map(|segment| parse_pdf_rect(&segment.bounds).ok())
-    .collect::<Vec<_>>();
-  assert!(
-    bounds.iter().any(|bounds| bounds.height() > minimum_height),
-    "missing page {page_index} text height greater than {minimum_height}pt; bounds={bounds:?}"
-  );
-}
-
 fn assert_any_text_and_path_height_close(summary: &PdfSummary, page_index: usize, tolerance: f32) {
   let text_bounds = summary
     .text_segments
@@ -1753,6 +1727,81 @@ fn first_text_segment_height(summary: &PdfSummary, fixture_name: &str) -> f32 {
     .first()
     .unwrap_or_else(|| panic!("missing first text segment in {fixture_name}"));
   parse_pdf_rect(&segment.bounds).unwrap().height()
+}
+
+fn first_layout_line_height(
+  summary: &ooxmlsdk_pdf_test::DocxLayoutSummary,
+  fixture_name: &str,
+) -> f32 {
+  summary
+    .lines
+    .first()
+    .unwrap_or_else(|| panic!("missing first layout line in {fixture_name}"))
+    .height_pt
+}
+
+fn assert_any_layout_line_height_less_than(
+  summary: &ooxmlsdk_pdf_test::DocxLayoutSummary,
+  page_index: usize,
+  maximum_height: f32,
+) {
+  assert!(
+    summary
+      .lines
+      .iter()
+      .filter(|line| line.page_index == page_index)
+      .any(|line| line.height_pt < maximum_height),
+    "missing page {page_index} layout line height less than {maximum_height}pt; lines={:?}",
+    summary.lines
+  );
+}
+
+fn assert_any_layout_line_height_greater_than(
+  summary: &ooxmlsdk_pdf_test::DocxLayoutSummary,
+  page_index: usize,
+  minimum_height: f32,
+) {
+  assert!(
+    summary
+      .lines
+      .iter()
+      .filter(|line| line.page_index == page_index)
+      .any(|line| line.height_pt > minimum_height),
+    "missing page {page_index} layout line height greater than {minimum_height}pt; lines={:?}",
+    summary.lines
+  );
+}
+
+fn assert_any_layout_row_height_less_than(
+  summary: &ooxmlsdk_pdf_test::DocxLayoutSummary,
+  page_index: usize,
+  maximum_height: f32,
+) {
+  assert!(
+    summary
+      .rows
+      .iter()
+      .filter(|row| row.page_index == page_index)
+      .any(|row| row.height_pt < maximum_height),
+    "missing page {page_index} layout row height less than {maximum_height}pt; rows={:?}",
+    summary.rows
+  );
+}
+
+fn assert_any_layout_row_height_greater_than(
+  summary: &ooxmlsdk_pdf_test::DocxLayoutSummary,
+  page_index: usize,
+  minimum_height: f32,
+) {
+  assert!(
+    summary
+      .rows
+      .iter()
+      .filter(|row| row.page_index == page_index)
+      .any(|row| row.height_pt > minimum_height),
+    "missing page {page_index} layout row height greater than {minimum_height}pt; rows={:?}",
+    summary.rows
+  );
 }
 
 fn first_path_top_from_page_top(summary: &PdfSummary, fixture_name: &str) -> f32 {
@@ -2628,9 +2677,9 @@ fn mapped_fixture_tdf133070_has_footer_preserves_relative_anchor_height() {
 #[test]
 // Source: ../core/sw/qa/extras/ooxmlexport/ooxmlexport18.cxx:testTdf153128
 fn mapped_fixture_tdf153128_preserves_one_point_line_height() {
-  let summary = render_summary("tdf153128.docx");
+  let summary = layout_summary("tdf153128.docx");
   assert!(
-    first_text_segment_height(&summary, "tdf153128.docx") < 1.5,
+    first_layout_line_height(&summary, "tdf153128.docx") < 30.0 / 20.0,
     "first line height should stay near 1pt"
   );
 }
@@ -4212,11 +4261,11 @@ fn mapped_fixture_tdf117923_keeps_numbering_portion_text_and_font_height() {
 #[test]
 // Source: ../core/sw/qa/extras/layout/layout5.cxx:testTdf153136
 fn mapped_fixture_tdf153136_preserves_space_character_line_height_rules() {
-  let summary = render_summary("tdf153136.docx");
-  assert_any_text_height_less_than(&summary, 0, 300.0 / 20.0);
-  assert_any_text_height_greater_than(&summary, 0, 1000.0 / 20.0);
-  assert_any_text_height_less_than(&summary, 1, 300.0 / 20.0);
-  assert_any_text_height_greater_than(&summary, 1, 1000.0 / 20.0);
+  let summary = layout_summary("tdf153136.docx");
+  assert_any_layout_line_height_less_than(&summary, 0, 300.0 / 20.0);
+  assert_any_layout_line_height_greater_than(&summary, 0, 1000.0 / 20.0);
+  assert_any_layout_row_height_less_than(&summary, 1, 300.0 / 20.0);
+  assert_any_layout_row_height_greater_than(&summary, 1, 1000.0 / 20.0);
 }
 
 #[test]

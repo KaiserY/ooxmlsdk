@@ -71,20 +71,45 @@ fn inline_text_height(style: &TextStyle) -> f32 {
 }
 
 fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
-  paragraph
-    .inlines
-    .iter()
-    .find_map(|inline| match inline {
-      InlineItem::Text(run) => Some(run.style.clone()),
-      InlineItem::Image(_)
-      | InlineItem::Shape(_)
-      | InlineItem::FormWidgetStart(_)
-      | InlineItem::FormWidgetEnd(_)
-      | InlineItem::LastRenderedPageBreak
-      | InlineItem::PageBreak
-      | InlineItem::ColumnBreak => None,
-    })
-    .unwrap_or_else(|| paragraph.base_style.clone())
+  if let Some(style) = paragraph.inlines.iter().find_map(|inline| match inline {
+    InlineItem::Text(run) if text_run_affects_line_height(&run.text) => Some(run.style.clone()),
+    InlineItem::Text(_) => None,
+    InlineItem::Image(_)
+    | InlineItem::Shape(_)
+    | InlineItem::FormWidgetStart(_)
+    | InlineItem::FormWidgetEnd(_)
+    | InlineItem::LastRenderedPageBreak
+    | InlineItem::PageBreak
+    | InlineItem::ColumnBreak => None,
+  }) {
+    return style;
+  }
+
+  paragraph_ignored_blank_line_style(paragraph).unwrap_or_else(|| paragraph.base_style.clone())
+}
+
+fn text_run_affects_line_height(text: &str) -> bool {
+  text
+    .chars()
+    .any(|ch| ch != '\n' && ch != '\t' && !libreoffice_ignored_line_height_blank(ch))
+}
+
+fn paragraph_ignored_blank_line_style(paragraph: &crate::docx::Paragraph) -> Option<TextStyle> {
+  let mut style = paragraph.base_style.clone();
+  let mut found = false;
+  for inline in &paragraph.inlines {
+    let InlineItem::Text(run) = inline else {
+      continue;
+    };
+    if text_run_affects_line_height(&run.text) {
+      continue;
+    }
+    if !found || run.style.font_size_pt < style.font_size_pt {
+      style.font_size_pt = run.style.font_size_pt;
+    }
+    found = true;
+  }
+  found.then_some(style)
 }
 
 fn paragraph_line_height_for_setup(
@@ -7038,11 +7063,7 @@ fn table_cell_first_line_style(cell: &TableCell) -> TextStyle {
     let Block::Paragraph(paragraph) = block else {
       continue;
     };
-    for inline in &paragraph.inlines {
-      if let InlineItem::Text(run) = inline {
-        return run.style.clone();
-      }
-    }
+    return paragraph_base_line_style(paragraph);
   }
   TextStyle::default()
 }

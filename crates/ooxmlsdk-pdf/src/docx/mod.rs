@@ -3196,29 +3196,38 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(indentation) = properties.indentation() {
-    format.indent_left_pt = indentation
-      .start
-      .as_ref()
-      .or(indentation.left.as_ref())
-      .and_then(signed_twips_measure_to_points)
-      .unwrap_or(0.0);
-    format.indent_right_pt = indentation
-      .end
-      .as_ref()
-      .or(indentation.right.as_ref())
-      .and_then(signed_twips_measure_to_points)
-      .unwrap_or(0.0);
-    let first_line = indentation
-      .first_line
-      .as_ref()
-      .and_then(twips_measure_to_points)
-      .unwrap_or(0.0);
-    let hanging = indentation
-      .hanging
-      .as_ref()
-      .and_then(twips_measure_to_points)
-      .unwrap_or(0.0);
-    format.first_line_indent_pt = first_line - hanging;
+    if indentation.start.is_some() || indentation.left.is_some() {
+      format.indent_left_set = true;
+      format.indent_left_pt = indentation
+        .start
+        .as_ref()
+        .or(indentation.left.as_ref())
+        .and_then(signed_twips_measure_to_points)
+        .unwrap_or(0.0);
+    }
+    if indentation.end.is_some() || indentation.right.is_some() {
+      format.indent_right_set = true;
+      format.indent_right_pt = indentation
+        .end
+        .as_ref()
+        .or(indentation.right.as_ref())
+        .and_then(signed_twips_measure_to_points)
+        .unwrap_or(0.0);
+    }
+    if indentation.first_line.is_some() || indentation.hanging.is_some() {
+      format.first_line_indent_set = true;
+      let first_line = indentation
+        .first_line
+        .as_ref()
+        .and_then(twips_measure_to_points)
+        .unwrap_or(0.0);
+      let hanging = indentation
+        .hanging
+        .as_ref()
+        .and_then(twips_measure_to_points)
+        .unwrap_or(0.0);
+      format.first_line_indent_pt = first_line - hanging;
+    }
   }
 
   if let Some(tabs) = properties.tabs() {
@@ -4637,28 +4646,28 @@ fn push_sdt_run(
 }
 
 fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec<String>)> {
-  let mut kind = FormWidgetKind::Text;
+  let mut kind = None;
   let mut entries = Vec::new();
   for choice in &properties.sdt_properties_choice {
     match choice {
       w::SdtPropertiesChoice::WComboBox(combo_box) => {
-        kind = FormWidgetKind::ComboBox;
+        kind = Some(FormWidgetKind::ComboBox);
         entries = sdt_list_item_display_texts(&combo_box.w_list_item);
       }
       w::SdtPropertiesChoice::WDropDownList(drop_down) => {
-        kind = FormWidgetKind::DropDownList;
+        kind = Some(FormWidgetKind::DropDownList);
         entries = sdt_list_item_display_texts(&drop_down.w_list_item);
       }
       w::SdtPropertiesChoice::WDate(_) => {
-        kind = FormWidgetKind::Text;
+        kind = Some(FormWidgetKind::Text);
       }
       w::SdtPropertiesChoice::WRichText | w::SdtPropertiesChoice::WText(_) => {
-        kind = FormWidgetKind::Text;
+        kind = Some(FormWidgetKind::Text);
       }
       _ => {}
     }
   }
-  Some((kind, entries))
+  kind.map(|kind| (kind, entries))
 }
 
 fn sdt_list_item_display_texts(items: &[w::ListItem]) -> Vec<String> {
@@ -10614,14 +10623,17 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
     target.line_height_pt = values.line_height_pt;
     target.line_height_rule = values.line_height_rule;
   }
-  if values.indent_left_pt != 0.0 {
+  if values.indent_left_set {
     target.indent_left_pt = values.indent_left_pt;
+    target.indent_left_set = true;
   }
-  if values.indent_right_pt != 0.0 {
+  if values.indent_right_set {
     target.indent_right_pt = values.indent_right_pt;
+    target.indent_right_set = true;
   }
-  if values.first_line_indent_pt != 0.0 {
+  if values.first_line_indent_set {
     target.first_line_indent_pt = values.first_line_indent_pt;
+    target.first_line_indent_set = true;
   }
   if !values.tab_stops.is_empty() {
     target.tab_stops = values.tab_stops;

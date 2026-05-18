@@ -32,6 +32,38 @@ use ooxmlsdk::sdk::{
 pub use error::{PdfError, Result};
 pub use options::{PdfOptions, PdfStandard};
 
+#[derive(Clone, Debug)]
+pub struct DocxLayoutSummary {
+  pub lines: Vec<DocxLayoutLineSummary>,
+  pub rows: Vec<DocxLayoutRowSummary>,
+}
+
+#[derive(Clone, Debug)]
+pub struct DocxLayoutLineSummary {
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub block_index: Option<usize>,
+  pub line_index: usize,
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+}
+
+#[derive(Clone, Debug)]
+pub struct DocxLayoutRowSummary {
+  pub page_index: usize,
+  pub section_index: usize,
+  pub section_page_index: usize,
+  pub block_index: Option<usize>,
+  pub row_index: usize,
+  pub x_pt: f32,
+  pub y_pt: f32,
+  pub width_pt: f32,
+  pub height_pt: f32,
+}
+
 /// Convert a DOCX stream into PDF bytes.
 pub fn convert_docx<R>(reader: R, options: PdfOptions) -> Result<Vec<u8>>
 where
@@ -57,6 +89,66 @@ pub fn convert_wordprocessing_document(
   validate_docx_fonts(&doc)?;
   let pages = layout::layout(&doc, &options)?;
   render::krilla::render(&pages, &options)
+}
+
+/// Inspect DOCX layout line boxes without rendering to PDF.
+///
+/// This mirrors LibreOffice layout-dump tests that assert `SwLineLayout`
+/// metrics directly instead of going through PDF text extraction.
+pub fn inspect_docx_layout<R>(reader: R, options: PdfOptions) -> Result<DocxLayoutSummary>
+where
+  R: Read + Seek,
+{
+  let settings = OpenSettings {
+    markup_compatibility_process_settings: MarkupCompatibilityProcessSettings {
+      process_mode: MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly,
+      target_file_format_version: FileFormatVersion::Microsoft365,
+    },
+    ..Default::default()
+  };
+  let mut document = WordprocessingDocument::new_with_settings(reader, settings)?;
+  let doc = docx::extract(&mut document, &options)?;
+  validate_docx_fonts(&doc)?;
+  let layout = layout::layout(&doc, &options)?;
+  Ok(layout_summary(layout))
+}
+
+fn layout_summary(layout: layout::LayoutDocument) -> DocxLayoutSummary {
+  let mut lines = Vec::new();
+  let mut rows = Vec::new();
+  for frame in layout.frames {
+    for fragment in frame.fragments {
+      let Some(bounds) = fragment.bounds else {
+        continue;
+      };
+      match fragment.kind {
+        layout::FrameFragmentKind::ParagraphLine => lines.push(DocxLayoutLineSummary {
+          page_index: frame.page_index,
+          section_index: frame.section_index,
+          section_page_index: frame.section_page_index,
+          block_index: frame.block_index,
+          line_index: fragment.index,
+          x_pt: bounds.x_pt,
+          y_pt: bounds.y_pt,
+          width_pt: bounds.width_pt,
+          height_pt: bounds.height_pt,
+        }),
+        layout::FrameFragmentKind::TableRow => rows.push(DocxLayoutRowSummary {
+          page_index: frame.page_index,
+          section_index: frame.section_index,
+          section_page_index: frame.section_page_index,
+          block_index: frame.block_index,
+          row_index: fragment.row_index,
+          x_pt: bounds.x_pt,
+          y_pt: bounds.y_pt,
+          width_pt: bounds.width_pt,
+          height_pt: bounds.height_pt,
+        }),
+        layout::FrameFragmentKind::TableCell | layout::FrameFragmentKind::NoteLine => {}
+      }
+    }
+  }
+  DocxLayoutSummary { lines, rows }
 }
 
 /// Convert an XLSX stream into PDF bytes.

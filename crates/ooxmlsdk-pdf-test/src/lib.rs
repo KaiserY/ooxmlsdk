@@ -8,8 +8,10 @@
 pub mod pdf_extract;
 pub mod render;
 
+use std::fs::File;
 use std::path::{Path, PathBuf};
 
+pub use ooxmlsdk_pdf::{DocxLayoutLineSummary, DocxLayoutRowSummary, DocxLayoutSummary};
 pub use pdf_extract::{
   AnnotationSummary, LinkTargetKind, PdfBounds, PdfSummary, PixelRect, RawAnnotationSummary,
   RawPageSummary, RawXObjectSummary, RenderedPageImage, assert_pdf_rect_close, parse_pdf_rect,
@@ -50,6 +52,13 @@ pub fn pdfexport_fixtures() -> Vec<PathBuf> {
 pub fn pdf_summary_for_fixture(fixture: &Path) -> Result<PdfSummary> {
   let pdf = render_fixture_pdf(fixture)?;
   PdfSummary::from_bytes(&pdf).map_err(CalibrationError::PdfiumExtraction)
+}
+
+pub fn docx_layout_summary_for_fixture(fixture: &Path) -> Result<DocxLayoutSummary> {
+  Ok(ooxmlsdk_pdf::inspect_docx_layout(
+    File::open(fixture)?,
+    ooxmlsdk_pdf::PdfOptions::default(),
+  )?)
 }
 
 pub fn pdf_page_count_for_fixture(fixture: &Path) -> Result<usize> {

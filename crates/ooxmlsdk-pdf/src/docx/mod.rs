@@ -1269,12 +1269,18 @@ fn body_sections(
       }
       w::BodyChoice::WTbl(table) => current_blocks.push(Block::Table(table_model(
         table,
-        styles,
-        numbering,
-        images,
-        hyperlinks,
-        custom_xml_bindings,
-        form_widget_ids,
+        &mut TableModelEnv {
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer: false,
+        },
       ))),
       w::BodyChoice::WSdt(sdt) => {
         current_blocks.extend(sdt_block_blocks(
@@ -1677,12 +1683,18 @@ fn sdt_block_blocks(
       ))]),
       w::SdtContentBlockChoice::WTbl(table) => Some(vec![Block::Table(table_model(
         table.as_ref(),
-        styles,
-        numbering,
-        images,
-        hyperlinks,
-        custom_xml_bindings,
-        form_widget_ids,
+        &mut TableModelEnv {
+          styles,
+          numbering,
+          images,
+          hyperlinks,
+          custom_xml_bindings,
+          form_widget_ids,
+        },
+        TableModelContext {
+          nested_table_level: 1,
+          in_header_footer: false,
+        },
       ))]),
       w::SdtContentBlockChoice::WSdt(sdt) => Some(sdt_block_blocks(
         sdt.as_ref(),
@@ -1743,12 +1755,18 @@ fn header_blocks(
         ))),
         w::HeaderChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
-          styles,
-          &mut numbering,
-          &images,
-          &hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
+          &mut TableModelEnv {
+            styles,
+            numbering: &mut numbering,
+            images: &images,
+            hyperlinks: &hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+          },
+          TableModelContext {
+            nested_table_level: 1,
+            in_header_footer: true,
+          },
         ))),
         _ => None,
       })
@@ -1820,12 +1838,18 @@ fn footer_blocks(
         ))),
         w::FooterChoice::WTbl(table) => Some(Block::Table(table_model(
           table,
-          styles,
-          &mut numbering,
-          &images,
-          &hyperlinks,
-          custom_xml_bindings,
-          form_widget_ids,
+          &mut TableModelEnv {
+            styles,
+            numbering: &mut numbering,
+            images: &images,
+            hyperlinks: &hyperlinks,
+            custom_xml_bindings,
+            form_widget_ids,
+          },
+          TableModelContext {
+            nested_table_level: 1,
+            in_header_footer: true,
+          },
         ))),
         _ => None,
       })
@@ -2095,19 +2119,15 @@ fn preserve_note_text_portions(paragraph: &mut Paragraph) {
 
 fn table_model(
   table: &w::Table,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  custom_xml_bindings: &CustomXmlBindings,
-  form_widget_ids: &mut FormWidgetIdAllocator,
+  env: &mut TableModelEnv<'_>,
+  model_context: TableModelContext,
 ) -> Table {
   let properties = table.w_tbl_pr.as_ref();
   let table_style_id = properties
     .table_style
     .as_ref()
     .map(|style| style.val.as_str());
-  let table_style = styles.table_style(table_style_id);
+  let table_style = env.styles.table_style(table_style_id);
   let table_look = properties
     .table_look
     .as_ref()
@@ -2130,12 +2150,12 @@ fn table_model(
   let row_count = rows.len();
   let rows = {
     let mut context = TableImportContext {
-      styles,
-      numbering,
-      images,
-      hyperlinks,
-      custom_xml_bindings,
-      form_widget_ids,
+      styles: env.styles,
+      numbering: env.numbering,
+      images: env.images,
+      hyperlinks: env.hyperlinks,
+      custom_xml_bindings: env.custom_xml_bindings,
+      form_widget_ids: env.form_widget_ids,
       cell_margins,
       table_style: &table_style,
       table_look,
@@ -2148,6 +2168,16 @@ fn table_model(
       .collect::<Vec<_>>()
   };
   let starts_after_last_rendered_page_break = table_starts_after_last_rendered_page_break(&rows);
+  let placement = properties
+    .table_position_properties
+    .as_ref()
+    .map(table_position_placement);
+  let split_allowed = placement.is_some();
+  let following_text_flow = placement.is_some()
+    && (model_context.nested_table_level >= 2 || model_context.in_header_footer)
+    && !(model_context.in_header_footer
+      && placement
+        .is_some_and(|placement| matches!(placement.vertical_anchor, FrameVerticalAnchor::Page)));
   Table {
     column_widths_pt: table
       .w_tbl_grid
@@ -2175,10 +2205,9 @@ fn table_model(
       .map(table_alignment)
       .or(table_style.alignment)
       .unwrap_or_default(),
-    placement: properties
-      .table_position_properties
-      .as_ref()
-      .map(table_position_placement),
+    placement,
+    split_allowed,
+    following_text_flow,
     starts_after_last_rendered_page_break,
     borders: properties
       .table_borders
@@ -2376,6 +2405,7 @@ fn table_row_model(
           table_cell_model(
             cell,
             context,
+            row.table_property_exceptions.as_deref(),
             table_cell_style_for(
               context.table_style,
               TableCellStyleContext {
@@ -2476,9 +2506,15 @@ fn table_cell_style_for(
 fn table_cell_model(
   cell: &w::TableCell,
   context: &mut TableImportContext<'_>,
+  row_table_exceptions: Option<&w::TablePropertyExceptions>,
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
+  let base_margins = style.margins.unwrap_or(context.cell_margins);
+  let row_cell_margins = row_table_exceptions
+    .and_then(|exceptions| exceptions.table_cell_margin_default.as_deref())
+    .map(|margins| table_cell_margin_default_with_base(margins, base_margins))
+    .unwrap_or(base_margins);
   let mut blocks = cell
     .table_cell_choice
     .iter()
@@ -2503,12 +2539,18 @@ fn table_cell_model(
         }
         w::TableCellChoice::WTbl(table) => blocks.push(Block::Table(table_model(
           table,
-          context.styles,
-          context.numbering,
-          context.images,
-          context.hyperlinks,
-          context.custom_xml_bindings,
-          context.form_widget_ids,
+          &mut TableModelEnv {
+            styles: context.styles,
+            numbering: context.numbering,
+            images: context.images,
+            hyperlinks: context.hyperlinks,
+            custom_xml_bindings: context.custom_xml_bindings,
+            form_widget_ids: context.form_widget_ids,
+          },
+          TableModelContext {
+            nested_table_level: 2,
+            in_header_footer: false,
+          },
         ))),
         _ => {}
       }
@@ -2529,9 +2571,8 @@ fn table_cell_model(
       .unwrap_or(style.borders),
     margins: properties
       .and_then(|properties| properties.table_cell_margin.as_deref())
-      .map(|margins| table_cell_margin(margins, context.cell_margins))
-      .or(style.margins)
-      .unwrap_or(context.cell_margins),
+      .map(|margins| table_cell_margin(margins, row_cell_margins))
+      .unwrap_or(row_cell_margins),
     preferred_width_pt: properties
       .and_then(|properties| properties.table_cell_width.as_ref())
       .and_then(table_cell_width_to_points),
@@ -2626,7 +2667,13 @@ fn table_cell_conditional_style(
 }
 
 fn table_cell_margin_default(margins: &w::TableCellMarginDefault) -> CellMargins {
-  let mut model = CellMargins::default();
+  table_cell_margin_default_with_base(margins, CellMargins::default())
+}
+
+fn table_cell_margin_default_with_base(
+  margins: &w::TableCellMarginDefault,
+  mut model: CellMargins,
+) -> CellMargins {
   if let Some(top) = &margins.top_margin
     && let Some(value) = margin_width_to_points(top.width.as_ref(), top.r#type)
   {
@@ -8447,12 +8494,18 @@ fn textbox_blocks_with_base(
       w::TextBoxContentChoice::WTbl(table) => {
         let mut table = table_model(
           table,
-          styles,
-          &mut numbering,
-          images,
-          hyperlinks,
-          &custom_xml_bindings,
-          &mut form_widget_ids,
+          &mut TableModelEnv {
+            styles,
+            numbering: &mut numbering,
+            images,
+            hyperlinks,
+            custom_xml_bindings: &custom_xml_bindings,
+            form_widget_ids: &mut form_widget_ids,
+          },
+          TableModelContext {
+            nested_table_level: 1,
+            in_header_footer: false,
+          },
         );
         clear_shape_text_table_placements(&mut table);
         blocks.push(Block::Table(table));
@@ -9353,6 +9406,21 @@ struct TableImportContext<'a> {
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
   row_count: usize,
+}
+
+#[derive(Clone, Copy)]
+struct TableModelContext {
+  nested_table_level: usize,
+  in_header_footer: bool,
+}
+
+struct TableModelEnv<'a> {
+  styles: &'a StylesCatalog,
+  numbering: &'a mut NumberingCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
 }
 
 impl StylesCatalog {
@@ -12213,7 +12281,7 @@ mod tests {
       row_count: 1,
     };
 
-    let cell = table_cell_model(&cell, &mut context, style);
+    let cell = table_cell_model(&cell, &mut context, None, style);
 
     let Block::Paragraph(paragraph) = &cell.blocks[0] else {
       panic!("expected paragraph");

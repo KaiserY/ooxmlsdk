@@ -79,6 +79,7 @@ pub(crate) fn extract(
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
+  let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let mirror_margins = mirror_margins(package, &main);
   let document = main.root_element(package)?;
   let page_background = document
@@ -184,6 +185,7 @@ pub(crate) fn extract(
     page,
     default_tab_stop_pt,
     even_and_odd_headers,
+    split_page_break_and_paragraph_mark,
     form_widgets,
     sections,
     header_blocks,
@@ -198,6 +200,23 @@ pub(crate) fn extract(
     title_page,
     blocks,
   })
+}
+
+fn split_page_break_and_paragraph_mark(
+  package: &mut WordprocessingDocument,
+  main: &MainDocumentPart,
+) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .w_compat
+        .as_ref()
+        .and_then(|compat| compat.split_page_break_and_paragraph_mark.as_ref())
+        .map(|setting| setting.val.is_none_or(|value| value.as_bool()))
+    })
+    .unwrap_or(false)
 }
 
 fn default_tab_stop_pt(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> f32 {
@@ -7714,6 +7733,7 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
 fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineShape> {
   vml_inline_shape(
     rectangle.style.as_deref(),
+    vml_allow_in_cell(rectangle.allow_in_cell),
     rectangle.fill_color.as_deref(),
     vml_rectangle_fill_image(rectangle, images),
     rectangle.stroke_color.as_deref(),
@@ -7727,6 +7747,7 @@ fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<Inli
   let stroked = round_rectangle.stroked.is_none_or(|value| value.as_bool());
   vml_inline_shape(
     round_rectangle.style.as_deref(),
+    vml_allow_in_cell(round_rectangle.allow_in_cell),
     filled
       .then_some(round_rectangle.fill_color.as_deref())
       .flatten(),
@@ -7747,6 +7768,7 @@ fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShap
   let stroked = shape.stroked.is_none_or(|value| value.as_bool());
   vml_inline_shape(
     shape.style.as_deref(),
+    vml_allow_in_cell(shape.allow_in_cell),
     shape.fill_color.as_deref(),
     vml_shape_fill_image(shape, images),
     shape
@@ -7825,7 +7847,8 @@ fn vml_polyline_shape(polyline: &v::PolyLine) -> Option<InlineShape> {
   if fill_color.is_none() && stroke.is_none() {
     return None;
   }
-  let style = vml_image_style(polyline.style.as_deref());
+  let mut style = vml_image_style(polyline.style.as_deref());
+  style.layout_in_cell = vml_allow_in_cell(polyline.allow_in_cell);
   Some(InlineShape {
     width_pt,
     height_pt,
@@ -7898,6 +7921,7 @@ fn vml_fill_image(
 
 fn vml_inline_shape(
   style: Option<&str>,
+  layout_in_cell: bool,
   fill_color: Option<&str>,
   fill_image: Option<InlineShapeImageFill>,
   stroke_color: Option<&str>,
@@ -7908,7 +7932,8 @@ fn vml_inline_shape(
     return None;
   }
 
-  let style = vml_image_style(style);
+  let mut style = vml_image_style(style);
+  style.layout_in_cell = layout_in_cell;
   let (width_pt, height_pt) = style.size_pt?;
   let fill_color = fill_color.and_then(parse_vml_color);
   let stroke = stroke_color
@@ -7955,6 +7980,7 @@ fn vml_inline_shape(
 
 fn vml_textbox_frame(
   shape_style: Option<&str>,
+  layout_in_cell: bool,
   textbox: &v::TextBox,
   styles: &StylesCatalog,
   images: &ImageCatalog,
@@ -7967,7 +7993,8 @@ fn vml_textbox_frame(
   let Some(v::TextBoxChoice::WTxbxContent(content)) = textbox.text_box_choice.as_ref() else {
     return None;
   };
-  let style = vml_image_style(shape_style);
+  let mut style = vml_image_style(shape_style);
+  style.layout_in_cell = layout_in_cell;
   let (shape_width_pt, shape_height_pt) = style.size_pt?;
   let mut frame = TextBoxFrameContent::new(textbox_blocks(content, styles, images, hyperlinks));
   apply_vml_textbox_properties(textbox, &mut frame);
@@ -8315,6 +8342,7 @@ fn image_file_image(image: &v::ImageFile, images: &ImageCatalog) -> Option<Inlin
       v::ImageFileChoice::VImagedata(data) => vml_image_data(
         data,
         image.style.as_deref(),
+        vml_allow_in_cell(image.allow_in_cell),
         image.alternate.clone(),
         images,
       ),
@@ -8338,7 +8366,14 @@ fn push_image_file_textboxes(
 
   for choice in &image.image_file_choice {
     if let v::ImageFileChoice::VTextbox(textbox) = choice {
-      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
+      if let Some(frame) = vml_textbox_frame(
+        style,
+        vml_allow_in_cell(image.allow_in_cell),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -8366,6 +8401,7 @@ fn rectangle_image(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<In
       v::RectangleChoice::VImagedata(data) => vml_image_data(
         data,
         rectangle.style.as_deref(),
+        vml_allow_in_cell(rectangle.allow_in_cell),
         rectangle.alternate.clone(),
         images,
       ),
@@ -8389,7 +8425,14 @@ fn push_rectangle_textboxes(
 
   for choice in &rectangle.rectangle_choice {
     if let v::RectangleChoice::VTextbox(textbox) = choice {
-      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
+      if let Some(frame) = vml_textbox_frame(
+        style,
+        vml_allow_in_cell(rectangle.allow_in_cell),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -8421,7 +8464,14 @@ fn push_round_rectangle_textboxes(
 
   for choice in &round_rectangle.round_rectangle_choice {
     if let v::RoundRectangleChoice::VTextbox(textbox) = choice {
-      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
+      if let Some(frame) = vml_textbox_frame(
+        style,
+        vml_allow_in_cell(round_rectangle.allow_in_cell),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -8446,6 +8496,7 @@ fn shape_image(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineImage> {
     v::ShapeChoice::VImagedata(data) => vml_image_data(
       data,
       shape.style.as_deref(),
+      vml_allow_in_cell(shape.allow_in_cell),
       shape.alternate.clone(),
       images,
     ),
@@ -8469,7 +8520,14 @@ fn push_shape_textboxes(
 
   for choice in &shape.shape_choice {
     if let v::ShapeChoice::VTextbox(textbox) = choice {
-      if let Some(frame) = vml_textbox_frame(style, textbox, styles, images, hyperlinks) {
+      if let Some(frame) = vml_textbox_frame(
+        style,
+        vml_allow_in_cell(shape.allow_in_cell),
+        textbox,
+        styles,
+        images,
+        hyperlinks,
+      ) {
         inlines.push(InlineItem::Shape(frame));
       } else {
         push_vml_textbox(
@@ -8678,12 +8736,14 @@ fn push_table_text(table: &Table, inlines: &mut Vec<InlineItem>, style: TextStyl
 fn vml_image_data(
   data: &v::ImageData,
   style: Option<&str>,
+  layout_in_cell: bool,
   alt_text: Option<String>,
   images: &ImageCatalog,
 ) -> Option<InlineImage> {
   let relationship_id = data.relationship_id.as_ref().or(data.rel_id.as_ref())?;
   let resource = images.by_relationship_id.get(relationship_id)?;
-  let style = vml_image_style(style);
+  let mut style = vml_image_style(style);
+  style.layout_in_cell = layout_in_cell;
   let (width_pt, height_pt) = style.size_pt.unwrap_or((72.0, 72.0));
 
   Some(InlineImage {
@@ -8719,6 +8779,7 @@ struct VmlImageStyle {
   vertical_offset_pt: f32,
   wrap: ImageWrapMode,
   behind_text: bool,
+  layout_in_cell: bool,
   margin_top_pt: f32,
   margin_right_pt: f32,
   margin_bottom_pt: f32,
@@ -8811,6 +8872,7 @@ impl Default for VmlImageStyle {
       vertical_offset_pt: 0.0,
       wrap: ImageWrapMode::Square,
       behind_text: false,
+      layout_in_cell: true,
       margin_top_pt: 0.0,
       margin_right_pt: 0.0,
       margin_bottom_pt: 0.0,
@@ -8832,7 +8894,7 @@ impl VmlImageStyle {
         wrap: self.wrap,
         wrap_side: ImageWrapSide::BothSides,
         behind_text: self.behind_text,
-        layout_in_cell: true,
+        layout_in_cell: self.layout_in_cell,
         allow_overlap: true,
         relative_height: 0,
         relative_width_to: None,
@@ -8953,6 +9015,10 @@ fn vml_image_style(style: Option<&str>) -> VmlImageStyle {
 
   output.size_pt = width.zip(height);
   output
+}
+
+fn vml_allow_in_cell(value: Option<ooxmlsdk::simple_type::TrueFalseValue>) -> bool {
+  value.is_none_or(|value| value.as_bool())
 }
 
 fn vml_horizontal_reference(value: &str) -> HorizontalImageReference {
@@ -12453,6 +12519,7 @@ mod tests {
       table_style: &TableStyleModel::default(),
       table_look: TableLookModel::default(),
       row_count: 1,
+      nested_table_level: 1,
     };
 
     let cell = table_cell_model(&cell, &mut context, None, style);

@@ -10,6 +10,7 @@ pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub default_tab_stop_pt: f32,
   pub even_and_odd_headers: bool,
+  pub split_page_break_and_paragraph_mark: bool,
   pub form_widgets: Vec<FormWidget>,
   pub sections: Vec<ImportedSection>,
   pub header_blocks: Vec<Block>,

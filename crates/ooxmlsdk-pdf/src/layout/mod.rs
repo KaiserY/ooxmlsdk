@@ -84,7 +84,7 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
-    .unwrap_or_default()
+    .unwrap_or_else(|| paragraph.base_style.clone())
 }
 
 fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &TextStyle) -> f32 {
@@ -106,7 +106,8 @@ fn word_auto_line_height(style: &TextStyle) -> f32 {
 }
 
 fn libreoffice_empty_paragraph_first_line_height(style: &TextStyle) -> f32 {
-  // Source: LibreOffice sw/qa/extras/ooxmlimport/ooxmlimport.cxx testTdf105143.
+  // Source: LibreOffice keeps VML/text anchor offsets based on an empty-paragraph
+  // first-line box that is taller than the default 115% auto line height.
   style.font_size_pt * LO_EMPTY_PARAGRAPH_FIRST_LINE_HEIGHT_PER_FONT_SIZE
 }
 
@@ -2281,7 +2282,11 @@ fn materialize_pending_floating_table_follows_in_local_pages(
   current: &mut Page,
   pages: &mut Vec<Page>,
 ) {
-  let replacement = empty_section_page(current.setup, current.section_index, current.section_page_index);
+  let replacement = empty_section_page(
+    current.setup,
+    current.section_index,
+    current.section_page_index,
+  );
   let mut all_pages = std::mem::take(pages);
   all_pages.push(std::mem::replace(current, replacement));
   materialize_pending_floating_table_follows(&mut all_pages);
@@ -2719,6 +2724,35 @@ fn page_items_bounds(items: &[PageItem]) -> Option<(f32, f32, f32, f32)> {
   bounds
 }
 
+fn item_vertical_bounds(item: &PageItem) -> (f32, f32) {
+  match item {
+    PageItem::Text(text) => (text.y_pt, text.y_pt + text.line_height_pt),
+    PageItem::Image(image) => (image.y_pt, image.y_pt + image.height_pt),
+    PageItem::Rect(rect) => (rect.y_pt, rect.y_pt + rect.height_pt),
+    PageItem::Fill(fill) => (fill.y_pt, fill.y_pt + fill.height_pt),
+    PageItem::Line(line) => {
+      let half_width = line.width_pt / 2.0;
+      (
+        line.y1_pt.min(line.y2_pt) - half_width,
+        line.y1_pt.max(line.y2_pt) + half_width,
+      )
+    }
+    PageItem::Polyline(polyline) => (polyline.y_pt, polyline.y_pt + polyline.height_pt),
+  }
+}
+
+fn page_items_vertical_bounds(items: &[PageItem]) -> Option<(f32, f32)> {
+  let mut bounds: Option<(f32, f32)> = None;
+  for item in items {
+    let (top, bottom) = item_vertical_bounds(item);
+    bounds = Some(match bounds {
+      Some((current_top, current_bottom)) => (current_top.min(top), current_bottom.max(bottom)),
+      None => (top, bottom),
+    });
+  }
+  bounds
+}
+
 fn layout_follow_reason_for_block(block: &Block) -> FollowReason {
   let Block::Paragraph(paragraph) = block else {
     return FollowReason::Overflow;
@@ -2996,25 +3030,41 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
     (flow.content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
       .max(DEFAULT_FONT_SIZE_PT);
   let base_line_style = paragraph_base_line_style(paragraph);
-  let line_height = paragraph_line_height(paragraph, &base_line_style);
-  let mut line_count = 1usize;
+  let base_line_height = paragraph_line_height(paragraph, &base_line_style);
+  let text_frame = TextFrame {
+    default_line_left: 0.0,
+    first_line_left: 0.0,
+    default_line_right: content_width,
+    paragraph_left: 0.0,
+    base_line_height,
+    line_height_rule: paragraph.format.line_height_rule,
+  };
+  let mut line_height = base_line_height;
+  let mut content_height = 0.0;
   let mut x = (paragraph.format.first_line_indent_pt).max(0.0);
+  let finish_line = |content_height: &mut f32, line_height: &mut f32| {
+    *content_height += line_real_height(paragraph, *line_height, false);
+    *line_height = base_line_height;
+  };
 
   for item in &paragraph.inlines {
     match item {
       InlineItem::Text(run) => {
         for segment in text_segments(&run.text) {
           if segment == "\n" || segment == "\t" {
-            line_count += 1;
+            finish_line(&mut content_height, &mut line_height);
             x = 0.0;
             continue;
           }
           let width = measure_text(&segment, &run.style);
           if x + width > content_width && x > 0.0 {
-            line_count += 1;
+            finish_line(&mut content_height, &mut line_height);
             x = 0.0;
           }
           x += width.min(content_width);
+          if segment_affects_line_height(&segment) {
+            line_height = include_text_height(line_height, text_frame, &run.style);
+          }
         }
       }
       InlineItem::Image(image) => {
@@ -3024,30 +3074,31 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
           content_width,
         );
         if x + width > content_width && x > 0.0 {
-          line_count += 1;
+          finish_line(&mut content_height, &mut line_height);
         }
-        line_count += (height / line_height).ceil().max(1.0) as usize - 1;
+        line_height = line_height.max(height.min(base_line_height));
         x = width;
       }
       InlineItem::Shape(shape) => {
         if x + shape.width_pt > content_width && x > 0.0 {
-          line_count += 1;
+          finish_line(&mut content_height, &mut line_height);
         }
-        line_count += (shape.height_pt / line_height).ceil().max(1.0) as usize - 1;
+        line_height = line_height.max(shape.height_pt);
         x = shape.width_pt;
       }
       InlineItem::FormWidgetStart(_)
       | InlineItem::FormWidgetEnd(_)
       | InlineItem::LastRenderedPageBreak => {}
       InlineItem::PageBreak | InlineItem::ColumnBreak => {
-        line_count += 1;
+        finish_line(&mut content_height, &mut line_height);
         x = 0.0;
       }
     }
   }
+  finish_line(&mut content_height, &mut line_height);
 
   paragraph.format.spacing_before_pt
-    + line_count as f32 * line_height
+    + content_height
     + paragraph
       .format
       .spacing_after_pt
@@ -3084,7 +3135,8 @@ fn paragraph_spacing_before(
       flow.text_segmentation,
       TextSegmentation::Body | TextSegmentation::RepeatingSlot
     )
-    && flow.section_index == 0
+    && flow.section_page_index > 0
+    && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
   {
     return 0.0;
   }
@@ -3131,7 +3183,12 @@ fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Parag
 }
 
 fn segment_affects_line_height(text: &str) -> bool {
-  !text.is_empty() && !text.chars().all(|ch| ch == ' ' || ch == '\t')
+  !text.is_empty() && !text.chars().all(libreoffice_ignored_line_height_blank)
+}
+
+fn libreoffice_ignored_line_height_blank(ch: char) -> bool {
+  // Source: LibreOffice sw/source/core/text/porlay.cxx lcl_HasOnlyBlanks().
+  matches!(ch, ' ' | '\u{2002}' | '\u{2003}' | '\u{2005}' | '\u{3000}')
 }
 
 fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
@@ -4522,7 +4579,7 @@ fn layout_floating_table(
       if page_index == 0 {
         frame_y
       } else {
-        page_items_bounds(&page.items).map_or(flow.content_top_pt, |(_, top, _, _)| top)
+        page_items_vertical_bounds(&page.items).map_or(flow.content_top_pt, |(top, _)| top)
       },
       if page_index + 1 == total_frame_pages {
         Some(bottom_y)
@@ -4531,9 +4588,9 @@ fn layout_floating_table(
       },
     );
   }
-  let first_page_bottom = frame_pages.first().and_then(|page| {
-    page_items_bounds(&page.items).map(|(_, _, _, bottom)| bottom)
-  });
+  let first_page_bottom = frame_pages
+    .first()
+    .and_then(|page| page_items_vertical_bounds(&page.items).map(|(_, bottom)| bottom));
   if let Some(first_page) = frame_pages.first_mut() {
     append_floating_table_wrap_exclusion(first_page, placement);
     let item_offset = current.items.len();
@@ -4609,12 +4666,10 @@ fn decorate_floating_table_page_bounds(
   default_top_pt: f32,
   default_bottom_pt: Option<f32>,
 ) {
-  let (top_pt, bottom_pt) = page_items_bounds(&page.items)
-    .map(|(_, top, _, bottom)| (top, bottom))
-    .unwrap_or_else(|| {
-      let bottom = default_bottom_pt.unwrap_or(default_top_pt + DEFAULT_LINE_HEIGHT_PT);
-      (default_top_pt, bottom)
-    });
+  let (top_pt, bottom_pt) = page_items_vertical_bounds(&page.items).unwrap_or_else(|| {
+    let bottom = default_bottom_pt.unwrap_or(default_top_pt + DEFAULT_LINE_HEIGHT_PT);
+    (default_top_pt, bottom)
+  });
   page.items.insert(
     0,
     PageItem::Rect(RectItem {
@@ -4752,6 +4807,11 @@ fn flatten_nested_pages(
   items
 }
 
+fn ordered_local_pages(first_page: Page, mut discarded_pages: Vec<Page>) -> Vec<Page> {
+  discarded_pages.push(first_page);
+  discarded_pages
+}
+
 #[derive(Clone, Debug)]
 struct TableFrameLayout<'a> {
   table: &'a Table,
@@ -4785,11 +4845,12 @@ impl<'a> TableFrameLayout<'a> {
     let full_width_horizontal_borders =
       allow_width_overflow || table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let repeating_header_count = table_repeating_header_count(table);
-    let repeating_header_height =
-      table_repeating_header_height(table, repeating_header_count, &column_widths);
     let coalesce_row_shading = table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let split_allowed = table_split_allowed(table);
-    let total_height = table_total_height_with_widths(table, &column_widths);
+    let row_heights = table_row_heights_with_widths(table, &column_widths);
+    let repeating_header_height =
+      table_repeating_header_height_from_row_heights(table, repeating_header_count, &row_heights);
+    let total_height = table_total_height_from_row_heights(table, &row_heights);
 
     Some(Self {
       table,
@@ -4801,6 +4862,7 @@ impl<'a> TableFrameLayout<'a> {
         full_width_horizontal_borders,
         coalesce_row_shading,
         split_allowed,
+        row_heights,
         repeating_header_count,
         repeating_header_height,
         total_height,
@@ -4820,13 +4882,46 @@ impl<'a> TableFrameLayout<'a> {
         layout = next_layout;
       }
     }
+    let table_row_keep = layout.table_row_keep_enabled();
+    let allow_split_of_keep_row = table_row_keep
+      && layout.are_all_body_rows_keep_with_next()
+      && y <= layout.frame.block.content_top_pt + LAYOUT_EPSILON_PT;
     let mut rows_moved_to_follow = HashSet::new();
     let mut left_border_segment = None;
     let mut right_border_segment = None;
-    for (row_index, row) in self.table.rows.iter().enumerate() {
+    let mut row_index = 0usize;
+    while row_index < self.table.rows.len() {
+      let problem_row_index =
+        layout.first_problem_row_index(row_index, y, table_row_keep, allow_split_of_keep_row);
+      let format_until = problem_row_index.unwrap_or(self.table.rows.len());
+      while row_index < format_until {
+        let row = &self.table.rows[row_index];
+        let row_frame = layout.row_frame(row, row_index, y);
+        let row_top = y;
+        y = row_frame.format(current, pages);
+        extend_border_segment(
+          current,
+          &mut left_border_segment,
+          row_frame.leading_border_segment(row_top, y),
+        );
+        extend_border_segment(
+          current,
+          &mut right_border_segment,
+          row_frame.trailing_border_segment(row_top, y),
+        );
+        row_index += 1;
+        if row_index < self.table.rows.len() {
+          y += row_cell_spacing_pt(self.table, row);
+        }
+      }
+      if row_index >= self.table.rows.len() {
+        break;
+      }
+
+      let row = &self.table.rows[row_index];
       let mut row_frame = layout.row_frame(row, row_index, y);
       let row_height = row_frame.height_pt;
-      if layout.should_split_row(&row_frame, current) {
+      if layout.should_split_row(&row_frame, table_row_keep, allow_split_of_keep_row) {
         let mut remaining_height = row_height;
         let mut content_offset = 0.0;
         while remaining_height > LAYOUT_EPSILON_PT {
@@ -4883,47 +4978,158 @@ impl<'a> TableFrameLayout<'a> {
             y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
           }
         }
+        row_index += 1;
+        if row_index < self.table.rows.len() {
+          y += row_cell_spacing_pt(self.table, row);
+        }
         continue;
       }
 
-      let move_to_follow = layout.should_move_row_to_follow(
-        &row_frame,
-        current,
-        rows_moved_to_follow.contains(&row_index),
-      );
-      if move_to_follow {
-        rows_moved_to_follow.insert(row_index);
-        flush_border_segment(current, &mut left_border_segment);
-        flush_border_segment(current, &mut right_border_segment);
-        (flow, y) = advance_section_flow(flow, current, pages);
-        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
-          layout = next_layout;
+      let already_moved = rows_moved_to_follow.contains(&row_index);
+      if !layout.should_move_row_to_follow(&row_frame, already_moved) {
+        let row_top = y;
+        y = row_frame.format(current, pages);
+        extend_border_segment(
+          current,
+          &mut left_border_segment,
+          row_frame.leading_border_segment(row_top, y),
+        );
+        extend_border_segment(
+          current,
+          &mut right_border_segment,
+          row_frame.trailing_border_segment(row_top, y),
+        );
+        row_index += 1;
+        if row_index < self.table.rows.len() {
+          y += row_cell_spacing_pt(self.table, row);
         }
-        y = layout.format_repeated_header_rows(current, pages, y, row_height);
-        row_frame = layout.row_frame(row, row_index, y);
+        continue;
       }
 
-      let row_top = y;
-      y = row_frame.format(current, pages);
-      extend_border_segment(
-        current,
-        &mut left_border_segment,
-        row_frame.leading_border_segment(row_top, y),
-      );
-      extend_border_segment(
-        current,
-        &mut right_border_segment,
-        row_frame.trailing_border_segment(row_top, y),
-      );
-      if row_index + 1 < self.table.rows.len() {
-        y += row_cell_spacing_pt(self.table, row);
+      flush_border_segment(current, &mut left_border_segment);
+      flush_border_segment(current, &mut right_border_segment);
+      rows_moved_to_follow.insert(row_index);
+      (flow, y) = advance_section_flow(flow, current, pages);
+      if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+        layout = next_layout;
       }
+      y = layout.format_repeated_header_rows(
+        current,
+        pages,
+        y,
+        layout.follow_page_required_height(row_index, y),
+      );
     }
 
     flush_border_segment(current, &mut left_border_segment);
     flush_border_segment(current, &mut right_border_segment);
 
     (flow, y + TABLE_SPACING_AFTER_PT)
+  }
+
+  fn first_problem_row_index(
+    &self,
+    start_row_index: usize,
+    y: f32,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
+  ) -> Option<usize> {
+    if let Some(problem_row_index) =
+      self.page_start_problem_row_index(start_row_index, y, table_row_keep, allow_split_of_keep_row)
+    {
+      return Some(self.adjust_problem_row_index_for_keep_with_next(
+        problem_row_index,
+        start_row_index,
+        table_row_keep,
+        allow_split_of_keep_row,
+      ));
+    }
+    let mut current_y = y;
+    for row_index in start_row_index..self.table.rows.len() {
+      if self.should_move_keep_with_next_chain_to_follow(
+        row_index,
+        current_y,
+        table_row_keep,
+        allow_split_of_keep_row,
+      ) {
+        return Some(self.adjust_problem_row_index_for_keep_with_next(
+          row_index,
+          start_row_index,
+          table_row_keep,
+          allow_split_of_keep_row,
+        ));
+      }
+      let row = &self.table.rows[row_index];
+      let row_frame = self.row_frame(row, row_index, current_y);
+      if row_frame.bottom() > self.frame.block.content_bottom + LAYOUT_EPSILON_PT {
+        return Some(self.adjust_problem_row_index_for_keep_with_next(
+          row_index,
+          start_row_index,
+          table_row_keep,
+          allow_split_of_keep_row,
+        ));
+      }
+      current_y = row_frame.bottom();
+      if row_index + 1 < self.table.rows.len() {
+        current_y += row_cell_spacing_pt(self.table, row);
+      }
+    }
+    None
+  }
+
+  fn adjust_problem_row_index_for_keep_with_next(
+    &self,
+    mut row_index: usize,
+    start_row_index: usize,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
+  ) -> usize {
+    if !table_row_keep || allow_split_of_keep_row {
+      return row_index;
+    }
+    let floor = start_row_index.max(self.frame.repeating_header_count);
+    while row_index > floor && self.table.rows[row_index - 1].keep_with_next {
+      row_index -= 1;
+    }
+    row_index
+  }
+
+  fn page_start_problem_row_index(
+    &self,
+    start_row_index: usize,
+    y: f32,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
+  ) -> Option<usize> {
+    if !table_row_keep || allow_split_of_keep_row {
+      return None;
+    }
+    if y > self.frame.block.content_top_pt + LAYOUT_EPSILON_PT {
+      return None;
+    }
+    let first_body_row_index = start_row_index.max(self.frame.repeating_header_count);
+    let Some(first_body_row) = self.table.rows.get(first_body_row_index) else {
+      return None;
+    };
+    let required_bottom = self.keep_with_next_chain_bottom(first_body_row_index, y);
+    if required_bottom <= self.frame.block.content_bottom + LAYOUT_EPSILON_PT {
+      return None;
+    }
+    let first_body_row_frame = self.row_frame(first_body_row, first_body_row_index, y);
+    if self.should_split_row(
+      &first_body_row_frame,
+      table_row_keep,
+      allow_split_of_keep_row,
+    ) {
+      return None;
+    }
+    if self.frame.repeating_header_count > 0
+      && start_row_index <= self.frame.repeating_header_count
+      && first_body_row_index + 1 < self.table.rows.len()
+    {
+      return Some(first_body_row_index + 1);
+    }
+    None
   }
 
   fn row_frame(&self, row: &'a TableRow, row_index: usize, y: f32) -> RowFrame<'a, '_> {
@@ -4933,23 +5139,61 @@ impl<'a> TableFrameLayout<'a> {
       row,
       row_index,
       y,
-      height_pt: table_row_height_with_widths(
-        self.table,
-        row_index,
-        row,
-        &self.frame.column_widths,
-      ),
+      height_pt: self
+        .frame
+        .row_heights
+        .get(row_index)
+        .copied()
+        .unwrap_or_else(|| {
+          table_row_height_with_widths(self.table, row_index, row, &self.frame.column_widths)
+        }),
     }
   }
 
-  fn should_move_row_to_follow(
+  fn should_move_keep_with_next_chain_to_follow(
     &self,
-    row: &RowFrame<'_, '_>,
-    current: &Page,
-    already_moved: bool,
+    row_index: usize,
+    y: f32,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
   ) -> bool {
-    let _ = current;
+    if row_index + 1 >= self.table.rows.len()
+      || !table_row_keep
+      || allow_split_of_keep_row
+      || !self.table.rows[row_index].keep_with_next
+      || y <= self.frame.block.content_top_pt + LAYOUT_EPSILON_PT
+    {
+      return false;
+    }
+    self.keep_with_next_chain_bottom(row_index, y)
+      > self.frame.block.content_bottom + LAYOUT_EPSILON_PT
+  }
+
+  fn keep_with_next_chain_bottom(&self, row_index: usize, y: f32) -> f32 {
+    let mut current_y = y;
+    let mut bottom = y;
+    let mut current_row_index = row_index;
+    while let Some(row) = self.table.rows.get(current_row_index) {
+      let row_frame = self.row_frame(row, current_row_index, current_y);
+      bottom = row_frame.bottom();
+      if !row.keep_with_next || current_row_index + 1 >= self.table.rows.len() {
+        break;
+      }
+      current_y = bottom + row_cell_spacing_pt(self.table, row);
+      current_row_index += 1;
+    }
+    bottom
+  }
+
+  fn follow_page_required_height(&self, row_index: usize, y: f32) -> f32 {
+    (self.keep_with_next_chain_bottom(row_index, y) - y).max(0.0)
+  }
+
+  fn should_move_row_to_follow(&self, row: &RowFrame<'_, '_>, already_moved: bool) -> bool {
     if already_moved || row.bottom() <= self.frame.block.content_bottom {
+      return false;
+    }
+    if self.is_first_non_header_row(row.row_index) {
       return false;
     }
 
@@ -4958,15 +5202,46 @@ impl<'a> TableFrameLayout<'a> {
       || row.y > self.frame.block.content_top_pt + LAYOUT_EPSILON_PT
   }
 
-  fn should_split_row(&self, row: &RowFrame<'_, '_>, current: &Page) -> bool {
-    let _ = current;
+  fn is_first_non_header_row(&self, row_index: usize) -> bool {
+    row_index == self.frame.repeating_header_count
+  }
+
+  fn should_split_row(
+    &self,
+    row: &RowFrame<'_, '_>,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
+  ) -> bool {
     let row_split_allowed = !row.row.cant_split || !row.fits_empty_body_region();
     row_split_allowed
       && !row.row.exact_height
       && !row_repeat_header_effective(self.table, row.row_index)
       && !row_has_vertical_merge_context(self.table, row.row_index)
+      && (!table_row_keep || !row.row.keep_with_next || allow_split_of_keep_row)
       && row.bottom() > self.frame.block.content_bottom
       && row.y < self.frame.block.content_bottom
+  }
+
+  fn table_row_keep_enabled(&self) -> bool {
+    self.table.split_allowed && self.table.placement.is_none()
+  }
+
+  fn are_all_body_rows_keep_with_next(&self) -> bool {
+    let mut row_index = self.frame.repeating_header_count;
+    let Some(row) = self.table.rows.get(row_index) else {
+      return false;
+    };
+    if !row.keep_with_next {
+      return false;
+    }
+    row_index += 1;
+    while let Some(row) = self.table.rows.get(row_index) {
+      if !row.keep_with_next {
+        return false;
+      }
+      row_index += 1;
+    }
+    true
   }
 
   fn format_repeated_header_rows(
@@ -4989,7 +5264,9 @@ impl<'a> TableFrameLayout<'a> {
       .take(self.frame.repeating_header_count)
       .enumerate()
     {
-      y = self.row_frame(header, header_index, y).format(current, pages);
+      y = self
+        .row_frame(header, header_index, y)
+        .format(current, pages);
       if header_index + 1 < self.frame.repeating_header_count || row_height > 0.0 {
         y += row_cell_spacing_pt(self.table, header);
       }
@@ -5061,6 +5338,7 @@ struct TableFrame {
   full_width_horizontal_borders: bool,
   coalesce_row_shading: bool,
   split_allowed: bool,
+  row_heights: Vec<f32>,
   repeating_header_count: usize,
   repeating_header_height: f32,
   total_height: f32,
@@ -5711,10 +5989,10 @@ fn table_disables_repeating_headers(table: &Table, repeating_header_count: usize
   repeating_header_count == table.rows.len() && table.rows.len() > 1
 }
 
-fn table_repeating_header_height(
+fn table_repeating_header_height_from_row_heights(
   table: &Table,
   repeating_header_count: usize,
-  column_widths: &[f32],
+  row_heights: &[f32],
 ) -> f32 {
   table
     .rows
@@ -5722,7 +6000,10 @@ fn table_repeating_header_height(
     .enumerate()
     .take(repeating_header_count)
     .map(|(row_index, row)| {
-      table_row_height_with_widths(table, row_index, row, column_widths)
+      row_heights
+        .get(row_index)
+        .copied()
+        .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT)
         + row_cell_spacing_pt(table, row)
     })
     .sum()
@@ -5749,6 +6030,13 @@ fn cell_horizontal_border(
 ) -> Option<BorderStyle> {
   let borders = table.borders;
   if top_edge {
+    let table_border = borders.and_then(|borders| {
+      if row_index == 0 {
+        borders.top
+      } else {
+        borders.inside_horizontal
+      }
+    });
     stronger_border(
       cell.borders.top,
       row_index
@@ -5760,7 +6048,7 @@ fn cell_horizontal_border(
             .and_then(|row| row_cell_at_grid(row, grid_index))
             .and_then(|previous_cell| previous_cell.borders.bottom)
         })
-        .or_else(|| borders.and_then(|borders| borders.top)),
+        .or(table_border),
     )
   } else {
     let table_border = borders.and_then(|borders| {
@@ -5996,14 +6284,27 @@ fn table_left_position(
   }
 }
 
-fn table_row_height(table: &Table, row_index: usize, row: &TableRow) -> f32 {
-  table_row_height_with_widths(table, row_index, row, &[])
+fn table_total_height_with_widths(table: &Table, column_widths: &[f32]) -> f32 {
+  let row_heights = table_row_heights_with_widths(table, column_widths);
+  table_total_height_from_row_heights(table, &row_heights)
 }
 
-fn table_total_height_with_widths(table: &Table, column_widths: &[f32]) -> f32 {
+fn table_row_heights_with_widths(table: &Table, column_widths: &[f32]) -> Vec<f32> {
+  table
+    .rows
+    .iter()
+    .enumerate()
+    .map(|(row_index, row)| table_row_height_with_widths(table, row_index, row, column_widths))
+    .collect()
+}
+
+fn table_total_height_from_row_heights(table: &Table, row_heights: &[f32]) -> f32 {
   let mut height = 0.0;
   for (row_index, row) in table.rows.iter().enumerate() {
-    height += table_row_height_with_widths(table, row_index, row, column_widths);
+    height += row_heights
+      .get(row_index)
+      .copied()
+      .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT);
     if row_index + 1 < table.rows.len() {
       height += row_cell_spacing_pt(table, row);
     }
@@ -6032,9 +6333,15 @@ fn table_row_height_with_widths(
     }
   }
   match (row.height_pt, row.exact_height) {
-    (Some(height), true) => height + row_bottom_border_spacing_extent(table, row_index, row),
+    (Some(height), true) => {
+      height
+        + row_bottom_cell_margin_extent(row)
+        + row_bottom_border_spacing_extent(table, row_index, row)
+    }
     (Some(height), false) => content_height.max(
       height
+        + row_top_cell_margin_extent(row)
+        + row_bottom_cell_margin_extent(row)
         + row_top_border_space_extent(table, row_index, row)
         + row_bottom_border_spacing_extent(table, row_index, row),
     ),
@@ -6042,10 +6349,25 @@ fn table_row_height_with_widths(
   }
 }
 
+fn row_top_cell_margin_extent(row: &TableRow) -> f32 {
+  row
+    .cells
+    .iter()
+    .filter(|cell| !cell.vertical_merge_continue)
+    .map(|cell| cell.margins.top_pt)
+    .fold(0.0, f32::max)
+}
+
+fn row_bottom_cell_margin_extent(row: &TableRow) -> f32 {
+  row
+    .cells
+    .iter()
+    .filter(|cell| !cell.vertical_merge_continue)
+    .map(|cell| cell.margins.bottom_pt)
+    .fold(0.0, f32::max)
+}
+
 fn row_top_border_space_extent(table: &Table, row_index: usize, row: &TableRow) -> f32 {
-  if row_index != 0 && row_cell_spacing_pt(table, row) <= 0.0 {
-    return 0.0;
-  }
   let mut grid_index = row.grid_before;
   let mut extent: f32 = 0.0;
   for cell in &row.cells {
@@ -6148,7 +6470,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = inline_text_height(&first_line_style);
   let first_line_baseline_offset = baseline_offset_in_line(&first_line_style, first_line_height);
-  let split_fragment = content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
+  let split_fragment =
+    content_offset > LAYOUT_EPSILON_PT || content_height > height + LAYOUT_EPSILON_PT;
   let aligned_content_top = if split_fragment {
     y + cell.margins.top_pt
   } else {
@@ -6166,6 +6489,12 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let content_start_y = text_y;
   let text_left = x + cell.margins.left_pt;
   let text_bottom = y + height - cell.margins.bottom_pt;
+  let following_text_flow_bottom = following_text_flow_cell_bottom(current, text_bottom);
+  let flow_bottom = if split_fragment {
+    text_bottom
+  } else {
+    UNBOUNDED_LAYOUT_EXTENT_PT
+  };
   let flow = FlowContext {
     setup,
     section_index: current.section_index,
@@ -6174,8 +6503,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     columns: SectionColumns::default(),
     content_top_pt: text_y,
     content_left_pt: text_left,
-    content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
-    body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+    content_bottom: flow_bottom,
+    body_content_bottom_pt: flow_bottom,
     content_width,
     layout_cell_bounds: Some(FrameBounds {
       x_pt: x,
@@ -6197,7 +6526,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     )
   });
 
-  if has_following_text_flow_table && escape_following_text_flow_pages {
+  if has_following_text_flow_table && escape_following_text_flow_pages && !split_fragment {
     for (index, block) in cell.blocks.iter().enumerate() {
       let previous = index
         .checked_sub(1)
@@ -6206,8 +6535,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       let block_flow = match block {
         Block::Table(table) if table.placement.is_some() && table.following_text_flow => {
           FlowContext {
-            content_bottom: text_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
-            body_content_bottom_pt: text_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
+            content_bottom: following_text_flow_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
+            body_content_bottom_pt: following_text_flow_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
             ..flow
           }
         }
@@ -6231,8 +6560,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     let block_flow = match block {
       Block::Table(table) if table.placement.is_some() && table.following_text_flow => {
         FlowContext {
-          content_bottom: text_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
-          body_content_bottom_pt: text_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
+          content_bottom: following_text_flow_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
+          body_content_bottom_pt: following_text_flow_bottom.max(text_y + DEFAULT_LINE_HEIGHT_PT),
           ..flow
         }
       }
@@ -6251,11 +6580,48 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   }
   materialize_pending_floating_table_follows_in_local_pages(&mut nested_page, &mut discarded_pages);
 
+  if has_following_text_flow_table && !split_fragment {
+    let mut local_pages = ordered_local_pages(nested_page, discarded_pages).into_iter();
+    if let Some(first_page) = local_pages.next() {
+      current.items.extend(
+        first_page
+          .items
+          .into_iter()
+          .filter(|item| table_cell_item_intersects_vertical_bounds(item, y, text_bottom)),
+      );
+    }
+    for follow_page in local_pages {
+      if follow_page.items.is_empty() {
+        continue;
+      }
+      current
+        .pending_floating_table_follows
+        .push(PendingFloatingTableFollow {
+          setup: follow_page.setup,
+          section_index: follow_page.section_index,
+          section_page_index: follow_page.section_page_index,
+          items: follow_page.items,
+          frame_fragments: Vec::new(),
+          frame_influences: Vec::new(),
+          wrap_exclusions: follow_page.wrap_exclusions,
+        });
+    }
+    return;
+  }
+
   current.items.extend(
     flatten_nested_pages(nested_page, discarded_pages, content_start_y, text_bottom)
       .into_iter()
       .filter(|item| table_cell_item_intersects_vertical_bounds(item, y, text_bottom)),
   );
+}
+
+fn following_text_flow_cell_bottom(current: &Page, text_bottom: f32) -> f32 {
+  // Source: LibreOffice sw/source/core/layout/fly.cxx GetFlyAnchorBottom() and
+  // SwFlyFrame::Grow_(): split fly growth is limited by the current body
+  // deadline. A cell whose estimated height grows past the page bottom must
+  // still split the nested following-text-flow floating table on this page.
+  text_bottom.min(current.setup.height_pt - current.setup.margin_bottom_pt)
 }
 
 fn table_cell_first_line_style(cell: &TableCell) -> TextStyle {
@@ -7927,7 +8293,8 @@ impl<'a> TextFrameLayout<'a> {
             }
             if shape_has_invisible_auto_fit_textbox_bounds(shape) {
               // Source: LibreOffice keeps a Writer fly frame for textbox
-              // content even when the owning draw shape has no fill/stroke.
+              // content even when the owning draw shape has no fill/stroke,
+              // but that layout-only frame is not painted as a polypolygon.
               current.items.push(PageItem::Rect(RectItem {
                 x_pt,
                 y_pt,
@@ -7935,7 +8302,7 @@ impl<'a> TextFrameLayout<'a> {
                 height_pt,
                 fill_color: None,
                 fill_opacity: 1.0,
-                stroke: Some(BorderStyle::default()),
+                stroke: None,
                 stroke_opacity: 0.0,
               }));
             }
@@ -8865,6 +9232,7 @@ mod tests {
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
       #[cfg(test)]
       runs: Vec::new(),
       format: Box::new(ParagraphFormat {
@@ -8954,6 +9322,7 @@ mod tests {
       footnote_reference_ids: Vec::new(),
       endnote_reference_ids: Vec::new(),
       starts_after_last_rendered_page_break: false,
+      base_style: TextStyle::default(),
       #[cfg(test)]
       runs: vec![run],
       format: Box::new(ParagraphFormat::default()),
@@ -9047,6 +9416,7 @@ mod tests {
           height_pt: None,
           exact_height: false,
           repeat_header: false,
+          keep_with_next: false,
           cant_split: false,
           cell_spacing_pt: None,
           grid_before: 0,
@@ -9058,6 +9428,7 @@ mod tests {
           height_pt: None,
           exact_height: false,
           repeat_header: false,
+          keep_with_next: false,
           cant_split: false,
           cell_spacing_pt: None,
           grid_before: 0,
@@ -9069,6 +9440,7 @@ mod tests {
           height_pt: None,
           exact_height: false,
           repeat_header: false,
+          keep_with_next: false,
           cant_split: false,
           cell_spacing_pt: None,
           grid_before: 0,
@@ -9106,6 +9478,7 @@ mod tests {
         height_pt: Some(height_pt),
         exact_height: true,
         repeat_header: false,
+        keep_with_next: false,
         cant_split: false,
         cell_spacing_pt: spacing_pt,
         grid_before: 0,

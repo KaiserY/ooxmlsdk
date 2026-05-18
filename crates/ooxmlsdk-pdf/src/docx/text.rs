@@ -191,6 +191,7 @@ pub(super) fn paragraph_model_with_base<'a>(
     footnote_reference_ids,
     endnote_reference_ids,
     starts_after_last_rendered_page_break,
+    base_style: run_style,
     #[cfg(test)]
     runs,
     format: Box::new(format),

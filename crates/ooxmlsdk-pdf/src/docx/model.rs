@@ -105,6 +105,7 @@ pub(crate) struct Paragraph {
   pub footnote_reference_ids: Vec<i64>,
   pub endnote_reference_ids: Vec<i64>,
   pub starts_after_last_rendered_page_break: bool,
+  pub base_style: TextStyle,
   #[cfg(test)]
   pub runs: Vec<TextRun>,
   pub format: Box<ParagraphFormat>,
@@ -146,6 +147,7 @@ pub(crate) struct TableRow {
   pub height_pt: Option<f32>,
   pub exact_height: bool,
   pub repeat_header: bool,
+  pub keep_with_next: bool,
   pub cant_split: bool,
   pub cell_spacing_pt: Option<f32>,
   pub grid_before: usize,

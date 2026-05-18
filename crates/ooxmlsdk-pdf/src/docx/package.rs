@@ -14,6 +14,8 @@ use ooxmlsdk::sdk::SdkPart;
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
   pub(super) charts_by_relationship_id: HashMap<String, String>,
+  pub(super) diagram_data_by_relationship_id: HashMap<String, String>,
+  pub(super) diagram_drawings_by_relationship_id: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -62,6 +64,15 @@ impl ImageCatalog {
       Self::chart_parts(package, main.chart_parts(package), |chart_part| {
         main.get_id_of_part(package, chart_part)
       });
+    catalog.diagram_data_by_relationship_id =
+      Self::xml_parts(package, main.diagram_data_parts(package), |part| {
+        main.get_id_of_part(package, part)
+      });
+    catalog.diagram_drawings_by_relationship_id = Self::xml_parts(
+      package,
+      main.diagram_persist_layout_parts(package),
+      |part| main.get_id_of_part(package, part),
+    );
     catalog
   }
 
@@ -138,6 +149,8 @@ impl ImageCatalog {
     Self {
       by_relationship_id,
       charts_by_relationship_id: HashMap::new(),
+      diagram_data_by_relationship_id: HashMap::new(),
+      diagram_drawings_by_relationship_id: HashMap::new(),
     }
   }
 
@@ -146,12 +159,23 @@ impl ImageCatalog {
     chart_parts: impl Iterator<Item = ChartPart> + 'a,
     relationship_id: impl Fn(&ChartPart) -> Option<&'a str>,
   ) -> HashMap<String, String> {
+    Self::xml_parts(package, chart_parts, relationship_id)
+  }
+
+  fn xml_parts<'a, P>(
+    package: &WordprocessingDocument,
+    parts: impl Iterator<Item = P> + 'a,
+    relationship_id: impl Fn(&P) -> Option<&'a str>,
+  ) -> HashMap<String, String>
+  where
+    P: SdkPart,
+  {
     let mut by_relationship_id = HashMap::new();
-    for chart_part in chart_parts {
-      let Some(relationship_id) = relationship_id(&chart_part) else {
+    for part in parts {
+      let Some(relationship_id) = relationship_id(&part) else {
         continue;
       };
-      let Some(data) = chart_part.data_to_vec(package) else {
+      let Some(data) = part.data_to_vec(package) else {
         continue;
       };
       let Ok(xml) = String::from_utf8(data) else {

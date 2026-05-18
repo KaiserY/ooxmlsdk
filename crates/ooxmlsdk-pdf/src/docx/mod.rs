@@ -274,9 +274,7 @@ fn supplemental_graphic_blocks(
   main: &MainDocumentPart,
   styles: &StylesCatalog,
 ) -> Vec<Block> {
-  let mut blocks = chart_text_blocks(package, main, styles);
-  blocks.extend(diagram_text_blocks(package, main, styles));
-  blocks
+  chart_text_blocks(package, main, styles)
 }
 
 fn chart_text_blocks(
@@ -480,48 +478,6 @@ fn chart_has_vertical_multilevel_category_axis(xml: &str) -> bool {
   false
 }
 
-fn diagram_text_blocks(
-  package: &WordprocessingDocument,
-  main: &MainDocumentPart,
-  styles: &StylesCatalog,
-) -> Vec<Block> {
-  let diagram_colors = main
-    .diagram_colors_parts(package)
-    .filter_map(|part| {
-      part
-        .data_to_vec(package)
-        .and_then(|data| String::from_utf8(data).ok())
-    })
-    .collect::<Vec<_>>();
-  let mut color_index = 0usize;
-  let mut blocks = Vec::new();
-  for drawing_part in main.diagram_persist_layout_parts(package) {
-    let Some(xml) = drawing_part
-      .data_to_vec(package)
-      .and_then(|data| String::from_utf8(data).ok())
-    else {
-      continue;
-    };
-    let color = diagram_colors
-      .get(color_index)
-      .and_then(|colors_xml| diagram_text_color(colors_xml, &styles.theme_colors))
-      .or(styles.theme_colors.dark2)
-      .unwrap_or(RgbColor {
-        r: 0x1F,
-        g: 0x49,
-        b: 0x7D,
-      });
-    color_index += 1;
-    for text in diagram_shape_texts(&xml) {
-      blocks.push(simple_text_block(
-        text,
-        text_style_with_color(styles, color),
-      ));
-    }
-  }
-  blocks
-}
-
 fn chart_label_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(false);
@@ -656,85 +612,6 @@ fn push_unique_chart_text(texts: &mut Vec<String>, value: &str) {
     return;
   }
   texts.push(trimmed.to_string());
-}
-
-fn diagram_text_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut in_tx_fill = false;
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"txFillClrLst") => {
-        in_tx_fill = true;
-      }
-      Event::End(event) if qname_ends_with(event.name().as_ref(), b"txFillClrLst") => {
-        in_tx_fill = false;
-      }
-      Event::Start(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors)
-          .map(|it| it.color);
-      }
-      Event::Empty(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_empty_scheme_color(&event, theme_colors).map(|it| it.color);
-      }
-      Event::Start(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        return color_attr(&event, b"val");
-      }
-      Event::Empty(event) if in_tx_fill && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        return color_attr(&event, b"val");
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
-}
-
-fn diagram_shape_texts(xml: &str) -> Vec<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut in_shape = false;
-  let mut in_text = false;
-  let mut current = String::new();
-  let mut texts = Vec::new();
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"sp") => {
-        in_shape = true;
-        current.clear();
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"sp") => {
-        if !current.is_empty() {
-          texts.push(current.clone());
-        }
-        current.clear();
-        in_shape = false;
-      }
-      Ok(Event::Start(event)) if in_shape && qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = true;
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
-        in_text = false;
-      }
-      Ok(Event::Text(event)) if in_shape && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::CData(event)) if in_shape && in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
-    }
-  }
-
-  texts
 }
 
 fn simple_text_block(text: String, style: TextStyle) -> Block {
@@ -3253,18 +3130,14 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(spacing) = properties.spacing_between_lines() {
-    format.spacing_before_set = spacing.before.is_some();
-    format.spacing_before_pt = spacing
-      .before
-      .as_ref()
-      .and_then(twips_measure_to_points)
-      .unwrap_or(0.0);
-    format.spacing_after_set = spacing.after.is_some();
-    format.spacing_after_pt = spacing
-      .after
-      .as_ref()
-      .and_then(twips_measure_to_points)
-      .unwrap_or(0.0);
+    if let Some(before) = spacing.before.as_ref() {
+      format.spacing_before_set = true;
+      format.spacing_before_pt = twips_measure_to_points(before).unwrap_or(0.0);
+    }
+    if let Some(after) = spacing.after.as_ref() {
+      format.spacing_after_set = true;
+      format.spacing_after_pt = twips_measure_to_points(after).unwrap_or(0.0);
+    }
     if let Some(line) = spacing.line.as_ref() {
       match spacing.line_rule {
         None | Some(w::LineSpacingRuleValues::Auto) => {
@@ -3612,6 +3485,17 @@ fn paragraph_inlines(
         None,
         &mut inline_context,
       ),
+      w::ParagraphChoice::XmlAny(xml) => {
+        push_run_xml_any(
+          xml,
+          &mut inlines,
+          base_style.clone(),
+          base_style.clone(),
+          styles,
+          images,
+          hyperlinks,
+        );
+      }
       _ => {}
     }
   }
@@ -4795,7 +4679,11 @@ fn push_run_xml_any(
       inlines.push(InlineItem::Image(image));
     }
     drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
+    let textbox_start = inlines.len();
     drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
+    if inlines.len() == textbox_start {
+      push_alternate_content_pict_textboxes(xml, inlines, base_style, styles, images, hyperlinks);
+    }
     return;
   }
 
@@ -4806,7 +4694,11 @@ fn push_run_xml_any(
       inlines.push(InlineItem::Image(image));
     }
     drawing::push_drawing_shapes(&drawing, inlines, styles, images, hyperlinks);
+    let textbox_start = inlines.len();
     drawing::push_drawing_textboxes(&drawing, inlines, style, styles, images, hyperlinks);
+    if inlines.len() == textbox_start {
+      push_alternate_content_pict_textboxes(xml, inlines, base_style, styles, images, hyperlinks);
+    }
     return;
   }
 
@@ -4828,6 +4720,26 @@ fn push_run_xml_any(
     drawing::push_pict_shapes(&picture, inlines, images);
     drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
   }
+}
+
+fn push_alternate_content_pict_textboxes(
+  xml: &str,
+  inlines: &mut Vec<InlineItem>,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+  images: &ImageCatalog,
+  hyperlinks: &HyperlinkCatalog,
+) {
+  if !(xml.contains("AlternateContent") && xml.contains("txbxContent")) {
+    return;
+  }
+  let Some(picture_xml) = first_named_xml_fragment(xml, b"pict") else {
+    return;
+  };
+  let Ok(picture) = w::Picture::from_bytes(picture_xml.as_bytes()) else {
+    return;
+  };
+  drawing::push_pict_textboxes(&picture, inlines, base_style, styles, images, hyperlinks);
 }
 
 fn push_inserted_run(
@@ -5931,9 +5843,11 @@ fn drawingml_textbox_frame_from_fragment(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineShape> {
-  let content = drawing_textbox_content(xml)?;
-  let text_box =
-    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks);
+  let text_box = if let Some(content) = drawing_textbox_content(xml) {
+    text_box_frame_from_drawingml(xml, &content, base_style, styles, images, hyperlinks)
+  } else {
+    drawingml_wordprocessing_textbox_frame_from_fragment(xml, base_style, styles)?
+  };
   let auto_fit = drawingml_textbox_uses_auto_fit(xml);
   let expands_auto_fit = auto_fit && drawingml_textbox_is_vertical(xml);
   let frame_stroke = drawingml_textbox_frame_stroke(xml, styles, auto_fit, placement);
@@ -6001,6 +5915,118 @@ fn drawingml_textbox_frame_from_fragment(
     text_box_auto_fit: auto_fit,
     text_vertical_alignment: text_box.vertical_alignment,
   })
+}
+
+fn drawingml_wordprocessing_textbox_frame_from_fragment(
+  xml: &str,
+  base_style: TextStyle,
+  styles: &StylesCatalog,
+) -> Option<TextBoxFrameContent> {
+  // Source: LibreOffice oox/source/shape/WpsContext.cxx imports wps:txbx
+  // content as text on the owning drawing shape. Some mc:AlternateContent
+  // fragments arrive without namespace declarations on the extracted child,
+  // so fall back to local-name parsing instead of dropping the textbox.
+  let txbx_content = first_named_xml_fragment(xml, b"txbxContent")?;
+  let texts = wordprocessing_textbox_texts_from_xml(&txbx_content);
+  if texts.is_empty() {
+    return None;
+  }
+  let blocks = texts
+    .into_iter()
+    .map(|text| simple_text_block(text, base_style.clone()))
+    .collect();
+  let mut frame = TextBoxFrameContent::new(blocks);
+  if let Some(body_pr) = first_named_xml_fragment(xml, b"bodyPr") {
+    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
+  }
+  if drawingml_textbox_uses_auto_light_text(xml, styles) {
+    let color = RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    };
+    recolor_blocks_text(&mut frame.blocks, color);
+  }
+  if let Some(rotation_deg) = drawingml_textbox_text_rotation(xml) {
+    rotate_textbox_blocks(&mut frame.blocks, rotation_deg);
+  }
+  apply_drawingml_textbox_layout_adjustments(&mut frame);
+  Some(frame)
+}
+
+fn wordprocessing_textbox_texts_from_xml(xml: &str) -> Vec<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  let mut in_paragraph = false;
+  let mut in_text = false;
+  let mut current = String::new();
+  let mut texts = Vec::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
+        in_paragraph = true;
+        current.clear();
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
+        if !current.is_empty() {
+          texts.push(current.clone());
+        }
+        current.clear();
+        in_paragraph = false;
+      }
+      Ok(Event::Start(event))
+        if in_paragraph
+          && (qname_ends_with(event.name().as_ref(), b"t")
+            || qname_ends_with(event.name().as_ref(), b"delText")) =>
+      {
+        in_text = true;
+      }
+      Ok(Event::End(event))
+        if qname_ends_with(event.name().as_ref(), b"t")
+          || qname_ends_with(event.name().as_ref(), b"delText") =>
+      {
+        in_text = false;
+      }
+      Ok(Event::Text(event)) if in_paragraph && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if in_paragraph && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  texts
+}
+
+fn recolor_blocks_text(blocks: &mut [Block], color: RgbColor) {
+  for block in blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        for inline in &mut paragraph.inlines {
+          if let InlineItem::Text(run) = inline {
+            run.style.color = color;
+          }
+        }
+      }
+      Block::Table(table) => {
+        for row in &mut table.rows {
+          for cell in &mut row.cells {
+            recolor_blocks_text(&mut cell.blocks, color);
+          }
+        }
+      }
+      Block::Frame(frame) => recolor_blocks_text(&mut frame.blocks, color),
+    }
+  }
 }
 
 fn autofit_textbox_placement(placement: ImagePlacement) -> ImagePlacement {
@@ -6465,6 +6491,20 @@ fn push_drawing_shapes_impl(
       inlines.extend(chart_shapes.into_iter().map(InlineItem::Shape));
       continue;
     }
+    if let Some(diagram_shapes) = drawing_diagram_shapes(
+      xml,
+      placement,
+      transform,
+      DrawingShapeImportContext {
+        effect_extent,
+        styles,
+        images,
+        hyperlinks,
+      },
+    ) {
+      inlines.extend(diagram_shapes);
+      continue;
+    }
     inlines.extend(drawingml_shapes_from_xml(
       xml,
       placement,
@@ -6477,6 +6517,72 @@ fn push_drawing_shapes_impl(
       },
       false,
     ));
+  }
+}
+
+fn drawing_diagram_shapes(
+  graphic_xml: &str,
+  placement: ImagePlacement,
+  transform: DrawingMlGroupTransform,
+  context: DrawingShapeImportContext<'_>,
+) -> Option<Vec<InlineItem>> {
+  // Source: LibreOffice oox/source/drawingml/graphicshapecontext.cxx
+  // resolves dgm:relIds through the diagram data part, then imports the
+  // persisted diagramDrawing extDrawing fallback when present.
+  let data_relationship_id = drawing_diagram_data_relationship_id(graphic_xml)?;
+  let data_xml = context
+    .images
+    .diagram_data_by_relationship_id
+    .get(&data_relationship_id)?;
+  let drawing_relationship_id = diagram_ext_drawing_relationship_id(data_xml)?;
+  let drawing_xml = context
+    .images
+    .diagram_drawings_by_relationship_id
+    .get(&drawing_relationship_id)?;
+  Some(drawingml_shapes_from_xml(
+    drawing_xml,
+    placement,
+    transform,
+    context,
+    false,
+  ))
+}
+
+fn drawing_diagram_data_relationship_id(xml: &str) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"relIds") =>
+      {
+        for attr in event.attributes().with_checks(false).flatten() {
+          if attr.key.as_ref().ends_with(b":dm") || attr.key.as_ref() == b"dm" {
+            return decode_xml_attr_value(&attr, reader.decoder());
+          }
+        }
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
+fn diagram_ext_drawing_relationship_id(xml: &str) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event)
+        if qname_ends_with(event.name().as_ref(), b"dataModelExt") =>
+      {
+        if let Some(relationship_id) = attr_value(&event, b"relId") {
+          return Some(relationship_id.to_string());
+        }
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
   }
 }
 
@@ -6786,7 +6892,10 @@ fn drawingml_shapes_from_xml(
           ));
         }
       }
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+      Ok(Event::Start(event))
+        if qname_ends_with(event.name().as_ref(), b"wsp")
+          || qname_ends_with(event.name().as_ref(), b"sp") =>
+      {
         if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
           && let Some(shape) = drawingml_shape_from_fragment(
             &fragment,
@@ -6819,7 +6928,10 @@ fn drawingml_shapes_from_xml(
           }
         }
       }
-      Ok(Event::Empty(event)) if qname_ends_with(event.name().as_ref(), b"wsp") => {
+      Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"wsp")
+          || qname_ends_with(event.name().as_ref(), b"sp") =>
+      {
         let mut writer = Writer::new(Vec::new());
         if writer.write_event(Event::Empty(event.into_owned())).is_ok()
           && let Ok(fragment) = String::from_utf8(writer.into_inner())
@@ -7005,7 +7117,8 @@ fn drawingml_shape_from_fragment(
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
-  Some(InlineShape {
+  let mut text_box = drawingml_shape_text_box_from_fragment(xml, styles);
+  let mut shape = InlineShape {
     width_pt,
     height_pt,
     effect_left_pt: effect_extent.left_pt,
@@ -7031,7 +7144,93 @@ fn drawingml_shape_from_fragment(
     text_inset_bottom_pt: 0.0,
     text_box_auto_fit: false,
     text_vertical_alignment: TextBoxVerticalAlignment::Top,
-  })
+  };
+  if let Some(text_box) = text_box.take() {
+    shape.text_box_blocks = text_box.blocks;
+    shape.text_inset_left_pt = text_box.left_pt;
+    shape.text_inset_top_pt = text_box.top_pt;
+    shape.text_inset_right_pt = text_box.right_pt;
+    shape.text_inset_bottom_pt = text_box.bottom_pt;
+    shape.text_vertical_alignment = text_box.vertical_alignment;
+  }
+  Some(shape)
+}
+
+fn drawingml_shape_text_box_from_fragment(
+  xml: &str,
+  styles: &StylesCatalog,
+) -> Option<TextBoxFrameContent> {
+  // Source: LibreOffice oox/source/drawingml/shape.cxx imports SmartArt
+  // persisted dsp:sp text as child shape text, using the a:bodyPr insets.
+  let body_pr = first_named_xml_fragment(xml, b"bodyPr");
+  let texts = drawingml_shape_text_body_texts(xml);
+  if texts.is_empty() {
+    return None;
+  }
+  let color = drawingml_text_fill_colors(xml, &styles.theme_colors)
+    .into_iter()
+    .next()
+    .unwrap_or_else(|| TextStyle::default().color);
+  let blocks = texts
+    .into_iter()
+    .map(|text| simple_text_block(text, text_style_with_color(styles, color)))
+    .collect();
+  let mut frame = TextBoxFrameContent::new(blocks);
+  if let Some(body_pr) = body_pr {
+    apply_drawingml_textbox_body_properties(&body_pr, &mut frame);
+  }
+  apply_drawingml_textbox_layout_adjustments(&mut frame);
+  Some(frame)
+}
+
+fn drawingml_shape_text_body_texts(xml: &str) -> Vec<String> {
+  let tx_body = match first_named_xml_fragment(xml, b"txBody") {
+    Some(tx_body) => tx_body,
+    None => return Vec::new(),
+  };
+  let mut reader = Reader::from_str(&tx_body);
+  reader.config_mut().trim_text(false);
+  let mut in_paragraph = false;
+  let mut in_text = false;
+  let mut current = String::new();
+  let mut texts = Vec::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
+        in_paragraph = true;
+        current.clear();
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"p") => {
+        if !current.is_empty() {
+          texts.push(current.clone());
+        }
+        current.clear();
+        in_paragraph = false;
+      }
+      Ok(Event::Start(event)) if in_paragraph && qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = true;
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"t") => {
+        in_text = false;
+      }
+      Ok(Event::Text(event)) if in_paragraph && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::CData(event)) if in_paragraph && in_text => {
+        if let Ok(value) = event.xml10_content() {
+          current.push_str(value.as_ref());
+        }
+      }
+      Ok(Event::Eof) => break,
+      Ok(_) => {}
+      Err(_) => break,
+    }
+  }
+
+  texts
 }
 
 #[cfg(test)]

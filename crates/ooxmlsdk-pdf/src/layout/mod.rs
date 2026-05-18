@@ -3459,7 +3459,7 @@ fn paragraph_spacing_before(
     return section_start_spacing_before(previous, paragraph);
   }
   if let Some(Block::Paragraph(previous)) = previous
-    && suppress_contextual_spacing(previous, paragraph)
+    && suppress_spacing_between_identical_styles(previous, paragraph)
   {
     return 0.0;
   }
@@ -3470,7 +3470,7 @@ fn section_start_spacing_before(
   previous: &crate::docx::Paragraph,
   paragraph: &crate::docx::Paragraph,
 ) -> f32 {
-  if paragraph.format.contextual_spacing {
+  if paragraph.format.contextual_spacing && paragraph_styles_identical(previous, paragraph) {
     return 0.0;
   }
   (paragraph.format.spacing_before_pt - previous.format.spacing_after_pt).max(0.0)
@@ -3500,7 +3500,7 @@ fn libreoffice_ignored_line_height_blank(ch: char) -> bool {
 
 fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
   if let Some(Block::Paragraph(next)) = next
-    && suppress_contextual_spacing(paragraph, next)
+    && suppress_spacing_between_identical_styles(paragraph, next)
   {
     return 0.0;
   }
@@ -3510,16 +3510,26 @@ fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Blo
     .max(PARAGRAPH_SPACING_AFTER_PT)
 }
 
-fn suppress_contextual_spacing(
+fn suppress_spacing_between_identical_styles(
   first: &crate::docx::Paragraph,
   second: &crate::docx::Paragraph,
 ) -> bool {
-  if !first.format.contextual_spacing || !second.format.contextual_spacing {
-    return false;
-  }
+  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
+  // SwFlowFrame::CalcUpperSpace() ignores the full inter-paragraph spacing
+  // when both identical paragraphs have contextual spacing, and also ignores
+  // the side that requested contextual spacing in the one-sided cases.
+  (first.format.contextual_spacing || second.format.contextual_spacing)
+    && paragraph_styles_identical(first, second)
+}
+
+fn paragraph_styles_identical(
+  first: &crate::docx::Paragraph,
+  second: &crate::docx::Paragraph,
+) -> bool {
   match (&first.format.style_id, &second.format.style_id) {
     (Some(first_style), Some(second_style)) => first_style == second_style,
-    _ => first.format == second.format,
+    (None, None) => true,
+    _ => false,
   }
 }
 
@@ -6651,7 +6661,7 @@ fn table_column_count(table: &Table) -> usize {
 
 fn table_repeating_header_count(table: &Table) -> usize {
   let count = leading_repeat_header_count(table);
-  if count == 0 || count > 10 || table_disables_repeating_headers(table, count) {
+  if count == 0 || count >= 10 || table_disables_repeating_headers(table, count) {
     0
   } else {
     count

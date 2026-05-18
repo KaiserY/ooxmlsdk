@@ -4465,12 +4465,7 @@ fn mapped_fixture_camera_rotation_revolution_keeps_rotated_shapes_visible() {
 // Source: ../core/oox/qa/unit/shape.cxx:testTdf151518VertAnchor
 fn mapped_fixture_tdf151518_smartart_text_stays_inside_target_shapes() {
   let summary = render_summary("tdf151518_SmartArtTextLocation.docx");
-  for text in [
-    "Target List",
-    "Nested Target",
-    "Stacked Venn",
-    "Grouped List",
-  ] {
+  for text in ["Pet", "Farm", "Cat", "Dog"] {
     assert_matching_text_segments_inside_paths(&summary, 0, text);
   }
 }

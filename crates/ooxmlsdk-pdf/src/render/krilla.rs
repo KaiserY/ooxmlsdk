@@ -814,7 +814,11 @@ fn writer_text_items_coalesce(current: &TextItem, next: &TextItem) -> bool {
 
 impl PaintText {
   fn from_layout_text(text: &TextItem, owner: Option<PaintLineOwner>, page_width_pt: f32) -> Self {
-    let glyphs = shaped_pdf_glyphs(&text.text, &text.style);
+    let glyphs = if text.style.small_caps {
+      None
+    } else {
+      shaped_pdf_glyphs(&text.text, &text.style)
+    };
     let width_pt = glyphs
       .as_ref()
       .map(|run| run.width_pt)
@@ -1272,7 +1276,17 @@ fn draw_text_item(
         portion.baseline_y * (1.0 - vertical_scale),
       ));
     }
-    if let Some(glyphs) = &portion.glyphs {
+    if item.style.small_caps {
+      let font = fonts.select(&item.style);
+      surface.draw_text(
+        Point::from_xy(portion.x_pt, portion.baseline_y),
+        font,
+        item.style.font_size_pt,
+        &item.text[portion.text_range.clone()],
+        false,
+        TextDirection::Auto,
+      );
+    } else if let Some(glyphs) = &portion.glyphs {
       let font = fonts.select(&item.style);
       surface.draw_glyphs(
         Point::from_xy(portion.x_pt, portion.baseline_y),

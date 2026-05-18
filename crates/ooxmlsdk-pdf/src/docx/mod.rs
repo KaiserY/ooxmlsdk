@@ -65,8 +65,6 @@ const MIN_IMPORTED_LINE_HEIGHT_PT: f32 = 0.1;
 const TAB_STOP_DEDUP_EPSILON_PT: f32 = 0.1;
 const COMMENT_REFERENCE_FONT_SCALE: f32 = 0.75;
 const MAX_WORD_TABLE_MARGIN_TWIPS: f32 = 31_680.0;
-// Source: LibreOffice include/editeng/svxfont.hxx SMALL_CAPS_PERCENTAGE.
-const LO_SMALL_CAPS_FONT_SCALE: f32 = 0.80;
 
 pub(crate) fn extract(
   package: &mut WordprocessingDocument,
@@ -9437,6 +9435,7 @@ struct RunStyleOverrides {
   underline: Option<bool>,
   strikethrough: Option<bool>,
   uppercase: Option<bool>,
+  small_caps: Option<bool>,
   hidden: Option<bool>,
 }
 
@@ -10493,6 +10492,9 @@ fn merge_run_style_overrides(
   if source.uppercase.is_some() {
     target.uppercase = source.uppercase;
   }
+  if source.small_caps.is_some() {
+    target.small_caps = source.small_caps;
+  }
   if source.hidden.is_some() {
     target.hidden = source.hidden;
   }
@@ -10566,6 +10568,9 @@ fn run_style_overrides(properties: Option<RunProps<'_>>) -> RunStyleOverrides {
     uppercase: properties
       .caps()
       .and_then(|value| value.val.map(|value| value.as_bool())),
+    small_caps: properties
+      .small_caps()
+      .map(|value| value.val.is_none_or(|value| value.as_bool())),
     hidden: properties
       .vanish()
       .and_then(|value| value.val.map(|value| value.as_bool())),
@@ -10587,6 +10592,9 @@ fn apply_run_style_overrides(style: &mut TextStyle, overrides: RunStyleOverrides
   }
   if let Some(uppercase) = overrides.uppercase {
     style.uppercase = uppercase;
+  }
+  if let Some(small_caps) = overrides.small_caps {
+    style.small_caps = small_caps;
   }
   if let Some(hidden) = overrides.hidden {
     style.hidden = hidden;
@@ -10692,6 +10700,9 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   }
   if values.uppercase {
     target.uppercase = true;
+  }
+  if values.small_caps {
+    target.small_caps = true;
   }
   if values.hidden {
     target.hidden = true;

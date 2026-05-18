@@ -23,6 +23,8 @@ const LO_TEXT_LINE_MIN_WIDTH_PT: f32 = 1.0;
 const LO_TEXT_LINE_WIDTH_HALF_DIVISOR: f32 = 2.0;
 const LO_TEXT_LINE_STRIKEOUT_OFFSET_DIVISOR: f32 = 3.0;
 const LO_TEXT_LINE_UNDERLINE_BASELINE_OFFSET_PT: f32 = 1.0;
+// Source: LibreOffice include/editeng/svxfont.hxx SMALL_CAPS_PERCENTAGE.
+const LO_SMALL_CAPS_FONT_SCALE: f32 = 0.80;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ShapedText {
@@ -171,10 +173,10 @@ impl FontMetricsCache {
   fn measure(&self, text: &str, style: &TextStyle) -> Option<f32> {
     let font = self.select(style)?;
     let mut width = 0.0;
-    for run in script_runs(text) {
+    for run in case_mapped_script_runs(text, style) {
       width += font.measure(
-        run.text,
-        style.font_size_pt,
+        &run.text,
+        run.font_size_pt,
         style.character_spacing_pt,
         run.script,
       )?;
@@ -186,13 +188,13 @@ impl FontMetricsCache {
     let font = self.select(style)?;
     let mut glyphs = Vec::new();
     let mut width_pt = 0.0;
-    for run in script_runs(text) {
+    for run in case_mapped_script_runs(text, style) {
       let shaped = font.shape(
-        run.text,
-        style.font_size_pt,
+        &run.text,
+        run.font_size_pt,
         style.character_spacing_pt,
         run.script,
-        run.start,
+        run.source_start,
       )?;
       width_pt += shaped.width_pt;
       glyphs.extend(shaped.glyphs);
@@ -372,6 +374,82 @@ struct ScriptRun<'a> {
   start: usize,
 }
 
+#[derive(Clone, Debug)]
+struct CaseMappedScriptRun {
+  text: String,
+  script: UnicodeScriptValue,
+  source_start: usize,
+  font_size_pt: f32,
+}
+
+fn case_mapped_script_runs(text: &str, style: &TextStyle) -> Vec<CaseMappedScriptRun> {
+  if !style.small_caps {
+    return script_runs(text)
+      .into_iter()
+      .map(|run| CaseMappedScriptRun {
+        text: run.text.to_string(),
+        script: run.script,
+        source_start: run.start,
+        font_size_pt: style.font_size_pt,
+      })
+      .collect();
+  }
+
+  let mut runs = Vec::new();
+  let mut start = 0;
+  let mut active_lowercase = None;
+  for (index, ch) in text.char_indices() {
+    let lowercase = ch.is_lowercase();
+    if let Some(active) = active_lowercase {
+      if lowercase != active {
+        push_small_caps_case_run(text, start, index, active, style.font_size_pt, &mut runs);
+        start = index;
+        active_lowercase = Some(lowercase);
+      }
+    } else {
+      active_lowercase = Some(lowercase);
+    }
+  }
+  if let Some(active) = active_lowercase {
+    push_small_caps_case_run(
+      text,
+      start,
+      text.len(),
+      active,
+      style.font_size_pt,
+      &mut runs,
+    );
+  }
+  runs
+}
+
+fn push_small_caps_case_run(
+  text: &str,
+  start: usize,
+  end: usize,
+  lowercase: bool,
+  font_size_pt: f32,
+  runs: &mut Vec<CaseMappedScriptRun>,
+) {
+  let mapped = if lowercase {
+    text[start..end].to_uppercase()
+  } else {
+    text[start..end].to_string()
+  };
+  for run in script_runs(&mapped) {
+    runs.push(CaseMappedScriptRun {
+      text: run.text.to_string(),
+      script: run.script,
+      source_start: start + run.start,
+      font_size_pt: if lowercase {
+        font_size_pt * LO_SMALL_CAPS_FONT_SCALE
+      } else {
+        font_size_pt
+      },
+    });
+  }
+}
+
 fn script_runs(text: &str) -> Vec<ScriptRun<'_>> {
   let mut runs = Vec::new();
   let mut start = 0;
@@ -432,6 +510,14 @@ fn glyph_text_range(
   text_offset: usize,
 ) -> std::ops::Range<usize> {
   let cluster = infos[index].cluster as usize;
+  if infos
+    .iter()
+    .take(index)
+    .any(|info| info.cluster as usize == cluster)
+  {
+    let offset = text_offset + cluster.min(text.len());
+    return offset..offset;
+  }
   let next_cluster = infos
     .iter()
     .enumerate()

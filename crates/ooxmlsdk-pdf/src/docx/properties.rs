@@ -1,5 +1,5 @@
 use super::{
-  LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE, LO_SMALL_CAPS_FONT_SCALE, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE,
+  LO_DEFAULT_ESCAPEMENT_HEIGHT_SCALE, LO_SUBSCRIPT_BASELINE_SHIFT_SCALE,
   LO_SUPERSCRIPT_BASELINE_SHIFT_SCALE, MIN_ESCAPEMENT_FONT_SIZE_PT, ParagraphFormat,
   ParagraphProps, RunProps, RunStyleOverrides, StylesCatalog, TextStyle, ThemeColors, ThemeFonts,
   merge_paragraph_format, resolve_run_color, resolve_text_fill, resolve_text_outline,
@@ -163,11 +163,8 @@ pub(super) fn merge_run_style(
   if let Some(caps) = properties.caps() {
     style.uppercase = caps.val.is_none_or(|value| value.as_bool());
   }
-  if let Some(small_caps) = properties.small_caps()
-    && small_caps.val.is_none_or(|value| value.as_bool())
-  {
-    style.font_size_pt =
-      (style.font_size_pt * LO_SMALL_CAPS_FONT_SCALE).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+  if let Some(small_caps) = properties.small_caps() {
+    style.small_caps = small_caps.val.is_none_or(|value| value.as_bool());
   }
   if let Some(vanish) = properties.vanish() {
     style.hidden = vanish.val.is_none_or(|value| value.as_bool());

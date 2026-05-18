@@ -73,6 +73,7 @@ pub(super) fn paragraph_model_with_base<'a>(
   };
   let mut format =
     properties::paragraph_format(styles, style_id, base.format, direct_paragraph_properties);
+  format.style_id = style_id.map(Arc::<str>::from);
   let mut run_style =
     properties::paragraph_run_style(styles, style_id, base.run_style.clone(), base.run_overrides);
   if paragraph_mark_is_deleted(paragraph) {

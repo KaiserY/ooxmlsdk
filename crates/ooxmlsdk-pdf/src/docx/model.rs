@@ -236,6 +236,7 @@ impl Default for BorderStyle {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ParagraphFormat {
+  pub style_id: Option<Arc<str>>,
   pub spacing_before_pt: f32,
   pub spacing_after_pt: f32,
   pub spacing_before_set: bool,
@@ -636,6 +637,7 @@ pub(crate) struct TextStyle {
   pub underline: bool,
   pub strikethrough: bool,
   pub uppercase: bool,
+  pub small_caps: bool,
   pub hidden: bool,
   pub rotation_deg: f32,
   pub color: RgbColor,
@@ -658,6 +660,7 @@ impl Default for TextStyle {
       underline: false,
       strikethrough: false,
       uppercase: false,
+      small_caps: false,
       hidden: false,
       rotation_deg: 0.0,
       color: RgbColor { r: 0, g: 0, b: 0 },

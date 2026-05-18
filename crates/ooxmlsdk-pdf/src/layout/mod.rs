@@ -3338,9 +3338,13 @@ fn suppress_contextual_spacing(
   first: &crate::docx::Paragraph,
   second: &crate::docx::Paragraph,
 ) -> bool {
-  first.format.contextual_spacing
-    && second.format.contextual_spacing
-    && first.format == second.format
+  if !first.format.contextual_spacing || !second.format.contextual_spacing {
+    return false;
+  }
+  match (&first.format.style_id, &second.format.style_id) {
+    (Some(first_style), Some(second_style)) => first_style == second_style,
+    _ => first.format == second.format,
+  }
 }
 
 fn layout_document_block(

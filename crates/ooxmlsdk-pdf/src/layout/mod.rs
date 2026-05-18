@@ -29,7 +29,6 @@ const DEFAULT_LINE_HEIGHT_PT: f32 = 14.0;
 const LO_MIN_FRAME_SIZE_PT: f32 = 23.0 / units::TWIPS_PER_POINT;
 const TABLE_ROW_MIN_HEIGHT_PT: f32 = LO_MIN_FRAME_SIZE_PT;
 const TABLE_SPACING_AFTER_PT: f32 = 0.0;
-const MIN_HEADER_FOOTER_HEIGHT_PT: f32 = units::POINTS_PER_INCH / units::MILLIMETERS_PER_INCH;
 const DEFAULT_ORPHAN_LINES: usize = 2;
 const DEFAULT_WIDOW_LINES: usize = 2;
 const MOVE_BACKWARD_SUPPRESS_THRESHOLD: usize = 20;
@@ -587,6 +586,12 @@ struct RepeatingSlotState {
   first_footer: bool,
   even_header: bool,
   even_footer: bool,
+  default_header_height_pt: f32,
+  default_footer_height_pt: f32,
+  first_header_height_pt: f32,
+  first_footer_height_pt: f32,
+  even_header_height_pt: f32,
+  even_footer_height_pt: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2960,6 +2965,10 @@ fn paragraph_starts_with_last_rendered_page_break(paragraph: &crate::docx::Parag
     .is_some_and(|inline| matches!(inline, InlineItem::LastRenderedPageBreak))
 }
 
+fn segment_affects_line_height(text: &str) -> bool {
+  !text.is_empty() && !text.chars().all(|ch| ch == ' ' || ch == '\t')
+}
+
 fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
   if let Some(Block::Paragraph(next)) = next
     && suppress_contextual_spacing(paragraph, next)
@@ -2992,12 +3001,14 @@ fn layout_document_block(
 ) -> (FlowContext, f32) {
   match block {
     Block::Paragraph(paragraph) => {
+      let mut ignore_top_margin_at_page_start = false;
       if paragraph.starts_after_last_rendered_page_break
         && flow.text_segmentation == TextSegmentation::Body
         && y > flow.content_top_pt + LAYOUT_EPSILON_PT
         && !current.items.is_empty()
       {
         (flow, y) = force_page_break(flow, current, pages);
+        ignore_top_margin_at_page_start = true;
       }
       if let Some(frame) = paragraph_frame(paragraph) {
         return layout_floating_frame(&frame, flow, current, pages, y);
@@ -3022,9 +3033,18 @@ fn layout_document_block(
           pages.len() + 1,
         );
         y = flow.content_top_pt;
+        ignore_top_margin_at_page_start = true;
       }
 
-      if !ignore_top_margin_after_page_break {
+      if paragraph.starts_after_last_rendered_page_break
+        && flow.text_segmentation == TextSegmentation::Body
+        && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
+        && y <= flow.content_top_pt + LAYOUT_EPSILON_PT
+      {
+        ignore_top_margin_at_page_start = true;
+      }
+
+      if !ignore_top_margin_after_page_break && !ignore_top_margin_at_page_start {
         y += paragraph_spacing_before(previous, paragraph, flow);
       }
       let paragraph_flow = FlowContext {
@@ -3553,8 +3573,10 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         .max(DEFAULT_FONT_SIZE_PT);
     let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
     let mut discarded_pages = Vec::new();
-    let header_area = header_area(page.setup);
-    let mut y = header_area.top_pt;
+    let header_height =
+      measured_repeating_blocks_height(header_blocks, page.setup, document.default_tab_stop_pt);
+    let header_top = page.setup.header_distance_pt.max(0.0);
+    let mut y = header_top;
     for block in header_blocks {
       y = layout_repeating_block(
         block,
@@ -3567,10 +3589,10 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           section_page_index: page.section_page_index,
           column_index: 0,
           columns: SectionColumns::default(),
-          content_top_pt: header_area.top_pt,
+          content_top_pt: header_top,
           content_left_pt: page.setup.margin_left_pt,
-          content_bottom: header_area.bottom_pt,
-          body_content_bottom_pt: header_area.bottom_pt,
+          content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+          body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
           content_width,
           layout_cell_bounds: None,
           default_tab_stop_pt: document.default_tab_stop_pt,
@@ -3581,8 +3603,13 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
       );
     }
 
-    let footer_area = footer_area(page.setup);
-    let mut y = footer_area.top_pt;
+    let footer_height =
+      measured_repeating_blocks_height(footer_blocks, page.setup, document.default_tab_stop_pt);
+    let footer_bottom = (page.setup.height_pt - page.setup.footer_distance_pt.max(0.0))
+      .max(0.0)
+      .min(page.setup.height_pt);
+    let footer_top = (footer_bottom - footer_height).max(0.0);
+    let mut y = footer_top;
     for block in footer_blocks {
       y = layout_repeating_block(
         block,
@@ -3595,10 +3622,10 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
           section_page_index: page.section_page_index,
           column_index: 0,
           columns: SectionColumns::default(),
-          content_top_pt: footer_area.top_pt,
+          content_top_pt: footer_top,
           content_left_pt: page.setup.margin_left_pt,
-          content_bottom: footer_area.bottom_pt,
-          body_content_bottom_pt: footer_area.bottom_pt,
+          content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+          body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
           content_width,
           layout_cell_bounds: None,
           default_tab_stop_pt: document.default_tab_stop_pt,
@@ -3938,35 +3965,6 @@ fn apply_column_separators(document: &DocxDocument, pages: &mut [Page], frames: 
   }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RepeatingArea {
-  top_pt: f32,
-  bottom_pt: f32,
-}
-
-fn header_area(setup: PageSetup) -> RepeatingArea {
-  let top = setup.header_distance_pt.max(0.0);
-  let bottom = setup.margin_top_pt.max(top + MIN_HEADER_FOOTER_HEIGHT_PT);
-  RepeatingArea {
-    top_pt: top,
-    bottom_pt: bottom.min(setup.height_pt),
-  }
-}
-
-fn footer_area(setup: PageSetup) -> RepeatingArea {
-  let bottom = (setup.height_pt - setup.footer_distance_pt.max(0.0))
-    .max(0.0)
-    .min(setup.height_pt);
-  let margin_top = (setup.height_pt - setup.margin_bottom_pt).max(0.0);
-  let top = margin_top.min((bottom - MIN_HEADER_FOOTER_HEIGHT_PT).max(0.0));
-  RepeatingArea {
-    top_pt: top,
-    bottom_pt: bottom
-      .max(top + MIN_HEADER_FOOTER_HEIGHT_PT)
-      .min(setup.height_pt),
-  }
-}
-
 fn body_flow_for_page(flow: FlowContext, page_number: usize) -> FlowContext {
   let (content_top_pt, content_bottom) = body_content_limits_for_page(
     flow.setup,
@@ -3990,14 +3988,18 @@ fn body_content_limits_for_page(
 ) -> (f32, f32) {
   let mut top = setup.margin_top_pt;
   let mut bottom = setup.height_pt - setup.margin_bottom_pt;
-  let (has_header, has_footer) =
+  let (has_header, has_footer, header_height, footer_height) =
     repeating_slots_present_for_page(slots, page_number, section_page_index);
 
   if has_header && !setup.top_margin_was_negative {
-    top = top.max(header_area(setup).bottom_pt);
+    top = top.max(setup.header_distance_pt.max(0.0) + header_height);
   }
   if has_footer && !setup.bottom_margin_was_negative {
-    bottom = bottom.min(footer_area(setup).top_pt);
+    bottom = bottom.min(
+      (setup.height_pt - setup.footer_distance_pt.max(0.0) - footer_height)
+        .max(0.0)
+        .min(setup.height_pt),
+    );
   }
   if bottom < top + DEFAULT_LINE_HEIGHT_PT {
     bottom = (top + DEFAULT_LINE_HEIGHT_PT).min(setup.height_pt);
@@ -4017,6 +4019,36 @@ fn repeating_slot_state(document: &DocxDocument, section_index: usize) -> Repeat
       first_footer: !section.first_footer_blocks.is_empty(),
       even_header: !section.even_header_blocks.is_empty(),
       even_footer: !section.even_footer_blocks.is_empty(),
+      default_header_height_pt: measured_repeating_blocks_height(
+        &section.header_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
+      default_footer_height_pt: measured_repeating_blocks_height(
+        &section.footer_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
+      first_header_height_pt: measured_repeating_blocks_height(
+        &section.first_header_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
+      first_footer_height_pt: measured_repeating_blocks_height(
+        &section.first_footer_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
+      even_header_height_pt: measured_repeating_blocks_height(
+        &section.even_header_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
+      even_footer_height_pt: measured_repeating_blocks_height(
+        &section.even_footer_blocks,
+        section.page,
+        document.default_tab_stop_pt,
+      ),
     };
   }
 
@@ -4029,6 +4061,36 @@ fn repeating_slot_state(document: &DocxDocument, section_index: usize) -> Repeat
     first_footer: !document.first_footer_blocks.is_empty(),
     even_header: !document.header_blocks.is_empty(),
     even_footer: !document.footer_blocks.is_empty(),
+    default_header_height_pt: measured_repeating_blocks_height(
+      &document.header_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
+    default_footer_height_pt: measured_repeating_blocks_height(
+      &document.footer_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
+    first_header_height_pt: measured_repeating_blocks_height(
+      &document.first_header_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
+    first_footer_height_pt: measured_repeating_blocks_height(
+      &document.first_footer_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
+    even_header_height_pt: measured_repeating_blocks_height(
+      &document.header_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
+    even_footer_height_pt: measured_repeating_blocks_height(
+      &document.footer_blocks,
+      document.page,
+      document.default_tab_stop_pt,
+    ),
   }
 }
 
@@ -4036,37 +4098,91 @@ fn repeating_slots_present_for_page(
   slots: RepeatingSlotState,
   page_number: usize,
   section_page_index: usize,
-) -> (bool, bool) {
+) -> (bool, bool, f32, f32) {
   let first_page_in_section = section_page_index == 0;
   let use_even_slot = slots.even_and_odd_headers && page_number.is_multiple_of(2);
-  let header = selected_repeating_slot_present(
+  let (header, header_height) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
     slots.title_page,
-    slots.first_header,
-    slots.even_header,
-    slots.default_header,
+    (slots.first_header, slots.first_header_height_pt),
+    (slots.even_header, slots.even_header_height_pt),
+    (slots.default_header, slots.default_header_height_pt),
   );
-  let footer = selected_repeating_slot_present(
+  let (footer, footer_height) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
     slots.title_page,
-    slots.first_footer,
-    slots.even_footer,
-    slots.default_footer,
+    (slots.first_footer, slots.first_footer_height_pt),
+    (slots.even_footer, slots.even_footer_height_pt),
+    (slots.default_footer, slots.default_footer_height_pt),
   );
-  (header, footer)
+  (header, footer, header_height, footer_height)
 }
 
-fn selected_repeating_slot_present(
+fn selected_repeating_slot(
   first_page_in_section: bool,
   use_even_slot: bool,
   title_page: bool,
-  first: bool,
-  even: bool,
-  default: bool,
-) -> bool {
-  (first_page_in_section && title_page && first) || (use_even_slot && even) || default
+  first: (bool, f32),
+  even: (bool, f32),
+  default_: (bool, f32),
+) -> (bool, f32) {
+  if first_page_in_section && title_page && first.0 {
+    return first;
+  }
+  if use_even_slot && even.0 {
+    return even;
+  }
+  if default_.0 {
+    return default_;
+  }
+  (false, 0.0)
+}
+
+fn measured_repeating_blocks_height(
+  blocks: &[Block],
+  setup: PageSetup,
+  default_tab_stop_pt: f32,
+) -> f32 {
+  if blocks.is_empty() {
+    return 0.0;
+  }
+
+  let mut scratch = empty_section_page(
+    PageSetup {
+      margin_top_pt: 0.0,
+      margin_bottom_pt: 0.0,
+      ..setup
+    },
+    0,
+    0,
+  );
+  let mut discarded_pages = Vec::new();
+  let content_width =
+    (setup.width_pt - setup.margin_left_pt - setup.margin_right_pt).max(DEFAULT_FONT_SIZE_PT);
+  let flow = FlowContext {
+    setup: scratch.setup,
+    section_index: 0,
+    section_page_index: 0,
+    column_index: 0,
+    columns: SectionColumns::default(),
+    content_top_pt: 0.0,
+    content_left_pt: setup.margin_left_pt,
+    content_bottom: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
+    body_content_bottom_pt: MEASURE_SCRATCH_PAGE_HEIGHT_PT,
+    content_width,
+    layout_cell_bounds: None,
+    default_tab_stop_pt,
+    repeating_slots: RepeatingSlotState::default(),
+    text_segmentation: TextSegmentation::Body,
+    paragraph_spacing_context: ParagraphSpacingContext::Normal,
+  };
+  let mut y = 0.0;
+  for block in blocks {
+    y = layout_repeating_block(block, &mut scratch, &mut discarded_pages, y, flow);
+  }
+  y
 }
 
 fn layout_repeating_block(
@@ -4262,10 +4378,13 @@ fn layout_floating_table(
       .append(&mut follow_page.wrap_exclusions);
     output_flow = FlowContext {
       section_page_index: follow_page.section_page_index,
-      content_top_pt: follow_page.setup.margin_top_pt,
-      content_bottom: follow_page.setup.height_pt - follow_page.setup.margin_bottom_pt,
-      body_content_bottom_pt: follow_page.setup.height_pt - follow_page.setup.margin_bottom_pt,
-      ..output_flow
+      ..body_flow_for_page(
+        FlowContext {
+          section_page_index: follow_page.section_page_index,
+          ..output_flow
+        },
+        pages.len() + 1,
+      )
     };
   }
   let occupied_bottom = bottom_y + placement.margin_bottom_pt;
@@ -6722,7 +6841,6 @@ impl<'a> TextFrameLayout<'a> {
               }
               chunk_x = x;
               pending_tab = Some(tab_stop);
-              line_height = include_text_height(line_height, text_frame, &run.style);
               emitted = true;
               continue;
             }
@@ -6841,7 +6959,9 @@ impl<'a> TextFrameLayout<'a> {
                       inline_index,
                       text_offset,
                     });
-                    line_height = include_text_height(line_height, text_frame, &run.style);
+                    if segment_affects_line_height(text) {
+                      line_height = include_text_height(line_height, text_frame, &run.style);
+                    }
                     line_has_form_widget |= meta.form_widget_id.is_some();
                     emitted = true;
                   }
@@ -6897,7 +7017,9 @@ impl<'a> TextFrameLayout<'a> {
                   inline_index,
                   text_offset,
                 });
-                line_height = include_text_height(line_height, text_frame, &run.style);
+                if segment_affects_line_height(&text) {
+                  line_height = include_text_height(line_height, text_frame, &run.style);
+                }
                 line_has_form_widget |= meta.form_widget_id.is_some();
                 emitted = true;
               }
@@ -6913,7 +7035,9 @@ impl<'a> TextFrameLayout<'a> {
               inline_index,
               text_offset: segment.end,
             });
-            line_height = include_text_height(line_height, text_frame, &run.style);
+            if segment_affects_line_height(&segment.text) {
+              line_height = include_text_height(line_height, text_frame, &run.style);
+            }
             line_has_form_widget |= meta.form_widget_id.is_some();
             emitted = true;
             tab_over_margin_active = false;
@@ -8179,33 +8303,20 @@ mod tests {
   }
 
   #[test]
-  fn repeating_areas_follow_word_margin_distances() {
+  fn body_limits_reserve_measured_header_footer_height() {
     let setup = PageSetup::default();
-
-    let header = header_area(setup);
-    let footer = footer_area(setup);
-
-    assert_eq!(header.top_pt, 36.0);
-    assert_eq!(header.bottom_pt, 72.0);
-    assert_eq!(footer.top_pt, 720.0);
-    assert_eq!(footer.bottom_pt, 756.0);
-  }
-
-  #[test]
-  fn repeating_areas_keep_minimum_height_when_distances_overlap_margins() {
-    let setup = PageSetup {
-      margin_top_pt: 20.0,
-      margin_bottom_pt: 20.0,
-      header_distance_pt: 30.0,
-      footer_distance_pt: 30.0,
+    let slots = RepeatingSlotState {
+      default_header: true,
+      default_footer: true,
+      default_header_height_pt: 20.0,
+      default_footer_height_pt: 30.0,
       ..Default::default()
     };
 
-    let header = header_area(setup);
-    let footer = footer_area(setup);
+    let (top, bottom) = body_content_limits_for_page(setup, slots, 1, 0);
 
-    assert!(header.bottom_pt - header.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
-    assert!(footer.bottom_pt - footer.top_pt + 0.001 >= MIN_HEADER_FOOTER_HEIGHT_PT);
+    assert_eq!(top, 56.0);
+    assert_eq!(bottom, 690.0);
   }
 
   #[test]

@@ -836,6 +836,7 @@ impl<'a> RootFrameLayout<'a> {
     self
       .follows
       .retain(|follow| follow.from_page_index < page_count && follow.to_page_index < page_count);
+    normalize_layout_frames(&mut self.frames, &self.pages);
 
     LayoutDocument {
       pages: self.pages,
@@ -886,6 +887,16 @@ impl<'a> RootFrameLayout<'a> {
       {
         self.current.preserve_empty = true;
       }
+      if section.blocks.is_empty()
+        && section_index == 0
+        && section_index + 1 < self.document.sections.len()
+      {
+        // Source: LibreOffice sw/qa/extras/ooxmlexport/ooxmlexport8.cxx:testN750255
+        // keeps an empty section page when a paragraph-level sectPr precedes a
+        // following section break; a nextColumn break without columns then acts
+        // as a page break, so later content must not reuse the empty page.
+        self.current.preserve_empty = true;
+      }
       self.format_block_sequence_with_previous(&section.blocks, flow, previous_section_block);
     }
   }
@@ -911,6 +922,27 @@ impl<'a> RootFrameLayout<'a> {
 
   fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
     let current_page_has_body_progress = self.current_page_has_body_progress();
+    let previous_section_is_empty = section_index > 0
+      && self
+        .document
+        .sections
+        .get(section_index - 1)
+        .is_some_and(|previous| previous.blocks.is_empty());
+    if section_index > 0
+      && self.current.items.is_empty()
+      && self.current.preserve_empty
+      && previous_section_is_empty
+    {
+      self.push_current_page(empty_page(section.page, section_index));
+      self.y = body_content_limits_for_page(
+        section.page,
+        repeating_slot_state(self.document, section_index),
+        self.pages.len() + 1,
+        0,
+      )
+      .0;
+      return;
+    }
     if section_index > 0
       && section.break_kind == SectionBreakKind::Continuous
       && section.columns.count > 1
@@ -931,6 +963,7 @@ impl<'a> RootFrameLayout<'a> {
       return;
     }
     let reuse_empty_page = self.current.items.is_empty()
+      && (!self.current.preserve_empty || !previous_section_is_empty)
       && (section_index == 0
         || section.break_kind == SectionBreakKind::Continuous
         || (section.break_kind == SectionBreakKind::NextPage
@@ -2731,6 +2764,33 @@ fn normalize_replayed_fragments(
     fragment.item_start = fallback.item_start;
     fragment.item_end = fallback.item_end;
     fragment.bounds = fallback.bounds;
+  }
+}
+
+fn normalize_layout_frames(frames: &mut Vec<LayoutFrame>, pages: &[Page]) {
+  frames.retain(|frame| {
+    frame.page_index < pages.len()
+      && frame.section_index == pages[frame.page_index].section_index
+      && frame.section_page_index == pages[frame.page_index].section_page_index
+      && !frame.items.is_empty()
+  });
+  for frame in frames {
+    let item_len = frame.items.len();
+    frame.item_start = 0;
+    frame.item_end = item_len;
+    frame.lines = line_boxes_for_items(&frame.items, 0, item_len);
+    if frame.fragments.is_empty() {
+      frame.fragments = frame_fragments_for(frame.kind, &frame.lines);
+    } else {
+      normalize_replayed_fragments(
+        &mut frame.fragments,
+        &frame_fragments_for(frame.kind, &frame.lines),
+        frame.kind,
+        item_len,
+      );
+    }
+    frame.split_start = frame_cursor(frame.block_index, frame.kind, 0, &frame.lines, true);
+    frame.split_end = frame_cursor(frame.block_index, frame.kind, item_len, &frame.lines, false);
   }
 }
 
@@ -5359,7 +5419,7 @@ impl<'a> TableFrameLayout<'a> {
     let repeating_header_count = table_repeating_header_count(table);
     let coalesce_row_shading = table.preferred_width_pct.is_some_and(|pct| pct >= 0.999);
     let split_allowed = table_split_allowed(table);
-    let row_heights = table_row_heights_with_widths(table, &column_widths);
+    let row_heights = table_row_heights_with_widths(table, &column_widths, area.setup);
     let repeating_header_height =
       table_repeating_header_height_from_row_heights(table, repeating_header_count, &row_heights);
     let total_height = table_total_height_from_row_heights(table, &row_heights);
@@ -5696,7 +5756,13 @@ impl<'a> TableFrameLayout<'a> {
         .get(row_index)
         .copied()
         .unwrap_or_else(|| {
-          table_row_height_with_widths(self.table, row_index, row, &self.frame.column_widths)
+          table_row_height_with_widths(
+            self.table,
+            row_index,
+            row,
+            &self.frame.column_widths,
+            self.frame.block.setup,
+          )
         }),
     }
   }
@@ -6456,6 +6522,7 @@ impl CellFrame<'_, '_> {
       self.row_index,
       self.grid_start,
       self.height_pt,
+      self.table_frame.block.setup,
     )
     .unwrap_or(self.height_pt)
   }
@@ -6506,6 +6573,7 @@ fn vertical_merge_content_height(
   row_index: usize,
   grid_start: usize,
   current_row_height: f32,
+  setup: PageSetup,
 ) -> Option<f32> {
   let mut height = current_row_height;
   let mut previous_row = table.rows.get(row_index)?;
@@ -6518,7 +6586,7 @@ fn vertical_merge_content_height(
       break;
     }
     height += row_cell_spacing_pt(table, previous_row);
-    height += table_row_height_with_widths(table, follow_row_index, row, column_widths);
+    height += table_row_height_with_widths(table, follow_row_index, row, column_widths, setup);
     previous_row = row;
     has_continuation = true;
   }
@@ -6902,16 +6970,22 @@ fn table_left_position(
 }
 
 fn table_total_height_with_widths(table: &Table, column_widths: &[f32]) -> f32 {
-  let row_heights = table_row_heights_with_widths(table, column_widths);
+  let row_heights = table_row_heights_with_widths(table, column_widths, PageSetup::default());
   table_total_height_from_row_heights(table, &row_heights)
 }
 
-fn table_row_heights_with_widths(table: &Table, column_widths: &[f32]) -> Vec<f32> {
+fn table_row_heights_with_widths(
+  table: &Table,
+  column_widths: &[f32],
+  setup: PageSetup,
+) -> Vec<f32> {
   table
     .rows
     .iter()
     .enumerate()
-    .map(|(row_index, row)| table_row_height_with_widths(table, row_index, row, column_widths))
+    .map(|(row_index, row)| {
+      table_row_height_with_widths(table, row_index, row, column_widths, setup)
+    })
     .collect()
 }
 
@@ -6940,6 +7014,7 @@ fn table_row_height_with_widths(
   row_index: usize,
   row: &TableRow,
   column_widths: &[f32],
+  setup: PageSetup,
 ) -> f32 {
   let mut grid_index = row.grid_before;
   let mut content_height = TABLE_ROW_MIN_HEIGHT_PT;
@@ -6948,10 +7023,11 @@ fn table_row_height_with_widths(
   for cell in &row.cells {
     let width = spanned_cell_width(cell, column_widths, &mut grid_index);
     if !cell.vertical_merge_continue {
-      let cell_height =
-        table_cell_content_height(cell, width) - cell.margins.top_pt - cell.margins.bottom_pt
-          + row_top_margin
-          + row_bottom_margin;
+      let cell_height = table_cell_content_height(cell, width, setup)
+        - cell.margins.top_pt
+        - cell.margins.bottom_pt
+        + row_top_margin
+        + row_bottom_margin;
       content_height = content_height.max(cell_height);
     }
   }
@@ -7093,7 +7169,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   } = fragment;
   let content_width =
     (width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
-  let content_height = table_cell_content_height(cell, width);
+  let content_height = table_cell_content_height(cell, width, setup);
   let first_line_style = table_cell_first_line_style(cell);
   let first_line_height = inline_text_height(&first_line_style);
   let first_line_baseline_offset = baseline_offset_in_line(&first_line_style, first_line_height);
@@ -7483,11 +7559,11 @@ fn textbox_item_inside_shape_bounds(
   item
 }
 
-fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
+fn table_cell_content_height(cell: &TableCell, cell_width: f32, setup: PageSetup) -> f32 {
   let content_width =
     (cell_width - cell.margins.left_pt - cell.margins.right_pt).max(DEFAULT_FONT_SIZE_PT);
   let flow = FlowContext {
-    setup: PageSetup::default(),
+    setup,
     section_index: 0,
     section_page_index: 0,
     column_index: 0,
@@ -10569,7 +10645,7 @@ mod tests {
     };
 
     assert_eq!(
-      vertical_merge_content_height(&table, &[72.0], 0, 0, 10.0),
+      vertical_merge_content_height(&table, &[72.0], 0, 0, 10.0, PageSetup::default()),
       Some(38.0)
     );
     assert!(row_has_vertical_merge_context(&table, 0));

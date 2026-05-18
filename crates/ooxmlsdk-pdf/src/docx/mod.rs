@@ -1308,26 +1308,35 @@ fn body_sections(
         if let Some(text) = pending_drop_cap_text.take() {
           prepend_drop_cap_text(&mut model, text);
         }
+        let section_properties = paragraph
+          .paragraph_properties
+          .as_deref()
+          .and_then(|properties| properties.section_properties.as_deref())
+          .cloned();
         if paragraph_is_effectively_empty(&model)
+          && section_properties.is_none()
           && current_blocks
             .last()
             .is_some_and(|block| matches!(block, Block::Table(_)))
         {
           continue;
         }
-        push_body_paragraph(&mut current_blocks, model);
-        if let Some(section_properties) = paragraph
-          .paragraph_properties
-          .as_deref()
-          .and_then(|properties| properties.section_properties.as_deref())
-          .cloned()
-        {
+        if let Some(section_properties) = section_properties {
+          if !paragraph_is_effectively_empty(&model) {
+            push_body_paragraph(&mut current_blocks, model);
+          }
+          // Source: LibreOffice sw/source/writerfilter/dmapper/PropertyMap.cxx
+          // treats the paragraph carrying sectPr as discarded section metadata;
+          // its below spacing is emulated separately instead of creating an
+          // extra empty layout paragraph.
           close_section(
             &mut sections,
             &mut current_blocks,
             Some(section_properties),
             &mut previous_properties,
           );
+        } else {
+          push_body_paragraph(&mut current_blocks, model);
         }
       }
       w::BodyChoice::WTbl(table) => current_blocks.push(Block::Table(table_model(
@@ -4643,16 +4652,20 @@ fn push_sdt_run(
     return;
   }
 
+  let mut complex_field = None;
   for choice in &content.sdt_content_run_choice {
     match choice {
-      w::SdtContentRunChoice::WR(run) => push_run(
+      w::SdtContentRunChoice::WR(run) => push_run_or_complex_field(
         run.as_ref(),
         inlines,
         base_style.clone(),
-        context.styles,
-        context.images,
-        context.hyperlinks,
+        RunImportContext {
+          styles: context.styles,
+          images: context.images,
+          hyperlinks: context.hyperlinks,
+        },
         hyperlink_url,
+        &mut complex_field,
       ),
       w::SdtContentRunChoice::WFldSimple(field) => {
         push_simple_field(field.as_ref(), inlines, base_style.clone(), context);
@@ -4723,6 +4736,7 @@ fn push_sdt_run(
       _ => {}
     }
   }
+  flush_unclosed_complex_field(inlines, &mut complex_field);
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetEnd(widget_id));
   }

@@ -9,6 +9,7 @@ use crate::units;
 pub(crate) struct DocxDocument {
   pub page: PageSetup,
   pub default_tab_stop_pt: f32,
+  pub compatibility_mode: u16,
   pub even_and_odd_headers: bool,
   pub split_page_break_and_paragraph_mark: bool,
   pub form_widgets: Vec<FormWidget>,
@@ -47,6 +48,7 @@ pub(crate) struct SectionColumns {
   pub count: usize,
   pub gap_pt: f32,
   pub separator: bool,
+  pub unbalanced: bool,
   pub explicit_count: usize,
   pub explicit_widths_pt: [f32; 45],
   pub explicit_gaps_pt: [f32; 44],
@@ -58,6 +60,7 @@ impl Default for SectionColumns {
       count: 1,
       gap_pt: 36.0,
       separator: false,
+      unbalanced: false,
       explicit_count: 0,
       explicit_widths_pt: [0.0; 45],
       explicit_gaps_pt: [0.0; 44],

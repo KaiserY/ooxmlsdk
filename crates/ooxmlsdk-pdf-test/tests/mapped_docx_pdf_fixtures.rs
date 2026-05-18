@@ -340,19 +340,6 @@ fn assert_text_objects_share_non_black_fill_color(summary: &PdfSummary, texts: &
   );
 }
 
-fn assert_text_fill_color_count(summary: &PdfSummary, color: &str, expected_count: usize) {
-  let count = summary
-    .text_objects
-    .iter()
-    .filter(|object| object.fill_color.as_deref() == Some(color))
-    .count();
-  assert_eq!(
-    count, expected_count,
-    "text fill color {color} count mismatch; text_objects={:?}",
-    summary.text_objects
-  );
-}
-
 fn assert_has_path_fill_color(summary: &PdfSummary, color: &str) {
   assert!(
     summary
@@ -3892,7 +3879,15 @@ fn mapped_fixture_ct_formatted_deletion_marks_deleted_paragraph_with_strikeout()
 // Source: ../core/sw/qa/extras/layout/layout2.cxx:testRedlineMovingDOCX
 fn mapped_fixture_tdf104797_docx_move_redline_paints_green_moved_text() {
   let summary = render_summary("tdf104797.docx");
-  assert_text_fill_color_count(&summary, "#008000@ff", 6);
+  assert_page_contains(&summary, 0, "Will this sentence be duplicated?");
+  assert_page_contains(&summary, 0, "This is a filler sentence.");
+  assert_page_contains(&summary, 0, "ADDED STUFF");
+  // LibreOffice checks green textcolor commands in the metafile. PDFium may
+  // split one moved run into multiple text objects, so assert the moved text
+  // itself is painted with the LibreOffice move-redline color.
+  assert_text_object_fill_color(&summary, "Will this sentence be duplicated", "#008000@ff");
+  assert_text_object_fill_color(&summary, "duplicated?", "#008000@ff");
+  assert_text_object_fill_color(&summary, "?", "#008000@ff");
 }
 
 #[test]

@@ -614,6 +614,7 @@ struct FlowContext {
   layout_cell_bounds: Option<FrameBounds>,
   layout_cell_print_bounds: Option<FrameBounds>,
   default_tab_stop_pt: f32,
+  compatibility_mode: u16,
   split_page_break_and_paragraph_mark: bool,
   repeating_slots: RepeatingSlotState,
   text_segmentation: TextSegmentation,
@@ -900,6 +901,7 @@ impl<'a> RootFrameLayout<'a> {
     body_flow_for_page(
       FlowContext {
         repeating_slots: repeating_slot_state(self.document, frame.section_index),
+        compatibility_mode: self.document.compatibility_mode,
         split_page_break_and_paragraph_mark: self.document.split_page_break_and_paragraph_mark,
         ..flow
       },
@@ -909,6 +911,25 @@ impl<'a> RootFrameLayout<'a> {
 
   fn start_section_frame(&mut self, section_index: usize, section: &crate::docx::ImportedSection) {
     let current_page_has_body_progress = self.current_page_has_body_progress();
+    if section_index > 0
+      && section.break_kind == SectionBreakKind::Continuous
+      && section.columns.count > 1
+      && section.columns.unbalanced
+      && blocks_have_footnote_references(&section.blocks)
+      && current_page_has_body_progress
+    {
+      // Source: LibreOffice sw/source/core/layout/findfrm.cxx:tdf139336
+      // moves footnotes in non-balanced column sections to the page frame.
+      self.push_current_page(empty_page(section.page, section_index));
+      self.y = body_content_limits_for_page(
+        section.page,
+        repeating_slot_state(self.document, section_index),
+        self.pages.len() + 1,
+        0,
+      )
+      .0;
+      return;
+    }
     let reuse_empty_page = self.current.items.is_empty()
       && (section_index == 0
         || section.break_kind == SectionBreakKind::Continuous
@@ -2024,8 +2045,11 @@ fn page_frame_fragments(
       {
         fragment.kind = FrameFragmentKind::NoteLine;
       }
+      fragment.item_start = fragment.item_start.max(item_start);
+      fragment.item_end = fragment.item_end.min(item_end);
       fragment
     })
+    .filter(|fragment| fragment.item_start < fragment.item_end)
     .collect()
 }
 
@@ -2990,6 +3014,7 @@ fn flow_context(
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt,
+    compatibility_mode: 12,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::Body,
@@ -3292,11 +3317,17 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
           floating_bottom = floating_bottom.max(shape_y + height + placement.margin_bottom_pt);
           continue;
         }
+        let mut compatibility_forced_shape_line = false;
         if x + shape.width_pt > content_width && x > 0.0 {
           finish_line(&mut content_height, &mut line_height);
+          compatibility_forced_shape_line = true;
         }
         has_flow_content = true;
-        line_height = line_height.max(shape.height_pt);
+        line_height = if flow.compatibility_mode < 15 && compatibility_forced_shape_line {
+          shape.height_pt.max(LAYOUT_EPSILON_PT)
+        } else {
+          line_height.max(shape.height_pt)
+        };
         x = shape.width_pt;
       }
       InlineItem::FormWidgetStart(_)
@@ -3446,6 +3477,7 @@ fn layout_document_block(
       let mut ignore_top_margin_at_page_start = false;
       if paragraph.starts_after_last_rendered_page_break
         && flow.text_segmentation == TextSegmentation::Body
+        && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
         && y > flow.content_top_pt + LAYOUT_EPSILON_PT
         && !current.items.is_empty()
         && !previous.is_some_and(block_contains_page_break)
@@ -3673,6 +3705,7 @@ fn flow_from_block_area(area: BlockArea) -> FlowContext {
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt: area.default_tab_stop_pt,
+    compatibility_mode: 12,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: area.repeating_slots,
     text_segmentation: TextSegmentation::Body,
@@ -4033,6 +4066,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
+      compatibility_mode: document.compatibility_mode,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
       repeating_slots: repeating_slot_state(document, page.section_index),
       text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4065,6 +4099,7 @@ fn repeating_slot_wrap_exclusions_for_page(
       layout_cell_bounds: None,
       layout_cell_print_bounds: None,
       default_tab_stop_pt: document.default_tab_stop_pt,
+      compatibility_mode: document.compatibility_mode,
       split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
       repeating_slots: repeating_slot_state(document, page.section_index),
       text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4205,6 +4240,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
+        compatibility_mode: document.compatibility_mode,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4237,6 +4273,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
         layout_cell_bounds: None,
         layout_cell_print_bounds: None,
         default_tab_stop_pt: document.default_tab_stop_pt,
+        compatibility_mode: document.compatibility_mode,
         split_page_break_and_paragraph_mark: document.split_page_break_and_paragraph_mark,
         repeating_slots: RepeatingSlotState::default(),
         text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4264,6 +4301,23 @@ fn section_has_repeating_blocks(section: &crate::docx::ImportedSection) -> bool 
 
 fn blocks_have_visible_body_content(blocks: &[Block]) -> bool {
   blocks.iter().any(block_has_visible_body_content)
+}
+
+fn blocks_have_footnote_references(blocks: &[Block]) -> bool {
+  blocks.iter().any(block_has_footnote_references)
+}
+
+fn block_has_footnote_references(block: &Block) -> bool {
+  match block {
+    Block::Paragraph(paragraph) => !paragraph.footnote_reference_ids.is_empty(),
+    Block::Table(table) => table.rows.iter().any(|row| {
+      row
+        .cells
+        .iter()
+        .any(|cell| blocks_have_footnote_references(&cell.blocks))
+    }),
+    Block::Frame(frame) => blocks_have_footnote_references(&frame.blocks),
+  }
 }
 
 fn block_has_visible_body_content(block: &Block) -> bool {
@@ -4788,6 +4842,7 @@ fn measured_repeating_blocks_height(
     layout_cell_bounds: None,
     layout_cell_print_bounds: None,
     default_tab_stop_pt,
+    compatibility_mode: 12,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::RepeatingSlot,
@@ -4946,7 +5001,10 @@ fn layout_floating_table(
   let Some(placement) = table.placement else {
     return (flow, y);
   };
-  if table.starts_after_last_rendered_page_break && y > flow.content_top_pt + LAYOUT_EPSILON_PT {
+  if table.starts_after_last_rendered_page_break
+    && y > flow.content_top_pt + LAYOUT_EPSILON_PT
+    && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
+  {
     current.preserve_empty = true;
     (flow, y) = advance_section_flow(flow, current, pages);
   }
@@ -7090,6 +7148,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       height_pt: (height - top_margin_for_lowers - bottom_margin_for_lowers).max(0.0),
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    compatibility_mode: 12,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -7300,6 +7359,7 @@ fn layout_shape_text_box(
     layout_cell_bounds: parent_flow.layout_cell_bounds,
     layout_cell_print_bounds: parent_flow.layout_cell_print_bounds,
     default_tab_stop_pt: parent_flow.default_tab_stop_pt,
+    compatibility_mode: parent_flow.compatibility_mode,
     split_page_break_and_paragraph_mark: parent_flow.split_page_break_and_paragraph_mark,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -7450,6 +7510,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
       height_pt: 0.0,
     }),
     default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+    compatibility_mode: 12,
     split_page_break_and_paragraph_mark: false,
     repeating_slots: RepeatingSlotState::default(),
     text_segmentation: TextSegmentation::TableCell,
@@ -9102,15 +9163,24 @@ impl<'a> TextFrameLayout<'a> {
               let shape_y = shape_y + shape.offset_y_pt + text_anchor_offset;
               let shape_x = adjusted_floating_shape_x(placement, shape, shape_x);
               let shape_y = adjusted_floating_shape_y(placement, shape, shape_y);
+              let shape_paint_y = if placement.layout_in_cell
+                && flow.text_segmentation == TextSegmentation::TableCell
+                && matches!(placement.wrap, ImageWrapMode::Square | ImageWrapMode::Tight)
+                && shape.text_box_blocks.is_empty()
+              {
+                shape_y - height
+              } else {
+                shape_y
+              };
               let allows_outside_page =
                 shape.allow_outside_page || floating_shape_may_extend_outside_page(placement);
-              let (shape_x, shape_y) = if allows_outside_page {
-                (shape_x, shape_y)
+              let (shape_x, shape_paint_y) = if allows_outside_page {
+                (shape_x, shape_paint_y)
               } else {
-                keep_floating_shape_inside_page(shape_x, shape_y, width, height, flow)
+                keep_floating_shape_inside_page(shape_x, shape_paint_y, width, height, flow)
               };
               let (shape_item_start, shape_item_end) =
-                place_shape(current, flow, shape_x, shape_y, width, height);
+                place_shape(current, flow, shape_x, shape_paint_y, width, height);
               if placement.behind_text
                 && shape.fill_color.is_none()
                 && shape.fill_image.is_none()
@@ -9122,7 +9192,8 @@ impl<'a> TextFrameLayout<'a> {
                   x_pt: shape_x,
                   y_pt: y,
                   width_pt: width,
-                  height_pt: (shape_y + height - y - BorderStyle::default().width_pt).max(height),
+                  height_pt: (shape_paint_y + height - y - BorderStyle::default().width_pt)
+                    .max(height),
                   fill_color: None,
                   fill_opacity: 1.0,
                   stroke: Some(BorderStyle::default()),
@@ -9131,12 +9202,51 @@ impl<'a> TextFrameLayout<'a> {
               }
               let influence_bounds = Some(FrameBounds {
                 x_pt: shape_x - placement.margin_left_pt,
-                y_pt: shape_y - placement.margin_top_pt,
+                y_pt: shape_paint_y - placement.margin_top_pt,
                 width_pt: width + placement.margin_left_pt + placement.margin_right_pt,
                 height_pt: height + placement.margin_top_pt + placement.margin_bottom_pt,
               });
               match placement.wrap {
                 ImageWrapMode::TopBottom | ImageWrapMode::None => {
+                  if !placement.behind_text {
+                    append_vertical_wrap_exclusion(
+                      current,
+                      flow,
+                      shape_x - placement.margin_left_pt,
+                      shape_y - placement.margin_top_pt,
+                      shape_x + width + placement.margin_right_pt,
+                      shape_y + height + placement.margin_bottom_pt,
+                    );
+                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                    push_page_influence(
+                      current,
+                      FrameInfluenceKind::FlyWrap,
+                      shape_item_start,
+                      shape_item_end,
+                      influence_bounds,
+                    );
+                    y = y.max(shape_y + height + placement.margin_bottom_pt);
+                    if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                      (flow, y) = advance_section_flow(flow, current, pages);
+                      text_frame = TextFrame::new(self.paragraph, flow);
+                      text_state.note_page_follow(pages.len(), y);
+                      reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
+                      default_line_right = text_frame.default_line_right;
+                      paragraph_left = text_frame.paragraph_left;
+                      base_line_height = text_frame.base_line_height;
+                      line_height = base_line_height;
+                      line_item_start_index = current.items.len();
+                    }
+                  }
+                  (line_left, line_right) =
+                    self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
+                  x = line_left;
+                  line_height = base_line_height;
+                }
+                ImageWrapMode::Square | ImageWrapMode::Tight
+                  if placement.layout_in_cell
+                    && flow.text_segmentation == TextSegmentation::TableCell =>
+                {
                   if !placement.behind_text {
                     append_vertical_wrap_exclusion(
                       current,
@@ -9214,6 +9324,7 @@ impl<'a> TextFrameLayout<'a> {
                 emitted = false;
                 pending_text_page_break = false;
               }
+              let mut compatibility_forced_shape_line = false;
               if x + shape.width_pt > line_right && x > line_left {
                 (flow, text_frame, y, line_left, line_right) = self.advance_line(
                   TextLineAdvance {
@@ -9238,6 +9349,7 @@ impl<'a> TextFrameLayout<'a> {
                 paragraph_left = text_frame.paragraph_left;
                 base_line_height = text_frame.base_line_height;
                 x = line_left;
+                compatibility_forced_shape_line = true;
               }
               let _ = place_shape(
                 current,
@@ -9254,7 +9366,11 @@ impl<'a> TextFrameLayout<'a> {
                 shape.height_pt,
               );
               x += shape.width_pt;
-              line_height = line_height.max(shape.height_pt);
+              line_height = if flow.compatibility_mode < 15 && compatibility_forced_shape_line {
+                shape.height_pt.max(LAYOUT_EPSILON_PT)
+              } else {
+                line_height.max(shape.height_pt)
+              };
             }
           }
           if matches!(

@@ -79,6 +79,8 @@ pub(crate) fn extract(
   let mut form_widget_ids = FormWidgetIdAllocator::default();
   let default_tab_stop_pt = default_tab_stop_pt(package, &main);
   let even_and_odd_headers = even_and_odd_headers(package, &main);
+  let compatibility_mode = compatibility_mode(package, &main);
+  let no_column_balance = no_column_balance(package, &main);
   let split_page_break_and_paragraph_mark = split_page_break_and_paragraph_mark(package, &main);
   let mirror_margins = mirror_margins(package, &main);
   let document = main.root_element(package)?;
@@ -102,6 +104,7 @@ pub(crate) fn extract(
         &hyperlinks,
         &custom_xml_bindings,
         &mut form_widget_ids,
+        no_column_balance,
       )
     })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
@@ -184,6 +187,7 @@ pub(crate) fn extract(
   Ok(DocxDocument {
     page,
     default_tab_stop_pt,
+    compatibility_mode,
     even_and_odd_headers,
     split_page_break_and_paragraph_mark,
     form_widgets,
@@ -200,6 +204,38 @@ pub(crate) fn extract(
     title_page,
     blocks,
   })
+}
+
+fn compatibility_mode(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> u16 {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings.w_compat.as_ref().and_then(|compat| {
+        compat
+          .w_compat_setting
+          .iter()
+          .find(|setting| setting.w_name == w::CompatSettingNameValues::CompatibilityMode)
+          .and_then(|setting| setting.w_val.as_str().parse::<u16>().ok())
+      })
+    })
+    // Source: LibreOffice sw/source/writerfilter/dmapper/SettingsTable.cxx
+    // defaults a missing DOCX compatibilityMode to Word 2007 / mode 12.
+    .unwrap_or(12)
+}
+
+fn no_column_balance(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> bool {
+  main
+    .document_settings_part(package)
+    .and_then(|part| part.root_element(package).ok())
+    .and_then(|settings| {
+      settings
+        .w_compat
+        .as_ref()
+        .and_then(|compat| compat.no_column_balance.as_ref())
+        .map(|value| on_off_only_value(value.val))
+    })
+    .unwrap_or(false)
 }
 
 fn split_page_break_and_paragraph_mark(
@@ -1245,6 +1281,7 @@ fn body_sections(
   hyperlinks: &HyperlinkCatalog,
   custom_xml_bindings: &CustomXmlBindings,
   form_widget_ids: &mut FormWidgetIdAllocator,
+  no_column_balance: bool,
 ) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
@@ -1330,6 +1367,22 @@ fn body_sections(
       body.w_sect_pr.as_deref().cloned(),
       &mut previous_properties,
     );
+  }
+
+  for index in 0..sections.len() {
+    if sections[index].columns.count <= 1 {
+      continue;
+    }
+    let next_is_continuous = sections
+      .get(index + 1)
+      .is_some_and(|next| next.break_kind == SectionBreakKind::Continuous);
+    if no_column_balance || !next_is_continuous {
+      // Source: LibreOffice sw/source/writerfilter/dmapper/PropertyMap.cxx
+      // and sw/source/filter/ww8/ww8par.cxx set DontBalanceTextColumns
+      // from w:noColumnBalance, and for multi-column sections followed by a
+      // non-continuous break or by the end of the section group.
+      sections[index].columns.unbalanced = true;
+    }
   }
 
   sections
@@ -1691,6 +1744,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
         count: explicit_count.max(1),
         gap_pt,
         separator: columns.separator.is_some_and(|value| value.as_bool()),
+        unbalanced: false,
         explicit_count,
         explicit_widths_pt: widths,
         explicit_gaps_pt: gaps,
@@ -1706,6 +1760,7 @@ fn section_columns(section: &w::SectionProperties) -> SectionColumns {
     count,
     gap_pt,
     separator: columns.separator.is_some_and(|value| value.as_bool()),
+    unbalanced: false,
     explicit_count: 0,
     explicit_widths_pt: [0.0; 45],
     explicit_gaps_pt: [0.0; 44],

@@ -266,6 +266,7 @@ pub(crate) struct ParagraphFrameProperties {
   pub height_pt: Option<f32>,
   pub height_rule: FrameHeightRule,
   pub placement: FloatingFramePlacement,
+  pub drop_cap: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -693,6 +694,7 @@ pub(crate) struct PageSetup {
   pub borders: CellBordersModel,
   pub borders_offset_from_text: bool,
   pub line_numbering: Option<LineNumbering>,
+  pub doc_grid_line_pitch_pt: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -722,6 +724,7 @@ impl Default for PageSetup {
       borders: CellBordersModel::default(),
       borders_offset_from_text: false,
       line_numbering: None,
+      doc_grid_line_pitch_pt: None,
     }
   }
 }

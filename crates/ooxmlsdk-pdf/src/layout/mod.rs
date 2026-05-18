@@ -87,13 +87,28 @@ fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
     .unwrap_or_else(|| paragraph.base_style.clone())
 }
 
-fn paragraph_line_height(paragraph: &crate::docx::Paragraph, base_line_style: &TextStyle) -> f32 {
+fn paragraph_line_height_for_setup(
+  paragraph: &crate::docx::Paragraph,
+  base_line_style: &TextStyle,
+  setup: PageSetup,
+  text_segmentation: TextSegmentation,
+) -> f32 {
   match paragraph.format.line_height_rule {
-    LineHeightRule::Auto => paragraph
-      .format
-      .line_height_pt
-      .map(|multiple| word_auto_line_height(base_line_style) * multiple)
-      .unwrap_or_else(|| inline_text_height(base_line_style)),
+    LineHeightRule::Auto => {
+      let line_height = paragraph
+        .format
+        .line_height_pt
+        .map(|multiple| word_auto_line_height(base_line_style) * multiple)
+        .unwrap_or_else(|| inline_text_height(base_line_style));
+      // Source: LibreOffice sw/source/core/text/itrform2.cxx
+      // SwTextFormatter::CalcRealHeight() uses the imported document grid
+      // base height as the auto line real height in grid layout.
+      if text_segmentation == TextSegmentation::Body {
+        line_height.max(setup.doc_grid_line_pitch_pt.unwrap_or(0.0))
+      } else {
+        line_height
+      }
+    }
     LineHeightRule::AtLeast | LineHeightRule::Exact => paragraph
       .format
       .line_height_pt
@@ -440,6 +455,8 @@ pub(crate) struct Page {
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
   wrap_exclusions: Vec<WrapExclusion>,
+  repeating_wrap_exclusion_catalog: RepeatingWrapExclusionCatalog,
+  repeating_wrap_exclusions: Vec<WrapExclusion>,
   pending_floating_table_follows: Vec<PendingFloatingTableFollow>,
 }
 
@@ -614,13 +631,14 @@ struct ResolvedTabStop {
   alignment: TabStopAlignment,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct WrapExclusion {
   left_pt: f32,
   right_pt: f32,
   top_pt: f32,
   bottom_pt: f32,
   side: ImageWrapSide,
+  blocks_flow: bool,
 }
 
 impl WrapExclusion {
@@ -630,6 +648,31 @@ impl WrapExclusion {
 
   fn overlaps_horizontal_span(&self, left_pt: f32, right_pt: f32) -> bool {
     right_pt > self.left_pt && left_pt < self.right_pt
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+struct RepeatingWrapExclusionCatalog {
+  first_odd: Vec<WrapExclusion>,
+  first_even: Vec<WrapExclusion>,
+  even: Vec<WrapExclusion>,
+  default: Vec<WrapExclusion>,
+}
+
+impl RepeatingWrapExclusionCatalog {
+  fn selected(&self, section_page_index: usize, page_number: usize) -> &[WrapExclusion] {
+    let even_page = page_number.is_multiple_of(2);
+    if section_page_index == 0 {
+      if even_page {
+        &self.first_even
+      } else {
+        &self.first_odd
+      }
+    } else if even_page {
+      &self.even
+    } else {
+      &self.default
+    }
   }
 }
 
@@ -783,6 +826,7 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn format_body_frames(&mut self) {
+    self.seed_current_repeating_wrap_exclusions();
     if self.document.sections.is_empty() {
       let blocks = self.document.blocks.clone();
       let flow = self.body_flow(document_page_frame(
@@ -847,6 +891,7 @@ impl<'a> RootFrameLayout<'a> {
       self.current.section_index = section_index;
       self.current.section_page_index = 0;
       activate_pending_floating_table_follows_for_current(&mut self.current, &mut self.pages);
+      self.seed_current_repeating_wrap_exclusions();
       self.y = body_content_limits_for_page(
         section.page,
         repeating_slot_state(self.document, section_index),
@@ -865,6 +910,7 @@ impl<'a> RootFrameLayout<'a> {
         section_page_index = 1;
         self.current.section_page_index = section_page_index;
         activate_pending_floating_table_follows_for_current(&mut self.current, &mut self.pages);
+        self.seed_current_repeating_wrap_exclusions();
       }
       self.y = body_content_limits_for_page(
         section.page,
@@ -1345,16 +1391,42 @@ impl<'a> RootFrameLayout<'a> {
     let Some(previous) = self.pages.last() else {
       return;
     };
-    self.pages.push(empty_section_page(
+    let mut page = empty_section_page(
       previous.setup,
       previous.section_index,
       previous.section_page_index + 1,
-    ));
+    );
+    page.repeating_wrap_exclusion_catalog = previous.repeating_wrap_exclusion_catalog.clone();
+    page.repeating_wrap_exclusions = page
+      .repeating_wrap_exclusion_catalog
+      .selected(page.section_page_index, self.pages.len() + 1)
+      .to_vec();
+    extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &page.repeating_wrap_exclusions);
+    self.pages.push(page);
   }
 
   fn push_current_page(&mut self, next: Page) {
     self.pages.push(std::mem::replace(&mut self.current, next));
     activate_pending_floating_table_follows_for_current(&mut self.current, &mut self.pages);
+    self.seed_current_repeating_wrap_exclusions();
+  }
+
+  fn seed_current_repeating_wrap_exclusions(&mut self) {
+    let catalog = repeating_wrap_exclusion_catalog_for_page(self.document, &self.current);
+    let exclusions = catalog
+      .selected(self.current.section_page_index, self.pages.len() + 1)
+      .to_vec();
+    let previous = self.current.repeating_wrap_exclusions.clone();
+    self
+      .current
+      .wrap_exclusions
+      .retain(|exclusion| !previous.contains(exclusion));
+    self.current.repeating_wrap_exclusion_catalog = catalog;
+    self.current.repeating_wrap_exclusions = exclusions;
+    extend_wrap_exclusions_unique(
+      &mut self.current.wrap_exclusions,
+      &self.current.repeating_wrap_exclusions,
+    );
   }
 
   fn follow_transition_start(&self, flow: FlowContext) -> FollowTransitionStart {
@@ -2845,6 +2917,8 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     frame_fragments: Vec::new(),
     frame_influences: Vec::new(),
     wrap_exclusions: Vec::new(),
+    repeating_wrap_exclusion_catalog: RepeatingWrapExclusionCatalog::default(),
+    repeating_wrap_exclusions: Vec::new(),
     pending_floating_table_follows: Vec::new(),
   }
 }
@@ -2969,10 +3043,19 @@ fn advance_section_flow(
     let next_flow = flow_with_column(flow, next_column);
     (next_flow, next_flow.content_top_pt)
   } else {
-    pages.push(std::mem::replace(
-      current,
-      empty_section_page(flow.setup, flow.section_index, flow.section_page_index + 1),
-    ));
+    let next_page_number = pages.len() + 2;
+    let next_section_page_index = flow.section_page_index + 1;
+    let mut next_page = empty_section_page(flow.setup, flow.section_index, next_section_page_index);
+    next_page.repeating_wrap_exclusion_catalog = current.repeating_wrap_exclusion_catalog.clone();
+    next_page.repeating_wrap_exclusions = next_page
+      .repeating_wrap_exclusion_catalog
+      .selected(next_section_page_index, next_page_number)
+      .to_vec();
+    extend_wrap_exclusions_unique(
+      &mut next_page.wrap_exclusions,
+      &next_page.repeating_wrap_exclusions,
+    );
+    pages.push(std::mem::replace(current, next_page));
     activate_pending_floating_table_follows_for_current(current, pages);
     let next_flow = body_flow_for_page(
       flow_with_column(
@@ -3040,7 +3123,12 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
     (flow.content_width - paragraph.format.indent_left_pt - paragraph.format.indent_right_pt)
       .max(DEFAULT_FONT_SIZE_PT);
   let base_line_style = paragraph_base_line_style(paragraph);
-  let base_line_height = paragraph_line_height(paragraph, &base_line_style);
+  let base_line_height = paragraph_line_height_for_setup(
+    paragraph,
+    &base_line_style,
+    flow.setup,
+    flow.text_segmentation,
+  );
   let text_frame = TextFrame {
     default_line_left: 0.0,
     first_line_left: 0.0,
@@ -3286,21 +3374,7 @@ fn layout_document_block(
         && !current.items.is_empty()
         && flow.text_segmentation == TextSegmentation::Body
       {
-        pages.push(std::mem::replace(
-          current,
-          empty_section_page(flow.setup, flow.section_index, flow.section_page_index + 1),
-        ));
-        flow = body_flow_for_page(
-          flow_with_column(
-            FlowContext {
-              section_page_index: flow.section_page_index + 1,
-              ..flow
-            },
-            0,
-          ),
-          pages.len() + 1,
-        );
-        y = flow.content_top_pt;
+        (flow, y) = force_page_break(flow, current, pages);
         ignore_top_margin_at_page_start = true;
       }
 
@@ -3781,6 +3855,209 @@ fn collect_endnote_ids_from_blocks(blocks: &[Block], ids: &mut Vec<i64>) {
   }
 }
 
+fn repeating_slot_blocks_for_page<'a>(
+  document: &'a DocxDocument,
+  page: &Page,
+  page_number: usize,
+) -> (&'a [Block], &'a [Block]) {
+  let first_page_in_section = page.section_page_index == 0;
+  let section = document.sections.get(page.section_index);
+  let title_page = section
+    .map(|section| section.title_page)
+    .unwrap_or(document.title_page);
+  let (default_header, default_footer, first_header, first_footer, even_header, even_footer) =
+    section
+      .map(|section| {
+        (
+          section.header_blocks.as_slice(),
+          section.footer_blocks.as_slice(),
+          section.first_header_blocks.as_slice(),
+          section.first_footer_blocks.as_slice(),
+          section.even_header_blocks.as_slice(),
+          section.even_footer_blocks.as_slice(),
+        )
+      })
+      .unwrap_or((
+        document.header_blocks.as_slice(),
+        document.footer_blocks.as_slice(),
+        document.first_header_blocks.as_slice(),
+        document.first_footer_blocks.as_slice(),
+        document.header_blocks.as_slice(),
+        document.footer_blocks.as_slice(),
+      ));
+  let use_even_slot = document.even_and_odd_headers && page_number.is_multiple_of(2);
+  let header_blocks = if first_page_in_section && title_page && !first_header.is_empty() {
+    first_header
+  } else if use_even_slot && !even_header.is_empty() {
+    even_header
+  } else {
+    default_header
+  };
+  let footer_blocks = if first_page_in_section && title_page && !first_footer.is_empty() {
+    first_footer
+  } else if use_even_slot && !even_footer.is_empty() {
+    even_footer
+  } else {
+    default_footer
+  };
+  (header_blocks, footer_blocks)
+}
+
+fn repeating_slot_wrap_exclusions_for_page(
+  document: &DocxDocument,
+  page: &Page,
+  page_number: usize,
+) -> Vec<WrapExclusion> {
+  let (header_blocks, footer_blocks) = repeating_slot_blocks_for_page(document, page, page_number);
+  if header_blocks.is_empty() && footer_blocks.is_empty() {
+    return Vec::new();
+  }
+
+  let content_width =
+    (page.setup.width_pt - page.setup.margin_left_pt - page.setup.margin_right_pt)
+      .max(DEFAULT_FONT_SIZE_PT);
+  let mut adornment = empty_section_page(page.setup, page.section_index, page.section_page_index);
+  let mut discarded_pages = Vec::new();
+
+  let header_height =
+    measured_repeating_blocks_height(header_blocks, page.setup, document.default_tab_stop_pt);
+  let header_top = page.setup.header_distance_pt.max(0.0);
+  layout_repeating_blocks_into_page(
+    header_blocks,
+    &mut adornment,
+    &mut discarded_pages,
+    header_top,
+    FlowContext {
+      setup: page.setup,
+      section_index: page.section_index,
+      section_page_index: page.section_page_index,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: header_top,
+      content_left_pt: page.setup.margin_left_pt,
+      content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+      body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+      content_width,
+      layout_cell_bounds: None,
+      default_tab_stop_pt: document.default_tab_stop_pt,
+      repeating_slots: repeating_slot_state(document, page.section_index),
+      text_segmentation: TextSegmentation::RepeatingSlot,
+      paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    },
+  );
+
+  let footer_height =
+    measured_repeating_blocks_height(footer_blocks, page.setup, document.default_tab_stop_pt);
+  let footer_bottom = (page.setup.height_pt - page.setup.footer_distance_pt.max(0.0))
+    .max(0.0)
+    .min(page.setup.height_pt);
+  let footer_top = (footer_bottom - footer_height).max(0.0);
+  layout_repeating_blocks_into_page(
+    footer_blocks,
+    &mut adornment,
+    &mut discarded_pages,
+    footer_top,
+    FlowContext {
+      setup: page.setup,
+      section_index: page.section_index,
+      section_page_index: page.section_page_index,
+      column_index: 0,
+      columns: SectionColumns::default(),
+      content_top_pt: footer_top,
+      content_left_pt: page.setup.margin_left_pt,
+      content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+      body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+      content_width,
+      layout_cell_bounds: None,
+      default_tab_stop_pt: document.default_tab_stop_pt,
+      repeating_slots: repeating_slot_state(document, page.section_index),
+      text_segmentation: TextSegmentation::RepeatingSlot,
+      paragraph_spacing_context: ParagraphSpacingContext::Normal,
+    },
+  );
+
+  adornment.wrap_exclusions
+}
+
+fn repeating_wrap_exclusion_catalog_for_page(
+  document: &DocxDocument,
+  page: &Page,
+) -> RepeatingWrapExclusionCatalog {
+  let first_page_odd = empty_section_page(page.setup, page.section_index, 0);
+  let first_page_even = empty_section_page(page.setup, page.section_index, 0);
+  let default_page = empty_section_page(page.setup, page.section_index, 1);
+  let even_page = empty_section_page(page.setup, page.section_index, 1);
+  RepeatingWrapExclusionCatalog {
+    first_odd: repeating_slot_wrap_exclusions_for_page(document, &first_page_odd, 1),
+    first_even: repeating_slot_wrap_exclusions_for_page(document, &first_page_even, 2),
+    even: repeating_slot_wrap_exclusions_for_page(document, &even_page, 2),
+    default: repeating_slot_wrap_exclusions_for_page(document, &default_page, 1),
+  }
+}
+
+fn layout_repeating_blocks_into_page(
+  blocks: &[Block],
+  page: &mut Page,
+  discarded_pages: &mut Vec<Page>,
+  mut y: f32,
+  flow: FlowContext,
+) -> f32 {
+  for (index, block) in blocks.iter().enumerate() {
+    y = layout_repeating_block(
+      block,
+      page,
+      discarded_pages,
+      y,
+      flow,
+      index + 1 == blocks.len(),
+    );
+  }
+  y
+}
+
+fn extend_wrap_exclusions_unique(target: &mut Vec<WrapExclusion>, exclusions: &[WrapExclusion]) {
+  for exclusion in exclusions {
+    if !target.contains(exclusion) {
+      target.push(*exclusion);
+    }
+  }
+}
+
+fn reset_wrap_exclusions_for_y(page: &Page, y: f32, target: &mut Vec<WrapExclusion>) {
+  target.clear();
+  target.extend(
+    page
+      .wrap_exclusions
+      .iter()
+      .copied()
+      .filter(|exclusion| exclusion.bottom_pt > y),
+  );
+}
+
+fn append_vertical_wrap_exclusion(
+  page: &mut Page,
+  flow: FlowContext,
+  left_pt: f32,
+  top_pt: f32,
+  right_pt: f32,
+  bottom_pt: f32,
+) {
+  if bottom_pt <= top_pt + LAYOUT_EPSILON_PT {
+    return;
+  }
+  let block_left = flow.content_left_pt;
+  let block_right = block_left + flow.content_width;
+  let exclusion = WrapExclusion {
+    left_pt: left_pt.min(block_left),
+    right_pt: right_pt.max(block_right),
+    top_pt,
+    bottom_pt,
+    side: ImageWrapSide::BothSides,
+    blocks_flow: true,
+  };
+  extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &[exclusion]);
+}
+
 fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
   let document_repeating_blocks_empty = document.header_blocks.is_empty()
     && document.footer_blocks.is_empty()
@@ -3799,46 +4076,7 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
   }
 
   for (index, page) in pages.iter_mut().enumerate() {
-    let first_page_in_section = page.section_page_index == 0;
-    let section = document.sections.get(page.section_index);
-    let title_page = section
-      .map(|section| section.title_page)
-      .unwrap_or(document.title_page);
-    let (default_header, default_footer, first_header, first_footer, even_header, even_footer) =
-      section
-        .map(|section| {
-          (
-            &section.header_blocks,
-            &section.footer_blocks,
-            &section.first_header_blocks,
-            &section.first_footer_blocks,
-            &section.even_header_blocks,
-            &section.even_footer_blocks,
-          )
-        })
-        .unwrap_or((
-          &document.header_blocks,
-          &document.footer_blocks,
-          &document.first_header_blocks,
-          &document.first_footer_blocks,
-          &document.header_blocks,
-          &document.footer_blocks,
-        ));
-    let use_even_slot = document.even_and_odd_headers && (index + 1) % 2 == 0;
-    let header_blocks = if first_page_in_section && title_page && !first_header.is_empty() {
-      first_header
-    } else if use_even_slot && !even_header.is_empty() {
-      even_header
-    } else {
-      default_header
-    };
-    let footer_blocks = if first_page_in_section && title_page && !first_footer.is_empty() {
-      first_footer
-    } else if use_even_slot && !even_footer.is_empty() {
-      even_footer
-    } else {
-      default_footer
-    };
+    let (header_blocks, footer_blocks) = repeating_slot_blocks_for_page(document, page, index + 1);
 
     if header_blocks.is_empty() && footer_blocks.is_empty() {
       continue;
@@ -3852,32 +4090,29 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
     let header_height =
       measured_repeating_blocks_height(header_blocks, page.setup, document.default_tab_stop_pt);
     let header_top = page.setup.header_distance_pt.max(0.0);
-    let mut y = header_top;
-    for block in header_blocks {
-      y = layout_repeating_block(
-        block,
-        &mut adornment,
-        &mut discarded_pages,
-        y,
-        FlowContext {
-          setup: page.setup,
-          section_index: page.section_index,
-          section_page_index: page.section_page_index,
-          column_index: 0,
-          columns: SectionColumns::default(),
-          content_top_pt: header_top,
-          content_left_pt: page.setup.margin_left_pt,
-          content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
-          body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
-          content_width,
-          layout_cell_bounds: None,
-          default_tab_stop_pt: document.default_tab_stop_pt,
-          repeating_slots: RepeatingSlotState::default(),
-          text_segmentation: TextSegmentation::RepeatingSlot,
-          paragraph_spacing_context: ParagraphSpacingContext::Normal,
-        },
-      );
-    }
+    layout_repeating_blocks_into_page(
+      header_blocks,
+      &mut adornment,
+      &mut discarded_pages,
+      header_top,
+      FlowContext {
+        setup: page.setup,
+        section_index: page.section_index,
+        section_page_index: page.section_page_index,
+        column_index: 0,
+        columns: SectionColumns::default(),
+        content_top_pt: header_top,
+        content_left_pt: page.setup.margin_left_pt,
+        content_bottom: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+        body_content_bottom_pt: header_top + header_height + DEFAULT_LINE_HEIGHT_PT,
+        content_width,
+        layout_cell_bounds: None,
+        default_tab_stop_pt: document.default_tab_stop_pt,
+        repeating_slots: RepeatingSlotState::default(),
+        text_segmentation: TextSegmentation::RepeatingSlot,
+        paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      },
+    );
 
     let footer_height =
       measured_repeating_blocks_height(footer_blocks, page.setup, document.default_tab_stop_pt);
@@ -3885,39 +4120,36 @@ fn apply_headers_and_footers(document: &DocxDocument, pages: &mut [Page]) {
       .max(0.0)
       .min(page.setup.height_pt);
     let footer_top = (footer_bottom - footer_height).max(0.0);
-    let mut y = footer_top;
-    for block in footer_blocks {
-      y = layout_repeating_block(
-        block,
-        &mut adornment,
-        &mut discarded_pages,
-        y,
-        FlowContext {
-          setup: page.setup,
-          section_index: page.section_index,
-          section_page_index: page.section_page_index,
-          column_index: 0,
-          columns: SectionColumns::default(),
-          content_top_pt: footer_top,
-          content_left_pt: page.setup.margin_left_pt,
-          content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
-          body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
-          content_width,
-          layout_cell_bounds: None,
-          default_tab_stop_pt: document.default_tab_stop_pt,
-          repeating_slots: RepeatingSlotState::default(),
-          text_segmentation: TextSegmentation::RepeatingSlot,
-          paragraph_spacing_context: ParagraphSpacingContext::Normal,
-        },
-      );
-    }
+    layout_repeating_blocks_into_page(
+      footer_blocks,
+      &mut adornment,
+      &mut discarded_pages,
+      footer_top,
+      FlowContext {
+        setup: page.setup,
+        section_index: page.section_index,
+        section_page_index: page.section_page_index,
+        column_index: 0,
+        columns: SectionColumns::default(),
+        content_top_pt: footer_top,
+        content_left_pt: page.setup.margin_left_pt,
+        content_bottom: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+        body_content_bottom_pt: footer_bottom + DEFAULT_LINE_HEIGHT_PT,
+        content_width,
+        layout_cell_bounds: None,
+        default_tab_stop_pt: document.default_tab_stop_pt,
+        repeating_slots: RepeatingSlotState::default(),
+        text_segmentation: TextSegmentation::RepeatingSlot,
+        paragraph_spacing_context: ParagraphSpacingContext::Normal,
+      },
+    );
 
     let item_offset = page.items.len();
     offset_page_frame_records(&mut adornment, item_offset);
     page.items.extend(adornment.items);
     page.frame_fragments.extend(adornment.frame_fragments);
     page.frame_influences.extend(adornment.frame_influences);
-    page.wrap_exclusions.extend(adornment.wrap_exclusions);
+    extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &adornment.wrap_exclusions);
   }
 }
 
@@ -4460,8 +4692,15 @@ fn measured_repeating_blocks_height(
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
   let mut y = 0.0;
-  for block in blocks {
-    y = layout_repeating_block(block, &mut scratch, &mut discarded_pages, y, flow);
+  for (index, block) in blocks.iter().enumerate() {
+    y = layout_repeating_block(
+      block,
+      &mut scratch,
+      &mut discarded_pages,
+      y,
+      flow,
+      index + 1 == blocks.len(),
+    );
   }
   y
 }
@@ -4472,19 +4711,33 @@ fn layout_repeating_block(
   discarded_pages: &mut Vec<Page>,
   y: f32,
   flow: FlowContext,
+  is_last_repeating_block: bool,
 ) -> f32 {
   match block {
     Block::Paragraph(paragraph) => {
+      let spacing_after_pt = if is_last_repeating_block {
+        // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
+        // SwFlowFrame::CalcLowerSpace(), tdf#128195 branch:
+        // HeaderSpacingBelowLastPara adds the last header/footer paragraph's
+        // lower paragraph space plus SwBorderAttrs::CalcLineSpacing().
+        paragraph
+          .format
+          .spacing_after_pt
+          .max(PARAGRAPH_SPACING_AFTER_PT)
+          + table_cell_line_spacing_before_border(paragraph)
+      } else {
+        paragraph
+          .format
+          .spacing_after_pt
+          .max(PARAGRAPH_SPACING_AFTER_PT)
+      };
       let (_, y) = layout_paragraph(
         paragraph,
         flow,
         page,
         discarded_pages,
         y + paragraph.format.spacing_before_pt,
-        paragraph
-          .format
-          .spacing_after_pt
-          .max(PARAGRAPH_SPACING_AFTER_PT),
+        spacing_after_pt,
       );
       y
     }
@@ -4734,18 +4987,25 @@ fn decorate_floating_table_page_bounds(
 }
 
 fn append_floating_table_wrap_exclusion(page: &mut Page, placement: FloatingFramePlacement) {
-  if frame_wrap_blocks_flow(placement.wrap) {
-    return;
-  }
   let Some((left_pt, top_pt, right_pt, bottom_pt)) = page_items_bounds(&page.items) else {
     return;
   };
+  let blocks_flow = frame_wrap_blocks_flow(placement.wrap);
   let exclusion = WrapExclusion {
-    left_pt: left_pt - placement.margin_left_pt,
-    right_pt: right_pt + placement.margin_right_pt,
+    left_pt: if blocks_flow {
+      0.0
+    } else {
+      left_pt - placement.margin_left_pt
+    },
+    right_pt: if blocks_flow {
+      page.setup.width_pt
+    } else {
+      right_pt + placement.margin_right_pt
+    },
     top_pt: top_pt - placement.margin_top_pt,
     bottom_pt: bottom_pt + placement.margin_bottom_pt,
     side: ImageWrapSide::BothSides,
+    blocks_flow,
   };
   page.wrap_exclusions.push(exclusion);
 }
@@ -5412,6 +5672,9 @@ impl<'a> TableFrameLayout<'a> {
   }
 
   fn table_needs_vertical_dodge(&self, exclusion: WrapExclusion) -> bool {
+    if exclusion.blocks_flow {
+      return true;
+    }
     let table_width = self.frame.right_pt - self.frame.left_pt;
     let block_left = self.frame.block.content_left_pt;
     let block_right = block_left + self.frame.block.content_width;
@@ -6978,7 +7241,12 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32) -> f32 {
     .map(|(index, block)| match block {
       Block::Paragraph(paragraph) => {
         let estimated = estimated_paragraph_height(paragraph, flow);
-        let min_height = paragraph_line_height(paragraph, &paragraph_base_line_style(paragraph));
+        let min_height = paragraph_line_height_for_setup(
+          paragraph,
+          &paragraph_base_line_style(paragraph),
+          flow.setup,
+          flow.text_segmentation,
+        );
         let cell_border_spacing = if index + 1 == cell.blocks.len() {
           table_cell_line_spacing_before_border(paragraph)
         } else {
@@ -7417,7 +7685,12 @@ impl TextFrame {
       first_line_left,
       default_line_right: default_line_left + flow.content_width,
       paragraph_left: default_line_left.min(first_line_left),
-      base_line_height: paragraph_line_height(paragraph, &base_line_style),
+      base_line_height: paragraph_line_height_for_setup(
+        paragraph,
+        &base_line_style,
+        flow.setup,
+        flow.text_segmentation,
+      ),
       line_height_rule: paragraph.format.line_height_rule,
     }
   }
@@ -7599,7 +7872,7 @@ struct ActiveTextFrame {
 struct TextLineAdvance<'a> {
   current: &'a mut Page,
   pages: &'a mut Vec<Page>,
-  wrap_exclusions: &'a [WrapExclusion],
+  wrap_exclusions: &'a mut Vec<WrapExclusion>,
   state: &'a mut TextFrameState,
   active: ActiveTextFrame,
   line_left: f32,
@@ -7684,7 +7957,9 @@ impl<'a> TextFrameLayout<'a> {
       next_frame = TextFrame::new(self.paragraph, next_flow);
       *line_height = next_frame.base_line_height;
       advance.state.note_page_follow(advance.pages.len(), next_y);
+      reset_wrap_exclusions_for_y(advance.current, next_y, advance.wrap_exclusions);
     }
+    next_y = dodge_text_wrap_exclusions(next_y, *line_height, advance.wrap_exclusions);
     let (line_left, line_right) =
       self.line_bounds(next_frame, next_y, *line_height, advance.wrap_exclusions);
     *advance.line_item_start_index = advance.current.items.len();
@@ -7700,7 +7975,8 @@ impl<'a> TextFrameLayout<'a> {
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32) {
     let (next_flow, y) = force_page_break(flow, current, pages);
     let next_frame = TextFrame::new(self.paragraph, next_flow);
-    wrap_exclusions.clear();
+    reset_wrap_exclusions_for_y(current, y, wrap_exclusions);
+    let y = dodge_text_wrap_exclusions(y, next_frame.base_line_height, wrap_exclusions);
     (
       next_flow,
       next_frame,
@@ -7719,8 +7995,9 @@ impl<'a> TextFrameLayout<'a> {
     wrap_exclusions: &mut Vec<WrapExclusion>,
   ) -> (FlowContext, TextFrame, f32, f32, f32, f32, bool) {
     let (next_flow, y) = advance_section_flow(flow, current, pages);
-    wrap_exclusions.clear();
+    reset_wrap_exclusions_for_y(current, y, wrap_exclusions);
     let next_frame = TextFrame::new(self.paragraph, next_flow);
+    let y = dodge_text_wrap_exclusions(y, next_frame.base_line_height, wrap_exclusions);
     (
       next_flow,
       next_frame,
@@ -7770,6 +8047,7 @@ impl<'a> TextFrameLayout<'a> {
       libreoffice_empty_paragraph_first_line_height(&paragraph_base_line_style(paragraph));
     let mut base_line_height = text_frame.base_line_height;
     let mut line_height = line.height_pt;
+    y = dodge_text_wrap_exclusions(y, line_height, &wrap_exclusions);
     let (mut line_left, mut line_right) =
       self.line_bounds(text_frame, y, line_height, &wrap_exclusions);
     if paragraph.list_label.is_some() {
@@ -7882,7 +8160,7 @@ impl<'a> TextFrameLayout<'a> {
                 TextLineAdvance {
                   current,
                   pages,
-                  wrap_exclusions: &wrap_exclusions,
+                  wrap_exclusions: &mut wrap_exclusions,
                   state: &mut text_state,
                   active: ActiveTextFrame {
                     flow,
@@ -7966,7 +8244,7 @@ impl<'a> TextFrameLayout<'a> {
                 TextLineAdvance {
                   current,
                   pages,
-                  wrap_exclusions: &wrap_exclusions,
+                  wrap_exclusions: &mut wrap_exclusions,
                   state: &mut text_state,
                   active: ActiveTextFrame {
                     flow,
@@ -8021,7 +8299,7 @@ impl<'a> TextFrameLayout<'a> {
                         TextLineAdvance {
                           current,
                           pages,
-                          wrap_exclusions: &wrap_exclusions,
+                          wrap_exclusions: &mut wrap_exclusions,
                           state: &mut text_state,
                           active: ActiveTextFrame {
                             flow,
@@ -8079,7 +8357,7 @@ impl<'a> TextFrameLayout<'a> {
                     TextLineAdvance {
                       current,
                       pages,
-                      wrap_exclusions: &wrap_exclusions,
+                      wrap_exclusions: &mut wrap_exclusions,
                       state: &mut text_state,
                       active: ActiveTextFrame {
                         flow,
@@ -8229,6 +8507,15 @@ impl<'a> TextFrameLayout<'a> {
             match placement.wrap {
               ImageWrapMode::TopBottom | ImageWrapMode::None => {
                 if !placement.behind_text {
+                  append_vertical_wrap_exclusion(
+                    current,
+                    flow,
+                    image_x - placement.margin_left_pt,
+                    image_y - placement.margin_top_pt,
+                    image_x + width + placement.margin_right_pt,
+                    image_y + height + placement.margin_bottom_pt,
+                  );
+                  reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                   push_page_influence(
                     current,
                     FrameInfluenceKind::FlyWrap,
@@ -8241,7 +8528,7 @@ impl<'a> TextFrameLayout<'a> {
                     (flow, y) = advance_section_flow(flow, current, pages);
                     text_frame = TextFrame::new(self.paragraph, flow);
                     text_state.note_page_follow(pages.len(), y);
-                    wrap_exclusions.clear();
+                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                     default_line_right = text_frame.default_line_right;
                     paragraph_left = text_frame.paragraph_left;
                     base_line_height = text_frame.base_line_height;
@@ -8261,6 +8548,7 @@ impl<'a> TextFrameLayout<'a> {
                   top_pt: image_y - placement.margin_top_pt,
                   bottom_pt: image_y + height + placement.margin_bottom_pt,
                   side: placement.wrap_side,
+                  blocks_flow: false,
                 };
                 wrap_exclusions.push(exclusion);
                 current.wrap_exclusions.push(exclusion);
@@ -8294,7 +8582,7 @@ impl<'a> TextFrameLayout<'a> {
               TextLineAdvance {
                 current,
                 pages,
-                wrap_exclusions: &wrap_exclusions,
+                wrap_exclusions: &mut wrap_exclusions,
                 state: &mut text_state,
                 active: ActiveTextFrame {
                   flow,
@@ -8522,6 +8810,15 @@ impl<'a> TextFrameLayout<'a> {
               match placement.wrap {
                 ImageWrapMode::TopBottom | ImageWrapMode::None => {
                   if !placement.behind_text {
+                    append_vertical_wrap_exclusion(
+                      current,
+                      flow,
+                      shape_x - placement.margin_left_pt,
+                      shape_y - placement.margin_top_pt,
+                      shape_x + width + placement.margin_right_pt,
+                      shape_y + height + placement.margin_bottom_pt,
+                    );
+                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                     push_page_influence(
                       current,
                       FrameInfluenceKind::FlyWrap,
@@ -8535,7 +8832,7 @@ impl<'a> TextFrameLayout<'a> {
                     (flow, y) = advance_section_flow(flow, current, pages);
                     text_frame = TextFrame::new(self.paragraph, flow);
                     text_state.note_page_follow(pages.len(), y);
-                    wrap_exclusions.clear();
+                    reset_wrap_exclusions_for_y(current, y, &mut wrap_exclusions);
                     default_line_right = text_frame.default_line_right;
                     paragraph_left = text_frame.paragraph_left;
                     base_line_height = text_frame.base_line_height;
@@ -8554,6 +8851,7 @@ impl<'a> TextFrameLayout<'a> {
                     top_pt: shape_y - placement.margin_top_pt,
                     bottom_pt: shape_y + height + placement.margin_bottom_pt,
                     side: placement.wrap_side,
+                    blocks_flow: false,
                   };
                   wrap_exclusions.push(exclusion);
                   current.wrap_exclusions.push(exclusion);
@@ -8581,7 +8879,7 @@ impl<'a> TextFrameLayout<'a> {
                   TextLineAdvance {
                     current,
                     pages,
-                    wrap_exclusions: &wrap_exclusions,
+                    wrap_exclusions: &mut wrap_exclusions,
                     state: &mut text_state,
                     active: ActiveTextFrame {
                       flow,
@@ -8711,6 +9009,7 @@ impl<'a> TextFrameLayout<'a> {
         current,
         start_item_index,
         paragraph,
+        flow,
         paragraph_left,
         paragraph_top,
         default_line_right - paragraph_left,
@@ -8856,15 +9155,34 @@ fn push_line_segments(text: &str, segments: &mut Vec<String>) {
         continue;
       }
       if start < point {
-        segments.push(text[start..point].to_string());
+        push_text_line_segment(&text[start..point], segments);
       }
       start = point;
     }
 
     if start < text.len() {
-      segments.push(text[start..].to_string());
+      push_text_line_segment(&text[start..], segments);
     }
   });
+}
+
+fn push_text_line_segment(text: &str, segments: &mut Vec<String>) {
+  if segments.last().is_some_and(|segment| {
+    segment
+      .chars()
+      .all(libreoffice_forbidden_line_end_before_text)
+  }) {
+    let previous = segments.last_mut().unwrap();
+    previous.push_str(text);
+  } else {
+    segments.push(text.to_string());
+  }
+}
+
+fn libreoffice_forbidden_line_end_before_text(ch: char) -> bool {
+  // Source: LibreOffice uses i18npool breakiterator forbidden end-character
+  // handling, so opening quotation marks don't remain alone at line end.
+  matches!(ch, '“' | '‘')
 }
 
 fn next_tab_stop(
@@ -8916,6 +9234,9 @@ fn line_bounds_for_y(
   let mut left = default_left;
   let mut right = default_right;
   for exclusion in exclusions {
+    if exclusion.blocks_flow {
+      continue;
+    }
     if y + line_height <= exclusion.top_pt || y >= exclusion.bottom_pt {
       continue;
     }
@@ -8957,10 +9278,33 @@ fn line_bounds_for_y(
   }
 }
 
+fn dodge_text_wrap_exclusions(mut y: f32, line_height: f32, exclusions: &[WrapExclusion]) -> f32 {
+  loop {
+    let Some(exclusion) = exclusions
+      .iter()
+      .filter(|exclusion| {
+        exclusion.blocks_flow && exclusion.overlaps_vertical_span(y, y + line_height)
+      })
+      .min_by(|a, b| {
+        a.bottom_pt
+          .partial_cmp(&b.bottom_pt)
+          .unwrap_or(std::cmp::Ordering::Equal)
+      })
+    else {
+      return y;
+    };
+    if exclusion.bottom_pt <= y + LAYOUT_EPSILON_PT {
+      return y;
+    }
+    y = exclusion.bottom_pt;
+  }
+}
+
 fn decorate_paragraph(
   page: &mut Page,
   start_item_index: usize,
   paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
   x: f32,
   y: f32,
   width: f32,
@@ -8973,6 +9317,8 @@ fn decorate_paragraph(
   let height = height + padding * 2.0;
 
   if let Some(color) = paragraph.format.shading {
+    let (x, y, width, height) =
+      table_cell_paragraph_shading_bounds(flow).unwrap_or((x, y, width, height));
     page.items.insert(
       start_item_index,
       PageItem::Fill(FillItem {
@@ -8997,6 +9343,19 @@ fn decorate_paragraph(
   if let Some(border) = paragraph.format.borders.left {
     push_styled_line(page, x, y, x, y + height, border);
   }
+}
+
+fn table_cell_paragraph_shading_bounds(flow: FlowContext) -> Option<(f32, f32, f32, f32)> {
+  if !matches!(flow.text_segmentation, TextSegmentation::TableCell) {
+    return None;
+  }
+  let bounds = flow.layout_cell_bounds?;
+  (bounds.height_pt > LAYOUT_EPSILON_PT).then_some((
+    bounds.x_pt,
+    bounds.y_pt,
+    bounds.width_pt,
+    bounds.height_pt,
+  ))
 }
 
 fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, line_right: f32) {
@@ -9161,8 +9520,18 @@ fn force_page_break(
     section_page_index: flow.section_page_index + 1,
     ..flow
   };
+  let next_page_number = pages.len() + 2;
   let mut next_page =
     empty_section_page(flow.setup, flow.section_index, next_flow.section_page_index);
+  next_page.repeating_wrap_exclusion_catalog = current.repeating_wrap_exclusion_catalog.clone();
+  next_page.repeating_wrap_exclusions = next_page
+    .repeating_wrap_exclusion_catalog
+    .selected(next_flow.section_page_index, next_page_number)
+    .to_vec();
+  extend_wrap_exclusions_unique(
+    &mut next_page.wrap_exclusions,
+    &next_page.repeating_wrap_exclusions,
+  );
   next_page.preserve_empty = true;
   pages.push(std::mem::replace(current, next_page));
   activate_pending_floating_table_follows_for_current(current, pages);

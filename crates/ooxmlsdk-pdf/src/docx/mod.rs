@@ -1232,6 +1232,7 @@ fn body_sections(
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
   let mut previous_properties = None;
+  let mut pending_drop_cap_text = None;
 
   for choice in &body.body_choice {
     match choice {
@@ -1246,11 +1247,17 @@ fn body_sections(
           form_widget_ids,
         );
         model.format.hidden_separator = paragraph_mark_is_hidden(paragraph);
+        if paragraph_has_drop_cap_frame(&model) {
+          pending_drop_cap_text = paragraph_drop_cap_text(&model);
+          continue;
+        }
+        if let Some(text) = pending_drop_cap_text.take() {
+          prepend_drop_cap_text(&mut model, text);
+        }
         if paragraph_is_effectively_empty(&model)
-          && (current_blocks
+          && current_blocks
             .last()
             .is_some_and(|block| matches!(block, Block::Table(_)))
-            || paragraph_empty_font_size_pt(&model) <= 4.5)
         {
           continue;
         }
@@ -1388,12 +1395,16 @@ fn paragraph_is_effectively_empty(paragraph: &Paragraph) -> bool {
     })
 }
 
-fn paragraph_empty_font_size_pt(paragraph: &Paragraph) -> f32 {
-  paragraph
+fn paragraph_has_drop_cap_frame(paragraph: &Paragraph) -> bool {
+  paragraph.format.frame.is_some_and(|frame| frame.drop_cap)
+}
+
+fn paragraph_drop_cap_text(paragraph: &Paragraph) -> Option<String> {
+  let text = paragraph
     .inlines
     .iter()
-    .find_map(|inline| match inline {
-      InlineItem::Text(run) => Some(run.style.font_size_pt),
+    .filter_map(|inline| match inline {
+      InlineItem::Text(run) => Some(run.text.as_str()),
       InlineItem::Image(_)
       | InlineItem::Shape(_)
       | InlineItem::FormWidgetStart(_)
@@ -1402,7 +1413,34 @@ fn paragraph_empty_font_size_pt(paragraph: &Paragraph) -> f32 {
       | InlineItem::PageBreak
       | InlineItem::ColumnBreak => None,
     })
-    .unwrap_or(TextStyle::default().font_size_pt)
+    .collect::<String>();
+  (!text.is_empty()).then_some(text)
+}
+
+fn prepend_drop_cap_text(paragraph: &mut Paragraph, text: String) {
+  // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx
+  // saves DOCX framePr/dropCap paragraphs and applies them to the following
+  // paragraph as DropCapFormat instead of converting them to text frames.
+  if let Some(InlineItem::Text(run)) = paragraph
+    .inlines
+    .iter_mut()
+    .find(|inline| matches!(inline, InlineItem::Text(_)))
+  {
+    run.text.insert_str(0, &text);
+    return;
+  }
+  paragraph.inlines.insert(
+    0,
+    InlineItem::Text(TextRun {
+      text,
+      style: paragraph.base_style.clone(),
+      hyperlink_url: None,
+      dynamic_field: None,
+      style_ref_keys: Vec::new(),
+      style_ref_text: None,
+      preserve_text_portion: false,
+    }),
+  );
 }
 
 fn close_section(
@@ -2135,12 +2173,13 @@ fn table_model(
     .as_ref()
     .map(table_look_model)
     .unwrap_or_default();
+  let style_cell_margins = table_style.cell_margins.unwrap_or_default();
+  let direct_cell_margins = properties.table_cell_margin_default.is_some();
   let cell_margins = properties
     .table_cell_margin_default
     .as_deref()
-    .map(table_cell_margin_default)
-    .or(table_style.cell_margins)
-    .unwrap_or_default();
+    .map(|margins| table_cell_margin_default_with_base(margins, style_cell_margins))
+    .unwrap_or(style_cell_margins);
   let rows = table
     .table_choice2
     .iter()
@@ -2159,6 +2198,7 @@ fn table_model(
       custom_xml_bindings: env.custom_xml_bindings,
       form_widget_ids: env.form_widget_ids,
       cell_margins,
+      direct_cell_margins,
       table_style: &table_style,
       table_look,
       row_count,
@@ -2526,7 +2566,11 @@ fn table_cell_model(
   style: TableCellStyle,
 ) -> TableCell {
   let properties = cell.table_cell_properties.as_deref();
-  let base_margins = style.margins.unwrap_or(context.cell_margins);
+  let base_margins = if context.direct_cell_margins {
+    context.cell_margins
+  } else {
+    style.margins.unwrap_or(context.cell_margins)
+  };
   let row_cell_margins = row_table_exceptions
     .and_then(|exceptions| exceptions.table_cell_margin_default.as_deref())
     .map(|margins| table_cell_margin_default_with_base(margins, base_margins))
@@ -3272,6 +3316,12 @@ fn merge_paragraph_frame_properties(format: &mut ParagraphFormat, frame: &w::Fra
   if frame.wrap.is_some() {
     merged.placement.wrap = frame_wrap_mode(frame.wrap);
   }
+  if frame.drop_cap.is_some() {
+    merged.drop_cap = matches!(
+      frame.drop_cap,
+      Some(w::DropCapLocationValues::Drop | w::DropCapLocationValues::Margin)
+    );
+  }
   if frame.horizontal_space.is_some() {
     let horizontal_space = frame
       .horizontal_space
@@ -3308,6 +3358,10 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
     width_pt: frame.width.as_ref().and_then(twips_measure_to_points),
     height_pt: frame.height.as_ref().and_then(twips_measure_to_points),
     height_rule: frame_height_rule(frame.height_type),
+    drop_cap: matches!(
+      frame.drop_cap,
+      Some(w::DropCapLocationValues::Drop | w::DropCapLocationValues::Margin)
+    ),
     placement: FloatingFramePlacement {
       horizontal_anchor: frame_horizontal_anchor(frame.horizontal_position),
       vertical_anchor: frame_vertical_anchor(frame.vertical_position),
@@ -9427,6 +9481,7 @@ struct TableImportContext<'a> {
   custom_xml_bindings: &'a CustomXmlBindings,
   form_widget_ids: &'a mut FormWidgetIdAllocator,
   cell_margins: CellMargins,
+  direct_cell_margins: bool,
   table_style: &'a TableStyleModel,
   table_look: TableLookModel,
   row_count: usize,
@@ -11532,6 +11587,20 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .w_ln_num_type
     .as_ref()
     .and_then(line_numbering_model);
+  setup.doc_grid_line_pitch_pt = section
+    .w_doc_grid
+    .as_ref()
+    .filter(|grid| {
+      matches!(
+        grid.r#type,
+        Some(
+          w::DocGridValues::Lines | w::DocGridValues::LinesAndChars | w::DocGridValues::SnapToChars
+        )
+      )
+    })
+    .and_then(|grid| grid.line_pitch)
+    .filter(|pitch| *pitch > 0)
+    .map(|pitch| units::twips_to_points(pitch as f32));
 
   setup
 }
@@ -12348,6 +12417,7 @@ mod tests {
       custom_xml_bindings: &custom_xml_bindings,
       form_widget_ids: &mut form_widget_ids,
       cell_margins: CellMargins::default(),
+      direct_cell_margins: false,
       table_style: &TableStyleModel::default(),
       table_look: TableLookModel::default(),
       row_count: 1,

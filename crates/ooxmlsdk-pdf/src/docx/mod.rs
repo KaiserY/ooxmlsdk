@@ -1194,7 +1194,7 @@ fn body_sections(
           && section_properties.is_none()
           && current_blocks
             .last()
-            .is_some_and(|block| matches!(block, Block::Table(_)))
+            .is_some_and(|block| matches!(block, Block::Table(table) if table.placement.is_none()))
         {
           continue;
         }
@@ -2147,6 +2147,9 @@ fn table_model(
     })
     .collect::<Vec<_>>();
   let row_count = rows.len();
+  let explicit_no_repeat_header = rows.first().is_some_and(|row| {
+    direct_table_row_style(row.table_row_properties.as_deref()).repeat_header == Some(false)
+  });
   let rows = {
     let mut context = TableImportContext {
       styles: env.styles,
@@ -2209,6 +2212,7 @@ fn table_model(
     placement,
     split_allowed,
     following_text_flow,
+    explicit_no_repeat_header,
     starts_after_last_rendered_page_break,
     borders: properties
       .table_borders
@@ -2430,7 +2434,7 @@ fn table_row_model(
 }
 
 fn table_row_keep_with_next(cells: &[TableCell], nested_table_level: usize) -> bool {
-  if nested_table_level > 1 {
+  if nested_table_level > 0 {
     return false;
   }
   let Some(cell) = cells.first() else {

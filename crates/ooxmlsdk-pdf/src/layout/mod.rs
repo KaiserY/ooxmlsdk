@@ -496,6 +496,14 @@ pub(crate) struct LineBox {
   pub item_end: usize,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct LineNumberBox {
+  item_start: usize,
+  y_pt: f32,
+  height_pt: f32,
+  font_size_pt: f32,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Page {
   pub setup: PageSetup,
@@ -503,7 +511,9 @@ pub(crate) struct Page {
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
   body_content_frames: usize,
+  explicit_break_target: bool,
   preserve_empty: bool,
+  delete_forbidden: bool,
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
   wrap_exclusions: Vec<WrapExclusion>,
@@ -521,6 +531,7 @@ struct PendingFloatingTableFollow {
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
   wrap_exclusions: Vec<WrapExclusion>,
+  pending_floating_table_follows: Vec<PendingFloatingTableFollow>,
 }
 
 #[derive(Clone, Debug)]
@@ -869,13 +880,18 @@ impl<'a> RootFrameLayout<'a> {
     backward_moves.extend(decoration_backward_moves);
     reflow_executions.extend(decoration_reflow_executions);
     reflow_requests.extend(remaining_decoration_reflow_requests);
-    let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
-    let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
     let page_count = self.pages.len();
     self
       .follows
       .retain(|follow| follow.from_page_index < page_count && follow.to_page_index < page_count);
     normalize_layout_frames(&mut self.frames, &self.pages);
+    normalize_reflow_requests(&mut reflow_requests, &self.frames);
+    normalize_page_replays(&mut page_replays, &self.pages);
+    normalize_page_replay_applications(&mut page_replay_applications, &self.pages);
+    normalize_backward_moves(&mut backward_moves, &self.frames, &self.pages);
+    normalize_reflow_executions(&mut reflow_executions, &self.pages, &backward_moves);
+    let page_invalidations = page_invalidations_for_reflow_requests(&reflow_requests);
+    let restart_plan = restart_plan_for_page_invalidations(&self.frames, &page_invalidations);
 
     LayoutDocument {
       pages: self.pages,
@@ -925,6 +941,7 @@ impl<'a> RootFrameLayout<'a> {
         && section_has_repeating_blocks(&section)
       {
         self.current.preserve_empty = true;
+        self.current.delete_forbidden = true;
       }
       if section.blocks.is_empty()
         && section_index == 0
@@ -935,6 +952,7 @@ impl<'a> RootFrameLayout<'a> {
         // following section break; a nextColumn break without columns then acts
         // as a page break, so later content must not reuse the empty page.
         self.current.preserve_empty = true;
+        self.current.delete_forbidden = true;
       }
       self.format_block_sequence_with_previous(&section.blocks, flow, previous_section_block);
     }
@@ -1137,6 +1155,10 @@ impl<'a> RootFrameLayout<'a> {
       && flow.text_segmentation == TextSegmentation::Body
       && block_is_page_break_only_paragraph(block)
     {
+      // Source: LibreOffice sw/qa/extras/ooxmlexport/ooxmlexport13.cxx
+      // testTdf123636_newlinePageBreak4: with SplitPgBreakAndParaMark, a
+      // non-first empty page-break paragraph creates an empty following page
+      // but does not move following body text there.
       self.pending_trailing_page_break = true;
       return;
     }
@@ -1163,6 +1185,7 @@ impl<'a> RootFrameLayout<'a> {
     let transition = self.follow_transition_start(*flow);
     let frame_start = self.frame_segment_start(*flow);
     let line_number_start = self.current.items.len();
+    let line_number_fragment_start = self.current.frame_fragments.len();
     let frame_influences = block_frame_influences(
       block,
       self.document,
@@ -1179,7 +1202,8 @@ impl<'a> RootFrameLayout<'a> {
       &mut self.pages,
       self.y,
     );
-    self.add_line_number_for_block(block, *flow, line_number_start);
+    self.materialize_pending_floating_table_follow_chain(flow);
+    self.add_line_numbers_for_block(block, *flow, line_number_start, line_number_fragment_start);
     self.record_layout_frame_segments(
       frame_start,
       *flow,
@@ -1208,7 +1232,50 @@ impl<'a> RootFrameLayout<'a> {
     *flow = self.advance_if_past_body(*flow);
   }
 
-  fn add_line_number_for_block(&mut self, block: &Block, flow: FlowContext, start_index: usize) {
+  fn materialize_pending_floating_table_follow_chain(&mut self, flow: &mut FlowContext) {
+    if !has_pending_floating_table_follows(&self.current, &self.pages) {
+      return;
+    }
+
+    // Source: LibreOffice sw/source/core/layout/flycnt.cxx
+    // SwFrame::GetNextFlyLeaf() creates the follow fly during layout and
+    // chains it to the split anchor. SwTabFrame::Split() then moves rows into
+    // the follow table before frame recording/reflow sees the result. Keep the
+    // same ordering: a split floating table must be part of the current
+    // master/follow page chain, not an orphan materialized after all frames
+    // have already been recorded.
+    materialize_pending_floating_table_follows_in_local_pages(&mut self.current, &mut self.pages);
+
+    if self.current.section_index != flow.section_index
+      || self.current.section_page_index != flow.section_page_index
+    {
+      let next_flow = body_flow_for_page(
+        flow_with_column(
+          FlowContext {
+            setup: self.current.setup,
+            section_index: self.current.section_index,
+            section_page_index: self.current.section_page_index,
+            ..*flow
+          },
+          0,
+        ),
+        self.pages.len() + 1,
+      );
+      *flow = next_flow;
+      self.y = page_items_vertical_bounds(&self.current.items)
+        .map_or(next_flow.content_top_pt, |(_, bottom)| {
+          bottom.max(next_flow.content_top_pt)
+        });
+    }
+  }
+
+  fn add_line_numbers_for_block(
+    &mut self,
+    block: &Block,
+    flow: FlowContext,
+    start_index: usize,
+    fragment_start: usize,
+  ) {
     if flow.text_segmentation != TextSegmentation::Body {
       return;
     }
@@ -1218,47 +1285,48 @@ impl<'a> RootFrameLayout<'a> {
     let Some(line_numbering) = flow.setup.line_numbering else {
       return;
     };
-    let Some(first_text) = self.current.items[start_index..].iter().find_map(|item| {
-      if let PageItem::Text(text) = item {
-        Some(text)
-      } else {
-        None
-      }
-    }) else {
-      return;
-    };
-
-    let number = self.next_line_number;
-    self.next_line_number = self.next_line_number.saturating_add(1);
-    if number < line_numbering.start
-      || (number - line_numbering.start) % line_numbering.count_by != 0
-    {
+    let line_boxes = line_number_boxes_for_block(&self.current, start_index, fragment_start);
+    if line_boxes.is_empty() {
       return;
     }
 
-    let mut style = TextStyle::default();
-    style.font_size_pt = first_text.style.font_size_pt;
-    let text = number.to_string();
-    let width = measure_text(&text, &style);
-    self.current.items.insert(
-      start_index,
-      PageItem::Text(TextItem {
-        x_pt: (flow.content_left_pt - line_numbering.distance_pt - width).max(0.0),
-        y_pt: first_text.y_pt,
-        line_height_pt: first_text.line_height_pt,
-        text,
-        style,
-        hyperlink_url: None,
-        dynamic_field: None,
-        style_ref_keys: Vec::new(),
-        style_ref_text: None,
-        preserve_text_portion: false,
-        form_widget_id: None,
-        paragraph_bidi: false,
-        decoration_span_start_x_pt: None,
-        pdf_text_segmentation: PdfTextSegmentation::Line,
-      }),
-    );
+    let mut items = Vec::new();
+    for line_box in line_boxes {
+      let number = self.next_line_number;
+      self.next_line_number = self.next_line_number.saturating_add(1);
+      if number < line_numbering.start
+        || (number - line_numbering.start) % line_numbering.count_by != 0
+      {
+        continue;
+      }
+
+      let mut style = TextStyle::default();
+      style.font_size_pt = line_box.font_size_pt;
+      let text = number.to_string();
+      let width = measure_text(&text, &style);
+      items.push((
+        line_box.item_start,
+        PageItem::Text(TextItem {
+          x_pt: (flow.content_left_pt - line_numbering.distance_pt - width).max(0.0),
+          y_pt: line_box.y_pt,
+          line_height_pt: line_box.height_pt,
+          text,
+          style,
+          hyperlink_url: None,
+          dynamic_field: None,
+          style_ref_keys: Vec::new(),
+          style_ref_text: None,
+          preserve_text_portion: false,
+          form_widget_id: None,
+          paragraph_bidi: false,
+          decoration_span_start_x_pt: None,
+          pdf_text_segmentation: PdfTextSegmentation::Line,
+        }),
+      ));
+    }
+    for (offset, (item_start, item)) in items.into_iter().enumerate() {
+      insert_line_number_item(&mut self.current, item_start + offset, item);
+    }
   }
 
   fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
@@ -1538,7 +1606,9 @@ impl<'a> RootFrameLayout<'a> {
       .selected(page.section_page_index, self.pages.len() + 1)
       .to_vec();
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &page.repeating_wrap_exclusions);
+    page.explicit_break_target = true;
     page.preserve_empty = true;
+    page.delete_forbidden = true;
     self.pages.push(page);
   }
 
@@ -1644,13 +1714,13 @@ impl<'a> RootFrameLayout<'a> {
         0
       };
       let item_end = page.items.len();
-      if item_start >= item_end {
+      let mut fragments = page_frame_fragments(kind, &page.frame_fragments, item_start, item_end);
+      if item_start >= item_end && fragments.is_empty() {
         continue;
       }
       let items = page.items[item_start..item_end].to_vec();
       let bounds = frame_bounds_for_items(&items);
       let lines = line_boxes_for_items(&page.items, item_start, item_end);
-      let mut fragments = page_frame_fragments(kind, &page.frame_fragments, item_start, item_end);
       if fragments.is_empty() {
         fragments = frame_fragments_for(kind, &lines);
       }
@@ -1950,6 +2020,110 @@ fn line_boxes_for_items(items: &[PageItem], item_start: usize, item_end: usize) 
   lines
 }
 
+fn line_number_boxes_for_block(
+  page: &Page,
+  item_start: usize,
+  fragment_start: usize,
+) -> Vec<LineNumberBox> {
+  let item_end = page.items.len();
+  let mut boxes = page
+    .frame_fragments
+    .iter()
+    .skip(fragment_start)
+    .filter(|fragment| matches!(fragment.kind, FrameFragmentKind::ParagraphLine))
+    .filter(|fragment| {
+      if fragment.item_start < fragment.item_end {
+        fragment.item_start >= item_start && fragment.item_start < item_end
+      } else {
+        fragment.item_start >= item_start && fragment.item_start <= item_end
+      }
+    })
+    .filter_map(|fragment| {
+      let bounds = fragment.bounds?;
+      if let Some((y_pt, height_pt, font_size_pt)) =
+        line_number_text_metrics_for_items(&page.items, fragment.item_start, fragment.item_end)
+      {
+        return Some(LineNumberBox {
+          item_start: fragment.item_start,
+          y_pt,
+          height_pt,
+          font_size_pt,
+        });
+      }
+      Some(LineNumberBox {
+        item_start: fragment.item_start,
+        y_pt: bounds.y_pt,
+        height_pt: bounds.height_pt,
+        font_size_pt: DEFAULT_FONT_SIZE_PT,
+      })
+    })
+    .collect::<Vec<_>>();
+
+  if boxes.is_empty() {
+    boxes.extend(
+      line_boxes_for_items(&page.items, item_start, item_end)
+        .into_iter()
+        .map(|line| LineNumberBox {
+          item_start: line.item_start,
+          y_pt: line.y_pt,
+          height_pt: line.height_pt,
+          font_size_pt: line_number_font_size_for_items(
+            &page.items,
+            line.item_start,
+            line.item_end,
+          ),
+        }),
+    );
+  }
+
+  boxes
+}
+
+fn line_number_font_size_for_items(items: &[PageItem], item_start: usize, item_end: usize) -> f32 {
+  line_number_text_metrics_for_items(items, item_start, item_end)
+    .map(|(_, _, font_size_pt)| font_size_pt)
+    .unwrap_or(DEFAULT_FONT_SIZE_PT)
+}
+
+fn insert_line_number_item(page: &mut Page, index: usize, item: PageItem) {
+  page.items.insert(index, item);
+  for fragment in &mut page.frame_fragments {
+    if fragment.item_start == index && fragment.item_end == index {
+      fragment.item_end += 1;
+    } else if fragment.item_start >= index {
+      fragment.item_start += 1;
+      fragment.item_end += 1;
+    } else if fragment.item_end > index {
+      fragment.item_end += 1;
+    }
+  }
+  for influence in &mut page.frame_influences {
+    if influence.item_start >= index {
+      influence.item_start += 1;
+      influence.item_end += 1;
+    } else if influence.item_end > index {
+      influence.item_end += 1;
+    }
+  }
+}
+
+fn line_number_text_metrics_for_items(
+  items: &[PageItem],
+  item_start: usize,
+  item_end: usize,
+) -> Option<(f32, f32, f32)> {
+  items[item_start..item_end]
+    .iter()
+    .find_map(|item| match item {
+      PageItem::Text(text) => Some((text.y_pt, text.line_height_pt, text.style.font_size_pt)),
+      PageItem::Image(_)
+      | PageItem::Rect(_)
+      | PageItem::Fill(_)
+      | PageItem::Line(_)
+      | PageItem::Polyline(_) => None,
+    })
+}
+
 fn frame_fragments_for(kind: FollowFrameKind, lines: &[LineBox]) -> Vec<FrameFragment> {
   lines
     .iter()
@@ -2124,7 +2298,15 @@ fn page_frame_fragments(
 ) -> Vec<FrameFragment> {
   fragments
     .iter()
-    .filter(|fragment| fragment.item_start < item_end && fragment.item_end > item_start)
+    .filter(|fragment| {
+      if fragment.item_start < fragment.item_end {
+        fragment.item_start < item_end && fragment.item_end > item_start
+      } else {
+        fragment.bounds.is_some()
+          && fragment.item_start >= item_start
+          && fragment.item_start <= item_end
+      }
+    })
     .cloned()
     .map(|mut fragment| {
       if matches!(frame_kind, FollowFrameKind::Notes)
@@ -2132,11 +2314,13 @@ fn page_frame_fragments(
       {
         fragment.kind = FrameFragmentKind::NoteLine;
       }
-      fragment.item_start = fragment.item_start.max(item_start);
-      fragment.item_end = fragment.item_end.min(item_end);
+      if fragment.item_start < fragment.item_end {
+        fragment.item_start = fragment.item_start.max(item_start);
+        fragment.item_end = fragment.item_end.min(item_end);
+      }
       fragment
     })
-    .filter(|fragment| fragment.item_start < fragment.item_end)
+    .filter(|fragment| fragment.item_start < fragment.item_end || fragment.bounds.is_some())
     .collect()
 }
 
@@ -2461,6 +2645,62 @@ fn apply_page_replays(pages: &mut [Page], replays: &[PageReplay]) -> Vec<PageRep
   applications
 }
 
+fn normalize_page_replays(replays: &mut Vec<PageReplay>, pages: &[Page]) {
+  replays.retain(|replay| {
+    pages.get(replay.page_index).is_some_and(|page| {
+      replay.section_page_index == page.section_page_index
+        && replay.item_start <= replay.item_end
+        && !replay.replacement_items.is_empty()
+    })
+  });
+}
+
+fn normalize_page_replay_applications(
+  applications: &mut Vec<PageReplayApplication>,
+  pages: &[Page],
+) {
+  applications.retain(|application| {
+    pages.get(application.page_index).is_some_and(|page| {
+      application.section_page_index == page.section_page_index
+        && application.item_start <= application.item_end
+        && application.replacement_count > 0
+    })
+  });
+}
+
+fn normalize_backward_moves(moves: &mut Vec<BackwardMove>, frames: &[LayoutFrame], pages: &[Page]) {
+  moves.retain(|move_back| {
+    move_back.frame_index < frames.len()
+      && move_back.replay_start_frame_index < frames.len()
+      && pages
+        .get(move_back.from_page_index)
+        .is_some_and(|page| page.section_page_index == move_back.from_section_page_index)
+      && pages
+        .get(move_back.to_page_index)
+        .is_some_and(|page| page.section_page_index == move_back.to_section_page_index)
+      && move_back.to_page_index <= move_back.from_page_index
+      && (move_back.suppressed || move_back.replayed_frames > 0)
+  });
+}
+
+fn normalize_reflow_executions(
+  executions: &mut Vec<ReflowExecution>,
+  pages: &[Page],
+  backward_moves: &[BackwardMove],
+) {
+  // Source: LibreOffice layout invalidations are attached to the current frame
+  // tree after joins and CheckPageDescs() cleanup. These execution records are
+  // diagnostics for that normalized tree, so keep their move counts in sync
+  // with backward moves that survived normalization.
+  executions.retain_mut(|execution| {
+    if execution.request_count == 0 || execution.first_page_index >= pages.len() {
+      return false;
+    }
+    execution.backward_moves = execution.backward_moves.min(backward_moves.len());
+    true
+  });
+}
+
 fn apply_page_replay(page: &mut Page, replay: &PageReplay) -> bool {
   if page.section_page_index != replay.section_page_index
     || replay.item_start > replay.item_end
@@ -2477,29 +2717,31 @@ fn apply_page_replay(page: &mut Page, replay: &PageReplay) -> bool {
 }
 
 fn materialize_pending_floating_table_follows(pages: &mut Vec<Page>) {
-  let mut pending = Vec::<PendingFloatingTableFollow>::new();
-  for page in pages.iter_mut() {
-    pending.append(&mut page.pending_floating_table_follows);
+  while pages
+    .iter()
+    .any(|page| !page.pending_floating_table_follows.is_empty())
+  {
+    let mut pending = Vec::<PendingFloatingTableFollow>::new();
+    for page in pages.iter_mut() {
+      pending.append(&mut page.pending_floating_table_follows);
+    }
+    for follow in pending {
+      let page_index = ensure_section_page_slot(
+        pages,
+        follow.setup,
+        follow.section_index,
+        follow.section_page_index,
+      );
+      apply_pending_floating_table_follow(&mut pages[page_index], follow);
+    }
   }
-  for mut follow in pending {
-    let page_index = ensure_section_page_slot(
-      pages,
-      follow.setup,
-      follow.section_index,
-      follow.section_page_index,
-    );
-    let target = &mut pages[page_index];
-    let item_offset = target.items.len();
-    offset_page_frame_records_raw(
-      &mut follow.frame_fragments,
-      &mut follow.frame_influences,
-      item_offset,
-    );
-    target.items.append(&mut follow.items);
-    target.frame_fragments.append(&mut follow.frame_fragments);
-    target.frame_influences.append(&mut follow.frame_influences);
-    target.wrap_exclusions.append(&mut follow.wrap_exclusions);
-  }
+}
+
+fn has_pending_floating_table_follows(current: &Page, pages: &[Page]) -> bool {
+  !current.pending_floating_table_follows.is_empty()
+    || pages
+      .iter()
+      .any(|page| !page.pending_floating_table_follows.is_empty())
 }
 
 fn materialize_pending_floating_table_follows_in_local_pages(
@@ -2563,6 +2805,9 @@ fn apply_pending_floating_table_follow(page: &mut Page, mut follow: PendingFloat
   page.frame_fragments.append(&mut follow.frame_fragments);
   page.frame_influences.append(&mut follow.frame_influences);
   page.wrap_exclusions.append(&mut follow.wrap_exclusions);
+  page
+    .pending_floating_table_follows
+    .append(&mut follow.pending_floating_table_follows);
 }
 
 fn ensure_section_page_slot(
@@ -2848,6 +3093,25 @@ fn normalize_layout_frames(frames: &mut Vec<LayoutFrame>, pages: &[Page]) {
   }
 }
 
+fn normalize_reflow_requests(requests: &mut Vec<ReflowRequest>, frames: &[LayoutFrame]) {
+  // Source: LibreOffice layout invalidation follows the current frame tree
+  // after joins, page-desc cleanup and reflow. Keep our diagnostic restart
+  // requests attached to the normalized layout frames instead of preserving
+  // stale pre-normalization cursors.
+  requests.retain_mut(|request| {
+    let Some(frame) = frames.get(request.frame_index) else {
+      return false;
+    };
+    request.kind = frame.kind;
+    request.restart = frame.split_start;
+    request.page_index = frame.page_index;
+    request.section_page_index = frame.section_page_index;
+    request.column_index = frame.column_index;
+    request.influence_count = frame.influences.len();
+    true
+  });
+}
+
 fn page_invalidations_for_reflow_requests(requests: &[ReflowRequest]) -> Vec<PageInvalidation> {
   let mut invalidations = Vec::<PageInvalidation>::new();
   for request in requests {
@@ -3083,7 +3347,9 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_page_index,
     items: Vec::new(),
     body_content_frames: 0,
+    explicit_break_target: false,
     preserve_empty: false,
+    delete_forbidden: false,
     frame_fragments: Vec::new(),
     frame_influences: Vec::new(),
     wrap_exclusions: Vec::new(),
@@ -3091,6 +3357,12 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     repeating_wrap_exclusions: Vec::new(),
     pending_floating_table_follows: Vec::new(),
   }
+}
+
+#[derive(Clone)]
+struct CheckPage {
+  page: Page,
+  original_index: Option<usize>,
 }
 
 fn check_page_desc_empty_pages(
@@ -3101,27 +3373,85 @@ fn check_page_desc_empty_pages(
   outline_entries: &mut Vec<OutlineEntry>,
 ) {
   // Source: LibreOffice sw/source/core/layout/pagechg.cxx
-  // SwFrame::CheckPageDescs() removes empty pages unless they are needed to
-  // make the following non-empty page satisfy the page descriptor's left/right
-  // format wish.
+  // SwFrame::CheckPageDescs() walks the page chain, inserts intentional empty
+  // pages for right/left page wishes, and after every change re-evaluates the
+  // affected previous/next page instead of doing a one-shot filter.
   let original_pages = std::mem::take(pages);
   let original_len = original_pages.len();
   let mut page_index_map = vec![usize::MAX; original_len];
-  let mut kept = Vec::with_capacity(original_len);
 
-  for (index, page) in original_pages.iter().enumerate() {
-    if !is_page_frame_empty(page) && non_empty_page_needs_preceding_empty(document, page, &kept) {
-      let mut empty = empty_section_page(page.setup, page.section_index, page.section_page_index);
-      empty.preserve_empty = true;
-      kept.push(empty);
-    }
-    if is_page_frame_empty(page)
-      && !empty_page_needed_for_following_page(document, &kept, &original_pages, index)
+  let mut checked = original_pages
+    .iter()
+    .cloned()
+    .enumerate()
+    .map(|(original_index, page)| CheckPage {
+      page,
+      original_index: Some(original_index),
+    })
+    .collect::<Vec<_>>();
+
+  let mut index = 0;
+  while index < checked.len() {
+    let previous_pages = checked[..index]
+      .iter()
+      .map(|page| page.page.clone())
+      .collect::<Vec<_>>();
+    let is_intentional_empty = checked[index].page.preserve_empty;
+    let is_frame_empty =
+      !is_intentional_empty && page_frame_empty_for_check_page(&checked[index], follows);
+    let is_empty = is_intentional_empty || is_frame_empty;
+    let on_right = physical_page_is_right(index + 1);
+    let want_right =
+      page_wants_right_page(document, &checked[index].page, &previous_pages, index + 1);
+
+    if !is_empty
+      && on_right != want_right
+      && ((index == 0 && !want_right)
+        || index
+          .checked_sub(1)
+          .and_then(|previous| checked.get(previous))
+          .is_some_and(|previous| !previous.page.preserve_empty))
     {
+      let mut empty = empty_section_page(
+        checked[index].page.setup,
+        checked[index].page.section_index,
+        checked[index].page.section_page_index,
+      );
+      empty.preserve_empty = true;
+      checked.insert(
+        index,
+        CheckPage {
+          page: empty,
+          original_index: None,
+        },
+      );
       continue;
     }
-    page_index_map[index] = kept.len();
-    kept.push(page.clone());
+
+    if is_empty && !checked[index].page.delete_forbidden {
+      let next_want_right = checked.get(index + 1).map(|next| {
+        let mut previous_for_next = previous_pages.clone();
+        previous_for_next.push(checked[index].page.clone());
+        page_wants_right_page(document, &next.page, &previous_for_next, index + 2)
+      });
+      if is_frame_empty || next_want_right.is_none() || next_want_right == Some(on_right) {
+        checked.remove(index);
+        if is_frame_empty && index > 0 {
+          index -= 1;
+        }
+        continue;
+      }
+    }
+
+    index += 1;
+  }
+
+  let mut kept = Vec::with_capacity(checked.len().max(1));
+  for checked_page in checked {
+    if let Some(original_index) = checked_page.original_index {
+      page_index_map[original_index] = kept.len();
+    }
+    kept.push(checked_page.page);
   }
 
   for frame in frames {
@@ -3163,6 +3493,13 @@ fn check_page_desc_empty_pages(
   *pages = kept;
 }
 
+fn page_frame_empty_for_check_page(page: &CheckPage, follows: &[FrameFollow]) -> bool {
+  let Some(original_index) = page.original_index else {
+    return is_page_frame_empty(&page.page);
+  };
+  is_page_frame_empty_for_check(&page.page, follows, original_index)
+}
+
 fn is_page_frame_empty(page: &Page) -> bool {
   // Source: LibreOffice sw/source/core/layout/pagechg.cxx
   // sw::IsPageFrameEmpty() removes only pages without essential body content.
@@ -3172,99 +3509,78 @@ fn is_page_frame_empty(page: &Page) -> bool {
   if !page.items.is_empty() {
     return false;
   }
+  if page.explicit_break_target {
+    return false;
+  }
   page.body_content_frames == 0
 }
 
-fn non_empty_page_needs_preceding_empty(
-  document: &DocxDocument,
-  page: &Page,
-  kept_pages: &[Page],
-) -> bool {
-  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
-  // CheckPageDescs() case 3 inserts an empty page before a non-empty page when
-  // the page's physical side does not match WannaRightPage(), unless there is
-  // already an empty previous page.
-  if !page_has_explicit_side_wish(document, page, kept_pages) {
-    return false;
-  }
-  let physical_page_number = kept_pages.len() + 1;
-  physical_page_is_right(physical_page_number)
-    != page_desc_wants_right_page(document, page, kept_pages, physical_page_number)
-    && kept_pages
-      .last()
-      .is_none_or(|previous| !is_page_frame_empty(previous))
+fn is_page_frame_empty_for_check(page: &Page, follows: &[FrameFollow], page_index: usize) -> bool {
+  is_page_frame_empty(page)
+    && !follows.iter().any(|follow| {
+      follow.to_page_index == page_index && matches!(follow.reason, FollowReason::ExplicitBreak)
+    })
 }
 
-fn empty_page_needed_for_following_page(
-  document: &DocxDocument,
-  kept_pages: &[Page],
-  original_pages: &[Page],
-  empty_page_index: usize,
-) -> bool {
-  let Some(next_page) = original_pages[empty_page_index + 1..]
-    .iter()
-    .find(|page| !is_page_frame_empty(page))
-  else {
-    return original_pages[empty_page_index].preserve_empty;
-  };
-  if !page_has_explicit_side_wish(document, next_page, kept_pages) {
-    return original_pages[empty_page_index].preserve_empty;
-  }
-  let physical_without_empty = kept_pages.len() + 1;
-  let physical_with_empty = physical_without_empty + 1;
-  let want_without_empty =
-    page_desc_wants_right_page(document, next_page, kept_pages, physical_without_empty);
-  let mut kept_with_empty = kept_pages.to_vec();
-  kept_with_empty.push(original_pages[empty_page_index].clone());
-  let want_with_empty =
-    page_desc_wants_right_page(document, next_page, &kept_with_empty, physical_with_empty);
-
-  physical_page_is_right(physical_with_empty) == want_with_empty
-    && physical_page_is_right(physical_without_empty) != want_without_empty
-}
-
-fn page_desc_wants_right_page(
+fn page_wants_right_page(
   document: &DocxDocument,
   page: &Page,
   kept_pages: &[Page],
   physical_page_number: usize,
 ) -> bool {
   // Source: LibreOffice sw/source/core/layout/trvlfrm.cxx
-  // SwFrame::WannaRightPage() forces right/left when the page descriptor only
-  // provides that side's format; odd/even DOCX section breaks create such a
-  // temporary page style in SectionPropertyMap::CreateEvenOddPageStyleCopy().
-  let first_body_content_for_section = !kept_pages
+  // SwFrame::WannaRightPage(): prefer the first body content's page number
+  // offset, otherwise use the physical page side while ignoring a previous
+  // intentional empty page.
+  let first_body_content_for_section = !kept_pages.iter().any(|previous| {
+    previous.section_index == page.section_index
+      && !previous.preserve_empty
+      && !is_page_frame_empty(previous)
+  });
+  let first_body_content_in_document = !kept_pages
     .iter()
-    .any(|previous| previous.section_index == page.section_index && !is_page_frame_empty(previous));
+    .any(|previous| !previous.preserve_empty && !is_page_frame_empty(previous));
+  let mut wants_right = if first_body_content_for_section {
+    if first_body_content_in_document {
+      physical_page_is_right(physical_page_number)
+        ^ kept_pages
+          .last()
+          .is_some_and(|previous| previous.preserve_empty)
+    } else {
+      page
+        .setup
+        .page_number_start
+        .map(page_number_offset_wants_right_page)
+        .unwrap_or_else(|| {
+          physical_page_is_right(physical_page_number)
+            ^ kept_pages
+              .last()
+              .is_some_and(|previous| previous.preserve_empty)
+        })
+    }
+  } else {
+    physical_page_is_right(physical_page_number)
+      ^ kept_pages
+        .last()
+        .is_some_and(|previous| previous.preserve_empty)
+  };
+
   if first_body_content_for_section && let Some(section) = document.sections.get(page.section_index)
   {
     match section.break_kind {
-      SectionBreakKind::OddPage => return true,
-      SectionBreakKind::EvenPage => return false,
+      SectionBreakKind::OddPage => wants_right = true,
+      SectionBreakKind::EvenPage => wants_right = false,
       SectionBreakKind::Continuous | SectionBreakKind::NextPage | SectionBreakKind::NextColumn => {}
     }
   }
-  if first_body_content_for_section && let Some(start) = page.setup.page_number_start {
-    return physical_page_is_right(start.max(1) as usize);
-  }
-  physical_page_is_right(physical_page_number) ^ kept_pages.last().is_some_and(is_page_frame_empty)
+  wants_right
 }
 
-fn page_has_explicit_side_wish(document: &DocxDocument, page: &Page, kept_pages: &[Page]) -> bool {
-  let first_body_content_for_section = !kept_pages
-    .iter()
-    .any(|previous| previous.section_index == page.section_index && !is_page_frame_empty(previous));
-  first_body_content_for_section
-    && (page.setup.page_number_start.is_some()
-      || document
-        .sections
-        .get(page.section_index)
-        .is_some_and(|section| {
-          matches!(
-            section.break_kind,
-            SectionBreakKind::OddPage | SectionBreakKind::EvenPage
-          )
-        }))
+fn page_number_offset_wants_right_page(page_number: i32) -> bool {
+  // Source: LibreOffice sw/source/core/layout/frmtool.cxx
+  // IsRightPageByNumber(), for non-initial content where the document's first
+  // virtual page has already established the parity base.
+  page_number.rem_euclid(2) == 1
 }
 
 fn physical_page_is_right(page_number: usize) -> bool {
@@ -3456,7 +3772,10 @@ fn keep_group_height(block: &Block, next: Option<&Block>, flow: FlowContext) -> 
     && paragraph.format.keep_with_next
     && let Some(Block::Paragraph(next)) = next
   {
-    height += estimated_paragraph_height(next, flow);
+    // Source: LibreOffice sw/source/core/layout/calcmove.cxx
+    // CheckMoveFwd()/WouldFit() tests whether the next content can start in
+    // the remaining upper, not whether the whole next paragraph fits there.
+    height += estimated_paragraph_first_line_height(next, flow);
   }
   height
 }
@@ -3633,6 +3952,20 @@ fn estimated_paragraph_height(paragraph: &crate::docx::Paragraph, flow: FlowCont
       .format
       .spacing_after_pt
       .max(PARAGRAPH_SPACING_AFTER_PT)
+}
+
+fn estimated_paragraph_first_line_height(
+  paragraph: &crate::docx::Paragraph,
+  flow: FlowContext,
+) -> f32 {
+  let base_line_style = paragraph_base_line_style(paragraph);
+  paragraph.format.spacing_before_pt
+    + paragraph_line_height_for_setup(
+      paragraph,
+      &base_line_style,
+      flow.setup,
+      flow.text_segmentation,
+    )
 }
 
 fn starts_new_page(kind: SectionBreakKind) -> bool {
@@ -3821,9 +4154,7 @@ fn layout_document_block(
         (flow, y) = force_page_break(flow, current, pages);
         ignore_top_margin_at_page_start = true;
       }
-      if !block_is_page_break_only_paragraph(block) {
-        note_body_content_frame(current, flow);
-      }
+      note_body_content_frame(current, flow);
 
       if paragraph.starts_after_last_rendered_page_break
         && flow.text_segmentation == TextSegmentation::Body
@@ -3860,14 +4191,25 @@ fn layout_document_block(
       )
     }
     Block::Table(table) => {
+      let has_ind_prev = table_has_indirect_previous_frame(current, flow, y);
       note_body_content_frame(current, flow);
-      layout_table(table, flow, current, pages, y)
+      layout_table(table, flow, current, pages, y, has_ind_prev)
     }
     Block::Frame(frame) => {
       note_body_content_frame(current, flow);
       layout_floating_frame(frame, flow, current, pages, y)
     }
   }
+}
+
+fn table_has_indirect_previous_frame(page: &Page, flow: FlowContext, y: f32) -> bool {
+  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+  // SwTabFrame::MakeAll() uses GetIndPrev() before the table is split. The
+  // current table frame itself must not count as the previous frame.
+  if flow.text_segmentation == TextSegmentation::Body {
+    return page.body_content_frames > 0;
+  }
+  page_has_body_region_items(page, flow) || y > flow.content_top_pt + LAYOUT_EPSILON_PT
 }
 
 fn note_body_content_frame(current: &mut Page, flow: FlowContext) {
@@ -5241,7 +5583,8 @@ fn layout_repeating_block(
       y
     }
     Block::Table(table) => {
-      let (_, y) = layout_table(table, flow, page, discarded_pages, y);
+      let has_ind_prev = table_has_indirect_previous_frame(page, flow, y);
+      let (_, y) = layout_table(table, flow, page, discarded_pages, y, has_ind_prev);
       y
     }
     Block::Frame(frame) => {
@@ -5313,6 +5656,7 @@ fn layout_table(
   current: &mut Page,
   pages: &mut Vec<Page>,
   y: f32,
+  has_ind_prev: bool,
 ) -> (FlowContext, f32) {
   if table.placement.is_some()
     && table.following_text_flow
@@ -5324,13 +5668,16 @@ fn layout_table(
     let mut inline_table = table.clone();
     inline_table.placement = None;
     return TableFrameLayout::new(&inline_table, block_area(flow), false)
-      .map_or((flow, y), |layout| layout.format(current, pages, y));
+      .map_or((flow, y), |layout| {
+        layout.format(current, pages, y, has_ind_prev)
+      });
   }
   if table.placement.is_some() {
     return layout_floating_table(table, flow, current, pages, y);
   }
-  TableFrameLayout::new(table, block_area(flow), false)
-    .map_or((flow, y), |layout| layout.format(current, pages, y))
+  TableFrameLayout::new(table, block_area(flow), false).map_or((flow, y), |layout| {
+    layout.format(current, pages, y, has_ind_prev)
+  })
 }
 
 fn layout_floating_table(
@@ -5373,9 +5720,16 @@ fn layout_floating_table(
   let mut frame_pages = Vec::new();
   let (_, bottom_y) = TableFrameLayout::new(&effective_table, block_area(frame_flow), true)
     .map_or((frame_flow, frame_y), |layout| {
-      layout.format(&mut frame_page, &mut frame_pages, frame_y)
+      layout.format(&mut frame_page, &mut frame_pages, frame_y, false)
     });
   frame_pages.push(frame_page);
+  materialize_pending_floating_table_follows(&mut frame_pages);
+  join_split_fly_table_follows(&mut frame_pages, flow);
+  frame_pages.retain(|page| {
+    !page.items.is_empty()
+      || !page.frame_fragments.is_empty()
+      || !page.pending_floating_table_follows.is_empty()
+  });
   let total_frame_pages = frame_pages.len();
   for (page_index, page) in frame_pages.iter_mut().enumerate() {
     decorate_floating_table_page_bounds(
@@ -5411,9 +5765,15 @@ fn layout_floating_table(
     current
       .wrap_exclusions
       .append(&mut first_page.wrap_exclusions);
+    current
+      .pending_floating_table_follows
+      .append(&mut first_page.pending_floating_table_follows);
   }
   for mut follow_page in frame_pages.into_iter().skip(1) {
-    if follow_page.items.is_empty() {
+    if follow_page.items.is_empty()
+      && follow_page.frame_fragments.is_empty()
+      && follow_page.pending_floating_table_follows.is_empty()
+    {
       continue;
     }
     append_floating_table_wrap_exclusion(&mut follow_page, placement);
@@ -5427,6 +5787,7 @@ fn layout_floating_table(
         frame_fragments: follow_page.frame_fragments,
         frame_influences: follow_page.frame_influences,
         wrap_exclusions: follow_page.wrap_exclusions,
+        pending_floating_table_follows: follow_page.pending_floating_table_follows,
       });
   }
   let occupied_bottom = first_page_bottom.unwrap_or(bottom_y) + placement.margin_bottom_pt;
@@ -5435,6 +5796,79 @@ fn layout_floating_table(
   } else {
     (flow, y)
   }
+}
+
+fn join_split_fly_table_follows(pages: &mut Vec<Page>, flow: FlowContext) {
+  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+  // SwTabFrame::MakeAll(): when a table has a follow directly in a split fly,
+  // Writer first asks the split fly if it can grow enough to join follow table
+  // frames, then joins only that follow chain. Keep this restricted to pages
+  // that actually carry table-row fragments. Whole rows moved to the follow
+  // page are still part of the follow table chain even when the individual row
+  // fragment is not itself marked as a split follow.
+  let mut index = 1usize;
+  while index < pages.len() {
+    if pages[index].explicit_break_target {
+      index += 1;
+      continue;
+    }
+    if !page_has_table_follow_fragment(&pages[index]) {
+      index += 1;
+      continue;
+    }
+    let Some((_, previous_bottom)) = page_items_vertical_bounds(&pages[index - 1].items) else {
+      index += 1;
+      continue;
+    };
+    let Some((next_top, next_bottom)) = page_items_vertical_bounds(&pages[index].items) else {
+      let mut empty = pages.remove(index);
+      pages[index - 1]
+        .pending_floating_table_follows
+        .append(&mut empty.pending_floating_table_follows);
+      continue;
+    };
+    let next_height = (next_bottom - next_top).max(0.0);
+    if previous_bottom + next_height > flow.content_bottom + LAYOUT_EPSILON_PT {
+      index += 1;
+      continue;
+    }
+
+    let mut next = pages.remove(index);
+    let item_offset = pages[index - 1].items.len();
+    let dy = previous_bottom - next_top;
+    pages[index - 1].items.extend(
+      next
+        .items
+        .into_iter()
+        .map(|item| translate_page_item(item, 0.0, dy)),
+    );
+    offset_page_frame_records_raw(
+      &mut next.frame_fragments,
+      &mut next.frame_influences,
+      item_offset,
+    );
+    for fragment in next.frame_fragments {
+      pages[index - 1]
+        .frame_fragments
+        .push(translate_frame_fragment(fragment, 0.0, dy));
+    }
+    pages[index - 1]
+      .frame_influences
+      .append(&mut next.frame_influences);
+    pages[index - 1]
+      .wrap_exclusions
+      .append(&mut next.wrap_exclusions);
+    pages[index - 1]
+      .pending_floating_table_follows
+      .append(&mut next.pending_floating_table_follows);
+  }
+}
+
+fn page_has_table_follow_fragment(page: &Page) -> bool {
+  page
+    .frame_fragments
+    .iter()
+    .any(|fragment| matches!(fragment.kind, FrameFragmentKind::TableRow))
 }
 
 fn effective_floating_table_split_allowed(table: &Table, flow: FlowContext) -> bool {
@@ -5727,31 +6161,62 @@ impl<'a> TableFrameLayout<'a> {
     })
   }
 
-  fn format(&self, current: &mut Page, pages: &mut Vec<Page>, mut y: f32) -> (FlowContext, f32) {
+  fn format(
+    &self,
+    current: &mut Page,
+    pages: &mut Vec<Page>,
+    mut y: f32,
+    mut has_ind_prev: bool,
+  ) -> (FlowContext, f32) {
     let mut flow = flow_from_block_area(self.frame.block);
     let mut layout = self.clone();
-    y = layout.dodge_wrap_exclusions(current, y, layout.frame.total_height);
+    let mut repeating_headers_disabled = false;
+    y = layout.dodge_wrap_exclusions(current, y, layout.initial_dodge_height());
     if !layout.frame.split_allowed
       && y > layout.frame.block.content_top_pt + LAYOUT_EPSILON_PT
       && y + layout.frame.total_height > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT
     {
       (flow, y) = advance_section_flow(flow, current, pages);
-      if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+      has_ind_prev = false;
+      if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
         layout = next_layout;
       }
     }
     let table_row_keep = layout.table_row_keep_enabled();
-    let allow_split_of_keep_row = table_row_keep
-      && layout.are_all_body_rows_keep_with_next()
-      && y <= layout.frame.block.content_top_pt + LAYOUT_EPSILON_PT;
-    let mut rows_moved_to_follow = HashSet::new();
     let mut left_border_segment = None;
     let mut right_border_segment = None;
+    let mut follow_state = TableFollowState::default();
     let mut row_index = 0usize;
-    while row_index < self.table.rows.len() {
-      let problem_row_index =
-        layout.first_problem_row_index(row_index, y, table_row_keep, allow_split_of_keep_row);
-      let format_until = problem_row_index.unwrap_or(self.table.rows.len());
+    'table_rows: while row_index < self.table.rows.len() {
+      let allow_split_of_keep_row =
+        layout.allow_split_of_keep_row(row_index, has_ind_prev, table_row_keep);
+      let make_all = layout.make_all_split_plan(
+        row_index,
+        y,
+        has_ind_prev,
+        table_row_keep,
+        allow_split_of_keep_row,
+      );
+      if make_all.move_forward {
+        flush_border_segment(current, &mut left_border_segment);
+        flush_border_segment(current, &mut right_border_segment);
+        (flow, y) = advance_section_flow(flow, current, pages);
+        has_ind_prev = false;
+        if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+          layout = next_layout;
+        }
+        y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+        continue;
+      }
+      if make_all.disable_repeating_headers {
+        repeating_headers_disabled = true;
+        layout = layout.without_repeating_headers();
+        continue;
+      }
+      let split_decision = make_all.split_decision;
+      let format_until = split_decision.map_or(self.table.rows.len(), |decision| {
+        decision.master_end_row_index
+      });
       while row_index < format_until {
         let row = &self.table.rows[row_index];
         y = layout.dodge_wrap_exclusions(
@@ -5768,10 +6233,14 @@ impl<'a> TableFrameLayout<'a> {
           flush_border_segment(current, &mut left_border_segment);
           flush_border_segment(current, &mut right_border_segment);
           (flow, y) = advance_section_flow(flow, current, pages);
-          if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+          has_ind_prev = split_decision
+            .and_then(|decision| decision.follow_start_row_index)
+            .is_some();
+          if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
             layout = next_layout;
           }
           y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+          continue 'table_rows;
         }
         let row_frame = layout.row_frame(row, row_index, y);
         let row_top = y;
@@ -5795,6 +6264,12 @@ impl<'a> TableFrameLayout<'a> {
         break;
       }
 
+      let Some(split_decision) = split_decision else {
+        break;
+      };
+      if let Some(follow_start_row_index) = split_decision.follow_start_row_index {
+        debug_assert!(follow_start_row_index >= row_index);
+      }
       let row = &self.table.rows[row_index];
       y = layout.dodge_wrap_exclusions(
         current,
@@ -5810,14 +6285,20 @@ impl<'a> TableFrameLayout<'a> {
         flush_border_segment(current, &mut left_border_segment);
         flush_border_segment(current, &mut right_border_segment);
         (flow, y) = advance_section_flow(flow, current, pages);
-        if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+        has_ind_prev = split_decision.follow_start_row_index.is_some();
+        if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
           layout = next_layout;
         }
         y = layout.format_repeated_header_rows(current, pages, y, 0.0);
+        continue 'table_rows;
       }
-      let mut row_frame = layout.row_frame(row, row_index, y);
+      let row_frame = layout.row_frame(row, row_index, y);
       let row_height = row_frame.height_pt;
-      if layout.should_split_row(&row_frame, table_row_keep, allow_split_of_keep_row) {
+      if split_decision.split_row_allowed {
+        debug_assert!(split_decision.creates_follow_flow_line);
+        let last_rendered_follow_height =
+          layout.row_last_rendered_page_break_follow_height(row_index, row);
+        let mut last_rendered_follow_height_applied = false;
         let mut remaining_height = row_height;
         let mut content_offset = 0.0;
         while remaining_height > LAYOUT_EPSILON_PT {
@@ -5826,10 +6307,20 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
-            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+            has_ind_prev = true;
+            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
-            y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
+            y = layout.format_repeated_header_rows(
+              current,
+              pages,
+              y,
+              if follow_state.has_follow_flow_line {
+                remaining_height
+              } else {
+                0.0
+              },
+            );
             continue;
           }
 
@@ -5841,39 +6332,68 @@ impl<'a> TableFrameLayout<'a> {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
-            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+            has_ind_prev = true;
+            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
-            y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
+            y = layout.format_repeated_header_rows(
+              current,
+              pages,
+              y,
+              if follow_state.has_follow_flow_line {
+                remaining_height
+              } else {
+                0.0
+              },
+            );
             continue;
           }
 
           let fragment_height = remaining_height.min(available_height);
-          row_frame = layout.row_frame(row, row_index, y);
-          row_frame.format_fragment(current, pages, y, y + fragment_height, content_offset);
+          layout.row_frame(row, row_index, y).format_fragment(
+            current,
+            pages,
+            y,
+            y + fragment_height,
+            content_offset,
+          );
           extend_border_segment(
             current,
             &mut left_border_segment,
-            row_frame.leading_border_segment(y, y + fragment_height),
+            layout
+              .row_frame(row, row_index, y)
+              .leading_border_segment(y, y + fragment_height),
           );
           extend_border_segment(
             current,
             &mut right_border_segment,
-            row_frame.trailing_border_segment(y, y + fragment_height),
+            layout
+              .row_frame(row, row_index, y)
+              .trailing_border_segment(y, y + fragment_height),
           );
           y += fragment_height;
           remaining_height -= fragment_height;
           content_offset += fragment_height;
+          if !last_rendered_follow_height_applied
+            && content_offset > LAYOUT_EPSILON_PT
+            && let Some(follow_height) = last_rendered_follow_height
+          {
+            remaining_height = remaining_height.max(follow_height);
+            last_rendered_follow_height_applied = true;
+          }
+          follow_state.set_follow_flow_line(row_index, remaining_height, content_offset);
           if remaining_height > LAYOUT_EPSILON_PT {
             flush_border_segment(current, &mut left_border_segment);
             flush_border_segment(current, &mut right_border_segment);
             (flow, y) = advance_section_flow(flow, current, pages);
-            if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+            has_ind_prev = true;
+            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
               layout = next_layout;
             }
             y = layout.format_repeated_header_rows(current, pages, y, remaining_height);
           }
         }
+        follow_state.clear_follow_flow_line();
         row_index += 1;
         if row_index < self.table.rows.len() {
           y += row_cell_spacing_pt(self.table, row);
@@ -5881,8 +6401,7 @@ impl<'a> TableFrameLayout<'a> {
         continue;
       }
 
-      let already_moved = rows_moved_to_follow.contains(&row_index);
-      if !layout.should_move_row_to_follow(&row_frame, already_moved) {
+      if !split_decision.move_rows_to_follow {
         let row_top = y;
         y = row_frame.format(current, pages);
         extend_border_segment(
@@ -5902,11 +6421,137 @@ impl<'a> TableFrameLayout<'a> {
         continue;
       }
 
+      if layout.should_backward_move_follow_row_group(row_index, y) {
+        if follow_state.has_follow_flow_line
+          && follow_state.split_row_index == Some(row_index.saturating_sub(1))
+        {
+          if let Some(split_row_index) = follow_state.split_row_index
+            && let Some(split_row) = self.table.rows.get(split_row_index)
+            && follow_state.remaining_height_pt > LAYOUT_EPSILON_PT
+          {
+            let available_height = (layout.frame.block.content_bottom - y).max(0.0);
+            if available_height > LAYOUT_EPSILON_PT {
+              let fragment_height = follow_state.remaining_height_pt.min(available_height);
+              layout
+                .row_frame(split_row, split_row_index, y)
+                .format_fragment(
+                  current,
+                  pages,
+                  y,
+                  y + fragment_height,
+                  follow_state.content_offset_pt,
+                );
+              y += fragment_height;
+              follow_state.set_follow_flow_line(
+                split_row_index,
+                follow_state.remaining_height_pt - fragment_height,
+                follow_state.content_offset_pt + fragment_height,
+              );
+              if follow_state.has_follow_flow_line {
+                flush_border_segment(current, &mut left_border_segment);
+                flush_border_segment(current, &mut right_border_segment);
+                (flow, y) = advance_section_flow(flow, current, pages);
+                has_ind_prev = true;
+                if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+                  layout = next_layout;
+                }
+                y = layout.format_repeated_header_rows(
+                  current,
+                  pages,
+                  y,
+                  follow_state.remaining_height_pt,
+                );
+                continue;
+              }
+            }
+          }
+          if !follow_state.has_follow_flow_line {
+            follow_state.clear_follow_flow_line();
+          }
+        }
+        let rows_to_move = layout.maximum_layout_row_span(row_index);
+        for moved in 0..rows_to_move {
+          let moved_row_index = row_index + moved;
+          let Some(moved_row) = self.table.rows.get(moved_row_index) else {
+            break;
+          };
+          let moved_row_top = y;
+          let moved_row_frame = layout.row_frame(moved_row, moved_row_index, y);
+          let moved_row_height = moved_row_frame.height_pt;
+          if moved == 0
+            && moved_row_frame.bottom() > layout.frame.block.content_bottom + LAYOUT_EPSILON_PT
+            && layout.row_can_split_at_cut(
+              &moved_row_frame,
+              table_row_keep,
+              allow_split_of_keep_row,
+            )
+          {
+            let row_bottom = y + (layout.frame.block.content_bottom - y).max(0.0);
+            moved_row_frame.format_fragment(current, pages, y, row_bottom, 0.0);
+            extend_border_segment(
+              current,
+              &mut left_border_segment,
+              moved_row_frame.leading_border_segment(moved_row_top, row_bottom),
+            );
+            extend_border_segment(
+              current,
+              &mut right_border_segment,
+              moved_row_frame.trailing_border_segment(moved_row_top, row_bottom),
+            );
+            flush_border_segment(current, &mut left_border_segment);
+            flush_border_segment(current, &mut right_border_segment);
+            (flow, y) = advance_section_flow(flow, current, pages);
+            has_ind_prev = true;
+            if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
+              layout = next_layout;
+            }
+            y = layout.format_repeated_header_rows(
+              current,
+              pages,
+              y,
+              moved_row_height - (row_bottom - moved_row_top),
+            );
+            let remaining_height = moved_row_height - (row_bottom - moved_row_top);
+            layout
+              .row_frame(moved_row, moved_row_index, y)
+              .format_fragment(
+                current,
+                pages,
+                y,
+                y + remaining_height,
+                row_bottom - moved_row_top,
+              );
+            y += remaining_height;
+            row_index += 1;
+            if row_index < self.table.rows.len() {
+              y += row_cell_spacing_pt(self.table, moved_row);
+            }
+          } else {
+            y = moved_row_frame.format(current, pages);
+            extend_border_segment(
+              current,
+              &mut left_border_segment,
+              moved_row_frame.leading_border_segment(moved_row_top, y),
+            );
+            extend_border_segment(
+              current,
+              &mut right_border_segment,
+              moved_row_frame.trailing_border_segment(moved_row_top, y),
+            );
+            row_index += 1;
+            if row_index < self.table.rows.len() {
+              y += row_cell_spacing_pt(self.table, moved_row);
+            }
+          }
+        }
+        continue;
+      }
+
       flush_border_segment(current, &mut left_border_segment);
       flush_border_segment(current, &mut right_border_segment);
-      rows_moved_to_follow.insert(row_index);
       (flow, y) = advance_section_flow(flow, current, pages);
-      if let Some(next_layout) = TableFrameLayout::new(self.table, block_area(flow), false) {
+      has_ind_prev = split_decision.follow_start_row_index.is_some();
+      if let Some(next_layout) = self.layout_for_flow(flow, repeating_headers_disabled) {
         layout = next_layout;
       }
       y = layout.format_repeated_header_rows(
@@ -5923,109 +6568,257 @@ impl<'a> TableFrameLayout<'a> {
     (flow, y + TABLE_SPACING_AFTER_PT)
   }
 
-  fn first_problem_row_index(
+  fn table_split_decision(
     &self,
     start_row_index: usize,
     y: f32,
+    has_ind_prev: bool,
+    try_to_split_row: bool,
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
-  ) -> Option<usize> {
-    if let Some(problem_row_index) =
-      self.page_start_problem_row_index(start_row_index, y, table_row_keep, allow_split_of_keep_row)
-    {
-      return Some(self.adjust_problem_row_index_for_keep_with_next(
-        problem_row_index,
-        start_row_index,
-        table_row_keep,
-        allow_split_of_keep_row,
-      ));
-    }
+  ) -> Option<TableSplitDecision> {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::Split(): first identify the row that crosses the cut
+    // position and count the rows that remain in the master table, then apply
+    // row-split, repeated-headline and keep-with-next rules in that order.
+    let repeat_count = if start_row_index == 0 {
+      self.frame.repeating_header_count
+    } else {
+      0
+    };
     let mut current_y = y;
+    let mut row_count = 0usize;
+    let mut cut_row_index = None;
+    let mut remaining_space_for_cut_row = 0.0;
     for row_index in start_row_index..self.table.rows.len() {
-      if self.should_move_keep_with_next_chain_to_follow(
-        row_index,
-        current_y,
-        table_row_keep,
-        allow_split_of_keep_row,
-      ) {
-        return Some(self.adjust_problem_row_index_for_keep_with_next(
-          row_index,
-          start_row_index,
-          table_row_keep,
-          allow_split_of_keep_row,
-        ));
-      }
       let row = &self.table.rows[row_index];
       let row_frame = self.row_frame(row, row_index, current_y);
       if row_frame.bottom() > self.frame.block.content_bottom + LAYOUT_EPSILON_PT {
-        return Some(self.adjust_problem_row_index_for_keep_with_next(
-          row_index,
-          start_row_index,
-          table_row_keep,
-          allow_split_of_keep_row,
-        ));
+        cut_row_index = Some(row_index);
+        remaining_space_for_cut_row = self.frame.block.content_bottom - current_y;
+        break;
       }
+      row_count += 1;
       current_y = row_frame.bottom();
       if row_index + 1 < self.table.rows.len() {
         current_y += row_cell_spacing_pt(self.table, row);
       }
     }
-    None
+    let mut row_index = cut_row_index?;
+    let old_row_index = row_index;
+
+    let mut split_row_allowed = try_to_split_row
+      && remaining_space_for_cut_row > LAYOUT_EPSILON_PT
+      && self.row_can_split_at_cut(
+        &self.row_frame(&self.table.rows[row_index], row_index, current_y),
+        table_row_keep,
+        allow_split_of_keep_row,
+      );
+
+    let mut keep_next_row = false;
+    if row_count < repeat_count {
+      return Some(TableSplitDecision {
+        master_end_row_index: row_index,
+        follow_start_row_index: None,
+        split_row_allowed: false,
+        move_rows_to_follow: false,
+        creates_follow_flow_line: false,
+        move_whole_table: has_ind_prev,
+        disable_repeating_headers: !has_ind_prev,
+      });
+    } else if start_row_index == 0 && row_count == repeat_count {
+      if !split_row_allowed || self.row_contains_unsplittable_nested_table(row_index) {
+        keep_next_row = true;
+      }
+    }
+
+    if keep_next_row {
+      row_index = start_row_index.max(self.frame.repeating_header_count);
+      if row_index < self.table.rows.len() {
+        row_index += 1;
+        row_count += 1;
+      }
+      if row_index >= self.table.rows.len() {
+        return None;
+      }
+      split_row_allowed = false;
+    }
+
+    split_row_allowed = split_row_allowed
+      && (!table_row_keep || !self.table.rows[row_index].keep_with_next || allow_split_of_keep_row);
+
+    if !split_row_allowed && table_row_keep && !allow_split_of_keep_row {
+      let mut previous_row_index = row_index.checked_sub(1);
+      while let Some(previous) = previous_row_index {
+        if previous < start_row_index || !self.table.rows[previous].keep_with_next {
+          break;
+        }
+        if row_count <= repeat_count {
+          break;
+        }
+        row_index = previous;
+        row_count -= 1;
+        previous_row_index = previous.checked_sub(1);
+      }
+      if row_count == repeat_count && start_row_index == 0 {
+        row_index = old_row_index;
+      }
+    }
+
+    if !split_row_allowed && self.is_first_non_header_row(row_index) {
+      return Some(TableSplitDecision {
+        master_end_row_index: row_index,
+        follow_start_row_index: None,
+        split_row_allowed: false,
+        move_rows_to_follow: false,
+        creates_follow_flow_line: false,
+        move_whole_table: has_ind_prev,
+        disable_repeating_headers: false,
+      });
+    }
+
+    Some(TableSplitDecision {
+      master_end_row_index: row_index,
+      follow_start_row_index: Some(if split_row_allowed {
+        row_index + 1
+      } else {
+        row_index
+      }),
+      split_row_allowed,
+      move_rows_to_follow: !split_row_allowed,
+      creates_follow_flow_line: split_row_allowed,
+      move_whole_table: false,
+      disable_repeating_headers: false,
+    })
   }
 
-  fn adjust_problem_row_index_for_keep_with_next(
-    &self,
-    mut row_index: usize,
-    start_row_index: usize,
-    table_row_keep: bool,
-    allow_split_of_keep_row: bool,
-  ) -> usize {
-    if !table_row_keep || allow_split_of_keep_row {
-      return row_index;
-    }
-    let floor = start_row_index.max(self.frame.repeating_header_count);
-    while row_index > floor && self.table.rows[row_index - 1].keep_with_next {
-      row_index -= 1;
-    }
-    row_index
-  }
-
-  fn page_start_problem_row_index(
+  fn make_all_split_plan(
     &self,
     start_row_index: usize,
     y: f32,
+    has_ind_prev: bool,
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
-  ) -> Option<usize> {
-    if !table_row_keep || allow_split_of_keep_row {
-      return None;
+  ) -> TableMakeAllPlan {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::MakeAll(): try splitting with row-split enabled first, then
+    // retry the same split with bTryToSplit=false when the first attempt would
+    // move the whole table or cannot satisfy the break-line precondition.
+    let mut try_to_split_row = true;
+    loop {
+      let Some(decision) = self.table_split_decision(
+        start_row_index,
+        y,
+        has_ind_prev,
+        try_to_split_row,
+        table_row_keep,
+        allow_split_of_keep_row,
+      ) else {
+        return TableMakeAllPlan {
+          split_decision: None,
+          move_forward: false,
+          disable_repeating_headers: false,
+        };
+      };
+      if decision.disable_repeating_headers {
+        return TableMakeAllPlan {
+          split_decision: Some(decision),
+          move_forward: false,
+          disable_repeating_headers: true,
+        };
+      }
+      if decision.move_whole_table && try_to_split_row {
+        try_to_split_row = false;
+        continue;
+      }
+      if !self.table_break_line_fits(
+        start_row_index,
+        y,
+        has_ind_prev,
+        try_to_split_row,
+        table_row_keep,
+        allow_split_of_keep_row,
+      ) {
+        if try_to_split_row {
+          try_to_split_row = false;
+          continue;
+        }
+        if self.frame.repeating_header_count > 0 {
+          return TableMakeAllPlan {
+            split_decision: Some(decision),
+            move_forward: false,
+            disable_repeating_headers: true,
+          };
+        }
+        return TableMakeAllPlan {
+          split_decision: Some(decision),
+          move_forward: true,
+          disable_repeating_headers: false,
+        };
+      }
+      return TableMakeAllPlan {
+        split_decision: Some(decision),
+        move_forward: decision.move_whole_table,
+        disable_repeating_headers: false,
+      };
     }
-    if y > self.frame.block.content_top_pt + LAYOUT_EPSILON_PT {
-      return None;
+  }
+
+  fn table_break_line_fits(
+    &self,
+    start_row_index: usize,
+    y: f32,
+    has_ind_prev: bool,
+    try_to_split_row: bool,
+    table_row_keep: bool,
+    allow_split_of_keep_row: bool,
+  ) -> bool {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::MakeAll() computes nBreakLine from the repeated headlines,
+    // the keep-with-next row chain, and the second no-row-split attempt before
+    // it calls SwTabFrame::Split(). If that minimum prefix cannot fit and the
+    // table has an indirect previous frame, Writer moves the table forward
+    // instead of constructing an invalid follow.
+    if !has_ind_prev {
+      return true;
     }
-    let first_body_row_index = start_row_index.max(self.frame.repeating_header_count);
-    let Some(first_body_row) = self.table.rows.get(first_body_row_index) else {
-      return None;
+
+    let mut rows_needed = if start_row_index == 0 {
+      self.frame.repeating_header_count
+    } else {
+      0
     };
-    let required_bottom = self.keep_with_next_chain_bottom(first_body_row_index, y);
-    if required_bottom <= self.frame.block.content_bottom + LAYOUT_EPSILON_PT {
-      return None;
+    if table_row_keep && !allow_split_of_keep_row {
+      let mut row_index = start_row_index.max(self.frame.repeating_header_count);
+      while let Some(row) = self.table.rows.get(row_index) {
+        if !row.keep_with_next {
+          break;
+        }
+        rows_needed = rows_needed.max(row_index + 1 - start_row_index);
+        row_index += 1;
+      }
     }
-    let first_body_row_frame = self.row_frame(first_body_row, first_body_row_index, y);
-    if self.should_split_row(
-      &first_body_row_frame,
-      table_row_keep,
-      allow_split_of_keep_row,
-    ) {
-      return None;
+    if !try_to_split_row {
+      rows_needed = rows_needed.saturating_add(1);
     }
-    if self.frame.repeating_header_count > 0
-      && start_row_index <= self.frame.repeating_header_count
-      && first_body_row_index + 1 < self.table.rows.len()
-    {
-      return Some(first_body_row_index + 1);
+    if rows_needed == 0 {
+      return true;
     }
-    None
+
+    let mut current_y = y;
+    for row_index in start_row_index..self.table.rows.len().min(start_row_index + rows_needed) {
+      let row = &self.table.rows[row_index];
+      current_y += self
+        .frame
+        .row_heights
+        .get(row_index)
+        .copied()
+        .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT);
+      if row_index + 1 < self.table.rows.len() {
+        current_y += row_cell_spacing_pt(self.table, row);
+      }
+    }
+    current_y <= self.frame.block.content_bottom + LAYOUT_EPSILON_PT
   }
 
   fn row_frame(&self, row: &'a TableRow, row_index: usize, y: f32) -> RowFrame<'a, '_> {
@@ -6052,23 +6845,43 @@ impl<'a> TableFrameLayout<'a> {
     }
   }
 
-  fn should_move_keep_with_next_chain_to_follow(
-    &self,
-    row_index: usize,
-    y: f32,
-    table_row_keep: bool,
-    allow_split_of_keep_row: bool,
-  ) -> bool {
-    if row_index + 1 >= self.table.rows.len()
-      || !table_row_keep
-      || allow_split_of_keep_row
-      || !self.table.rows[row_index].keep_with_next
-      || y <= self.frame.block.content_top_pt + LAYOUT_EPSILON_PT
-    {
-      return false;
+  fn layout_for_flow(&self, flow: FlowContext, repeating_headers_disabled: bool) -> Option<Self> {
+    TableFrameLayout::new(self.table, block_area(flow), false).map(|layout| {
+      if repeating_headers_disabled {
+        layout.without_repeating_headers()
+      } else {
+        layout
+      }
+    })
+  }
+
+  fn without_repeating_headers(&self) -> Self {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::Split(), tdf#88496 fallback: if repeated headlines do not
+    // fit at the start of the upper, disable the table's rows-to-repeat and
+    // reformat instead of creating an endless follow chain.
+    let mut next = self.clone();
+    next.frame.repeating_header_count = 0;
+    next.frame.repeating_header_height = 0.0;
+    next
+  }
+
+  fn initial_dodge_height(&self) -> f32 {
+    if !self.frame.split_allowed {
+      return self.frame.total_height;
     }
-    self.keep_with_next_chain_bottom(row_index, y)
-      > self.frame.block.content_bottom + LAYOUT_EPSILON_PT
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::MakeAll() only needs the repeat/keep break line to fit
+    // before trying SwTabFrame::Split(); a split-capable table is not moved
+    // forward just because its full height reaches the page bottom.
+    let first_body_row_index = self.frame.repeating_header_count;
+    let first_body_height = self
+      .frame
+      .row_heights
+      .get(first_body_row_index)
+      .copied()
+      .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT);
+    self.frame.repeating_header_height + first_body_height
   }
 
   fn keep_with_next_chain_bottom(&self, row_index: usize, y: f32) -> f32 {
@@ -6091,24 +6904,170 @@ impl<'a> TableFrameLayout<'a> {
     (self.keep_with_next_chain_bottom(row_index, y) - y).max(0.0)
   }
 
-  fn should_move_row_to_follow(&self, row: &RowFrame<'_, '_>, already_moved: bool) -> bool {
-    if already_moved || row.bottom() <= self.frame.block.content_bottom {
+  fn should_backward_move_follow_row_group(&self, row_index: usize, y: f32) -> bool {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::MakeAll() calls GetFollow()->ShouldBwdMoved() before it
+    // keeps the follow split. ShouldBwdMoved() compares the first content
+    // line of the follow with the master upper's remaining space; if it fits,
+    // the first follow row (plus covered row-span lines) is pasted back into
+    // the master table.
+    if row_index >= self.table.rows.len() {
       return false;
     }
-    if self.is_first_non_header_row(row.row_index) {
+    let remaining_space = self.frame.block.content_bottom - y;
+    if remaining_space <= LAYOUT_EPSILON_PT {
       return false;
+    }
+    let first_content_height =
+      self.calc_height_of_first_content_line(row_index, self.table_row_keep_enabled());
+    first_content_height <= remaining_space + LAYOUT_EPSILON_PT
+  }
+
+  fn calc_height_of_first_content_line(&self, row_index: usize, table_row_keep: bool) -> f32 {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::CalcHeightOfFirstContentLine(): for follow tables, repeated
+    // headlines are ignored, keep-with-next rows are counted as full rows, and
+    // the next splittable row contributes only its first content line.
+    if !self.frame.split_allowed {
+      return self.frame.total_height;
     }
 
-    !row.row.cant_split
-      || row.fits_empty_body_region()
-      || row.y > self.frame.block.content_top_pt + LAYOUT_EPSILON_PT
+    let mut first_content_row_index = row_index;
+    let mut height = 0.0;
+    if table_row_keep {
+      while let Some(row) = self.table.rows.get(first_content_row_index) {
+        if !row.keep_with_next {
+          break;
+        }
+        height += self.row_height(first_content_row_index);
+        first_content_row_index += 1;
+      }
+    }
+
+    let Some(row) = self.table.rows.get(first_content_row_index) else {
+      return height;
+    };
+
+    if !self.row_can_contribute_first_content_line(first_content_row_index, row, table_row_keep) {
+      return height + self.row_height(first_content_row_index);
+    }
+
+    let first_line_height = self
+      .row_first_content_line_height(first_content_row_index, row)
+      .unwrap_or_else(|| self.row_height(first_content_row_index));
+    let minimum_row_height = row.height_pt.unwrap_or(0.0).max(TABLE_ROW_MIN_HEIGHT_PT);
+    height + first_line_height.max(minimum_row_height)
+  }
+
+  fn row_height(&self, row_index: usize) -> f32 {
+    self
+      .frame
+      .row_heights
+      .get(row_index)
+      .copied()
+      .unwrap_or(TABLE_ROW_MIN_HEIGHT_PT)
+  }
+
+  fn row_can_contribute_first_content_line(
+    &self,
+    row_index: usize,
+    row: &TableRow,
+    table_row_keep: bool,
+  ) -> bool {
+    !row.cant_split
+      && !row.exact_height
+      && !row_repeat_header_effective(self.table, row_index)
+      && !row_has_vertical_merge_context(self.table, row_index)
+      && (!table_row_keep || !row.keep_with_next)
+  }
+
+  fn row_first_content_line_height(&self, row_index: usize, row: &TableRow) -> Option<f32> {
+    let mut grid_index = row.grid_before;
+    let mut height: Option<f32> = None;
+    for cell in &row.cells {
+      let width = spanned_cell_width(cell, &self.frame.column_widths, &mut grid_index);
+      if cell.vertical_merge_continue {
+        continue;
+      }
+      let Some(cell_height) = table_cell_first_content_line_height(
+        cell,
+        width,
+        self.frame.block.setup,
+        TextSegmentation::TableCell,
+      ) else {
+        continue;
+      };
+      let row_line_height = cell_height - cell.margins.top_pt - cell.margins.bottom_pt
+        + row_top_cell_margin_extent(row)
+        + row_bottom_cell_margin_extent(row)
+        + row_top_border_space_extent(self.table, row_index, row)
+        + row_bottom_border_spacing_extent(self.table, row_index, row);
+      height = Some(height.map_or(row_line_height, |current| current.max(row_line_height)));
+    }
+    height
+  }
+
+  fn row_last_rendered_page_break_follow_height(
+    &self,
+    row_index: usize,
+    row: &TableRow,
+  ) -> Option<f32> {
+    // Source: LibreOffice sw/source/core/text/frmform.cxx formats a
+    // SwTextFrame follow from the cursor after a page break. The follow row
+    // must therefore reserve the height of the remaining lower content, not
+    // only the leftover twips of the original row frame.
+    let mut grid_index = row.grid_before;
+    let mut content_height = None;
+    let row_top_margin = row_top_cell_margin_extent(row);
+    let row_bottom_margin = row_bottom_cell_margin_extent(row);
+    for cell in &row.cells {
+      let width = spanned_cell_width(cell, &self.frame.column_widths, &mut grid_index);
+      if cell.vertical_merge_continue {
+        continue;
+      }
+      let Some(blocks) = table_cell_blocks_for_split_fragment(cell, true) else {
+        continue;
+      };
+      if blocks.is_empty() {
+        continue;
+      }
+      let mut follow_cell = cell.clone();
+      follow_cell.blocks = blocks;
+      let cell_height = table_cell_content_height(&follow_cell, width, self.frame.block.setup)
+        - cell.margins.top_pt
+        - cell.margins.bottom_pt
+        + row_top_margin
+        + row_bottom_margin
+        + row_top_border_space_extent(self.table, row_index, row)
+        + row_bottom_border_spacing_extent(self.table, row_index, row);
+      content_height =
+        Some(content_height.map_or(cell_height, |height: f32| height.max(cell_height)));
+    }
+    content_height
+  }
+
+  fn maximum_layout_row_span(&self, row_index: usize) -> usize {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // lcl_GetMaximumLayoutRowSpan(): when moving the first follow row
+    // backward, include following covered rows so row-span layout stays
+    // structurally valid.
+    let mut rows_to_move = 1usize;
+    let mut next_row_index = row_index + 1;
+    while let Some(row) = self.table.rows.get(next_row_index) {
+      if !row.cells.iter().any(|cell| cell.vertical_merge_continue) {
+        break;
+      }
+      rows_to_move += 1;
+      next_row_index += 1;
+    }
+    rows_to_move
   }
 
   fn is_first_non_header_row(&self, row_index: usize) -> bool {
     row_index == self.frame.repeating_header_count
   }
 
-  fn should_split_row(
+  fn row_can_split_at_cut(
     &self,
     row: &RowFrame<'_, '_>,
     table_row_keep: bool,
@@ -6117,22 +7076,47 @@ impl<'a> TableFrameLayout<'a> {
     let available_height = self.frame.block.content_bottom - row.y;
     let row_split_allowed = !row.row.cant_split || !row.fits_empty_body_region();
     row_split_allowed
+      && available_height > LAYOUT_EPSILON_PT
       && !row.row.exact_height
       && !row_repeat_header_effective(self.table, row.row_index)
       && !row_has_vertical_merge_context(self.table, row.row_index)
       && (!table_row_keep || !row.row.keep_with_next || allow_split_of_keep_row)
       && Self::row_minimum_split_fragment_height(self.table, row.row_index, row.row)
         < available_height - LAYOUT_EPSILON_PT
-      && row.bottom() > self.frame.block.content_bottom
-      && row.y < self.frame.block.content_bottom
+  }
+
+  fn row_contains_unsplittable_nested_table(&self, row_index: usize) -> bool {
+    self.table.rows.get(row_index).is_some_and(|row| {
+      row.cells.iter().any(|cell| {
+        cell
+          .blocks
+          .iter()
+          .any(|block| matches!(block, Block::Table(table) if !table.split_allowed))
+      })
+    })
   }
 
   fn table_row_keep_enabled(&self) -> bool {
     self.table.split_allowed && self.table.placement.is_none()
   }
 
-  fn are_all_body_rows_keep_with_next(&self) -> bool {
-    let mut row_index = self.frame.repeating_header_count;
+  fn allow_split_of_keep_row(
+    &self,
+    start_row_index: usize,
+    has_ind_prev: bool,
+    table_row_keep: bool,
+  ) -> bool {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // SwTabFrame::MakeAll() derives bAllowSplitOfRow from the current
+    // master/follow table: no indirect previous frame and all rows starting at
+    // the current first non-headline row keep with next.
+    table_row_keep
+      && !has_ind_prev
+      && self
+        .are_body_rows_keep_with_next_from(start_row_index.max(self.frame.repeating_header_count))
+  }
+
+  fn are_body_rows_keep_with_next_from(&self, mut row_index: usize) -> bool {
     let Some(row) = self.table.rows.get(row_index) else {
       return false;
     };
@@ -6157,7 +7141,7 @@ impl<'a> TableFrameLayout<'a> {
     row_height: f32,
   ) -> f32 {
     if self.frame.repeating_header_count == 0
-      || y + self.frame.repeating_header_height + row_height > self.frame.block.content_bottom
+      || y + self.frame.repeating_header_height > self.frame.block.content_bottom
     {
       return y;
     }
@@ -6316,6 +7300,53 @@ struct TableFrame {
   repeating_header_count: usize,
   repeating_header_height: f32,
   total_height: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TableSplitDecision {
+  master_end_row_index: usize,
+  follow_start_row_index: Option<usize>,
+  split_row_allowed: bool,
+  move_rows_to_follow: bool,
+  creates_follow_flow_line: bool,
+  move_whole_table: bool,
+  disable_repeating_headers: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TableMakeAllPlan {
+  split_decision: Option<TableSplitDecision>,
+  move_forward: bool,
+  disable_repeating_headers: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct TableFollowState {
+  has_follow_flow_line: bool,
+  split_row_index: Option<usize>,
+  remaining_height_pt: f32,
+  content_offset_pt: f32,
+}
+
+impl TableFollowState {
+  fn set_follow_flow_line(
+    &mut self,
+    row_index: usize,
+    remaining_height_pt: f32,
+    content_offset_pt: f32,
+  ) {
+    self.has_follow_flow_line = remaining_height_pt > LAYOUT_EPSILON_PT;
+    self.split_row_index = self.has_follow_flow_line.then_some(row_index);
+    self.remaining_height_pt = remaining_height_pt.max(0.0);
+    self.content_offset_pt = content_offset_pt.max(0.0);
+  }
+
+  fn clear_follow_flow_line(&mut self) {
+    self.has_follow_flow_line = false;
+    self.split_row_index = None;
+    self.remaining_height_pt = 0.0;
+    self.content_offset_pt = 0.0;
+  }
 }
 
 struct RowFrame<'a, 'f> {
@@ -6949,6 +7980,9 @@ fn table_column_count(table: &Table) -> usize {
 }
 
 fn table_repeating_header_count(table: &Table) -> usize {
+  if table.explicit_no_repeat_header {
+    return 0;
+  }
   let count = leading_repeat_header_count(table);
   if count == 0
     || count > HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND
@@ -7497,7 +8531,22 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
       }
     }
   };
-  let mut text_y = aligned_content_top + first_line_baseline_offset - content_offset;
+  let split_blocks = split_fragment
+    .then(|| table_cell_blocks_for_split_fragment(cell, content_offset > LAYOUT_EPSILON_PT))
+    .flatten();
+  if split_blocks.is_some() && content_offset > LAYOUT_EPSILON_PT {
+    // Source: LibreOffice writerfilter imports w:lastRenderedPageBreak as a
+    // real text break position. A follow fragment that starts after that
+    // marker is not a candidate for SwTabFrame::Join() back into its master.
+    current.explicit_break_target = true;
+  }
+  let blocks_to_layout = split_blocks.as_deref().unwrap_or(&cell.blocks);
+  let effective_content_offset = if split_blocks.is_some() {
+    0.0
+  } else {
+    content_offset
+  };
+  let mut text_y = aligned_content_top + first_line_baseline_offset - effective_content_offset;
   let content_start_y = text_y;
   let text_left = x + cell.margins.left_pt;
   let text_bottom = y + height - bottom_margin_for_lowers;
@@ -7510,7 +8559,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
   let flow = FlowContext {
     setup,
     section_index: current.section_index,
-    section_page_index: 0,
+    section_page_index: current.section_page_index,
     column_index: 0,
     columns: SectionColumns::default(),
     content_top_pt: text_y,
@@ -7537,7 +8586,8 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     text_segmentation: TextSegmentation::TableCell,
     paragraph_spacing_context: ParagraphSpacingContext::Normal,
   };
-  let mut nested_page = empty_page(setup, current.section_index);
+  let mut nested_page =
+    empty_section_page(setup, current.section_index, current.section_page_index);
   let mut discarded_pages = Vec::new();
   let has_following_text_flow_table = cell.blocks.iter().any(|block| {
     matches!(
@@ -7546,12 +8596,12 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     )
   });
 
-  if has_following_text_flow_table && escape_following_text_flow_pages && !split_fragment {
-    for (index, block) in cell.blocks.iter().enumerate() {
+  if has_following_text_flow_table && escape_following_text_flow_pages {
+    for (index, block) in blocks_to_layout.iter().enumerate() {
       let previous = index
         .checked_sub(1)
-        .and_then(|index| cell.blocks.get(index));
-      let next = cell.blocks.get(index + 1);
+        .and_then(|index| blocks_to_layout.get(index));
+      let next = blocks_to_layout.get(index + 1);
       let block_flow = match block {
         Block::Table(table) if table.placement.is_some() && table.following_text_flow => {
           FlowContext {
@@ -7569,14 +8619,14 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
     return;
   }
 
-  for (index, block) in cell.blocks.iter().enumerate() {
+  for (index, block) in blocks_to_layout.iter().enumerate() {
     if text_y > text_bottom {
       break;
     }
     let previous = index
       .checked_sub(1)
-      .and_then(|index| cell.blocks.get(index));
-    let next = cell.blocks.get(index + 1);
+      .and_then(|index| blocks_to_layout.get(index));
+    let next = blocks_to_layout.get(index + 1);
     let block_flow = match block {
       Block::Table(table) if table.placement.is_some() && table.following_text_flow => {
         FlowContext {
@@ -7602,7 +8652,7 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
 
   if has_following_text_flow_table && !split_fragment {
     let mut local_pages = ordered_local_pages(nested_page, discarded_pages).into_iter();
-    if let Some(first_page) = local_pages.next() {
+    if let Some(mut first_page) = local_pages.next() {
       let item_start = current.items.len();
       current.items.extend(
         first_page
@@ -7628,9 +8678,15 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
               Some(fragment)
             }),
         );
+      current
+        .pending_floating_table_follows
+        .append(&mut first_page.pending_floating_table_follows);
     }
     for follow_page in local_pages {
-      if follow_page.items.is_empty() {
+      if follow_page.items.is_empty()
+        && follow_page.frame_fragments.is_empty()
+        && follow_page.pending_floating_table_follows.is_empty()
+      {
         continue;
       }
       current
@@ -7640,9 +8696,10 @@ fn layout_table_cell(fragment: TableCellLayout<'_>) {
           section_index: follow_page.section_index,
           section_page_index: follow_page.section_page_index,
           items: follow_page.items,
-          frame_fragments: Vec::new(),
+          frame_fragments: follow_page.frame_fragments,
           frame_influences: Vec::new(),
           wrap_exclusions: follow_page.wrap_exclusions,
+          pending_floating_table_follows: follow_page.pending_floating_table_follows,
         });
     }
     return;
@@ -7691,6 +8748,167 @@ fn table_cell_first_line_style(cell: &TableCell) -> TextStyle {
     return paragraph_base_line_style(paragraph);
   }
   TextStyle::default()
+}
+
+fn table_cell_blocks_for_split_fragment(
+  cell: &TableCell,
+  follow_fragment: bool,
+) -> Option<Vec<Block>> {
+  // Source: LibreOffice Writer imports w:lastRenderedPageBreak as pagination
+  // evidence on the following text portion. When a table row is already split,
+  // SwTextFrame follows are laid out from the text cursor after the break, not
+  // from the whole paragraph again; split the imported block stream at that
+  // cursor before formatting the master/follow cell fragments.
+  let Some(split_index) = cell
+    .blocks
+    .iter()
+    .position(block_starts_after_last_rendered_page_break)
+  else {
+    return None;
+  };
+
+  let mut blocks = Vec::new();
+  if !follow_fragment {
+    blocks.extend(cell.blocks[..split_index].iter().cloned());
+  }
+
+  match &cell.blocks[split_index] {
+    Block::Paragraph(paragraph) => {
+      if let Some(paragraph) =
+        paragraph_fragment_around_last_rendered_page_break(paragraph, follow_fragment)
+      {
+        blocks.push(Block::Paragraph(paragraph));
+      }
+    }
+    block if follow_fragment => blocks.push(block.clone()),
+    _ => {}
+  }
+
+  if follow_fragment {
+    blocks.extend(cell.blocks[split_index + 1..].iter().cloned());
+  }
+  Some(blocks)
+}
+
+fn block_starts_after_last_rendered_page_break(block: &Block) -> bool {
+  match block {
+    Block::Paragraph(paragraph) => paragraph.starts_after_last_rendered_page_break,
+    Block::Table(table) => table.starts_after_last_rendered_page_break,
+    Block::Frame(frame) => frame
+      .blocks
+      .first()
+      .is_some_and(block_starts_after_last_rendered_page_break),
+  }
+}
+
+fn paragraph_fragment_around_last_rendered_page_break(
+  paragraph: &crate::docx::Paragraph,
+  follow_fragment: bool,
+) -> Option<crate::docx::Paragraph> {
+  let split_index = paragraph
+    .inlines
+    .iter()
+    .position(|inline| matches!(inline, InlineItem::LastRenderedPageBreak))?;
+  let inlines = if follow_fragment {
+    paragraph.inlines[split_index + 1..].to_vec()
+  } else {
+    paragraph.inlines[..split_index].to_vec()
+  };
+  if paragraph_inlines_are_layout_empty(&inlines) {
+    return None;
+  }
+  let mut fragment = paragraph.clone();
+  fragment.inlines = inlines;
+  fragment.starts_after_last_rendered_page_break = false;
+  Some(fragment)
+}
+
+fn paragraph_inlines_are_layout_empty(inlines: &[InlineItem]) -> bool {
+  inlines.iter().all(|inline| match inline {
+    InlineItem::Text(run) => run.text.trim().is_empty(),
+    InlineItem::FormWidgetStart(_) | InlineItem::FormWidgetEnd(_) => true,
+    InlineItem::LastRenderedPageBreak => true,
+    InlineItem::Image(_)
+    | InlineItem::Shape(_)
+    | InlineItem::PageBreak
+    | InlineItem::ColumnBreak => false,
+  })
+}
+
+fn table_cell_first_content_line_height(
+  cell: &TableCell,
+  width_pt: f32,
+  setup: PageSetup,
+  text_segmentation: TextSegmentation,
+) -> Option<f32> {
+  // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+  // lcl_CalcHeightOfFirstContentLine(): inspect the first lower frame in the
+  // cell. Text contributes FirstLineHeight(), nested tables recurse into
+  // CalcHeightOfFirstContentLine().
+  let content_width = (width_pt - cell.margins.left_pt - cell.margins.right_pt).max(0.0);
+  for block in &cell.blocks {
+    match block {
+      Block::Paragraph(paragraph) => {
+        let style = paragraph_base_line_style(paragraph);
+        return Some(paragraph_line_height_for_setup(
+          paragraph,
+          &style,
+          setup,
+          text_segmentation,
+        ));
+      }
+      Block::Table(table) => {
+        let area = BlockArea {
+          setup,
+          section_index: 0,
+          section_page_index: 0,
+          column_index: 0,
+          columns: SectionColumns::default(),
+          content_top_pt: 0.0,
+          content_left_pt: 0.0,
+          content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+          body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+          content_width,
+          default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+          repeating_slots: RepeatingSlotState::default(),
+        };
+        return TableFrameLayout::new(table, area, false).map(|layout| {
+          layout.calc_height_of_first_content_line(0, layout.table_row_keep_enabled())
+        });
+      }
+      Block::Frame(frame) => {
+        return Some(frame.height_pt.unwrap_or_else(|| {
+          let flow = FlowContext {
+            setup,
+            section_index: 0,
+            section_page_index: 0,
+            column_index: 0,
+            columns: SectionColumns::default(),
+            content_top_pt: 0.0,
+            content_left_pt: 0.0,
+            content_bottom: UNBOUNDED_LAYOUT_EXTENT_PT,
+            body_content_bottom_pt: UNBOUNDED_LAYOUT_EXTENT_PT,
+            content_width,
+            layout_cell_bounds: None,
+            layout_cell_print_bounds: None,
+            default_tab_stop_pt: DEFAULT_TAB_STOP_PT,
+            compatibility_mode: 12,
+            split_page_break_and_paragraph_mark: false,
+            repeating_slots: RepeatingSlotState::default(),
+            text_segmentation,
+            paragraph_spacing_context: ParagraphSpacingContext::Normal,
+          };
+          frame
+            .blocks
+            .iter()
+            .map(|block| estimated_block_height(block, flow))
+            .sum::<f32>()
+            .max(TABLE_ROW_MIN_HEIGHT_PT)
+        }));
+      }
+    }
+  }
+  None
 }
 
 fn table_cell_item_intersects_vertical_bounds(item: &PageItem, top: f32, bottom: f32) -> bool {
@@ -8504,31 +9722,58 @@ impl TextFrameState {
     orphan_lines: usize,
     widow_lines: usize,
   ) -> TextSplitDecision {
-    let Some(follow) = self.page_follows.last() else {
+    if self.page_follows.is_empty() {
       return TextSplitDecision::NoSplit;
-    };
+    }
     if keep_lines {
       return TextSplitDecision::Rejected;
     }
 
-    let before = self
-      .line_fragments
-      .iter()
-      .filter(|line| line.end <= follow.start && line.end > line.start)
-      .count();
-    let after = self
-      .line_fragments
-      .iter()
-      .filter(|line| line.start >= follow.start && line.end > line.start)
-      .count();
+    let mut previous_start = InlineCursor::default();
+    for (index, follow) in self.page_follows.iter().enumerate() {
+      let next_start = self
+        .page_follows
+        .get(index + 1)
+        .map(|next| next.start)
+        .unwrap_or(InlineCursor {
+          inline_index: usize::MAX,
+          text_offset: usize::MAX,
+        });
+      let before = self
+        .line_fragments
+        .iter()
+        .filter(|line| {
+          line.start >= previous_start && line.end <= follow.start && line.end > line.start
+        })
+        .count();
+      let after = self
+        .line_fragments
+        .iter()
+        .filter(|line| {
+          line.start >= follow.start && line.start < next_start && line.end > line.start
+        })
+        .count();
 
-    if before == 0 || after == 0 {
-      TextSplitDecision::Forced
-    } else if before >= orphan_lines && after >= widow_lines {
-      TextSplitDecision::Allowed
-    } else {
-      TextSplitDecision::Rejected
+      if before == 0 || after == 0 {
+        return TextSplitDecision::Forced;
+      }
+      if before < orphan_lines {
+        return TextSplitDecision::Rejected;
+      }
+      if after < widow_lines {
+        // Source: LibreOffice sw/source/core/text/widorp.cxx
+        // WidowsAndOrphans::FindWidows() asks the master of this follow to
+        // give lines to the follow. That is a local master/follow adjustment,
+        // not a request to move the whole paragraph from the first page.
+        return if index == 0 {
+          TextSplitDecision::Rejected
+        } else {
+          TextSplitDecision::Allowed
+        };
+      }
+      previous_start = follow.start;
     }
+    TextSplitDecision::Allowed
   }
 
   fn split_candidates_are_ordered(&self) -> bool {
@@ -8690,7 +9935,14 @@ impl<'a> TextFrameLayout<'a> {
         cell_index: None,
         item_start: *advance.line_item_start_index,
         item_end: advance.current.items.len(),
-        bounds: None,
+        bounds: (*advance.line_item_start_index == advance.current.items.len()).then_some(
+          FrameBounds {
+            x_pt: advance.line_left,
+            y_pt: y,
+            width_pt: (advance.line_right - advance.line_left).max(0.0),
+            height_pt: *line_height,
+          },
+        ),
       },
     );
     let real_height = line_real_height(self.paragraph, *line_height, *advance.line_has_form_widget);
@@ -9239,6 +10491,27 @@ impl<'a> TextFrameLayout<'a> {
         }
         InlineItem::LastRenderedPageBreak => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
+          if flow.text_segmentation == TextSegmentation::Body
+            && emitted
+            && page_has_body_region_items(current, flow)
+            && y + line_height > flow.content_bottom - LAYOUT_EPSILON_PT
+          {
+            // Source: DOCX imports w:lastRenderedPageBreak as the known text
+            // cursor where the previous layout created a page follow. Writer
+            // uses that evidence while laying out body text, so keep the
+            // following portions on the follow page instead of reflowing the
+            // whole paragraph continuously.
+            text_state.finish_line(y, line_height);
+            line_has_form_widget = false;
+            (flow, text_frame, y, line_left, line_right, line_height) =
+              self.force_text_page_break(flow, current, pages, &mut wrap_exclusions);
+            default_line_right = text_frame.default_line_right;
+            paragraph_left = text_frame.paragraph_left;
+            base_line_height = text_frame.base_line_height;
+            x = line_left;
+            line_item_start_index = current.items.len();
+            emitted = false;
+          }
           pending_tab = None;
         }
         InlineItem::Image(image) => {
@@ -9869,7 +11142,12 @@ impl<'a> TextFrameLayout<'a> {
           cell_index: None,
           item_start: line_item_start_index,
           item_end: current.items.len(),
-          bounds: None,
+          bounds: (line_item_start_index == current.items.len()).then_some(FrameBounds {
+            x_pt: line_left,
+            y_pt: y,
+            width_pt: (line_right - line_left).max(0.0),
+            height_pt: line_height,
+          }),
         },
       );
       let real_height = line_real_height(paragraph, line_height, line_has_form_widget);
@@ -9880,6 +11158,27 @@ impl<'a> TextFrameLayout<'a> {
       paragraph_bottom = y;
       y = paragraph_bottom + self.spacing_after_pt;
     } else {
+      if flow.setup.line_numbering.is_some() {
+        push_page_fragment(
+          current,
+          PageFragmentRecord {
+            kind: FrameFragmentKind::ParagraphLine,
+            split: FragmentSplitKind::Complete,
+            index: text_state.line_fragments.len(),
+            row_index: text_state.line_fragments.len(),
+            cell_index: None,
+            item_start: line_item_start_index,
+            item_end: current.items.len(),
+            bounds: Some(FrameBounds {
+              x_pt: line_left,
+              y_pt: y,
+              width_pt: (line_right - line_left).max(0.0),
+              height_pt: base_line_height,
+            }),
+          },
+        );
+        text_state.finish_paragraph(y, base_line_height, true);
+      }
       paragraph_bottom = y + base_line_height;
       y = paragraph_bottom + self.spacing_after_pt;
     }
@@ -10545,6 +11844,8 @@ fn force_page_break(
   let next_page_number = pages.len() + 2;
   let mut next_page =
     empty_section_page(flow.setup, flow.section_index, next_flow.section_page_index);
+  next_page.explicit_break_target = true;
+  next_page.body_content_frames = next_page.body_content_frames.saturating_add(1);
   next_page.repeating_wrap_exclusion_catalog = current.repeating_wrap_exclusion_catalog.clone();
   next_page.repeating_wrap_exclusions = next_page
     .repeating_wrap_exclusion_catalog
@@ -10939,6 +12240,7 @@ mod tests {
       placement: None,
       split_allowed: false,
       following_text_flow: false,
+      explicit_no_repeat_header: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 0.0,
@@ -11028,6 +12330,7 @@ mod tests {
       placement: None,
       split_allowed: false,
       following_text_flow: false,
+      explicit_no_repeat_header: false,
       starts_after_last_rendered_page_break: false,
       borders: None,
       cell_spacing_pt: 2.0,

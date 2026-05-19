@@ -131,6 +131,7 @@ pub(crate) struct Table {
   pub placement: Option<FloatingFramePlacement>,
   pub split_allowed: bool,
   pub following_text_flow: bool,
+  pub explicit_no_repeat_header: bool,
   pub starts_after_last_rendered_page_break: bool,
   pub borders: Option<TableBordersModel>,
   pub cell_spacing_pt: f32,

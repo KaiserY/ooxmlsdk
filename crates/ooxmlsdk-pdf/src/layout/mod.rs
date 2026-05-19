@@ -67,7 +67,17 @@ enum NoteSeparatorKind {
 }
 
 fn inline_text_height(style: &TextStyle) -> f32 {
-  inline_text_box_height(style)
+  // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
+  // maps w:szCs to CharHeightComplex. Writer line formatting carries the
+  // multi-script font heights in the line box, while Western glyph shaping
+  // still uses CharHeight for width.
+  if let Some(complex_font_size_pt) = style.complex_font_size_pt {
+    let mut complex_style = style.clone();
+    complex_style.font_size_pt = complex_font_size_pt;
+    inline_text_box_height(style).max(inline_text_box_height(&complex_style))
+  } else {
+    inline_text_box_height(style)
+  }
 }
 
 fn paragraph_base_line_style(paragraph: &crate::docx::Paragraph) -> TextStyle {
@@ -492,6 +502,7 @@ pub(crate) struct Page {
   pub section_index: usize,
   pub section_page_index: usize,
   pub items: Vec<PageItem>,
+  body_content_frames: usize,
   preserve_empty: bool,
   frame_fragments: Vec<FrameFragment>,
   frame_influences: Vec<FrameInfluence>,
@@ -803,6 +814,13 @@ impl<'a> RootFrameLayout<'a> {
     self.finish_current_page();
     self.finish_pending_trailing_page_break();
     materialize_pending_floating_table_follows(&mut self.pages);
+    check_page_desc_empty_pages(
+      self.document,
+      &mut self.pages,
+      &mut self.frames,
+      &mut self.follows,
+      &mut self.outline_entries,
+    );
 
     let mut layout_reruns = Vec::new();
     let influence_reflow_requests = reflow_requests_for_frames(&self.frames, true);
@@ -953,7 +971,12 @@ impl<'a> RootFrameLayout<'a> {
       && self.current.items.is_empty()
       && self.current.preserve_empty
       && previous_section_is_empty
+      && starts_new_page(section.break_kind)
     {
+      // Source: LibreOffice sw/source/core/layout/pagechg.cxx
+      // CheckPageDescs() keeps intentionally empty pages for page-style
+      // transitions, but a following continuous section does not consume an
+      // extra body page before its own content/breaks are laid out.
       self.push_current_page(empty_page(section.page, section_index));
       self.y = body_content_limits_for_page(
         section.page,
@@ -989,6 +1012,7 @@ impl<'a> RootFrameLayout<'a> {
         || section.break_kind == SectionBreakKind::Continuous
         || (section.break_kind == SectionBreakKind::NextPage
           && self.current.section_page_index > 0)
+        || (starts_new_page(section.break_kind) && !current_page_has_body_progress)
         || (!starts_new_page(section.break_kind) && !current_page_has_body_progress));
     if reuse_empty_page {
       self.current.setup = section.page;
@@ -1008,35 +1032,37 @@ impl<'a> RootFrameLayout<'a> {
       && current_page_has_body_progress
     {
       self.push_current_page(empty_page(section.page, section_index));
-      let mut section_page_index = 0;
-      if needs_section_parity_blank(section.break_kind, self.pages.len() + 1) {
-        self.pages.push(empty_page(section.page, section_index));
-        section_page_index = 1;
-        self.current.section_page_index = section_page_index;
-        activate_pending_floating_table_follows_for_current(&mut self.current, &mut self.pages);
-        self.seed_current_repeating_wrap_exclusions();
-      }
       self.y = body_content_limits_for_page(
         section.page,
         repeating_slot_state(self.document, section_index),
         self.pages.len() + 1,
-        section_page_index,
+        0,
       )
       .0;
     }
   }
 
   fn current_page_has_body_progress(&self) -> bool {
-    if !self.current.items.is_empty() {
-      return true;
-    }
-    let body_top = body_content_limits_for_page(
+    let (body_top, body_bottom) = body_content_limits_for_page(
       self.current.setup,
       repeating_slot_state(self.document, self.current.section_index),
       self.pages.len() + 1,
       self.current.section_page_index,
-    )
-    .0;
+    );
+    let body_flow = FlowContext {
+      content_top_pt: body_top,
+      content_bottom: body_bottom,
+      ..flow_context(
+        self.current.setup,
+        self.current.section_index,
+        SectionColumns::default(),
+        self.current.section_page_index,
+        self.document.default_tab_stop_pt,
+      )
+    };
+    if page_has_body_region_items(&self.current, body_flow) {
+      return true;
+    }
     self.y > body_top + LAYOUT_EPSILON_PT
   }
 
@@ -1236,7 +1262,9 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn advance_if_past_body(&mut self, flow: FlowContext) -> FlowContext {
-    if self.y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom && !self.current.items.is_empty() {
+    if self.y + DEFAULT_LINE_HEIGHT_PT > flow.content_bottom
+      && page_has_body_region_items(&self.current, flow)
+    {
       let transition = self.follow_transition_start(flow);
       let (next_flow, next_y) = advance_section_flow(flow, &mut self.current, &mut self.pages);
       self.y = next_y;
@@ -1480,7 +1508,11 @@ impl<'a> RootFrameLayout<'a> {
   }
 
   fn finish_current_page(&mut self) {
-    if !self.current.items.is_empty() || self.current.preserve_empty || self.pages.is_empty() {
+    if !self.current.items.is_empty()
+      || self.current.body_content_frames > 0
+      || self.current.preserve_empty
+      || self.pages.is_empty()
+    {
       self.pages.push(std::mem::replace(
         &mut self.current,
         empty_page(self.document.page, 0),
@@ -1506,6 +1538,7 @@ impl<'a> RootFrameLayout<'a> {
       .selected(page.section_page_index, self.pages.len() + 1)
       .to_vec();
     extend_wrap_exclusions_unique(&mut page.wrap_exclusions, &page.repeating_wrap_exclusions);
+    page.preserve_empty = true;
     self.pages.push(page);
   }
 
@@ -3004,16 +3037,6 @@ fn block_is_page_break_only_paragraph(block: &Block) -> bool {
   saw_page_break
 }
 
-fn block_contains_page_break(block: &Block) -> bool {
-  let Block::Paragraph(paragraph) = block else {
-    return false;
-  };
-  paragraph
-    .inlines
-    .iter()
-    .any(|inline| matches!(inline, InlineItem::PageBreak))
-}
-
 fn block_is_empty_paragraph(block: &Block) -> bool {
   let Block::Paragraph(paragraph) = block else {
     return false;
@@ -3059,6 +3082,7 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     section_index,
     section_page_index,
     items: Vec::new(),
+    body_content_frames: 0,
     preserve_empty: false,
     frame_fragments: Vec::new(),
     frame_influences: Vec::new(),
@@ -3067,6 +3091,184 @@ fn empty_section_page(setup: PageSetup, section_index: usize, section_page_index
     repeating_wrap_exclusions: Vec::new(),
     pending_floating_table_follows: Vec::new(),
   }
+}
+
+fn check_page_desc_empty_pages(
+  document: &DocxDocument,
+  pages: &mut Vec<Page>,
+  frames: &mut [LayoutFrame],
+  follows: &mut Vec<FrameFollow>,
+  outline_entries: &mut Vec<OutlineEntry>,
+) {
+  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
+  // SwFrame::CheckPageDescs() removes empty pages unless they are needed to
+  // make the following non-empty page satisfy the page descriptor's left/right
+  // format wish.
+  let original_pages = std::mem::take(pages);
+  let original_len = original_pages.len();
+  let mut page_index_map = vec![usize::MAX; original_len];
+  let mut kept = Vec::with_capacity(original_len);
+
+  for (index, page) in original_pages.iter().enumerate() {
+    if !is_page_frame_empty(page) && non_empty_page_needs_preceding_empty(document, page, &kept) {
+      let mut empty = empty_section_page(page.setup, page.section_index, page.section_page_index);
+      empty.preserve_empty = true;
+      kept.push(empty);
+    }
+    if is_page_frame_empty(page)
+      && !empty_page_needed_for_following_page(document, &kept, &original_pages, index)
+    {
+      continue;
+    }
+    page_index_map[index] = kept.len();
+    kept.push(page.clone());
+  }
+
+  for frame in frames {
+    if let Some(&mapped) = page_index_map.get(frame.page_index)
+      && mapped != usize::MAX
+    {
+      frame.page_index = mapped;
+    }
+  }
+  follows.retain_mut(|follow| {
+    let (Some(&from), Some(&to)) = (
+      page_index_map.get(follow.from_page_index),
+      page_index_map.get(follow.to_page_index),
+    ) else {
+      return false;
+    };
+    if from == usize::MAX || to == usize::MAX {
+      return false;
+    }
+    follow.from_page_index = from;
+    follow.to_page_index = to;
+    true
+  });
+  outline_entries.retain_mut(|entry| {
+    let Some(&mapped) = page_index_map.get(entry.page_index) else {
+      return false;
+    };
+    if mapped == usize::MAX {
+      return false;
+    }
+    entry.page_index = mapped;
+    true
+  });
+  if kept.is_empty()
+    && let Some(first) = original_pages.first()
+  {
+    kept.push(first.clone());
+  }
+  *pages = kept;
+}
+
+fn is_page_frame_empty(page: &Page) -> bool {
+  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
+  // sw::IsPageFrameEmpty() removes only pages without essential body content.
+  // Body table frames survive even when they have no rendered text yet; visible
+  // body-anchored objects are essential. Page decorations are applied after this
+  // pass, so they are not used to decide body emptiness.
+  if !page.items.is_empty() {
+    return false;
+  }
+  page.body_content_frames == 0
+}
+
+fn non_empty_page_needs_preceding_empty(
+  document: &DocxDocument,
+  page: &Page,
+  kept_pages: &[Page],
+) -> bool {
+  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
+  // CheckPageDescs() case 3 inserts an empty page before a non-empty page when
+  // the page's physical side does not match WannaRightPage(), unless there is
+  // already an empty previous page.
+  if !page_has_explicit_side_wish(document, page, kept_pages) {
+    return false;
+  }
+  let physical_page_number = kept_pages.len() + 1;
+  physical_page_is_right(physical_page_number)
+    != page_desc_wants_right_page(document, page, kept_pages, physical_page_number)
+    && kept_pages
+      .last()
+      .is_none_or(|previous| !is_page_frame_empty(previous))
+}
+
+fn empty_page_needed_for_following_page(
+  document: &DocxDocument,
+  kept_pages: &[Page],
+  original_pages: &[Page],
+  empty_page_index: usize,
+) -> bool {
+  let Some(next_page) = original_pages[empty_page_index + 1..]
+    .iter()
+    .find(|page| !is_page_frame_empty(page))
+  else {
+    return original_pages[empty_page_index].preserve_empty;
+  };
+  if !page_has_explicit_side_wish(document, next_page, kept_pages) {
+    return original_pages[empty_page_index].preserve_empty;
+  }
+  let physical_without_empty = kept_pages.len() + 1;
+  let physical_with_empty = physical_without_empty + 1;
+  let want_without_empty =
+    page_desc_wants_right_page(document, next_page, kept_pages, physical_without_empty);
+  let mut kept_with_empty = kept_pages.to_vec();
+  kept_with_empty.push(original_pages[empty_page_index].clone());
+  let want_with_empty =
+    page_desc_wants_right_page(document, next_page, &kept_with_empty, physical_with_empty);
+
+  physical_page_is_right(physical_with_empty) == want_with_empty
+    && physical_page_is_right(physical_without_empty) != want_without_empty
+}
+
+fn page_desc_wants_right_page(
+  document: &DocxDocument,
+  page: &Page,
+  kept_pages: &[Page],
+  physical_page_number: usize,
+) -> bool {
+  // Source: LibreOffice sw/source/core/layout/trvlfrm.cxx
+  // SwFrame::WannaRightPage() forces right/left when the page descriptor only
+  // provides that side's format; odd/even DOCX section breaks create such a
+  // temporary page style in SectionPropertyMap::CreateEvenOddPageStyleCopy().
+  let first_body_content_for_section = !kept_pages
+    .iter()
+    .any(|previous| previous.section_index == page.section_index && !is_page_frame_empty(previous));
+  if first_body_content_for_section && let Some(section) = document.sections.get(page.section_index)
+  {
+    match section.break_kind {
+      SectionBreakKind::OddPage => return true,
+      SectionBreakKind::EvenPage => return false,
+      SectionBreakKind::Continuous | SectionBreakKind::NextPage | SectionBreakKind::NextColumn => {}
+    }
+  }
+  if first_body_content_for_section && let Some(start) = page.setup.page_number_start {
+    return physical_page_is_right(start.max(1) as usize);
+  }
+  physical_page_is_right(physical_page_number) ^ kept_pages.last().is_some_and(is_page_frame_empty)
+}
+
+fn page_has_explicit_side_wish(document: &DocxDocument, page: &Page, kept_pages: &[Page]) -> bool {
+  let first_body_content_for_section = !kept_pages
+    .iter()
+    .any(|previous| previous.section_index == page.section_index && !is_page_frame_empty(previous));
+  first_body_content_for_section
+    && (page.setup.page_number_start.is_some()
+      || document
+        .sections
+        .get(page.section_index)
+        .is_some_and(|section| {
+          matches!(
+            section.break_kind,
+            SectionBreakKind::OddPage | SectionBreakKind::EvenPage
+          )
+        }))
+}
+
+fn physical_page_is_right(page_number: usize) -> bool {
+  !page_number.is_multiple_of(2)
 }
 
 fn flow_context(
@@ -3228,7 +3430,7 @@ fn prepare_block_flow(
   pages: &mut Vec<Page>,
   y: f32,
 ) -> (FlowContext, f32) {
-  if current.items.is_empty() || !block_should_stay_together(block, next) {
+  if !page_has_body_region_items(current, flow) || !block_should_stay_together(block, next) {
     return (flow, y);
   }
   let required_height = keep_group_height(block, next, flow);
@@ -3443,25 +3645,32 @@ fn starts_new_page(kind: SectionBreakKind) -> bool {
   )
 }
 
-fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -> bool {
-  match kind {
-    SectionBreakKind::EvenPage => !next_page_number.is_multiple_of(2),
-    SectionBreakKind::OddPage => next_page_number.is_multiple_of(2),
-    SectionBreakKind::Continuous | SectionBreakKind::NextPage | SectionBreakKind::NextColumn => {
-      false
-    }
-  }
-}
-
 fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
   // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
   // Page-break movement is based on body text/frame progress. Header/footer
-  // content is already present on the physical page, but it must not make an
-  // authored body break create an extra empty body page.
-  page.items.iter().any(|item| {
-    item_y(item).is_some_and(|y| {
-      y >= flow.content_top_pt - LAYOUT_EPSILON_PT && y <= flow.content_bottom + LAYOUT_EPSILON_PT
-    })
+  // content and page decorations may already be present on the physical page,
+  // but they must not make body layout create an extra empty body page.
+  page.items.iter().any(|item| match item {
+    PageItem::Text(text) => {
+      text.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && text.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::Image(image) => {
+      image.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && image.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::Rect(rect) => {
+      rect.y_pt >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && rect.y_pt <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::Line(line) => {
+      line.y1_pt.min(line.y2_pt) >= flow.content_top_pt - LAYOUT_EPSILON_PT
+        && line.y1_pt.min(line.y2_pt) <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }
+    PageItem::Polyline(polyline) => polyline.points.iter().any(|(_, y)| {
+      *y >= flow.content_top_pt - LAYOUT_EPSILON_PT && *y <= flow.content_bottom + LAYOUT_EPSILON_PT
+    }),
+    PageItem::Fill(_) => false,
   })
 }
 
@@ -3589,7 +3798,7 @@ fn layout_document_block(
   previous: Option<&Block>,
   block: &Block,
   next: Option<&Block>,
-  mut flow: FlowContext,
+  flow: FlowContext,
   current: &mut Page,
   pages: &mut Vec<Page>,
   mut y: f32,
@@ -3597,17 +3806,8 @@ fn layout_document_block(
   match block {
     Block::Paragraph(paragraph) => {
       let mut ignore_top_margin_at_page_start = false;
-      if paragraph.starts_after_last_rendered_page_break
-        && flow.text_segmentation == TextSegmentation::Body
-        && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
-        && y > flow.content_top_pt + LAYOUT_EPSILON_PT
-        && page_has_body_region_items(current, flow)
-        && !previous.is_some_and(block_contains_page_break)
-      {
-        (flow, y) = force_page_break(flow, current, pages);
-        ignore_top_margin_at_page_start = true;
-      }
       if let Some(frame) = paragraph_frame(paragraph) {
+        note_body_content_frame(current, flow);
         return layout_floating_frame(&frame, flow, current, pages, y);
       }
       let mut flow = flow;
@@ -3620,6 +3820,9 @@ fn layout_document_block(
       {
         (flow, y) = force_page_break(flow, current, pages);
         ignore_top_margin_at_page_start = true;
+      }
+      if !block_is_page_break_only_paragraph(block) {
+        note_body_content_frame(current, flow);
       }
 
       if paragraph.starts_after_last_rendered_page_break
@@ -3656,8 +3859,24 @@ fn layout_document_block(
         y,
       )
     }
-    Block::Table(table) => layout_table(table, flow, current, pages, y),
-    Block::Frame(frame) => layout_floating_frame(frame, flow, current, pages, y),
+    Block::Table(table) => {
+      note_body_content_frame(current, flow);
+      layout_table(table, flow, current, pages, y)
+    }
+    Block::Frame(frame) => {
+      note_body_content_frame(current, flow);
+      layout_floating_frame(frame, flow, current, pages, y)
+    }
+  }
+}
+
+fn note_body_content_frame(current: &mut Page, flow: FlowContext) {
+  // Source: LibreOffice sw/source/core/layout/pagechg.cxx
+  // sw::IsPageFrameEmpty() keeps pages whose body frame ContainsContent().
+  // A Writer content frame exists for an empty paragraph as well; PDF painted
+  // items are therefore insufficient for deciding if a body page is empty.
+  if flow.text_segmentation == TextSegmentation::Body {
+    current.body_content_frames = current.body_content_frames.saturating_add(1);
   }
 }
 
@@ -5128,7 +5347,10 @@ fn layout_floating_table(
     && y > flow.content_top_pt + LAYOUT_EPSILON_PT
     && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
   {
-    current.preserve_empty = true;
+    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
+    // HandleFramedParagraphPageBreak() inserts a dummy PAGE_BEFORE paragraph
+    // before a framed paragraph so the anchored frame is placed on the next
+    // page instead of remaining on the pre-break page.
     (flow, y) = advance_section_flow(flow, current, pages);
   }
   let mut effective_table = table.clone();
@@ -5892,12 +6114,15 @@ impl<'a> TableFrameLayout<'a> {
     table_row_keep: bool,
     allow_split_of_keep_row: bool,
   ) -> bool {
+    let available_height = self.frame.block.content_bottom - row.y;
     let row_split_allowed = !row.row.cant_split || !row.fits_empty_body_region();
     row_split_allowed
       && !row.row.exact_height
       && !row_repeat_header_effective(self.table, row.row_index)
       && !row_has_vertical_merge_context(self.table, row.row_index)
       && (!table_row_keep || !row.row.keep_with_next || allow_split_of_keep_row)
+      && Self::row_minimum_split_fragment_height(self.table, row.row_index, row.row)
+        < available_height - LAYOUT_EPSILON_PT
       && row.bottom() > self.frame.block.content_bottom
       && row.y < self.frame.block.content_bottom
   }
@@ -5961,10 +6186,21 @@ impl<'a> TableFrameLayout<'a> {
     {
       return 0.0;
     }
+    Self::row_minimum_split_fragment_height(self.table, row_index, row)
+  }
+
+  fn row_minimum_split_fragment_height(table: &Table, row_index: usize, row: &TableRow) -> f32 {
+    // Source: LibreOffice sw/source/core/layout/tabfrm.cxx
+    // lcl_PreprocessRowsInCells() only splits a minimum-height row when the
+    // available master fragment is larger than the row's minimum height;
+    // otherwise the row is moved to the follow table.
+    if row.exact_height {
+      return 0.0;
+    }
     row.height_pt.map_or(0.0, |height| {
       height
-        + row_top_border_space_extent(self.table, row_index, row)
-        + row_bottom_border_spacing_extent(self.table, row_index, row)
+        + row_top_border_space_extent(table, row_index, row)
+        + row_bottom_border_spacing_extent(table, row_index, row)
     })
   }
 
@@ -6714,12 +6950,20 @@ fn table_column_count(table: &Table) -> usize {
 
 fn table_repeating_header_count(table: &Table) -> usize {
   let count = leading_repeat_header_count(table);
-  if count == 0 || count >= 10 || table_disables_repeating_headers(table, count) {
+  if count == 0
+    || count > HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND
+    || table_disables_repeating_headers(table, count)
+  {
     0
   } else {
     count
   }
 }
+
+// Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapperTableManager.cxx
+// HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND. DOCX imports that mark more than this
+// many leading rows as headers disable repeating headers to match MS Word.
+const HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND: usize = 10;
 
 fn leading_repeat_header_count(table: &Table) -> usize {
   table
@@ -6765,7 +7009,7 @@ fn table_split_allowed(table: &Table) -> bool {
     return false;
   }
   let leading_repeat_header_count = leading_repeat_header_count(table);
-  !(leading_repeat_header_count <= 10
+  !(leading_repeat_header_count <= HEADER_ROW_LIMIT_FOR_MSO_WORKAROUND
     && table_disables_repeating_headers(table, leading_repeat_header_count))
 }
 
@@ -8457,7 +8701,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut next_flow = advance.active.flow;
     let mut next_frame = advance.active.frame;
     if next_y + *line_height > advance.active.flow.content_bottom
-      && !advance.current.items.is_empty()
+      && page_has_body_region_items(advance.current, advance.active.flow)
     {
       (next_flow, next_y) =
         advance_section_flow(advance.active.flow, advance.current, advance.pages);
@@ -8746,10 +8990,11 @@ impl<'a> TextFrameLayout<'a> {
             }
 
             let width = measure_text(&segment.text, &run.style);
+            let fit_width = line_fit_width(&segment.text, &run.style);
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
 
-            if x + width > line_right
+            if x + fit_width > line_right
               && x > line_left
               && pending_tab.is_none()
               && !tab_over_margin_active
@@ -8798,18 +9043,20 @@ impl<'a> TextFrameLayout<'a> {
               }
             }
 
-            if width > line_capacity && x <= line_left && !whitespace {
+            if fit_width > line_capacity && x <= line_left && !whitespace {
               let mut text_offset = segment.start;
               for text in emergency_break_segments(&segment.text) {
                 let width = measure_text(&text, &run.style);
-                if width > line_capacity && text.chars().count() > 1 {
+                let fit_width = line_fit_width(&text, &run.style);
+                if fit_width > line_capacity && text.chars().count() > 1 {
                   for ch in text.chars() {
                     let mut encoded = [0; 4];
                     let text = ch.encode_utf8(&mut encoded);
                     let width = measure_text(text, &run.style);
+                    let fit_width = line_fit_width(text, &run.style);
                     text_offset += text.len();
 
-                    if x + width > line_right && x > line_left {
+                    if x + fit_width > line_right && x > line_left {
                       flush_text(
                         current,
                         TextPlacement {
@@ -8874,7 +9121,7 @@ impl<'a> TextFrameLayout<'a> {
                 }
                 text_offset += text.len();
 
-                if x + width > line_right && x > line_left {
+                if x + fit_width > line_right && x > line_left {
                   flush_text(
                     current,
                     TextPlacement {
@@ -9061,7 +9308,9 @@ impl<'a> TextFrameLayout<'a> {
                     influence_bounds,
                   );
                   y = y.max(image_y + height + placement.margin_bottom_pt);
-                  if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                  if y + base_line_height > flow.content_bottom
+                    && page_has_body_region_items(current, flow)
+                  {
                     (flow, y) = advance_section_flow(flow, current, pages);
                     text_frame = TextFrame::new(self.paragraph, flow);
                     text_state.note_page_follow(pages.len(), y);
@@ -9390,7 +9639,9 @@ impl<'a> TextFrameLayout<'a> {
                       influence_bounds,
                     );
                     y = y.max(shape_y + height + placement.margin_bottom_pt);
-                    if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                    if y + base_line_height > flow.content_bottom
+                      && page_has_body_region_items(current, flow)
+                    {
                       (flow, y) = advance_section_flow(flow, current, pages);
                       text_frame = TextFrame::new(self.paragraph, flow);
                       text_state.note_page_follow(pages.len(), y);
@@ -9429,7 +9680,9 @@ impl<'a> TextFrameLayout<'a> {
                       influence_bounds,
                     );
                     y = y.max(shape_y + height + placement.margin_bottom_pt);
-                    if y + base_line_height > flow.content_bottom && !current.items.is_empty() {
+                    if y + base_line_height > flow.content_bottom
+                      && page_has_body_region_items(current, flow)
+                    {
                       (flow, y) = advance_section_flow(flow, current, pages);
                       text_frame = TextFrame::new(self.paragraph, flow);
                       text_state.note_page_follow(pages.len(), y);
@@ -9786,6 +10039,23 @@ fn emergency_break_segments(text: &str) -> Vec<String> {
   }
 
   text.chars().map(|ch| ch.to_string()).collect()
+}
+
+fn line_fit_width(text: &str, style: &TextStyle) -> f32 {
+  // Source: LibreOffice sw/source/core/text/guess.cxx
+  // Spaces from UAX #14 SP/BA classes are elided at line end for line-break
+  // fitting. Keep the original segment width for painting and following text
+  // advance; only the fit test ignores trailing collapsible blanks.
+  let fit_text = text.trim_end_matches(libreoffice_line_end_elidable_blank);
+  if fit_text.len() == text.len() {
+    measure_text(text, style)
+  } else {
+    measure_text(fit_text, style)
+  }
+}
+
+fn libreoffice_line_end_elidable_blank(ch: char) -> bool {
+  matches!(ch, ' ' | '\u{3000}' | '\u{2006}')
 }
 
 fn push_line_segments(text: &str, segments: &mut Vec<String>) {
@@ -10284,7 +10554,6 @@ fn force_page_break(
     &mut next_page.wrap_exclusions,
     &next_page.repeating_wrap_exclusions,
   );
-  next_page.preserve_empty = true;
   pages.push(std::mem::replace(current, next_page));
   activate_pending_floating_table_follows_for_current(current, pages);
   next_flow = body_flow_for_page(flow_with_column(next_flow, 0), pages.len() + 1);
@@ -10614,15 +10883,6 @@ mod tests {
 
     assert!(measured > DEFAULT_LINE_HEIGHT_PT);
     assert!((measured - estimated).abs() < DEFAULT_LINE_HEIGHT_PT * 2.0);
-  }
-
-  #[test]
-  fn even_odd_section_breaks_insert_blank_pages_for_page_parity() {
-    assert!(needs_section_parity_blank(SectionBreakKind::EvenPage, 3));
-    assert!(!needs_section_parity_blank(SectionBreakKind::EvenPage, 4));
-    assert!(needs_section_parity_blank(SectionBreakKind::OddPage, 2));
-    assert!(!needs_section_parity_blank(SectionBreakKind::OddPage, 3));
-    assert!(!needs_section_parity_blank(SectionBreakKind::NextPage, 3));
   }
 
   #[test]

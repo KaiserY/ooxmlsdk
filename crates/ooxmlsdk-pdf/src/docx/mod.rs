@@ -11192,6 +11192,9 @@ fn merge_style_values(target: &mut TextStyle, values: TextStyle) {
   if (values.font_size_pt - TextStyle::default().font_size_pt).abs() > f32::EPSILON {
     target.font_size_pt = values.font_size_pt;
   }
+  if values.complex_font_size_pt.is_some() {
+    target.complex_font_size_pt = values.complex_font_size_pt;
+  }
   if values.character_spacing_pt.abs() > f32::EPSILON {
     target.character_spacing_pt = values.character_spacing_pt;
   }
@@ -11822,6 +11825,16 @@ impl<'a> RunProps<'a> {
     }
   }
 
+  fn complex_script_font_size(&self) -> Option<&'a w::FontSizeComplexScript> {
+    match self {
+      Self::Direct(properties) => properties.font_size_complex_script.as_ref(),
+      Self::Style(properties) => properties.font_size_complex_script.as_ref(),
+      Self::BaseStyle(properties) => properties.font_size_complex_script.as_ref(),
+      Self::Numbering(properties) => properties.font_size_complex_script.as_ref(),
+      Self::ParagraphMark(properties) => properties.w_sz_cs.as_ref(),
+    }
+  }
+
   fn color(&self) -> Option<&'a w::Color> {
     match self {
       Self::Direct(properties) => properties.color.as_ref(),
@@ -12120,6 +12133,10 @@ fn page_setup(section: &w::SectionProperties) -> PageSetup {
     .w_ln_num_type
     .as_ref()
     .and_then(line_numbering_model);
+  setup.page_number_start = section
+    .w_pg_num_type
+    .as_ref()
+    .and_then(|page_number| page_number.start);
   setup.doc_grid_line_pitch_pt = section
     .w_doc_grid
     .as_ref()

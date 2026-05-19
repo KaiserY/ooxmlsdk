@@ -121,6 +121,16 @@ pub(super) fn merge_run_style(
     style.font_size_pt =
       (half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
+  if let Some(font_size) = properties.complex_script_font_size()
+    && let Ok(half_points) = font_size.val.parse::<f32>()
+  {
+    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
+    // imports w:szCs as CharHeightComplex. Keep it separate from Western
+    // CharHeight so Latin shaping width remains source-backed, while layout
+    // line height can still see the complex-script font height.
+    style.complex_font_size_pt =
+      Some((half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+  }
   if let Some(color) = properties.color() {
     if matches!(&properties, RunProps::Numbering(_)) && color.val.eq_ignore_ascii_case("auto") {
       style.color = super::RgbColor {

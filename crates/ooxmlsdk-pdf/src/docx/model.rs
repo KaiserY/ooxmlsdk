@@ -639,6 +639,7 @@ pub(crate) enum ImageWrapMode {
 pub(crate) struct TextStyle {
   pub font_family: Option<Arc<str>>,
   pub font_size_pt: f32,
+  pub complex_font_size_pt: Option<f32>,
   pub character_spacing_pt: f32,
   pub baseline_shift_pt: f32,
   pub bold: bool,
@@ -662,6 +663,7 @@ impl Default for TextStyle {
     Self {
       font_family: None,
       font_size_pt: 11.0,
+      complex_font_size_pt: None,
       character_spacing_pt: 0.0,
       baseline_shift_pt: 0.0,
       bold: false,
@@ -707,6 +709,7 @@ pub(crate) struct PageSetup {
   pub borders_offset_from_text: bool,
   pub line_numbering: Option<LineNumbering>,
   pub doc_grid_line_pitch_pt: Option<f32>,
+  pub page_number_start: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -737,6 +740,7 @@ impl Default for PageSetup {
       borders_offset_from_text: false,
       line_numbering: None,
       doc_grid_line_pitch_pt: None,
+      page_number_start: None,
     }
   }
 }

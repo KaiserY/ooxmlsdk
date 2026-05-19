@@ -8127,21 +8127,29 @@ fn push_picture_choice_shapes(
 }
 
 fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &ImageCatalog) {
+  let transform = VmlGroupTransform::from_group(group);
   for choice in &group.group_choice {
     match choice {
       v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines, images),
       v::GroupChoice::VRect(rectangle) => {
-        if let Some(shape) = vml_rectangle_shape(rectangle, images) {
+        let style =
+          transform.and_then(|transform| transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref()));
+        if let Some(shape) = vml_rectangle_shape_with_style(rectangle, style.as_deref(), images) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
       v::GroupChoice::VRoundrect(round_rectangle) => {
-        if let Some(shape) = vml_round_rectangle_shape(round_rectangle) {
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
+        });
+        if let Some(shape) = vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref()) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
       v::GroupChoice::VShape(shape) => {
-        if let Some(shape) = vml_shape_shape(shape, images) {
+        let style =
+          transform.and_then(|transform| transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref()));
+        if let Some(shape) = vml_shape_shape_with_style(shape, style.as_deref(), images) {
           inlines.push(InlineItem::Shape(shape));
         }
       }
@@ -8156,8 +8164,16 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
 }
 
 fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Option<InlineShape> {
+  vml_rectangle_shape_with_style(rectangle, rectangle.style.as_deref(), images)
+}
+
+fn vml_rectangle_shape_with_style(
+  rectangle: &v::Rectangle,
+  style: Option<&str>,
+  images: &ImageCatalog,
+) -> Option<InlineShape> {
   vml_inline_shape(
-    rectangle.style.as_deref(),
+    style,
     vml_allow_in_cell(rectangle.allow_in_cell),
     rectangle.fill_color.as_deref(),
     vml_rectangle_fill_image(rectangle, images),
@@ -8168,10 +8184,17 @@ fn vml_rectangle_shape(rectangle: &v::Rectangle, images: &ImageCatalog) -> Optio
 }
 
 fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<InlineShape> {
+  vml_round_rectangle_shape_with_style(round_rectangle, round_rectangle.style.as_deref())
+}
+
+fn vml_round_rectangle_shape_with_style(
+  round_rectangle: &v::RoundRectangle,
+  style: Option<&str>,
+) -> Option<InlineShape> {
   let filled = round_rectangle.filled.is_none_or(|value| value.as_bool());
   let stroked = round_rectangle.stroked.is_none_or(|value| value.as_bool());
   vml_inline_shape(
-    round_rectangle.style.as_deref(),
+    style,
     vml_allow_in_cell(round_rectangle.allow_in_cell),
     filled
       .then_some(round_rectangle.fill_color.as_deref())
@@ -8186,13 +8209,21 @@ fn vml_round_rectangle_shape(round_rectangle: &v::RoundRectangle) -> Option<Inli
 }
 
 fn vml_shape_shape(shape: &v::Shape, images: &ImageCatalog) -> Option<InlineShape> {
+  vml_shape_shape_with_style(shape, shape.style.as_deref(), images)
+}
+
+fn vml_shape_shape_with_style(
+  shape: &v::Shape,
+  style: Option<&str>,
+  images: &ImageCatalog,
+) -> Option<InlineShape> {
   let has_path = shape
     .edge_path
     .as_deref()
     .is_some_and(|path| !path.trim().is_empty());
   let stroked = shape.stroked.is_none_or(|value| value.as_bool());
   vml_inline_shape(
-    shape.style.as_deref(),
+    style,
     vml_allow_in_cell(shape.allow_in_cell),
     shape.fill_color.as_deref(),
     vml_shape_fill_image(shape, images),
@@ -9262,6 +9293,54 @@ impl VmlGroupTransform {
       }
     }
     Some(output.join(";"))
+  }
+
+  fn child_anchor_style(self, group_style: Option<&str>, child_style: Option<&str>) -> Option<String> {
+    let transformed = self.child_style(child_style)?;
+    let parent = vml_image_style(group_style);
+    if !parent.absolute_position {
+      return Some(transformed);
+    }
+
+    let child = vml_image_style(Some(&transformed));
+    let mut output = vec![
+      transformed,
+      "position:absolute".to_string(),
+      format!("margin-left:{}pt", parent.horizontal_offset_pt + child.horizontal_offset_pt),
+      format!("margin-top:{}pt", parent.vertical_offset_pt + child.vertical_offset_pt),
+    ];
+    output.push(vml_horizontal_reference_style(parent.horizontal_relative_to).to_string());
+    output.push(vml_vertical_reference_style(parent.vertical_relative_to).to_string());
+    if parent.behind_text {
+      output.push("z-index:-1".to_string());
+    }
+    Some(output.join(";"))
+  }
+}
+
+fn vml_horizontal_reference_style(reference: HorizontalImageReference) -> &'static str {
+  match reference {
+    HorizontalImageReference::Page => "mso-position-horizontal-relative:page",
+    HorizontalImageReference::Margin => "mso-position-horizontal-relative:margin",
+    HorizontalImageReference::Character => "mso-position-horizontal-relative:char",
+    HorizontalImageReference::Column
+    | HorizontalImageReference::LeftMargin
+    | HorizontalImageReference::RightMargin
+    | HorizontalImageReference::InsideMargin
+    | HorizontalImageReference::OutsideMargin => "mso-position-horizontal-relative:text",
+  }
+}
+
+fn vml_vertical_reference_style(reference: VerticalImageReference) -> &'static str {
+  match reference {
+    VerticalImageReference::Page => "mso-position-vertical-relative:page",
+    VerticalImageReference::Margin => "mso-position-vertical-relative:margin",
+    VerticalImageReference::Line => "mso-position-vertical-relative:line",
+    VerticalImageReference::TopMargin => "mso-position-vertical-relative:top-margin-area",
+    VerticalImageReference::BottomMargin => "mso-position-vertical-relative:bottom-margin-area",
+    VerticalImageReference::Paragraph
+    | VerticalImageReference::InsideMargin
+    | VerticalImageReference::OutsideMargin => "mso-position-vertical-relative:text",
   }
 }
 

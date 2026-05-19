@@ -3128,6 +3128,9 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   if let Some(contextual_spacing) = properties.contextual_spacing() {
     format.contextual_spacing = contextual_spacing.val.is_none_or(|value| value.as_bool());
   }
+  if let Some(snap_to_grid) = properties.snap_to_grid() {
+    format.snap_to_grid = Some(snap_to_grid.val.is_none_or(|value| value.as_bool()));
+  }
 
   if let Some(spacing) = properties.spacing_between_lines() {
     if let Some(before) = spacing.before.as_ref() {
@@ -3196,7 +3199,13 @@ fn merge_paragraph_format(format: &mut ParagraphFormat, properties: Option<Parag
   }
 
   if let Some(tabs) = properties.tabs() {
-    format.tab_stops = tab_stops(tabs);
+    // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
+    // LN_CT_PPrBase_tabs initializes the current tab-stop vector from the
+    // paragraph style, then DomainMapper_Impl::IncorporateTabStop() applies
+    // each direct tab. A w:val="clear" entry removes an inherited tab at the
+    // same position instead of being ignored.
+    apply_tab_stops(&mut format.tab_stops, tabs);
+    format.tab_stops_set = true;
   }
 
   if let Some(justification) = properties.justification() {
@@ -3359,31 +3368,41 @@ fn paragraph_frame_properties(frame: &w::FrameProperties) -> ParagraphFramePrope
   }
 }
 
-fn tab_stops(tabs: &w::Tabs) -> Vec<TabStop> {
-  let mut stops = tabs
-    .w_tab
-    .iter()
-    .filter_map(|tab| {
-      let alignment = match tab.val {
-        w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Decimal => {
-          TabStopAlignment::Left
-        }
-        w::TabStopValues::Center => TabStopAlignment::Center,
-        w::TabStopValues::Right | w::TabStopValues::End | w::TabStopValues::Number => {
-          TabStopAlignment::Right
-        }
-        w::TabStopValues::Clear | w::TabStopValues::Bar => return None,
-      };
-      Some(TabStop {
-        position_pt: signed_twips_measure_to_points(&tab.position)?,
+fn apply_tab_stops(stops: &mut Vec<TabStop>, tabs: &w::Tabs) {
+  for tab in &tabs.w_tab {
+    let Some(position_pt) = signed_twips_measure_to_points(&tab.position)
+      .filter(|position| position.is_finite() && *position >= 0.0)
+    else {
+      continue;
+    };
+    if matches!(tab.val, w::TabStopValues::Clear) {
+      stops.retain(|stop| (stop.position_pt - position_pt).abs() >= TAB_STOP_DEDUP_EPSILON_PT);
+      continue;
+    }
+    let alignment = match tab.val {
+      w::TabStopValues::Left | w::TabStopValues::Start | w::TabStopValues::Decimal => {
+        TabStopAlignment::Left
+      }
+      w::TabStopValues::Center => TabStopAlignment::Center,
+      w::TabStopValues::Right | w::TabStopValues::End | w::TabStopValues::Number => {
+        TabStopAlignment::Right
+      }
+      w::TabStopValues::Clear | w::TabStopValues::Bar => continue,
+    };
+    if let Some(existing) = stops
+      .iter_mut()
+      .find(|stop| (stop.position_pt - position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT)
+    {
+      existing.alignment = alignment;
+    } else {
+      stops.push(TabStop {
+        position_pt,
         alignment,
-      })
-    })
-    .filter(|stop| stop.position_pt.is_finite() && stop.position_pt >= 0.0)
-    .collect::<Vec<_>>();
+      });
+    }
+  }
   stops.sort_by(|a, b| a.position_pt.total_cmp(&b.position_pt));
   stops.dedup_by(|a, b| (a.position_pt - b.position_pt).abs() < TAB_STOP_DEDUP_EPSILON_PT);
-  stops
 }
 
 fn paragraph_inlines(
@@ -5758,6 +5777,7 @@ struct DrawingShapeImportContext<'a> {
   styles: &'a StylesCatalog,
   images: &'a ImageCatalog,
   hyperlinks: &'a HyperlinkCatalog,
+  smartart_text_colors_by_model_id: Option<&'a HashMap<String, RgbColor>>,
 }
 
 fn drawingml_textbox_frames_from_xml(
@@ -6500,6 +6520,7 @@ fn push_drawing_shapes_impl(
         styles,
         images,
         hyperlinks,
+        smartart_text_colors_by_model_id: None,
       },
     ) {
       inlines.extend(diagram_shapes);
@@ -6514,6 +6535,7 @@ fn push_drawing_shapes_impl(
         styles,
         images,
         hyperlinks,
+        smartart_text_colors_by_model_id: None,
       },
       false,
     ));
@@ -6534,6 +6556,16 @@ fn drawing_diagram_shapes(
     .images
     .diagram_data_by_relationship_id
     .get(&data_relationship_id)?;
+  let text_colors_by_model_id = drawing_diagram_color_relationship_id(graphic_xml)
+    .and_then(|relationship_id| {
+      context
+        .images
+        .diagram_colors_by_relationship_id
+        .get(&relationship_id)
+    })
+    .map(|colors_xml| {
+      diagram_text_fill_colors_by_model_id(data_xml, colors_xml, &context.styles.theme_colors)
+    });
   let drawing_relationship_id = diagram_ext_drawing_relationship_id(data_xml)?;
   let drawing_xml = context
     .images
@@ -6543,12 +6575,23 @@ fn drawing_diagram_shapes(
     drawing_xml,
     placement,
     transform,
-    context,
+    DrawingShapeImportContext {
+      smartart_text_colors_by_model_id: text_colors_by_model_id.as_ref(),
+      ..context
+    },
     false,
   ))
 }
 
 fn drawing_diagram_data_relationship_id(xml: &str) -> Option<String> {
+  drawing_diagram_relationship_id(xml, b"dm")
+}
+
+fn drawing_diagram_color_relationship_id(xml: &str) -> Option<String> {
+  drawing_diagram_relationship_id(xml, b"cs")
+}
+
+fn drawing_diagram_relationship_id(xml: &str, key: &[u8]) -> Option<String> {
   let mut reader = Reader::from_str(xml);
   reader.config_mut().trim_text(false);
   loop {
@@ -6557,7 +6600,12 @@ fn drawing_diagram_data_relationship_id(xml: &str) -> Option<String> {
         if qname_ends_with(event.name().as_ref(), b"relIds") =>
       {
         for attr in event.attributes().with_checks(false).flatten() {
-          if attr.key.as_ref().ends_with(b":dm") || attr.key.as_ref() == b"dm" {
+          let attr_key = attr.key.as_ref();
+          if attr_key == key
+            || attr_key
+              .strip_suffix(key)
+              .is_some_and(|prefix| prefix.ends_with(b":"))
+          {
             return decode_xml_attr_value(&attr, reader.decoder());
           }
         }
@@ -6566,6 +6614,89 @@ fn drawing_diagram_data_relationship_id(xml: &str) -> Option<String> {
       _ => {}
     }
   }
+}
+
+fn diagram_text_fill_colors_by_model_id(
+  data_xml: &str,
+  colors_xml: &str,
+  theme_colors: &ThemeColors,
+) -> HashMap<String, RgbColor> {
+  let text_colors_by_style_label =
+    diagram_text_fill_colors_by_style_label(colors_xml, theme_colors);
+  if text_colors_by_style_label.is_empty() {
+    return HashMap::new();
+  }
+
+  let mut reader = Reader::from_str(data_xml);
+  reader.config_mut().trim_text(false);
+  let mut current_model_id: Option<String> = None;
+  let mut colors = HashMap::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pt") => {
+        current_model_id = attr_value(&event, b"modelId").map(|value| value.to_string());
+      }
+      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"pt") => {
+        current_model_id = None;
+      }
+      Ok(Event::Start(event)) | Ok(Event::Empty(event))
+        if qname_ends_with(event.name().as_ref(), b"prSet") =>
+      {
+        let Some(model_id) = current_model_id.as_ref() else {
+          continue;
+        };
+        let Some(style_label) = attr_value(&event, b"presStyleLbl") else {
+          continue;
+        };
+        let Some(color) = text_colors_by_style_label.get(style_label.as_ref()) else {
+          continue;
+        };
+        colors.insert(model_id.clone(), *color);
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  colors
+}
+
+fn diagram_text_fill_colors_by_style_label(
+  colors_xml: &str,
+  theme_colors: &ThemeColors,
+) -> HashMap<String, RgbColor> {
+  let mut reader = Reader::from_str(colors_xml);
+  reader.config_mut().trim_text(false);
+  let mut colors = HashMap::new();
+
+  loop {
+    match reader.read_event() {
+      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"styleLbl") => {
+        let Some(name) = attr_value(&event, b"name").map(|value| value.to_string()) else {
+          continue;
+        };
+        let Some(fragment) = read_outer_xml_fragment(&mut reader, event) else {
+          continue;
+        };
+        let Some(color) = diagram_style_text_fill_color(&fragment, theme_colors) else {
+          continue;
+        };
+        colors.insert(name, color);
+      }
+      Ok(Event::Eof) | Err(_) => break,
+      _ => {}
+    }
+  }
+
+  colors
+}
+
+fn diagram_style_text_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  let fragment = first_named_xml_fragment(xml, b"txFillClrLst")?;
+  drawingml_color_from_named_fragment(&fragment, b"schemeClr", theme_colors)
+    .or_else(|| drawingml_color_from_named_fragment(&fragment, b"srgbClr", theme_colors))
+    .map(|color| color.color)
 }
 
 fn diagram_ext_drawing_relationship_id(xml: &str) -> Option<String> {
@@ -6904,6 +7035,7 @@ fn drawingml_shapes_from_xml(
             context.effect_extent,
             context.styles,
             context.images,
+            context.smartart_text_colors_by_model_id,
           )
         {
           shapes.push(InlineItem::Shape(shape));
@@ -6942,6 +7074,7 @@ fn drawingml_shapes_from_xml(
             context.effect_extent,
             context.styles,
             context.images,
+            context.smartart_text_colors_by_model_id,
           )
         {
           shapes.push(InlineItem::Shape(shape));
@@ -7075,6 +7208,7 @@ fn drawingml_shape_from_fragment(
   effect_extent: DrawingEffectExtent,
   styles: &StylesCatalog,
   images: &ImageCatalog,
+  smartart_text_colors_by_model_id: Option<&HashMap<String, RgbColor>>,
 ) -> Option<InlineShape> {
   let sp_pr = first_named_xml_fragment(xml, b"spPr")?;
   let explicit_fill_color = drawingml_shape_fill_color(&sp_pr, &styles.theme_colors);
@@ -7117,7 +7251,10 @@ fn drawingml_shape_from_fragment(
   let (offset_x_pt, offset_y_pt, width_pt, height_pt) =
     transform.rect(offset_x_pt, offset_y_pt, width_pt, height_pt);
 
-  let mut text_box = drawingml_shape_text_box_from_fragment(xml, styles);
+  let smartart_text_color = drawingml_model_id(xml).and_then(|model_id| {
+    smartart_text_colors_by_model_id.and_then(|colors| colors.get(model_id.as_str()).copied())
+  });
+  let mut text_box = drawingml_shape_text_box_from_fragment(xml, styles, smartart_text_color);
   let mut shape = InlineShape {
     width_pt,
     height_pt,
@@ -7156,9 +7293,24 @@ fn drawingml_shape_from_fragment(
   Some(shape)
 }
 
+fn drawingml_model_id(xml: &str) -> Option<String> {
+  let mut reader = Reader::from_str(xml);
+  reader.config_mut().trim_text(false);
+  loop {
+    match reader.read_event().ok()? {
+      Event::Start(event) | Event::Empty(event) => {
+        return attr_value(&event, b"modelId").map(|value| value.to_string());
+      }
+      Event::Eof => return None,
+      _ => {}
+    }
+  }
+}
+
 fn drawingml_shape_text_box_from_fragment(
   xml: &str,
   styles: &StylesCatalog,
+  smartart_text_color: Option<RgbColor>,
 ) -> Option<TextBoxFrameContent> {
   // Source: LibreOffice oox/source/drawingml/shape.cxx imports SmartArt
   // persisted dsp:sp text as child shape text, using the a:bodyPr insets.
@@ -7170,6 +7322,7 @@ fn drawingml_shape_text_box_from_fragment(
   let color = drawingml_text_fill_colors(xml, &styles.theme_colors)
     .into_iter()
     .next()
+    .or(smartart_text_color)
     .unwrap_or_else(|| TextStyle::default().color);
   let blocks = texts
     .into_iter()
@@ -10966,6 +11119,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
     target.line_height_pt = values.line_height_pt;
     target.line_height_rule = values.line_height_rule;
   }
+  if values.snap_to_grid.is_some() {
+    target.snap_to_grid = values.snap_to_grid;
+  }
   if values.indent_left_set {
     target.indent_left_pt = values.indent_left_pt;
     target.indent_left_set = true;
@@ -10978,8 +11134,9 @@ fn merge_format_values(target: &mut ParagraphFormat, values: ParagraphFormat) {
     target.first_line_indent_pt = values.first_line_indent_pt;
     target.first_line_indent_set = true;
   }
-  if !values.tab_stops.is_empty() {
+  if values.tab_stops_set {
     target.tab_stops = values.tab_stops;
+    target.tab_stops_set = true;
   }
   if values.alignment != ParagraphAlignment::default() {
     target.alignment = values.alignment;
@@ -11512,6 +11669,16 @@ impl<'a> ParagraphProps<'a> {
       Self::Style(properties) => properties.contextual_spacing.as_ref(),
       Self::BaseStyle(properties) => properties.contextual_spacing.as_ref(),
       Self::Previous(properties) => properties.contextual_spacing.as_ref(),
+    }
+  }
+
+  fn snap_to_grid(&self) -> Option<&'a w::SnapToGrid> {
+    match self {
+      Self::Direct(properties) => properties.snap_to_grid.as_ref(),
+      Self::Extended(properties) => properties.snap_to_grid.as_ref(),
+      Self::Style(properties) => properties.snap_to_grid.as_ref(),
+      Self::BaseStyle(properties) => properties.snap_to_grid.as_ref(),
+      Self::Previous(properties) => properties.snap_to_grid.as_ref(),
     }
   }
 
@@ -12107,6 +12274,7 @@ mod tests {
       DrawingEffectExtent::default(),
       &StylesCatalog::default(),
       &ImageCatalog::default(),
+      None,
     )
     .expect("custom geometry shape");
 
@@ -13174,6 +13342,7 @@ mod tests {
       &HyperlinkCatalog::default(),
       &CustomXmlBindings::default(),
       &mut FormWidgetIdAllocator::default(),
+      false,
     );
 
     assert_eq!(sections.len(), 2);

@@ -129,8 +129,10 @@ fn paragraph_line_height_for_setup(
       // Source: LibreOffice sw/source/core/text/itrform2.cxx
       // SwTextFormatter::CalcRealHeight() uses the imported document grid
       // base height as the auto line real height in grid layout.
-      if text_segmentation == TextSegmentation::Body {
-        line_height.max(setup.doc_grid_line_pitch_pt.unwrap_or(0.0))
+      if paragraph.format.snap_to_grid.unwrap_or(false)
+        && matches!(text_segmentation, TextSegmentation::Body)
+      {
+        snap_line_height_to_doc_grid(line_height, setup.doc_grid_line_pitch_pt)
       } else {
         line_height
       }
@@ -140,6 +142,19 @@ fn paragraph_line_height_for_setup(
       .line_height_pt
       .unwrap_or_else(|| inline_text_height(base_line_style)),
   }
+}
+
+fn snap_line_height_to_doc_grid(line_height: f32, doc_grid_line_pitch_pt: Option<f32>) -> f32 {
+  let Some(grid_height) = doc_grid_line_pitch_pt else {
+    return line_height;
+  };
+  if grid_height <= LAYOUT_EPSILON_PT || line_height <= grid_height {
+    return line_height.max(grid_height);
+  }
+  // Source: LibreOffice sw/source/core/text/itrform2.cxx
+  // SwTextFormatter::CalcRealHeight() rounds a snapped line up to the next
+  // document-grid base-height multiple.
+  (line_height / grid_height).ceil() * grid_height
 }
 
 fn word_auto_line_height(style: &TextStyle) -> f32 {
@@ -658,6 +673,12 @@ struct RepeatingSlotState {
 struct ResolvedTabStop {
   x_pt: f32,
   alignment: TabStopAlignment,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PendingAlignedTab {
+  stop: ResolvedTabStop,
+  item_start_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -3432,6 +3453,18 @@ fn needs_section_parity_blank(kind: SectionBreakKind, next_page_number: usize) -
   }
 }
 
+fn page_has_body_region_items(page: &Page, flow: FlowContext) -> bool {
+  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
+  // Page-break movement is based on body text/frame progress. Header/footer
+  // content is already present on the physical page, but it must not make an
+  // authored body break create an extra empty body page.
+  page.items.iter().any(|item| {
+    item_y(item).is_some_and(|y| {
+      y >= flow.content_top_pt - LAYOUT_EPSILON_PT && y <= flow.content_bottom + LAYOUT_EPSILON_PT
+    })
+  })
+}
+
 fn paragraph_spacing_before(
   previous: Option<&Block>,
   paragraph: &crate::docx::Paragraph,
@@ -3458,12 +3491,40 @@ fn paragraph_spacing_before(
   {
     return section_start_spacing_before(previous, paragraph);
   }
-  if let Some(Block::Paragraph(previous)) = previous
-    && suppress_spacing_between_identical_styles(previous, paragraph)
-  {
-    return 0.0;
+  if let Some(Block::Paragraph(previous)) = previous {
+    return paragraph_spacing_before_after_previous(previous, paragraph);
   }
   paragraph.format.spacing_before_pt
+}
+
+fn paragraph_lower_space(paragraph: &crate::docx::Paragraph) -> f32 {
+  paragraph
+    .format
+    .spacing_after_pt
+    .max(PARAGRAPH_SPACING_AFTER_PT)
+}
+
+fn paragraph_spacing_before_after_previous(
+  previous: &crate::docx::Paragraph,
+  paragraph: &crate::docx::Paragraph,
+) -> f32 {
+  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
+  // SwFlowFrame::CalcUpperSpace() collapses normal inter-paragraph spacing to
+  // max(previous lower, current upper), with contextual-spacing exceptions for
+  // identical paragraph styles.
+  let lower = paragraph_lower_space(previous);
+  if paragraph_styles_identical(previous, paragraph) {
+    match (
+      previous.format.contextual_spacing,
+      paragraph.format.contextual_spacing,
+    ) {
+      (true, true) => return 0.0,
+      (false, true) => return 0.0,
+      (true, false) => return paragraph.format.spacing_before_pt,
+      (false, false) => {}
+    }
+  }
+  (paragraph.format.spacing_before_pt - lower).max(0.0)
 }
 
 fn section_start_spacing_before(
@@ -3500,26 +3561,17 @@ fn libreoffice_ignored_line_height_blank(ch: char) -> bool {
 
 fn paragraph_spacing_after(paragraph: &crate::docx::Paragraph, next: Option<&Block>) -> f32 {
   if let Some(Block::Paragraph(next)) = next
-    && suppress_spacing_between_identical_styles(paragraph, next)
+    && paragraph_styles_identical(paragraph, next)
   {
-    return 0.0;
+    match (
+      paragraph.format.contextual_spacing,
+      next.format.contextual_spacing,
+    ) {
+      (true, true) | (true, false) => return 0.0,
+      (false, true) | (false, false) => {}
+    }
   }
-  paragraph
-    .format
-    .spacing_after_pt
-    .max(PARAGRAPH_SPACING_AFTER_PT)
-}
-
-fn suppress_spacing_between_identical_styles(
-  first: &crate::docx::Paragraph,
-  second: &crate::docx::Paragraph,
-) -> bool {
-  // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
-  // SwFlowFrame::CalcUpperSpace() ignores the full inter-paragraph spacing
-  // when both identical paragraphs have contextual spacing, and also ignores
-  // the side that requested contextual spacing in the one-sided cases.
-  (first.format.contextual_spacing || second.format.contextual_spacing)
-    && paragraph_styles_identical(first, second)
+  paragraph_lower_space(paragraph)
 }
 
 fn paragraph_styles_identical(
@@ -3549,7 +3601,7 @@ fn layout_document_block(
         && flow.text_segmentation == TextSegmentation::Body
         && flow.paragraph_spacing_context != ParagraphSpacingContext::SectionStart
         && y > flow.content_top_pt + LAYOUT_EPSILON_PT
-        && !current.items.is_empty()
+        && page_has_body_region_items(current, flow)
         && !previous.is_some_and(block_contains_page_break)
       {
         (flow, y) = force_page_break(flow, current, pages);
@@ -3560,10 +3612,10 @@ fn layout_document_block(
       }
       let mut flow = flow;
       let ignore_top_margin_after_page_break = paragraph.format.page_break_before
-        && !current.items.is_empty()
+        && page_has_body_region_items(current, flow)
         && flow.text_segmentation == TextSegmentation::Body;
       if paragraph.format.page_break_before
-        && !current.items.is_empty()
+        && page_has_body_region_items(current, flow)
         && flow.text_segmentation == TextSegmentation::Body
       {
         (flow, y) = force_page_break(flow, current, pages);
@@ -4081,7 +4133,7 @@ fn repeating_slot_blocks_for_page<'a>(
         document.footer_blocks.as_slice(),
       ));
   let use_even_slot = document.even_and_odd_headers && page_number.is_multiple_of(2);
-  let header_blocks = if first_page_in_section && title_page && !first_header.is_empty() {
+  let header_blocks = if first_page_in_section && title_page {
     first_header
   } else if use_even_slot && !even_header.is_empty() {
     even_header
@@ -4849,7 +4901,7 @@ fn repeating_slots_present_for_page(
   let (footer, footer_height) = selected_repeating_slot(
     first_page_in_section,
     use_even_slot,
-    slots.title_page,
+    slots.title_page && slots.first_footer,
     (slots.first_footer, slots.first_footer_height_pt),
     (slots.even_footer, slots.even_footer_height_pt),
     (slots.default_footer, slots.default_footer_height_pt),
@@ -4865,7 +4917,7 @@ fn selected_repeating_slot(
   even: (bool, f32),
   default_: (bool, f32),
 ) -> (bool, f32) {
-  if first_page_in_section && title_page && first.0 {
+  if first_page_in_section && title_page {
     return first;
   }
   if use_even_slot && even.0 {
@@ -4945,13 +4997,14 @@ fn layout_repeating_block(
       let spacing_after_pt = if is_last_repeating_block {
         // Source: LibreOffice sw/source/core/layout/flowfrm.cxx
         // SwFlowFrame::CalcLowerSpace(), tdf#128195 branch:
-        // HeaderSpacingBelowLastPara adds the last header/footer paragraph's
-        // lower paragraph space plus SwBorderAttrs::CalcLineSpacing().
-        paragraph
+        // the text frame already carries its normal paragraph lower spacing,
+        // then the header/footer compatibility branch adds the last
+        // paragraph's lower spacing again plus SwBorderAttrs::CalcLineSpacing().
+        let lower_space = paragraph
           .format
           .spacing_after_pt
-          .max(PARAGRAPH_SPACING_AFTER_PT)
-          + table_cell_line_spacing_before_border(paragraph)
+          .max(PARAGRAPH_SPACING_AFTER_PT);
+        lower_space + lower_space + paragraph_line_spacing_excess(paragraph)
       } else {
         paragraph
           .format
@@ -7616,7 +7669,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32, setup: PageSetup
           flow.text_segmentation,
         );
         let cell_border_spacing = if index + 1 == cell.blocks.len() {
-          table_cell_line_spacing_before_border(paragraph)
+          paragraph_line_spacing_excess(paragraph)
         } else {
           0.0
         };
@@ -7630,7 +7683,7 @@ fn table_cell_content_height(cell: &TableCell, cell_width: f32, setup: PageSetup
   cell.margins.top_pt + content + cell.margins.bottom_pt
 }
 
-fn table_cell_line_spacing_before_border(paragraph: &crate::docx::Paragraph) -> f32 {
+fn paragraph_line_spacing_excess(paragraph: &crate::docx::Paragraph) -> f32 {
   if !matches!(paragraph.format.line_height_rule, LineHeightRule::Auto) {
     return 0.0;
   }
@@ -7642,7 +7695,7 @@ fn table_cell_line_spacing_before_border(paragraph: &crate::docx::Paragraph) -> 
   }
   // Source: LibreOffice sw/source/core/layout/frmtool.cxx
   // SwBorderAttrs::CalcLineSpacing_ adds 115% of the proportional line spacing
-  // excess before a table cell border for Word-compatible DOCX layout.
+  // excess when Word-compatible layout asks for paragraph line spacing.
   word_auto_line_height(&paragraph_base_line_style(paragraph)) * (multiple - 1.0)
 }
 
@@ -8064,13 +8117,23 @@ struct TextFrame {
 impl TextFrame {
   fn new(paragraph: &crate::docx::Paragraph, flow: FlowContext) -> Self {
     let default_line_left = flow.content_left_pt + paragraph.format.indent_left_pt;
-    let first_line_left =
-      (default_line_left + paragraph.format.first_line_indent_pt).max(flow.content_left_pt);
+    // Source: LibreOffice sw/source/core/text/itrcrsr.cxx
+    // SwTextMargin::CtorInitTextMargin() allows a negative left indent to move
+    // mnFirst/mnLeft before the frame print-area left edge without moving
+    // mnRight left with it. Keep the existing local width model for
+    // non-negative indents; its list/table branches are represented elsewhere
+    // in this importer.
+    let first_line_left = default_line_left + paragraph.format.first_line_indent_pt;
+    let default_line_right = if paragraph.format.indent_left_pt < 0.0 {
+      flow.content_left_pt + flow.content_width - paragraph.format.indent_right_pt
+    } else {
+      default_line_left + flow.content_width - paragraph.format.indent_right_pt
+    };
     let base_line_style = paragraph_base_line_style(paragraph);
     Self {
       default_line_left,
       first_line_left,
-      default_line_right: default_line_left + flow.content_width,
+      default_line_right,
       paragraph_left: default_line_left.min(first_line_left),
       base_line_height: paragraph_line_height_for_setup(
         paragraph,
@@ -8485,7 +8548,7 @@ impl<'a> TextFrameLayout<'a> {
     let mut emitted = paragraph.list_label.is_some();
     let mut behind_text_floating_only = false;
     let mut pending_text_page_break = false;
-    let mut pending_tab: Option<ResolvedTabStop> = None;
+    let mut pending_tab: Option<PendingAlignedTab> = None;
     let mut text_state = TextFrameState::new();
     let line = LineFrame::first(text_frame, y, paragraph.list_label.is_some());
     y = line.y_pt;
@@ -8613,6 +8676,7 @@ impl<'a> TextFrameLayout<'a> {
                 &run.style,
                 meta.clone(),
               );
+              apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
@@ -8669,7 +8733,14 @@ impl<'a> TextFrameLayout<'a> {
                 tab_over_margin_active = true;
               }
               chunk_x = x;
-              pending_tab = Some(tab_stop);
+              pending_tab = matches!(
+                tab_stop.alignment,
+                TabStopAlignment::Center | TabStopAlignment::Right
+              )
+              .then_some(PendingAlignedTab {
+                stop: tab_stop,
+                item_start_index: current.items.len(),
+              });
               emitted = true;
               continue;
             }
@@ -8677,15 +8748,12 @@ impl<'a> TextFrameLayout<'a> {
             let width = measure_text(&segment.text, &run.style);
             let line_capacity = (line_right - line_left).max(DEFAULT_FONT_SIZE_PT);
             let whitespace = segment.text.chars().all(char::is_whitespace);
-            if let Some(tab_stop) = pending_tab.take()
-              && !whitespace
-            {
-              x = aligned_tab_x(tab_stop, width, line_left, line_right);
-              chunk_x = x;
-              tab_over_margin_active |= tab_stop.x_pt > line_right;
-            }
 
-            if x + width > line_right && x > line_left && !tab_over_margin_active {
+            if x + width > line_right
+              && x > line_left
+              && pending_tab.is_none()
+              && !tab_over_margin_active
+            {
               flush_text(
                 current,
                 TextPlacement {
@@ -8697,6 +8765,7 @@ impl<'a> TextFrameLayout<'a> {
                 &run.style,
                 meta.clone(),
               );
+              apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
               (flow, text_frame, y, line_left, line_right) = self.advance_line(
                 TextLineAdvance {
                   current,
@@ -8751,6 +8820,13 @@ impl<'a> TextFrameLayout<'a> {
                         &mut chunk,
                         &run.style,
                         meta.clone(),
+                      );
+                      apply_pending_aligned_tab(
+                        current,
+                        &mut pending_tab,
+                        y,
+                        line_left,
+                        line_right,
                       );
                       (flow, text_frame, y, line_left, line_right) = self.advance_line(
                         TextLineAdvance {
@@ -8810,6 +8886,7 @@ impl<'a> TextFrameLayout<'a> {
                     &run.style,
                     meta.clone(),
                   );
+                  apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
                   (flow, text_frame, y, line_left, line_right) = self.advance_line(
                     TextLineAdvance {
                       current,
@@ -8869,7 +8946,7 @@ impl<'a> TextFrameLayout<'a> {
             }
             line_has_form_widget |= meta.form_widget_id.is_some();
             emitted = true;
-            tab_over_margin_active = false;
+            tab_over_margin_active = pending_tab.is_some_and(|tab| tab.stop.x_pt > line_right);
             if flow.text_segmentation == TextSegmentation::DrawingLayer {
               flush_text(
                 current,
@@ -8896,6 +8973,7 @@ impl<'a> TextFrameLayout<'a> {
             &run.style,
             meta.clone(),
           );
+          apply_pending_aligned_tab(current, &mut pending_tab, y, line_left, line_right);
         }
         InlineItem::FormWidgetStart(widget_id) => {
           text_state.set_position(InlineCursor::after_inline(inline_index));
@@ -9838,20 +9916,6 @@ fn next_tab_stop(
   }
 }
 
-fn aligned_tab_x(
-  tab_stop: ResolvedTabStop,
-  text_width: f32,
-  line_left: f32,
-  _line_right: f32,
-) -> f32 {
-  let x = match tab_stop.alignment {
-    TabStopAlignment::Left => tab_stop.x_pt,
-    TabStopAlignment::Center => tab_stop.x_pt - text_width / 2.0,
-    TabStopAlignment::Right => tab_stop.x_pt - text_width,
-  };
-  x.max(line_left)
-}
-
 fn line_bounds_for_y(
   default_left: f32,
   default_right: f32,
@@ -10040,6 +10104,66 @@ fn align_paragraph_items(items: &mut [PageItem], alignment: ParagraphAlignment, 
       }
     }
   }
+}
+
+fn apply_pending_aligned_tab(
+  page: &mut Page,
+  pending_tab: &mut Option<PendingAlignedTab>,
+  y: f32,
+  _line_left: f32,
+  line_right: f32,
+) {
+  let Some(tab) = *pending_tab else {
+    return;
+  };
+  if tab.item_start_index >= page.items.len() {
+    return;
+  }
+
+  let mut min_x = f32::MAX;
+  let mut max_x: f32 = tab.stop.x_pt;
+  for item in page.items.iter().skip(tab.item_start_index) {
+    if let Some(item_y) = item_y(item)
+      && f32::abs(item_y - y) < 0.01
+      && let Some((x, width)) = item_horizontal_bounds(item)
+    {
+      min_x = min_x.min(x);
+      max_x = max_x.max(x + width);
+    }
+  }
+  if min_x == f32::MAX || max_x <= tab.stop.x_pt {
+    return;
+  }
+
+  // Source: LibreOffice sw/source/core/text/txttab.cxx
+  // SwTabPortion::PostFormat() sums the widths of every portion after a
+  // center/right tab and then stretches the tab portion so the whole following
+  // run, not only the first word, is aligned to the tab position.
+  let tab_right = if tab.stop.x_pt > line_right {
+    tab.stop.x_pt
+  } else {
+    tab.stop.x_pt.min(line_right)
+  };
+  let following_width = max_x - tab.stop.x_pt;
+  let aligned_left = match tab.stop.alignment {
+    TabStopAlignment::Left => tab.stop.x_pt,
+    TabStopAlignment::Center => tab_right - following_width / 2.0,
+    TabStopAlignment::Right => tab_right - following_width,
+  };
+  let dx = aligned_left - min_x;
+  if dx.abs() <= LAYOUT_EPSILON_PT {
+    *pending_tab = None;
+    return;
+  }
+
+  for item in page.items.iter_mut().skip(tab.item_start_index) {
+    if let Some(item_y) = item_y(item)
+      && f32::abs(item_y - y) < 0.01
+    {
+      shift_item_x(item, dx);
+    }
+  }
+  *pending_tab = None;
 }
 
 fn justify_line_items(
@@ -10362,7 +10486,7 @@ mod tests {
   }
 
   #[test]
-  fn table_cell_line_spacing_before_border_matches_writer_compat_extra() {
+  fn paragraph_line_spacing_excess_matches_writer_compat_extra() {
     let mut paragraph = Paragraph {
       inlines: vec![InlineItem::Text(TextRun {
         text: "double spaced".into(),
@@ -10392,9 +10516,9 @@ mod tests {
       list_label_tab_stop_pt: None,
     };
 
-    assert!((table_cell_line_spacing_before_border(&paragraph) - 12.65).abs() < 0.01);
+    assert!((paragraph_line_spacing_excess(&paragraph) - 12.65).abs() < 0.01);
     paragraph.format.line_height_pt = Some(1.0);
-    assert_eq!(table_cell_line_spacing_before_border(&paragraph), 0.0);
+    assert_eq!(paragraph_line_spacing_excess(&paragraph), 0.0);
   }
 
   #[test]

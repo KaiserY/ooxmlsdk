@@ -14,6 +14,7 @@ use ooxmlsdk::sdk::SdkPart;
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
   pub(super) charts_by_relationship_id: HashMap<String, String>,
+  pub(super) diagram_colors_by_relationship_id: HashMap<String, String>,
   pub(super) diagram_data_by_relationship_id: HashMap<String, String>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, String>,
 }
@@ -63,6 +64,10 @@ impl ImageCatalog {
     catalog.charts_by_relationship_id =
       Self::chart_parts(package, main.chart_parts(package), |chart_part| {
         main.get_id_of_part(package, chart_part)
+      });
+    catalog.diagram_colors_by_relationship_id =
+      Self::xml_parts(package, main.diagram_colors_parts(package), |part| {
+        main.get_id_of_part(package, part)
       });
     catalog.diagram_data_by_relationship_id =
       Self::xml_parts(package, main.diagram_data_parts(package), |part| {
@@ -149,6 +154,7 @@ impl ImageCatalog {
     Self {
       by_relationship_id,
       charts_by_relationship_id: HashMap::new(),
+      diagram_colors_by_relationship_id: HashMap::new(),
       diagram_data_by_relationship_id: HashMap::new(),
       diagram_drawings_by_relationship_id: HashMap::new(),
     }

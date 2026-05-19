@@ -325,6 +325,7 @@ mod tests {
         ..Default::default()
       },
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -435,6 +436,7 @@ mod tests {
         ..Default::default()
       },
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -512,6 +514,7 @@ mod tests {
           ..Default::default()
         },
         default_tab_stop_pt: 36.0,
+        compatibility_mode: 12,
         even_and_odd_headers: false,
         split_page_break_and_paragraph_mark: false,
         form_widgets: Vec::new(),
@@ -643,6 +646,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -787,6 +791,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -892,6 +897,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -989,6 +995,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1026,6 +1033,7 @@ mod tests {
         ..Default::default()
       },
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1115,6 +1123,7 @@ mod tests {
         ..Default::default()
       },
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1225,6 +1234,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page,
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1278,6 +1288,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page: crate::docx::PageSetup::default(),
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1431,6 +1442,7 @@ mod tests {
     let doc = crate::docx::DocxDocument {
       page,
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),
@@ -1530,6 +1542,7 @@ mod tests {
         ..Default::default()
       },
       default_tab_stop_pt: 36.0,
+      compatibility_mode: 12,
       even_and_odd_headers: false,
       split_page_break_and_paragraph_mark: false,
       form_widgets: Vec::new(),

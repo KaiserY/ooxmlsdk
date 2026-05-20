@@ -15,56 +15,17 @@ pub type StringValue = String;
 pub type UInt16Value = u16;
 pub type UInt32Value = u32;
 pub type UInt64Value = u64;
-pub type UniversalMeasureValue = String;
-pub type PositiveUniversalMeasureValue = String;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TwipsMeasureValue {
-  UnsignedDecimalNumber(UInt32Value),
-  PositiveUniversalMeasure(PositiveUniversalMeasureValue),
-}
-
-impl Default for TwipsMeasureValue {
-  fn default() -> Self {
-    Self::UnsignedDecimalNumber(UInt32Value::default())
-  }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SignedTwipsMeasureValue {
-  Integer(IntegerValue),
-  UniversalMeasure(UniversalMeasureValue),
-}
-
-impl Default for SignedTwipsMeasureValue {
-  fn default() -> Self {
-    Self::Integer(IntegerValue::default())
-  }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DecimalNumberOrPercentValue {
-  DecimalNumber(Int32Value),
-  Percent(String),
-}
-
-impl Default for DecimalNumberOrPercentValue {
-  fn default() -> Self {
-    Self::DecimalNumber(Int32Value::default())
-  }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MeasurementOrPercentValue {
-  DecimalNumberOrPercent(DecimalNumberOrPercentValue),
-  UniversalMeasure(UniversalMeasureValue),
-}
-
-impl Default for MeasurementOrPercentValue {
-  fn default() -> Self {
-    Self::DecimalNumberOrPercent(DecimalNumberOrPercentValue::default())
-  }
-}
+pub use crate::units::{
+  Coordinate32Value, CoordinateValue, DecimalNumberOrPercentValue, DrawingmlAngleValue,
+  DrawingmlPercentValue, DrawingmlPercentageValue, EmuValue, FixedPercentageValue, HpsMeasureValue,
+  MeasurementOrPercentValue, PositiveCoordinate32Value, PositiveCoordinateValue,
+  PositiveDrawingmlPercentageValue, PositiveFixedPercentageValue, PositiveUniversalMeasureValue,
+  SignedHpsMeasureValue, SignedTwipsMeasureValue, TextBulletSizeDecimalValue,
+  TextBulletSizePercentValue, TextBulletSizeValue, TextFontScalePercentOrPercentStringValue,
+  TextFontSizeValue, TextPointValue, TextSpacingPercentOrPercentStringValue, TextSpacingPointValue,
+  TwipsMeasureValue, TwipsValue, UniversalMeasureValue,
+};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, ooxmlsdk_derive::SdkEnum)]
 pub enum BooleanValue {

@@ -1,4 +1,5 @@
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
+use ooxmlsdk::simple_type::HpsMeasureValue;
 use std::sync::Arc;
 
 use super::{
@@ -348,7 +349,7 @@ fn paragraph_requires_placeholder_run(paragraph: &w::Paragraph) -> bool {
         .as_ref()
         .map(|size| size.val.as_str())
     })
-    .and_then(|value| value.parse::<f32>().ok())
-    .map(|half_points| half_points <= 9.0)
+    .and_then(|value| value.parse::<HpsMeasureValue>().ok())
+    .map(|size| size.to_half_points() <= 9)
     .unwrap_or(false)
 }

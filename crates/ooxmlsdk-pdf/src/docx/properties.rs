@@ -6,9 +6,7 @@ use super::{
 };
 use crate::units;
 use ooxmlsdk::schemas::schemas_openxmlformats_org_wordprocessingml_2006_main as w;
-
-// Source: OOXML w:sz stores font sizes in half-points.
-const WML_FONT_SIZE_UNITS_PER_POINT: f32 = 2.0;
+use ooxmlsdk::simple_type::HpsMeasureValue;
 
 pub(super) fn paragraph_format(
   styles: &StylesCatalog,
@@ -116,20 +114,18 @@ pub(super) fn merge_run_style(
     style.italic = italic.val.is_none_or(|value| value.as_bool());
   }
   if let Some(font_size) = properties.font_size()
-    && let Ok(half_points) = font_size.val.parse::<f32>()
+    && let Ok(size) = font_size.val.as_str().parse::<HpsMeasureValue>()
   {
-    style.font_size_pt =
-      (half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
+    style.font_size_pt = (size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT);
   }
   if let Some(font_size) = properties.complex_script_font_size()
-    && let Ok(half_points) = font_size.val.parse::<f32>()
+    && let Ok(size) = font_size.val.as_str().parse::<HpsMeasureValue>()
   {
     // Source: LibreOffice sw/source/writerfilter/dmapper/DomainMapper.cxx
     // imports w:szCs as CharHeightComplex. Keep it separate from Western
     // CharHeight so Latin shaping width remains source-backed, while layout
     // line height can still see the complex-script font height.
-    style.complex_font_size_pt =
-      Some((half_points / WML_FONT_SIZE_UNITS_PER_POINT).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
+    style.complex_font_size_pt = Some((size.to_points() as f32).max(MIN_ESCAPEMENT_FONT_SIZE_PT));
   }
   if let Some(color) = properties.color() {
     if matches!(&properties, RunProps::Numbering(_)) && color.val.eq_ignore_ascii_case("auto") {

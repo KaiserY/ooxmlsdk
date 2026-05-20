@@ -8192,13 +8192,13 @@ pub struct FromMarker {
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ToMarker Class.
@@ -8209,13 +8209,13 @@ pub struct ToMarker {
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: crate::schemas::xdr::ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: crate::schemas::xdr::ColumnOffset,
   /// Row
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: crate::schemas::xdr::RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: crate::schemas::xdr::RowOffset,
 }
 /// Defines the ConditionalFormattingRuleExtension Class.

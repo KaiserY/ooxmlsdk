@@ -422,9 +422,9 @@ pub struct Transform {
 /// Column).
 pub type ColumnId = crate::simple_type::Int32Value;
 /// Column Offset.
-pub type ColumnOffset = crate::simple_type::Int64Value;
+pub type ColumnOffset = crate::simple_type::CoordinateValue;
 /// Row Offset.
-pub type RowOffset = crate::simple_type::Int64Value;
+pub type RowOffset = crate::simple_type::CoordinateValue;
 /// Row.
 pub type RowId = crate::simple_type::Int32Value;
 /// Starting Anchor Point.
@@ -436,13 +436,13 @@ pub struct FromMarker {
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Ending Anchor Point.
@@ -454,13 +454,13 @@ pub struct ToMarker {
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_ColID/xdr:col"))]
   pub column_id: ColumnId,
   /// Column Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:colOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:colOff"))]
   pub column_offset: ColumnOffset,
   /// Row
   #[sdk(text_child(simple_type = "Int32Value", qname = "xdr:ST_RowID/xdr:row"))]
   pub row_id: RowId,
   /// Row Offset
-  #[sdk(text_child(simple_type = "Int64Value", qname = "a:ST_Coordinate/xdr:rowOff"))]
+  #[sdk(text_child(simple_type = "CoordinateValue", qname = "a:ST_Coordinate/xdr:rowOff"))]
   pub row_offset: RowOffset,
 }
 /// Client Data.

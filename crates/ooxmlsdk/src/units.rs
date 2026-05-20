@@ -182,6 +182,13 @@ impl UniversalMeasureValue {
   }
 }
 
+impl std::fmt::Display for UniversalMeasureValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
+}
+
 impl std::str::FromStr for UniversalMeasureValue {
   type Err = UnitParseError;
 
@@ -223,6 +230,21 @@ impl TwipsMeasureValue {
   #[inline]
   pub fn to_emu(self) -> EmuValue {
     twips_to_emu(self.to_twips())
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Twips(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for TwipsMeasureValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 
@@ -268,6 +290,21 @@ impl SignedTwipsMeasureValue {
   pub fn to_emu(self) -> EmuValue {
     twips_to_emu(self.to_twips())
   }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Twips(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for SignedTwipsMeasureValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
 }
 
 impl std::str::FromStr for SignedTwipsMeasureValue {
@@ -312,6 +349,21 @@ impl HpsMeasureValue {
   pub fn to_points(self) -> f64 {
     self.to_half_points() as f64 / 2.0
   }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::HalfPoints(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for HpsMeasureValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
 }
 
 impl std::str::FromStr for HpsMeasureValue {
@@ -355,6 +407,21 @@ impl SignedHpsMeasureValue {
   #[inline]
   pub fn to_points(self) -> f64 {
     self.to_half_points() as f64 / 2.0
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::HalfPoints(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for SignedHpsMeasureValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 
@@ -412,6 +479,21 @@ impl CoordinateValue {
     let value = self.to_emu();
     value >= DRAWINGML_POSITIVE_COORDINATE_MIN && value <= DRAWINGML_POSITIVE_COORDINATE_MAX
   }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Emu(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for CoordinateValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
 }
 
 impl std::str::FromStr for CoordinateValue {
@@ -458,6 +540,21 @@ impl Coordinate32Value {
   #[inline]
   pub const fn is_valid_positive_coordinate(self) -> bool {
     self.to_emu() >= 0
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Emu(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for Coordinate32Value {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 
@@ -522,6 +619,21 @@ impl DecimalNumberOrPercentValue {
       Self::Percent(value) => Some(format_percent_lexical(value)),
     }
   }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::DecimalNumber(value) => value.to_string(),
+      Self::Percent(value) => format_percent_lexical(value),
+    }
+  }
+}
+
+impl std::fmt::Display for DecimalNumberOrPercentValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
 }
 
 impl std::str::FromStr for DecimalNumberOrPercentValue {
@@ -582,6 +694,21 @@ impl DrawingmlPercentageValue {
       Self::PercentString(value) => Some(format_percent_lexical(value)),
     }
   }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Decimal(value) => value.to_string(),
+      Self::PercentString(value) => format_percent_lexical(value),
+    }
+  }
+}
+
+impl std::fmt::Display for DrawingmlPercentageValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
+  }
 }
 
 impl std::str::FromStr for DrawingmlPercentageValue {
@@ -629,6 +756,21 @@ impl TextPointValue {
       Self::Points100(value) => drawingml_text_size_to_emu(value),
       Self::UniversalMeasure(value) => value.emu(),
     }
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Points100(value) => value.to_string(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for TextPointValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 
@@ -678,6 +820,21 @@ impl TextBulletSizeValue {
   #[inline]
   pub fn as_ratio(self) -> f64 {
     drawingml_percent_to_ratio(self.as_drawingml_percent())
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::Decimal(value) => value.to_string(),
+      Self::PercentString(value) => format_percent_lexical(value),
+    }
+  }
+}
+
+impl std::fmt::Display for TextBulletSizeValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 
@@ -734,6 +891,21 @@ impl MeasurementOrPercentValue {
       Self::DecimalNumberOrPercent(value) => Some(value.as_word_ratio()),
       Self::UniversalMeasure(_) => None,
     }
+  }
+
+  #[inline]
+  pub fn to_lexical(self) -> String {
+    match self {
+      Self::DecimalNumberOrPercent(value) => value.to_lexical(),
+      Self::UniversalMeasure(value) => value.to_lexical(),
+    }
+  }
+}
+
+impl std::fmt::Display for MeasurementOrPercentValue {
+  #[inline]
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.write_str(self.to_lexical().as_str())
   }
 }
 

@@ -2020,7 +2020,7 @@ pub struct Tint {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Shade.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2029,7 +2029,7 @@ pub struct Shade {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Alpha.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2038,7 +2038,7 @@ pub struct Alpha {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Alpha Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2047,7 +2047,7 @@ pub struct AlphaOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::FixedPercentageValue,
 }
 /// Alpha Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2056,7 +2056,7 @@ pub struct AlphaModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::PositiveDrawingmlPercentageValue,
 }
 /// Hue Modulate.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2065,7 +2065,7 @@ pub struct HueModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::PositiveDrawingmlPercentageValue,
 }
 /// Hue.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2090,7 +2090,7 @@ pub struct HueOffset {
 pub struct Saturation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Saturation Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2098,7 +2098,7 @@ pub struct Saturation {
 pub struct SaturationOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Saturation Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2106,7 +2106,7 @@ pub struct SaturationOffset {
 pub struct SaturationModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Luminance.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2114,7 +2114,7 @@ pub struct SaturationModulation {
 pub struct Luminance {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Luminance Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2122,7 +2122,7 @@ pub struct Luminance {
 pub struct LuminanceOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Luminance Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2130,7 +2130,7 @@ pub struct LuminanceOffset {
 pub struct LuminanceModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Red.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2138,7 +2138,7 @@ pub struct LuminanceModulation {
 pub struct Red {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Red Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2146,7 +2146,7 @@ pub struct Red {
 pub struct RedOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Red Modulation.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2154,7 +2154,7 @@ pub struct RedOffset {
 pub struct RedModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Green.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2162,7 +2162,7 @@ pub struct RedModulation {
 pub struct Green {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Green Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2170,7 +2170,7 @@ pub struct Green {
 pub struct GreenOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Green Modification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2178,7 +2178,7 @@ pub struct GreenOffset {
 pub struct GreenModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Blue.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2186,7 +2186,7 @@ pub struct GreenModulation {
 pub struct Blue {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Blue Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2194,7 +2194,7 @@ pub struct Blue {
 pub struct BlueOffset {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Blue Modification.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2202,7 +2202,7 @@ pub struct BlueOffset {
 pub struct BlueModulation {
   /// Value
   #[sdk(attr(qname = ":val"))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::DrawingmlPercentageValue,
 }
 /// Extension.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2222,13 +2222,13 @@ pub struct Extension {
 pub struct RgbColorModelPercentage {
   /// Red
   #[sdk(attr(qname = ":r"))]
-  pub red_portion: crate::simple_type::DecimalNumberOrPercentValue,
+  pub red_portion: crate::simple_type::DrawingmlPercentageValue,
   /// Green
   #[sdk(attr(qname = ":g"))]
-  pub green_portion: crate::simple_type::DecimalNumberOrPercentValue,
+  pub green_portion: crate::simple_type::DrawingmlPercentageValue,
   /// Blue
   #[sdk(attr(qname = ":b"))]
-  pub blue_portion: crate::simple_type::DecimalNumberOrPercentValue,
+  pub blue_portion: crate::simple_type::DrawingmlPercentageValue,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
     qname = "a:CT_PositiveFixedPercentage/a:shade",
@@ -2324,10 +2324,10 @@ pub struct HslColor {
   pub hue_value: crate::simple_type::Int32Value,
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
-  pub sat_value: crate::simple_type::DecimalNumberOrPercentValue,
+  pub sat_value: crate::simple_type::DrawingmlPercentageValue,
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
-  pub lum_value: crate::simple_type::DecimalNumberOrPercentValue,
+  pub lum_value: crate::simple_type::DrawingmlPercentageValue,
   #[sdk(choice(
     qname = "a:CT_PositiveFixedPercentage/a:tint",
     qname = "a:CT_PositiveFixedPercentage/a:shade",
@@ -2491,15 +2491,15 @@ pub struct Shape3DType {
   /// Shape Depth
   #[sdk(attr(qname = ":z"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub z: Option<crate::simple_type::Int64Value>,
+  pub z: Option<crate::simple_type::CoordinateValue>,
   /// Extrusion Height
   #[sdk(attr(qname = ":extrusionH"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub extrusion_height: Option<crate::simple_type::Int64Value>,
+  pub extrusion_height: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Contour Width
   #[sdk(attr(qname = ":contourW"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub contour_width: Option<crate::simple_type::Int64Value>,
+  pub contour_width: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Preset Material Type
   #[sdk(attr(qname = ":prstMaterial"))]
   #[sdk(string_format(kind = "token"))]
@@ -2527,7 +2527,7 @@ pub struct FlatText {
   /// Z Coordinate
   #[sdk(attr(qname = ":z"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub z: Option<crate::simple_type::Int64Value>,
+  pub z: Option<crate::simple_type::CoordinateValue>,
 }
 /// Linear Gradient Fill.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2560,17 +2560,17 @@ pub struct Tile {
   /// Horizontal Offset
   #[sdk(attr(qname = ":tx"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub horizontal_offset: Option<crate::simple_type::Int64Value>,
+  pub horizontal_offset: Option<crate::simple_type::CoordinateValue>,
   /// Vertical Offset
   #[sdk(attr(qname = ":ty"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub vertical_offset: Option<crate::simple_type::Int64Value>,
+  pub vertical_offset: Option<crate::simple_type::CoordinateValue>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub horizontal_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub vertical_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Tile Flipping
   #[sdk(attr(qname = ":flip"))]
   #[sdk(string_format(kind = "token"))]
@@ -2778,7 +2778,7 @@ pub struct AlphaBiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub threshold: crate::simple_type::DecimalNumberOrPercentValue,
+  pub threshold: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Alpha Inverse Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2811,7 +2811,7 @@ pub struct AlphaModulationFixed {
   /// Amount
   #[sdk(attr(qname = ":amt"))]
   #[sdk(number_range(range = 0..))]
-  pub amount: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub amount: Option<crate::simple_type::PositiveDrawingmlPercentageValue>,
 }
 /// Alpha Inset/Outset Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2820,7 +2820,7 @@ pub struct AlphaOutset {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub radius: Option<crate::simple_type::Int64Value>,
+  pub radius: Option<crate::simple_type::CoordinateValue>,
 }
 /// Alpha Replace Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2829,7 +2829,7 @@ pub struct AlphaReplace {
   /// Alpha
   #[sdk(attr(qname = ":a"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub alpha: crate::simple_type::DecimalNumberOrPercentValue,
+  pub alpha: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Defines the BiLevel Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2838,7 +2838,7 @@ pub struct BiLevel {
   /// Threshold
   #[sdk(attr(qname = ":thresh"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub threshold: crate::simple_type::DecimalNumberOrPercentValue,
+  pub threshold: crate::simple_type::PositiveFixedPercentageValue,
 }
 /// Blend Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2859,7 +2859,7 @@ pub struct Blur {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub radius: Option<crate::simple_type::Int64Value>,
+  pub radius: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Grow Bounds
   #[sdk(attr(qname = ":grow"))]
   pub grow: Option<crate::simple_type::BooleanValue>,
@@ -2951,7 +2951,7 @@ pub struct Glow {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub radius: Option<crate::simple_type::Int64Value>,
+  pub radius: Option<crate::simple_type::PositiveCoordinateValue>,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -2973,11 +2973,11 @@ pub struct Hsl {
   /// Saturation
   #[sdk(attr(qname = ":sat"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub saturation: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub saturation: Option<crate::simple_type::FixedPercentageValue>,
   /// Luminance
   #[sdk(attr(qname = ":lum"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub luminance: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub luminance: Option<crate::simple_type::FixedPercentageValue>,
 }
 /// Inner Shadow Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -2988,11 +2988,11 @@ pub struct InnerShadow {
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub blur_radius: Option<crate::simple_type::Int64Value>,
+  pub blur_radius: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub distance: Option<crate::simple_type::Int64Value>,
+  pub distance: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
@@ -3014,11 +3014,11 @@ pub struct LuminanceEffect {
   /// Brightness
   #[sdk(attr(qname = ":bright"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub brightness: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub brightness: Option<crate::simple_type::FixedPercentageValue>,
   /// Contrast
   #[sdk(attr(qname = ":contrast"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub contrast: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub contrast: Option<crate::simple_type::FixedPercentageValue>,
 }
 /// Outer Shadow Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3029,21 +3029,21 @@ pub struct OuterShadow {
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub blur_radius: Option<crate::simple_type::Int64Value>,
+  pub blur_radius: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Shadow Offset Distance
   #[sdk(attr(qname = ":dist"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub distance: Option<crate::simple_type::Int64Value>,
+  pub distance: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Shadow Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
   pub direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Scaling Factor
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub horizontal_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Vertical Scaling Factor
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub vertical_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3096,7 +3096,7 @@ pub struct PresetShadow {
   /// Distance
   #[sdk(attr(qname = ":dist"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub distance: Option<crate::simple_type::Int64Value>,
+  pub distance: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
@@ -3118,27 +3118,27 @@ pub struct Reflection {
   /// Blur Radius
   #[sdk(attr(qname = ":blurRad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub blur_radius: Option<crate::simple_type::Int64Value>,
+  pub blur_radius: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Start Opacity
   #[sdk(attr(qname = ":stA"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub start_opacity: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub start_opacity: Option<crate::simple_type::PositiveFixedPercentageValue>,
   /// Start Position
   #[sdk(attr(qname = ":stPos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub start_position: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub start_position: Option<crate::simple_type::PositiveFixedPercentageValue>,
   /// End Alpha
   #[sdk(attr(qname = ":endA"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub end_alpha: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub end_alpha: Option<crate::simple_type::PositiveFixedPercentageValue>,
   /// End Position
   #[sdk(attr(qname = ":endPos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub end_position: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub end_position: Option<crate::simple_type::PositiveFixedPercentageValue>,
   /// Distance
   #[sdk(attr(qname = ":dist"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub distance: Option<crate::simple_type::Int64Value>,
+  pub distance: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Direction
   #[sdk(attr(qname = ":dir"))]
   #[sdk(number_range(range = 0..21600000))]
@@ -3149,10 +3149,10 @@ pub struct Reflection {
   pub fade_direction: Option<crate::simple_type::Int32Value>,
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub horizontal_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub vertical_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3189,10 +3189,10 @@ pub struct Reflection {
 pub struct RelativeOffset {
   /// Offset X
   #[sdk(attr(qname = ":tx"))]
-  pub offset_x: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub offset_x: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Offset Y
   #[sdk(attr(qname = ":ty"))]
-  pub offset_y: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub offset_y: Option<crate::simple_type::DrawingmlPercentageValue>,
 }
 /// Soft Edge Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3201,7 +3201,7 @@ pub struct SoftEdge {
   /// Radius
   #[sdk(attr(qname = ":rad"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub radius: crate::simple_type::Int64Value,
+  pub radius: crate::simple_type::PositiveCoordinateValue,
 }
 /// Defines the TintEffect Class.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3214,7 +3214,7 @@ pub struct TintEffect {
   /// Amount
   #[sdk(attr(qname = ":amt"))]
   #[sdk(number_range(range = -100000..= 100000))]
-  pub amount: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub amount: Option<crate::simple_type::FixedPercentageValue>,
 }
 /// Transform Effect.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3222,10 +3222,10 @@ pub struct TintEffect {
 pub struct TransformEffect {
   /// Horizontal Ratio
   #[sdk(attr(qname = ":sx"))]
-  pub horizontal_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub horizontal_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Vertical Ratio
   #[sdk(attr(qname = ":sy"))]
-  pub vertical_ratio: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub vertical_ratio: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Horizontal Skew
   #[sdk(attr(qname = ":kx"))]
   #[sdk(
@@ -3251,11 +3251,11 @@ pub struct TransformEffect {
   /// Horizontal Shift
   #[sdk(attr(qname = ":tx"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub horizontal_shift: Option<crate::simple_type::Int64Value>,
+  pub horizontal_shift: Option<crate::simple_type::CoordinateValue>,
   /// Vertical Shift
   #[sdk(attr(qname = ":ty"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub vertical_shift: Option<crate::simple_type::Int64Value>,
+  pub vertical_shift: Option<crate::simple_type::CoordinateValue>,
 }
 /// Effect Container.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3342,7 +3342,7 @@ pub struct Miter {
   /// Miter Join Limit
   #[sdk(attr(qname = ":lim"))]
   #[sdk(number_range(range = 0..))]
-  pub limit: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub limit: Option<crate::simple_type::PositiveDrawingmlPercentageValue>,
 }
 /// Preset Dash.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3529,11 +3529,11 @@ pub struct NormalAutoFit {
   /// Font Scale
   #[sdk(attr(qname = ":fontScale"))]
   #[sdk(number_range(range = 1000..= 100000))]
-  pub font_scale: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub font_scale: Option<crate::simple_type::TextFontScalePercentOrPercentStringValue>,
   /// Line Space Reduction
   #[sdk(attr(qname = ":lnSpcReduction"))]
   #[sdk(number_range(range = 0..= 13200000))]
-  pub line_space_reduction: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub line_space_reduction: Option<crate::simple_type::TextSpacingPercentOrPercentStringValue>,
 }
 /// Shape AutoFit.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3676,7 +3676,7 @@ pub struct BulletSizePercentage {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 25000..= 400000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::TextBulletSizeValue,
 }
 /// Bullet Size Points.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -3685,7 +3685,7 @@ pub struct BulletSizePoints {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 100..= 400000))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::TextFontSizeValue,
 }
 /// Specified.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4825,11 +4825,11 @@ pub struct Offset {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub x: crate::simple_type::Int64Value,
+  pub x: crate::simple_type::CoordinateValue,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub y: crate::simple_type::Int64Value,
+  pub y: crate::simple_type::CoordinateValue,
 }
 /// Child Offset.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4838,11 +4838,11 @@ pub struct ChildOffset {
   /// X-Axis Coordinate
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub x: crate::simple_type::Int64Value,
+  pub x: crate::simple_type::CoordinateValue,
   /// Y-Axis Coordinate
   #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub y: crate::simple_type::Int64Value,
+  pub y: crate::simple_type::CoordinateValue,
 }
 /// Extents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4851,11 +4851,11 @@ pub struct Extents {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub cx: crate::simple_type::Int64Value,
+  pub cx: crate::simple_type::PositiveCoordinateValue,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub cy: crate::simple_type::Int64Value,
+  pub cy: crate::simple_type::PositiveCoordinateValue,
 }
 /// Child Extents.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -4864,11 +4864,11 @@ pub struct ChildExtents {
   /// Extent Length
   #[sdk(attr(qname = ":cx"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub cx: crate::simple_type::Int64Value,
+  pub cx: crate::simple_type::PositiveCoordinateValue,
   /// Extent Width
   #[sdk(attr(qname = ":cy"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub cy: crate::simple_type::Int64Value,
+  pub cy: crate::simple_type::PositiveCoordinateValue,
 }
 /// Shape Locks.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5368,7 +5368,7 @@ pub struct Camera {
   /// Zoom
   #[sdk(attr(qname = ":zoom"))]
   #[sdk(number_range(range = 0..))]
-  pub zoom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub zoom: Option<crate::simple_type::PositiveDrawingmlPercentageValue>,
   /// Rotation
   #[sdk(child(qname = "a:CT_SphereCoords/a:rot"))]
   pub rotation: Option<Rotation>,
@@ -5413,15 +5413,15 @@ pub struct Anchor {
   /// X-Coordinate in 3D
   #[sdk(attr(qname = ":x"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub x: crate::simple_type::Int64Value,
+  pub x: crate::simple_type::CoordinateValue,
   /// Y-Coordinate in 3D
   #[sdk(attr(qname = ":y"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub y: crate::simple_type::Int64Value,
+  pub y: crate::simple_type::CoordinateValue,
   /// Z-Coordinate in 3D
   #[sdk(attr(qname = ":z"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub z: crate::simple_type::Int64Value,
+  pub z: crate::simple_type::CoordinateValue,
 }
 /// Normal.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5430,15 +5430,15 @@ pub struct Normal {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dx: crate::simple_type::Int64Value,
+  pub dx: crate::simple_type::CoordinateValue,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dy: crate::simple_type::Int64Value,
+  pub dy: crate::simple_type::CoordinateValue,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dz: crate::simple_type::Int64Value,
+  pub dz: crate::simple_type::CoordinateValue,
 }
 /// Up Vector.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5447,15 +5447,15 @@ pub struct UpVector {
   /// Distance along X-axis in 3D
   #[sdk(attr(qname = ":dx"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dx: crate::simple_type::Int64Value,
+  pub dx: crate::simple_type::CoordinateValue,
   /// Distance along Y-axis in 3D
   #[sdk(attr(qname = ":dy"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dy: crate::simple_type::Int64Value,
+  pub dy: crate::simple_type::CoordinateValue,
   /// Distance along Z-axis in 3D
   #[sdk(attr(qname = ":dz"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub dz: crate::simple_type::Int64Value,
+  pub dz: crate::simple_type::CoordinateValue,
 }
 /// Top Bevel.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5464,11 +5464,11 @@ pub struct BevelTop {
   /// Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub width: Option<crate::simple_type::Int64Value>,
+  pub width: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Height
   #[sdk(attr(qname = ":h"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub height: Option<crate::simple_type::Int64Value>,
+  pub height: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(kind = "token"))]
@@ -5481,11 +5481,11 @@ pub struct BevelBottom {
   /// Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub width: Option<crate::simple_type::Int64Value>,
+  pub width: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Height
   #[sdk(attr(qname = ":h"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub height: Option<crate::simple_type::Int64Value>,
+  pub height: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(kind = "token"))]
@@ -5498,11 +5498,11 @@ pub struct Bevel {
   /// Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub width: Option<crate::simple_type::Int64Value>,
+  pub width: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Height
   #[sdk(attr(qname = ":h"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub height: Option<crate::simple_type::Int64Value>,
+  pub height: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Preset Bevel
   #[sdk(attr(qname = ":prst"))]
   #[sdk(string_format(kind = "token"))]
@@ -5514,16 +5514,16 @@ pub struct Bevel {
 pub struct FillToRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub left: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub top: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub right: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub bottom: Option<crate::simple_type::DrawingmlPercentageValue>,
 }
 /// Tile Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5531,16 +5531,16 @@ pub struct FillToRectangle {
 pub struct TileRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub left: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub top: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub right: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub bottom: Option<crate::simple_type::DrawingmlPercentageValue>,
 }
 /// Fill Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5548,16 +5548,16 @@ pub struct TileRectangle {
 pub struct FillRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub left: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub top: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub right: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub bottom: Option<crate::simple_type::DrawingmlPercentageValue>,
 }
 /// Source Rectangle.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5565,16 +5565,16 @@ pub struct FillRectangle {
 pub struct SourceRectangle {
   /// Left Offset
   #[sdk(attr(qname = ":l"))]
-  pub left: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub left: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Top Offset
   #[sdk(attr(qname = ":t"))]
-  pub top: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub top: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Right Offset
   #[sdk(attr(qname = ":r"))]
-  pub right: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub right: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// Bottom Offset
   #[sdk(attr(qname = ":b"))]
-  pub bottom: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub bottom: Option<crate::simple_type::DrawingmlPercentageValue>,
 }
 /// Gradient stops.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -5585,7 +5585,7 @@ pub struct GradientStop {
   /// Position
   #[sdk(attr(qname = ":pos"))]
   #[sdk(number_range(range = 0..= 100000))]
-  pub position: crate::simple_type::DecimalNumberOrPercentValue,
+  pub position: crate::simple_type::PositiveFixedPercentageValue,
   #[sdk(choice(
     qname = "a:CT_ScRgbColor/a:scrgbClr",
     qname = "a:CT_SRgbColor/a:srgbClr",
@@ -5879,11 +5879,11 @@ pub struct Path {
   /// Path Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub width: Option<crate::simple_type::Int64Value>,
+  pub width: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Path Height
   #[sdk(attr(qname = ":h"))]
   #[sdk(number_range(range = 0..= 2147483647))]
-  pub height: Option<crate::simple_type::Int64Value>,
+  pub height: Option<crate::simple_type::PositiveCoordinateValue>,
   /// Path Fill
   #[sdk(attr(qname = ":fill"))]
   #[sdk(string_format(kind = "token"))]
@@ -6006,11 +6006,11 @@ pub struct DashStop {
   /// Dash Length
   #[sdk(attr(qname = ":d"))]
   #[sdk(number_range(range = 0..))]
-  pub dash_length: crate::simple_type::DecimalNumberOrPercentValue,
+  pub dash_length: crate::simple_type::PositiveDrawingmlPercentageValue,
   /// Space Length
   #[sdk(attr(qname = ":sp"))]
   #[sdk(number_range(range = 0..))]
-  pub space_length: crate::simple_type::DecimalNumberOrPercentValue,
+  pub space_length: crate::simple_type::PositiveDrawingmlPercentageValue,
 }
 /// 2D Transform for Grouped Objects.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -6067,16 +6067,16 @@ pub struct BodyProperties {
   pub wrap: Option<TextWrappingValues>,
   /// Left Inset
   #[sdk(attr(qname = ":lIns"))]
-  pub left_inset: Option<crate::simple_type::Int32Value>,
+  pub left_inset: Option<crate::simple_type::Coordinate32Value>,
   /// Top Inset
   #[sdk(attr(qname = ":tIns"))]
-  pub top_inset: Option<crate::simple_type::Int32Value>,
+  pub top_inset: Option<crate::simple_type::Coordinate32Value>,
   /// Right Inset
   #[sdk(attr(qname = ":rIns"))]
-  pub right_inset: Option<crate::simple_type::Int32Value>,
+  pub right_inset: Option<crate::simple_type::Coordinate32Value>,
   /// Bottom Inset
   #[sdk(attr(qname = ":bIns"))]
-  pub bottom_inset: Option<crate::simple_type::Int32Value>,
+  pub bottom_inset: Option<crate::simple_type::Coordinate32Value>,
   /// Number of Columns
   #[sdk(attr(qname = ":numCol"))]
   #[sdk(number_range(range = 1..= 16))]
@@ -6084,7 +6084,7 @@ pub struct BodyProperties {
   /// Space Between Columns
   #[sdk(attr(qname = ":spcCol"))]
   #[sdk(number_range(range = 0..))]
-  pub column_spacing: Option<crate::simple_type::Int32Value>,
+  pub column_spacing: Option<crate::simple_type::PositiveCoordinate32Value>,
   /// Columns Right-To-Left
   #[sdk(attr(qname = ":rtlCol"))]
   pub right_to_left_columns: Option<crate::simple_type::BooleanValue>,
@@ -6388,16 +6388,16 @@ pub struct Cell3DProperties {
 pub struct TableCellProperties {
   /// Left Margin
   #[sdk(attr(qname = ":marL"))]
-  pub left_margin: Option<crate::simple_type::Int32Value>,
+  pub left_margin: Option<crate::simple_type::Coordinate32Value>,
   /// Right Margin
   #[sdk(attr(qname = ":marR"))]
-  pub right_margin: Option<crate::simple_type::Int32Value>,
+  pub right_margin: Option<crate::simple_type::Coordinate32Value>,
   /// Top Margin
   #[sdk(attr(qname = ":marT"))]
-  pub top_margin: Option<crate::simple_type::Int32Value>,
+  pub top_margin: Option<crate::simple_type::Coordinate32Value>,
   /// Bottom Margin
   #[sdk(attr(qname = ":marB"))]
-  pub bottom_margin: Option<crate::simple_type::Int32Value>,
+  pub bottom_margin: Option<crate::simple_type::Coordinate32Value>,
   /// Text Direction
   #[sdk(attr(qname = ":vert"))]
   #[sdk(string_format(kind = "token"))]
@@ -6600,7 +6600,7 @@ pub struct GridColumn {
   /// Width
   #[sdk(attr(qname = ":w"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub width: crate::simple_type::Int64Value,
+  pub width: crate::simple_type::CoordinateValue,
   /// Defines the ExtensionList Class.
   #[sdk(child(qname = "a:CT_OfficeArtExtensionList/a:extLst"))]
   pub extension_list: Option<ExtensionList>,
@@ -6668,7 +6668,7 @@ pub struct TableRow {
   /// Height
   #[sdk(attr(qname = ":h"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub height: crate::simple_type::Int64Value,
+  pub height: crate::simple_type::CoordinateValue,
   /// Table Cell.
   #[sdk(child(qname = "a:CT_TableCell/a:tc"))]
   pub a_tc: Vec<TableCell>,
@@ -7021,7 +7021,7 @@ pub struct ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7106,7 +7106,7 @@ pub struct DefaultParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7191,7 +7191,7 @@ pub struct Level1ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7276,7 +7276,7 @@ pub struct Level2ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7361,7 +7361,7 @@ pub struct Level3ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7446,7 +7446,7 @@ pub struct Level4ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7531,7 +7531,7 @@ pub struct Level5ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7616,7 +7616,7 @@ pub struct Level6ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7701,7 +7701,7 @@ pub struct Level7ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7786,7 +7786,7 @@ pub struct Level8ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7871,7 +7871,7 @@ pub struct Level9ParagraphProperties {
   pub alignment: Option<TextAlignmentTypeValues>,
   /// Default Tab Size
   #[sdk(attr(qname = ":defTabSz"))]
-  pub default_tab_size: Option<crate::simple_type::Int32Value>,
+  pub default_tab_size: Option<crate::simple_type::Coordinate32Value>,
   /// Right To Left
   #[sdk(attr(qname = ":rtl"))]
   pub right_to_left: Option<crate::simple_type::BooleanValue>,
@@ -7947,7 +7947,7 @@ pub struct EndParagraphRunProperties {
   /// sz
   #[sdk(attr(qname = ":sz"))]
   #[sdk(number_range(range = 100..= 400000))]
-  pub font_size: Option<crate::simple_type::Int32Value>,
+  pub font_size: Option<crate::simple_type::TextFontSizeValue>,
   /// b
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
@@ -7973,13 +7973,13 @@ pub struct EndParagraphRunProperties {
   /// spc
   #[sdk(attr(qname = ":spc"))]
   #[sdk(number_range(range = -400000..= 400000))]
-  pub spacing: Option<crate::simple_type::Int32Value>,
+  pub spacing: Option<crate::simple_type::TextPointValue>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub baseline: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8070,7 +8070,7 @@ pub struct RunProperties {
   /// sz
   #[sdk(attr(qname = ":sz"))]
   #[sdk(number_range(range = 100..= 400000))]
-  pub font_size: Option<crate::simple_type::Int32Value>,
+  pub font_size: Option<crate::simple_type::TextFontSizeValue>,
   /// b
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
@@ -8096,13 +8096,13 @@ pub struct RunProperties {
   /// spc
   #[sdk(attr(qname = ":spc"))]
   #[sdk(number_range(range = -400000..= 400000))]
-  pub spacing: Option<crate::simple_type::Int32Value>,
+  pub spacing: Option<crate::simple_type::TextPointValue>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub baseline: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8193,7 +8193,7 @@ pub struct DefaultRunProperties {
   /// sz
   #[sdk(attr(qname = ":sz"))]
   #[sdk(number_range(range = 100..= 400000))]
-  pub font_size: Option<crate::simple_type::Int32Value>,
+  pub font_size: Option<crate::simple_type::TextFontSizeValue>,
   /// b
   #[sdk(attr(qname = ":b"))]
   pub bold: Option<crate::simple_type::BooleanValue>,
@@ -8219,13 +8219,13 @@ pub struct DefaultRunProperties {
   /// spc
   #[sdk(attr(qname = ":spc"))]
   #[sdk(number_range(range = -400000..= 400000))]
-  pub spacing: Option<crate::simple_type::Int32Value>,
+  pub spacing: Option<crate::simple_type::TextPointValue>,
   /// normalizeH
   #[sdk(attr(qname = ":normalizeH"))]
   pub normalize_height: Option<crate::simple_type::BooleanValue>,
   /// baseline
   #[sdk(attr(qname = ":baseline"))]
-  pub baseline: Option<crate::simple_type::DecimalNumberOrPercentValue>,
+  pub baseline: Option<crate::simple_type::DrawingmlPercentageValue>,
   /// noProof
   #[sdk(attr(qname = ":noProof"))]
   pub no_proof: Option<crate::simple_type::BooleanValue>,
@@ -8325,7 +8325,7 @@ pub struct Paragraph {
 pub struct TabStop {
   /// Tab Position
   #[sdk(attr(qname = ":pos"))]
-  pub position: Option<crate::simple_type::Int32Value>,
+  pub position: Option<crate::simple_type::Coordinate32Value>,
   /// Tab Alignment
   #[sdk(attr(qname = ":algn"))]
   #[sdk(string_format(kind = "token"))]
@@ -8338,7 +8338,7 @@ pub struct SpacingPercent {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 13200000))]
-  pub val: crate::simple_type::DecimalNumberOrPercentValue,
+  pub val: crate::simple_type::TextSpacingPercentOrPercentStringValue,
 }
 /// Spacing Points.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -8347,7 +8347,7 @@ pub struct SpacingPoints {
   /// Value
   #[sdk(attr(qname = ":val"))]
   #[sdk(number_range(range = 0..= 158400))]
-  pub val: crate::simple_type::Int32Value,
+  pub val: crate::simple_type::TextSpacingPointValue,
 }
 /// Line Spacing.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]

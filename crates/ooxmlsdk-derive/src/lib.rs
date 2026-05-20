@@ -1850,8 +1850,6 @@ fn is_string_like_type_name(name: &str) -> bool {
       | "DecimalValue"
       | "HexBinaryValue"
       | "Base64BinaryValue"
-      | "UniversalMeasureValue"
-      | "PositiveUniversalMeasureValue"
   )
 }
 
@@ -1909,16 +1907,16 @@ fn parse_simple_union_value_tokens(
 ) -> proc_macro2::TokenStream {
   match kind {
     SimpleUnionTypeKind::TwipsMeasure => {
-      quote! { crate::common::parse_twips_measure_value(#value_expr) }
+      quote! { crate::common::parse_twips_measure_value(#value_expr)? }
     }
     SimpleUnionTypeKind::SignedTwipsMeasure => {
-      quote! { crate::common::parse_signed_twips_measure_value(#value_expr) }
+      quote! { crate::common::parse_signed_twips_measure_value(#value_expr)? }
     }
     SimpleUnionTypeKind::DecimalNumberOrPercent => {
-      quote! { crate::common::parse_decimal_number_or_percent_value(#value_expr) }
+      quote! { crate::common::parse_decimal_number_or_percent_value(#value_expr)? }
     }
     SimpleUnionTypeKind::MeasurementOrPercent => {
-      quote! { crate::common::parse_measurement_or_percent_value(#value_expr) }
+      quote! { crate::common::parse_measurement_or_percent_value(#value_expr)? }
     }
   }
 }

@@ -333,19 +333,19 @@ pub struct EffectExtent {
   /// Additional Extent on Left Edge
   #[sdk(attr(qname = ":l"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub left_edge: crate::simple_type::Int64Value,
+  pub left_edge: crate::simple_type::CoordinateValue,
   /// Additional Extent on Top Edge
   #[sdk(attr(qname = ":t"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub top_edge: crate::simple_type::Int64Value,
+  pub top_edge: crate::simple_type::CoordinateValue,
   /// Additional Extent on Right Edge
   #[sdk(attr(qname = ":r"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub right_edge: crate::simple_type::Int64Value,
+  pub right_edge: crate::simple_type::CoordinateValue,
   /// Additional Extent on Bottom Edge
   #[sdk(attr(qname = ":b"))]
   #[sdk(number_range(range = -27273042329600..= 27273042316900))]
-  pub bottom_edge: crate::simple_type::Int64Value,
+  pub bottom_edge: crate::simple_type::CoordinateValue,
 }
 /// Tight Wrapping Extents Polygon.
 #[derive(Clone, Debug, Default, PartialEq, ooxmlsdk_derive::SdkType)]
@@ -488,7 +488,7 @@ pub enum HorizontalPositionChoice {
   /// Defines the PercentagePositionHeightOffset Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "DecimalNumberOrPercentValue",
+    simple_type = "DrawingmlPercentageValue",
     qname = "a:ST_Percentage/wp14:pctPosHOffset"
   ))]
   Wp14PctPosHOffset(crate::schemas::wp14::PercentagePositionHeightOffset),
@@ -507,7 +507,7 @@ pub enum VerticalPositionChoice {
   /// Defines the PercentagePositionVerticalOffset Class.
   #[sdk(text_child(
     office2010,
-    simple_type = "DecimalNumberOrPercentValue",
+    simple_type = "DrawingmlPercentageValue",
     qname = "a:ST_Percentage/wp14:pctPosVOffset"
   ))]
   Wp14PctPosVOffset(crate::schemas::wp14::PercentagePositionVerticalOffset),

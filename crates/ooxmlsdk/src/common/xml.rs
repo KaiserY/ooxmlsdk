@@ -363,21 +363,20 @@ pub(crate) fn parse_twips_measure_attr(
   decoder: Decoder,
 ) -> Result<crate::simple_type::TwipsMeasureValue, SdkError> {
   if let Some(value) = attr_raw_value(attr)
-    && let Some(value) = try_parse_u32_bytes(value)
+    && let Ok(value) = crate::simple_type::TwipsMeasureValue::from_bytes(value)
   {
-    return Ok(crate::simple_type::TwipsMeasureValue::UnsignedDecimalNumber(value));
+    return Ok(value);
   }
   let value = decode_attr_value(attr, decoder)?;
-  Ok(parse_twips_measure_value(value))
+  parse_twips_measure_value(value)
 }
 
 #[inline]
-pub(crate) fn parse_twips_measure_value(value: String) -> crate::simple_type::TwipsMeasureValue {
-  if let Some(value) = try_parse_u32_bytes(value.as_bytes()) {
-    crate::simple_type::TwipsMeasureValue::UnsignedDecimalNumber(value)
-  } else {
-    crate::simple_type::TwipsMeasureValue::PositiveUniversalMeasure(value)
-  }
+pub(crate) fn parse_twips_measure_value(
+  value: String,
+) -> Result<crate::simple_type::TwipsMeasureValue, SdkError> {
+  crate::simple_type::TwipsMeasureValue::from_bytes(value.as_bytes())
+    .map_err(|_| invalid_field_value("TwipsMeasureValue", "value", value))
 }
 
 #[inline]
@@ -386,23 +385,20 @@ pub(crate) fn parse_signed_twips_measure_attr(
   decoder: Decoder,
 ) -> Result<crate::simple_type::SignedTwipsMeasureValue, SdkError> {
   if let Some(value) = attr_raw_value(attr)
-    && let Some(value) = try_parse_i64_bytes(value)
+    && let Ok(value) = crate::simple_type::SignedTwipsMeasureValue::from_bytes(value)
   {
-    return Ok(crate::simple_type::SignedTwipsMeasureValue::Integer(value));
+    return Ok(value);
   }
   let value = decode_attr_value(attr, decoder)?;
-  Ok(parse_signed_twips_measure_value(value))
+  parse_signed_twips_measure_value(value)
 }
 
 #[inline]
 pub(crate) fn parse_signed_twips_measure_value(
   value: String,
-) -> crate::simple_type::SignedTwipsMeasureValue {
-  if let Some(value) = try_parse_i64_bytes(value.as_bytes()) {
-    crate::simple_type::SignedTwipsMeasureValue::Integer(value)
-  } else {
-    crate::simple_type::SignedTwipsMeasureValue::UniversalMeasure(value)
-  }
+) -> Result<crate::simple_type::SignedTwipsMeasureValue, SdkError> {
+  crate::simple_type::SignedTwipsMeasureValue::from_bytes(value.as_bytes())
+    .map_err(|_| invalid_field_value("SignedTwipsMeasureValue", "value", value))
 }
 
 #[inline]
@@ -411,23 +407,20 @@ pub(crate) fn parse_decimal_number_or_percent_attr(
   decoder: Decoder,
 ) -> Result<crate::simple_type::DecimalNumberOrPercentValue, SdkError> {
   if let Some(value) = attr_raw_value(attr)
-    && let Some(value) = try_parse_i32_bytes(value)
+    && let Ok(value) = crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value)
   {
-    return Ok(crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value));
+    return Ok(value);
   }
   let value = decode_attr_value(attr, decoder)?;
-  Ok(parse_decimal_number_or_percent_value(value))
+  parse_decimal_number_or_percent_value(value)
 }
 
 #[inline]
 pub(crate) fn parse_decimal_number_or_percent_value(
   value: String,
-) -> crate::simple_type::DecimalNumberOrPercentValue {
-  if let Some(value) = try_parse_i32_bytes(value.as_bytes()) {
-    crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value)
-  } else {
-    crate::simple_type::DecimalNumberOrPercentValue::Percent(value)
-  }
+) -> Result<crate::simple_type::DecimalNumberOrPercentValue, SdkError> {
+  crate::simple_type::DecimalNumberOrPercentValue::from_bytes(value.as_bytes())
+    .map_err(|_| invalid_field_value("DecimalNumberOrPercentValue", "value", value))
 }
 
 #[inline]
@@ -436,107 +429,20 @@ pub(crate) fn parse_measurement_or_percent_attr(
   decoder: Decoder,
 ) -> Result<crate::simple_type::MeasurementOrPercentValue, SdkError> {
   if let Some(value) = attr_raw_value(attr)
-    && let Some(value) = try_parse_i32_bytes(value)
+    && let Ok(value) = crate::simple_type::MeasurementOrPercentValue::from_bytes(value)
   {
-    return Ok(
-      crate::simple_type::MeasurementOrPercentValue::DecimalNumberOrPercent(
-        crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-      ),
-    );
+    return Ok(value);
   }
   let value = decode_attr_value(attr, decoder)?;
-  Ok(parse_measurement_or_percent_value(value))
+  parse_measurement_or_percent_value(value)
 }
 
 #[inline]
 pub(crate) fn parse_measurement_or_percent_value(
   value: String,
-) -> crate::simple_type::MeasurementOrPercentValue {
-  if let Some(value) = try_parse_i32_bytes(value.as_bytes()) {
-    crate::simple_type::MeasurementOrPercentValue::DecimalNumberOrPercent(
-      crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-    )
-  } else if value.as_bytes().last() == Some(&b'%') {
-    crate::simple_type::MeasurementOrPercentValue::DecimalNumberOrPercent(
-      crate::simple_type::DecimalNumberOrPercentValue::Percent(value),
-    )
-  } else {
-    crate::simple_type::MeasurementOrPercentValue::UniversalMeasure(value)
-  }
-}
-
-#[inline]
-fn try_parse_u32_bytes(value: &[u8]) -> Option<u32> {
-  let digits = match value {
-    [b'+', rest @ ..] => rest,
-    _ => value,
-  };
-  if digits.is_empty() {
-    return None;
-  }
-
-  let mut parsed: u32 = 0;
-  for &digit in digits {
-    if !digit.is_ascii_digit() {
-      return None;
-    }
-    parsed = parsed.checked_mul(10)?.checked_add((digit - b'0') as u32)?;
-  }
-  Some(parsed)
-}
-
-#[inline]
-fn try_parse_i32_bytes(value: &[u8]) -> Option<i32> {
-  let (negative, digits) = match value {
-    [b'-', rest @ ..] => (true, rest),
-    [b'+', rest @ ..] => (false, rest),
-    _ => (false, value),
-  };
-  if digits.is_empty() {
-    return None;
-  }
-
-  let mut parsed: i32 = 0;
-  for &digit in digits {
-    if !digit.is_ascii_digit() {
-      return None;
-    }
-    parsed = parsed.checked_mul(10).and_then(|current| {
-      if negative {
-        current.checked_sub((digit - b'0') as i32)
-      } else {
-        current.checked_add((digit - b'0') as i32)
-      }
-    })?;
-  }
-  Some(parsed)
-}
-
-#[inline]
-fn try_parse_i64_bytes(value: &[u8]) -> Option<i64> {
-  let (negative, digits) = match value {
-    [b'-', rest @ ..] => (true, rest),
-    [b'+', rest @ ..] => (false, rest),
-    _ => (false, value),
-  };
-  if digits.is_empty() {
-    return None;
-  }
-
-  let mut parsed: i64 = 0;
-  for &digit in digits {
-    if !digit.is_ascii_digit() {
-      return None;
-    }
-    parsed = parsed.checked_mul(10).and_then(|current| {
-      if negative {
-        current.checked_sub((digit - b'0') as i64)
-      } else {
-        current.checked_add((digit - b'0') as i64)
-      }
-    })?;
-  }
-  Some(parsed)
+) -> Result<crate::simple_type::MeasurementOrPercentValue, SdkError> {
+  crate::simple_type::MeasurementOrPercentValue::from_bytes(value.as_bytes())
+    .map_err(|_| invalid_field_value("MeasurementOrPercentValue", "value", value))
 }
 
 #[inline]
@@ -1388,11 +1294,9 @@ pub(crate) fn write_twips_measure_value<W: std::io::Write>(
   value: &crate::simple_type::TwipsMeasureValue,
 ) -> std::io::Result<()> {
   match value {
-    crate::simple_type::TwipsMeasureValue::UnsignedDecimalNumber(value) => {
-      write_escaped_text(writer, value)
-    }
-    crate::simple_type::TwipsMeasureValue::PositiveUniversalMeasure(value) => {
-      write_escaped_str(writer, value.as_str())
+    crate::simple_type::TwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
+    crate::simple_type::TwipsMeasureValue::UniversalMeasure(value) => {
+      write_escaped_str(writer, value.to_lexical().as_str())
     }
   }
 }
@@ -1403,11 +1307,9 @@ pub(crate) fn write_signed_twips_measure_value<W: std::io::Write>(
   value: &crate::simple_type::SignedTwipsMeasureValue,
 ) -> std::io::Result<()> {
   match value {
-    crate::simple_type::SignedTwipsMeasureValue::Integer(value) => {
-      write_escaped_text(writer, value)
-    }
+    crate::simple_type::SignedTwipsMeasureValue::Twips(value) => write_escaped_text(writer, value),
     crate::simple_type::SignedTwipsMeasureValue::UniversalMeasure(value) => {
-      write_escaped_str(writer, value.as_str())
+      write_escaped_str(writer, value.to_lexical().as_str())
     }
   }
 }
@@ -1421,9 +1323,10 @@ pub(crate) fn write_decimal_number_or_percent_value<W: std::io::Write>(
     crate::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value) => {
       write_escaped_text(writer, value)
     }
-    crate::simple_type::DecimalNumberOrPercentValue::Percent(value) => {
-      write_escaped_str(writer, value.as_str())
-    }
+    crate::simple_type::DecimalNumberOrPercentValue::Percent(value) => write_escaped_str(
+      writer,
+      crate::units::format_percent_lexical(*value).as_str(),
+    ),
   }
 }
 
@@ -1437,7 +1340,7 @@ pub(crate) fn write_measurement_or_percent_value<W: std::io::Write>(
       write_decimal_number_or_percent_value(writer, value)
     }
     crate::simple_type::MeasurementOrPercentValue::UniversalMeasure(value) => {
-      write_escaped_str(writer, value.as_str())
+      write_escaped_str(writer, value.to_lexical().as_str())
     }
   }
 }

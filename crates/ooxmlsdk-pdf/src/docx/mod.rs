@@ -26,9 +26,9 @@ use ooxmlsdk::schemas::{
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
 use ooxmlsdk::simple_type::{
-  DecimalNumberOrPercentValue, MeasurementOrPercentValue, SignedTwipsMeasureValue,
-  TwipsMeasureValue,
+  DrawingmlPercentageValue, MeasurementOrPercentValue, SignedTwipsMeasureValue, TwipsMeasureValue,
 };
+use ooxmlsdk::units as sdk_units;
 use quick_xml::Reader;
 use quick_xml::Writer;
 use quick_xml::escape::unescape;
@@ -52,8 +52,8 @@ const DEFAULT_TEXTBOX_MIN_HEIGHT_PT: f32 = 14.0;
 const DEFAULT_TEXTBOX_AUTO_FIT_WIDTH_PT: f32 = 200.0;
 // LibreOffice oox/source/shape/WpsContext.cxx uses the OOXML spec defaults:
 // left/right 91440 EMU, top/bottom 45720 EMU.
-const DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT: f32 = 91_440.0 / units::EMUS_PER_POINT;
-const DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT: f32 = 45_720.0 / units::EMUS_PER_POINT;
+const DEFAULT_TEXTBOX_LEFT_RIGHT_INSET_PT: f32 = 91_440.0 / sdk_units::EMUS_PER_POINT as f32;
+const DEFAULT_TEXTBOX_TOP_BOTTOM_INSET_PT: f32 = 45_720.0 / sdk_units::EMUS_PER_POINT as f32;
 const WML_DEFAULT_BORDER_WIDTH_PT: f32 = 0.5;
 const WML_MIN_BORDER_WIDTH_PT: f32 = 0.25;
 const DRAWINGML_DEFAULT_LINE_WIDTH_EMU: i64 = 0;
@@ -1129,39 +1129,30 @@ fn apply_drawingml_shade(color: RgbColor, amount: f32) -> RgbColor {
 }
 
 fn apply_drawingml_tint(color: RgbColor, amount: f32) -> RgbColor {
+  let scale = sdk_units::DRAWINGML_PERCENT_SCALE as f32;
   let red = drawingml_rgb_component_to_crgb(color.r);
   let green = drawingml_rgb_component_to_crgb(color.g);
   let blue = drawingml_rgb_component_to_crgb(color.b);
   RgbColor {
-    r: drawingml_crgb_component_to_rgb(
-      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - red as f32) * amount)
-        as i32,
-    ),
-    g: drawingml_crgb_component_to_rgb(
-      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - green as f32) * amount)
-        as i32,
-    ),
-    b: drawingml_crgb_component_to_rgb(
-      (units::DRAWINGML_PERCENT_SCALE - (units::DRAWINGML_PERCENT_SCALE - blue as f32) * amount)
-        as i32,
-    ),
+    r: drawingml_crgb_component_to_rgb((scale - (scale - red as f32) * amount) as i32),
+    g: drawingml_crgb_component_to_rgb((scale - (scale - green as f32) * amount) as i32),
+    b: drawingml_crgb_component_to_rgb((scale - (scale - blue as f32) * amount) as i32),
   }
 }
 
 fn drawingml_rgb_component_to_crgb(value: u8) -> i32 {
-  let component = i32::from(value) * units::DRAWINGML_PERCENT_SCALE as i32 / 255;
+  let component = i32::from(value) * sdk_units::DRAWINGML_PERCENT_SCALE / 255;
   drawingml_gamma(component, 2.3)
 }
 
 fn drawingml_crgb_component_to_rgb(value: i32) -> u8 {
   let component = drawingml_gamma(value, 1.0 / 2.3);
-  (component * 255 / units::DRAWINGML_PERCENT_SCALE as i32).clamp(0, 255) as u8
+  (component * 255 / sdk_units::DRAWINGML_PERCENT_SCALE).clamp(0, 255) as u8
 }
 
 fn drawingml_gamma(value: i32, gamma: f64) -> i32 {
-  ((f64::from(value) / f64::from(units::DRAWINGML_PERCENT_SCALE)).powf(gamma)
-    * f64::from(units::DRAWINGML_PERCENT_SCALE)
-    + 0.5) as i32
+  let scale = f64::from(sdk_units::DRAWINGML_PERCENT_SCALE);
+  ((f64::from(value) / scale).powf(gamma) * scale + 0.5) as i32
 }
 
 fn resolve_drawingml_scheme_color_name(
@@ -1200,16 +1191,16 @@ fn attr_value(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<B
 
 fn percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
   attr_value(event, key)?
-    .parse::<f32>()
+    .parse::<DrawingmlPercentageValue>()
     .ok()
-    .map(|value| (value / units::DRAWINGML_PERCENT_SCALE).clamp(0.0, 1.0))
+    .map(|value| (value.as_ratio() as f32).clamp(0.0, 1.0))
 }
 
 fn drawingml_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<f32> {
   attr_value(event, key)?
-    .parse::<f32>()
+    .parse::<DrawingmlPercentageValue>()
     .ok()
-    .map(|value| value / units::DRAWINGML_PERCENT_SCALE)
+    .map(|value| value.as_ratio() as f32)
 }
 
 fn alpha_percent_attr(event: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> f32 {
@@ -5788,25 +5779,25 @@ fn inline_image_impl(
 
 fn effect_extent_left(extent: Option<&wp::EffectExtent>) -> f32 {
   extent
-    .map(|extent| units::emu_to_points(extent.left_edge))
+    .map(|extent| units::emu_to_points(extent.left_edge.to_emu()))
     .unwrap_or(0.0)
 }
 
 fn effect_extent_top(extent: Option<&wp::EffectExtent>) -> f32 {
   extent
-    .map(|extent| units::emu_to_points(extent.top_edge))
+    .map(|extent| units::emu_to_points(extent.top_edge.to_emu()))
     .unwrap_or(0.0)
 }
 
 fn effect_extent_right(extent: Option<&wp::EffectExtent>) -> f32 {
   extent
-    .map(|extent| units::emu_to_points(extent.right_edge))
+    .map(|extent| units::emu_to_points(extent.right_edge.to_emu()))
     .unwrap_or(0.0)
 }
 
 fn effect_extent_bottom(extent: Option<&wp::EffectExtent>) -> f32 {
   extent
-    .map(|extent| units::emu_to_points(extent.bottom_edge))
+    .map(|extent| units::emu_to_points(extent.bottom_edge.to_emu()))
     .unwrap_or(0.0)
 }
 
@@ -9810,13 +9801,13 @@ fn vml_crop_fraction(value: Option<&str>) -> f32 {
       .trim()
       .parse::<f32>()
       .ok()
-      .map(|value| value / units::VML_PERCENT_SCALE)
+      .map(|value| value / sdk_units::VML_PERCENT_SCALE as f32)
   } else if let Some(fixed) = value.strip_suffix('f') {
     fixed
       .trim()
-      .parse::<f32>()
+      .parse::<sdk_units::VmlFixedValue>()
       .ok()
-      .map(|value| value / units::VML_FIXED_SCALE)
+      .map(|value| sdk_units::vml_fixed_to_ratio(value) as f32)
   } else {
     value.trim().parse::<f32>().ok()
   };
@@ -9946,9 +9937,9 @@ fn vml_rotation_degrees(value: &str) -> f32 {
   let rotation = if let Some(fixed) = value.strip_suffix("fd") {
     fixed
       .trim()
-      .parse::<f32>()
+      .parse::<sdk_units::VmlFixedValue>()
       .ok()
-      .map(|value| value / units::VML_FIXED_SCALE)
+      .map(|value| sdk_units::vml_fixed_to_ratio(value) as f32)
   } else {
     value.parse::<f32>().ok()
   };
@@ -10180,7 +10171,7 @@ fn image_crop_from_fill_rectangle(rect: &a::FillRectangle) -> ImageCrop {
 fn apply_image_transform(properties: &mut DrawingImageProperties, transform: &a::Transform2D) {
   properties.rotation_deg = transform
     .rotation
-    .map(|value| value as f32 / units::DRAWINGML_ANGLE_UNITS_PER_DEGREE)
+    .map(|value| sdk_units::drawingml_angle_to_degrees(value) as f32)
     .unwrap_or(0.0);
   properties.flip_horizontal = transform
     .horizontal_flip
@@ -11139,7 +11130,7 @@ fn opacity_from_w14_scheme_transforms(transforms: &[w14::SchemeColorChoice]) -> 
 }
 
 fn opacity_from_w14_alpha(alpha: Option<i32>) -> f32 {
-  let transparency = alpha.unwrap_or(0) as f32 / units::DRAWINGML_PERCENT_SCALE;
+  let transparency = sdk_units::drawingml_percent_to_ratio(alpha.unwrap_or(0)) as f32;
   (1.0 - transparency).clamp(0.0, 1.0)
 }
 
@@ -11148,16 +11139,16 @@ fn apply_w14_scheme_transforms(color: RgbColor, transforms: &[w14::SchemeColorCh
   for transform in transforms {
     match transform {
       w14::SchemeColorChoice::W14Tint(value) => {
-        hsl.apply_tint(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
+        hsl.apply_tint(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
       w14::SchemeColorChoice::W14Shade(value) => {
-        hsl.apply_shade(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
+        hsl.apply_shade(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
       w14::SchemeColorChoice::W14LumMod(value) => {
-        hsl.apply_luminance_mod(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
+        hsl.apply_luminance_mod(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
       w14::SchemeColorChoice::W14LumOff(value) => {
-        hsl.apply_luminance_offset(value.val as f32 / units::DRAWINGML_PERCENT_SCALE);
+        hsl.apply_luminance_offset(sdk_units::drawingml_percent_to_ratio(value.val) as f32);
       }
       _ => {}
     }
@@ -12575,21 +12566,11 @@ fn parse_hex_color(value: &str) -> Option<RgbColor> {
 }
 
 fn twips_measure_to_twips(value: &TwipsMeasureValue) -> Option<f32> {
-  match value {
-    TwipsMeasureValue::UnsignedDecimalNumber(value) => Some(*value as f32),
-    TwipsMeasureValue::PositiveUniversalMeasure(value) => {
-      universal_measure_to_points(value).map(units::points_to_twips)
-    }
-  }
+  Some(value.to_twips() as f32)
 }
 
 fn signed_twips_measure_to_twips(value: &SignedTwipsMeasureValue) -> Option<f32> {
-  match value {
-    SignedTwipsMeasureValue::Integer(value) => Some(*value as f32),
-    SignedTwipsMeasureValue::UniversalMeasure(value) => {
-      universal_measure_to_points(value).map(units::points_to_twips)
-    }
-  }
+  Some(value.to_twips() as f32)
 }
 
 fn twips_measure_to_points(value: &TwipsMeasureValue) -> Option<f32> {
@@ -12612,64 +12593,15 @@ fn table_margin_measurement_to_points(value: &MeasurementOrPercentValue) -> Opti
 }
 
 fn measurement_or_percent_to_twips(value: &MeasurementOrPercentValue) -> Option<f32> {
-  match value {
-    MeasurementOrPercentValue::DecimalNumberOrPercent(
-      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-    ) => Some(*value as f32),
-    MeasurementOrPercentValue::DecimalNumberOrPercent(
-      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(_),
-    ) => None,
-    MeasurementOrPercentValue::UniversalMeasure(value) => {
-      universal_measure_to_points(value).map(units::points_to_twips)
-    }
-  }
+  value.to_twips().map(|twips| twips as f32)
 }
 
 fn measurement_or_percent_to_percent(value: &MeasurementOrPercentValue) -> Option<f32> {
-  match value {
-    MeasurementOrPercentValue::DecimalNumberOrPercent(
-      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
-    ) => Some(*value as f32 / units::WORD_PERCENT_MEASURE_SCALE),
-    MeasurementOrPercentValue::DecimalNumberOrPercent(
-      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::Percent(value),
-    ) => value
-      .strip_suffix('%')
-      .and_then(|value| value.parse::<f32>().ok())
-      .map(|value| value / units::VML_PERCENT_SCALE),
-    MeasurementOrPercentValue::UniversalMeasure(_) => None,
-  }
+  value.as_word_ratio().map(|ratio| ratio as f32)
 }
 
-fn drawingml_percent_to_ratio(value: &DecimalNumberOrPercentValue) -> Option<f32> {
-  match value {
-    DecimalNumberOrPercentValue::DecimalNumber(value) => {
-      Some(*value as f32 / units::DRAWINGML_PERCENT_SCALE)
-    }
-    DecimalNumberOrPercentValue::Percent(value) => value
-      .strip_suffix('%')
-      .and_then(|value| value.parse::<f32>().ok())
-      .map(|value| value / units::VML_PERCENT_SCALE),
-  }
-}
-
-fn universal_measure_to_points(value: &str) -> Option<f32> {
-  let (number, unit) = value
-    .strip_suffix("mm")
-    .map(|number| (number, "mm"))
-    .or_else(|| value.strip_suffix("cm").map(|number| (number, "cm")))
-    .or_else(|| value.strip_suffix("in").map(|number| (number, "in")))
-    .or_else(|| value.strip_suffix("pt").map(|number| (number, "pt")))
-    .or_else(|| value.strip_suffix("pc").map(|number| (number, "pc")))
-    .or_else(|| value.strip_suffix("pi").map(|number| (number, "pi")))?;
-  let number = number.parse::<f32>().ok()?;
-  Some(match unit {
-    "mm" => units::millimeters_to_points(number),
-    "cm" => units::centimeters_to_points(number),
-    "in" => units::inches_to_points(number),
-    "pt" => number,
-    "pc" | "pi" => number * units::POINTS_PER_PICA,
-    _ => return None,
-  })
+fn drawingml_percent_to_ratio(value: &DrawingmlPercentageValue) -> Option<f32> {
+  Some(value.as_ratio() as f32)
 }
 
 fn page_setup(section: &w::SectionProperties) -> PageSetup {
@@ -12819,12 +12751,12 @@ mod tests {
   use super::*;
 
   fn twips(value: u32) -> TwipsMeasureValue {
-    TwipsMeasureValue::UnsignedDecimalNumber(value)
+    TwipsMeasureValue::Twips(value as u64)
   }
 
   fn measurement(value: i32) -> MeasurementOrPercentValue {
     MeasurementOrPercentValue::DecimalNumberOrPercent(
-      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value),
+      ooxmlsdk::simple_type::DecimalNumberOrPercentValue::DecimalNumber(value.into()),
     )
   }
 

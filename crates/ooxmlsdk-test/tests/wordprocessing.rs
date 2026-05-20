@@ -93,8 +93,8 @@ fn twips_measure_attr_preserves_universal_measure_variant() {
   let columns: Columns = r#"<w:cols w:space="1.5in"></w:cols>"#.parse().unwrap();
   assert_eq!(
     columns.space,
-    Some(TwipsMeasureValue::PositiveUniversalMeasure(
-      "1.5in".to_string()
+    Some(TwipsMeasureValue::UniversalMeasure(
+      ooxmlsdk::simple_type::UniversalMeasureValue::Inches(1_371_600)
     ))
   );
 
@@ -102,10 +102,7 @@ fn twips_measure_attr_preserves_universal_measure_variant() {
   assert!(xml.contains(r#"w:space="1.5in""#));
 
   let numeric: Columns = r#"<w:cols w:space="720"></w:cols>"#.parse().unwrap();
-  assert_eq!(
-    numeric.space,
-    Some(TwipsMeasureValue::UnsignedDecimalNumber(720))
-  );
+  assert_eq!(numeric.space, Some(TwipsMeasureValue::Twips(720)));
 }
 
 #[cfg(not(feature = "mce"))]

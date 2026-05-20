@@ -17,7 +17,9 @@ use ooxmlsdk::parts::{
 use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
+  schemas_microsoft_com_office_word_2010_wordprocessing_shape as wps,
   schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
 };
@@ -7724,7 +7726,8 @@ fn drawingml_picture_image_from_fragment(
   images: &ImageCatalog,
   hyperlinks: &HyperlinkCatalog,
 ) -> Option<InlineImage> {
-  let properties = drawing_image_properties_from_xml(xml, &styles.theme_colors)?;
+  let picture = pic::Picture::from_bytes(xml.as_bytes()).ok()?;
+  let properties = drawing_picture_image_properties(&picture, &styles.theme_colors)?;
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &properties);
@@ -7750,14 +7753,14 @@ fn drawingml_picture_image_from_fragment(
     rotation_deg: properties.rotation_deg,
     flip_horizontal: properties.flip_horizontal,
     flip_vertical: properties.flip_vertical,
-    alt_text: drawingml_picture_alt_text(xml),
+    alt_text: drawingml_picture_alt_text(&picture),
     hyperlink_url,
     placement: drawingml_child_placement(placement, offset_x_pt, offset_y_pt),
   })
 }
 
 fn drawingml_shape_image_fill(sp_pr: &str, images: &ImageCatalog) -> Option<InlineShapeImageFill> {
-  let properties = drawing_image_properties_from_xml(sp_pr, &ThemeColors::default())?;
+  let properties = drawing_shape_image_properties_from_fragment(sp_pr, &ThemeColors::default())?;
   let relationship_id = properties.relationship_id.as_deref()?;
   let resource = images.by_relationship_id.get(relationship_id)?;
   let image_data = image_data_with_effects(resource, &properties);
@@ -7864,25 +7867,14 @@ fn mso_brightness_contrast_component(value: u8, brightness: i32, contrast: i32) 
     .clamp(0.0, 255.0) as u8
 }
 
-fn drawingml_picture_alt_text(xml: &str) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"cNvPr") =>
-      {
-        if let Some(description) = attr_value(&event, b"descr") {
-          return Some(description.to_string());
-        }
-        if let Some(name) = attr_value(&event, b"name") {
-          return Some(name.to_string());
-        }
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
+fn drawingml_picture_alt_text(picture: &pic::Picture) -> Option<String> {
+  let properties = &picture
+    .non_visual_picture_properties
+    .non_visual_drawing_properties;
+  properties
+    .description
+    .clone()
+    .or_else(|| Some(properties.name.clone()))
 }
 
 fn drawingml_child_placement(
@@ -9688,182 +9680,324 @@ fn drawing_image_properties(
   if graphic_data.uri != "http://schemas.openxmlformats.org/drawingml/2006/picture" {
     return None;
   }
-  graphic_data
-    .xml_children
+  graphic_data.xml_children.iter().find_map(|child| {
+    pic::Picture::from_bytes(child.as_bytes())
+      .ok()
+      .and_then(|picture| drawing_picture_image_properties(&picture, theme_colors))
+  })
+}
+
+fn drawing_picture_image_properties(
+  picture: &pic::Picture,
+  theme_colors: &ThemeColors,
+) -> Option<DrawingImageProperties> {
+  let mut properties = DrawingImageProperties {
+    relationship_id: picture.blip_fill.blip.as_ref()?.embed.clone(),
+    hyperlink_relationship_id: picture
+      .non_visual_picture_properties
+      .non_visual_drawing_properties
+      .hyperlink_on_click
+      .as_ref()
+      .and_then(|hyperlink| hyperlink.id.clone()),
+    ..DrawingImageProperties::default()
+  };
+
+  if let Some(crop) = picture
+    .blip_fill
+    .blip_fill_choice
+    .as_ref()
+    .and_then(|choice| match choice {
+      pic::BlipFillChoice::AStretch(stretch) => stretch.fill_rectangle.as_ref(),
+      pic::BlipFillChoice::ATile(_) => None,
+    })
+    .map(image_crop_from_fill_rectangle)
+    .or_else(|| {
+      picture
+        .blip_fill
+        .source_rectangle
+        .as_ref()
+        .map(image_crop_from_source_rectangle)
+    })
+  {
+    properties.crop = crop;
+  }
+
+  if let Some(transform) = picture.shape_properties.transform2_d.as_ref() {
+    apply_image_transform(&mut properties, transform);
+  }
+
+  if let Some(blip) = picture.blip_fill.blip.as_ref() {
+    apply_image_effects_from_blip(&mut properties, blip, theme_colors);
+  }
+
+  Some(properties)
+}
+
+fn drawing_shape_image_properties_from_fragment(
+  xml: &str,
+  theme_colors: &ThemeColors,
+) -> Option<DrawingImageProperties> {
+  if let Ok(properties) = a::ShapeProperties::from_bytes(xml.as_bytes())
+    && let Some(a::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+      properties.shape_properties_choice2.as_ref()
+  {
+    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
+  }
+
+  if let Ok(properties) = pic::ShapeProperties::from_bytes(xml.as_bytes())
+    && let Some(pic::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+      properties.shape_properties_choice2.as_ref()
+  {
+    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
+  }
+
+  if let Ok(properties) = wps::ShapeProperties::from_bytes(xml.as_bytes())
+    && let Some(wps::ShapePropertiesChoice2::ABlipFill(blip_fill)) =
+      properties.shape_properties_choice2.as_ref()
+  {
+    return drawing_blip_fill_image_properties(blip_fill, theme_colors);
+  }
+
+  None
+}
+
+fn drawing_blip_fill_image_properties(
+  blip_fill: &a::BlipFill,
+  theme_colors: &ThemeColors,
+) -> Option<DrawingImageProperties> {
+  let mut properties = DrawingImageProperties {
+    relationship_id: blip_fill.blip.as_ref()?.embed.clone(),
+    ..DrawingImageProperties::default()
+  };
+
+  if let Some(crop) = blip_fill
+    .blip_fill_choice
+    .as_ref()
+    .and_then(|choice| match choice {
+      a::BlipFillChoice::AStretch(stretch) => stretch.fill_rectangle.as_ref(),
+      a::BlipFillChoice::ATile(_) => None,
+    })
+    .map(image_crop_from_fill_rectangle)
+    .or_else(|| {
+      blip_fill
+        .source_rectangle
+        .as_ref()
+        .map(image_crop_from_source_rectangle)
+    })
+  {
+    properties.crop = crop;
+  }
+
+  if let Some(blip) = blip_fill.blip.as_ref() {
+    apply_image_effects_from_blip(&mut properties, blip, theme_colors);
+  }
+
+  Some(properties)
+}
+
+fn image_crop_from_source_rectangle(rect: &a::SourceRectangle) -> ImageCrop {
+  ImageCrop {
+    left: rect
+      .left
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    top: rect
+      .top
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    right: rect
+      .right
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    bottom: rect
+      .bottom
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+  }
+}
+
+fn image_crop_from_fill_rectangle(rect: &a::FillRectangle) -> ImageCrop {
+  ImageCrop {
+    left: rect
+      .left
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    top: rect
+      .top
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    right: rect
+      .right
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+    bottom: rect
+      .bottom
+      .as_ref()
+      .and_then(drawingml_percent_to_ratio)
+      .unwrap_or(0.0),
+  }
+}
+
+fn apply_image_transform(properties: &mut DrawingImageProperties, transform: &a::Transform2D) {
+  properties.rotation_deg = transform
+    .rotation
+    .map(|value| value as f32 / units::DRAWINGML_ANGLE_UNITS_PER_DEGREE)
+    .unwrap_or(0.0);
+  properties.flip_horizontal = transform
+    .horizontal_flip
+    .as_ref()
+    .is_some_and(|value| value.as_bool());
+  properties.flip_vertical = transform
+    .vertical_flip
+    .as_ref()
+    .is_some_and(|value| value.as_bool());
+}
+
+fn apply_image_effects_from_blip(
+  properties: &mut DrawingImageProperties,
+  blip: &a::Blip,
+  theme_colors: &ThemeColors,
+) {
+  for choice in &blip.blip_choice {
+    match choice {
+      a::BlipChoice::AGrayscl => properties.effects.grayscale = true,
+      a::BlipChoice::ALum(luminance) => {
+        properties.effects.brightness = luminance
+          .brightness
+          .as_ref()
+          .and_then(drawingml_percent_to_ratio)
+          .map(drawingml_ratio_to_effect_percent);
+        properties.effects.contrast = luminance
+          .contrast
+          .as_ref()
+          .and_then(drawingml_percent_to_ratio)
+          .map(drawingml_ratio_to_effect_percent);
+      }
+      a::BlipChoice::ADuotone(duotone) => {
+        if let Some(colors) = image_duotone_colors_from_model(duotone, theme_colors) {
+          properties.effects.duotone = Some(colors);
+        }
+      }
+      _ => {}
+    }
+  }
+}
+
+fn drawingml_ratio_to_effect_percent(value: f32) -> i32 {
+  (value * 100.0).round() as i32
+}
+
+fn image_duotone_colors_from_model(
+  duotone: &a::Duotone,
+  theme_colors: &ThemeColors,
+) -> Option<(RgbColor, RgbColor)> {
+  let colors = duotone
+    .duotone_choice
     .iter()
-    .find_map(|child| drawing_image_properties_from_xml(child, theme_colors))
+    .filter_map(|choice| drawingml_duotone_color(choice, theme_colors))
+    .collect::<Vec<_>>();
+  Some((colors.first().copied()?, colors.get(1).copied()?))
+}
+
+fn drawingml_duotone_color(
+  choice: &a::DuotoneChoice,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match choice {
+    a::DuotoneChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
+    a::DuotoneChoice::ASchemeClr(color) => resolve_drawingml_scheme_color(color, theme_colors),
+    a::DuotoneChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+    _ => None,
+  }
+}
+
+fn resolve_drawingml_scheme_color(
+  color: &a::SchemeColor,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  let mut resolved = resolve_drawingml_scheme_color_value(color.val, theme_colors)?;
+  for transform in &color.scheme_color_choice {
+    match transform {
+      a::SchemeColorChoice::ATint(value) => {
+        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
+          resolved = apply_drawingml_tint(resolved, amount);
+        }
+      }
+      a::SchemeColorChoice::AShade(value) => {
+        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
+          resolved = apply_drawingml_shade(resolved, amount);
+        }
+      }
+      a::SchemeColorChoice::ASatMod(value) => {
+        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
+          let mut hsl = HslColor::from_rgb(resolved);
+          hsl.apply_saturation_mod(amount);
+          resolved = hsl.to_rgb();
+        }
+      }
+      a::SchemeColorChoice::ALumMod(value) => {
+        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
+          let mut hsl = HslColor::from_rgb(resolved);
+          hsl.apply_luminance_mod(amount);
+          resolved = hsl.to_rgb();
+        }
+      }
+      a::SchemeColorChoice::ALumOff(value) => {
+        if let Some(amount) = drawingml_percent_to_ratio(&value.val) {
+          let mut hsl = HslColor::from_rgb(resolved);
+          hsl.apply_luminance_offset(amount);
+          resolved = hsl.to_rgb();
+        }
+      }
+      _ => {}
+    }
+  }
+  Some(resolved)
+}
+
+fn resolve_drawingml_scheme_color_value(
+  value: a::SchemeColorValues,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match value {
+    a::SchemeColorValues::Dark1 | a::SchemeColorValues::Text1 => theme_colors.dark1,
+    a::SchemeColorValues::Light1 | a::SchemeColorValues::Background1 => theme_colors.light1,
+    a::SchemeColorValues::Dark2 | a::SchemeColorValues::Text2 => theme_colors.dark2,
+    a::SchemeColorValues::Light2 | a::SchemeColorValues::Background2 => theme_colors.light2,
+    a::SchemeColorValues::Accent1 => theme_colors.accent1,
+    a::SchemeColorValues::Accent2 => theme_colors.accent2,
+    a::SchemeColorValues::Accent3 => theme_colors.accent3,
+    a::SchemeColorValues::Accent4 => theme_colors.accent4,
+    a::SchemeColorValues::Accent5 => theme_colors.accent5,
+    a::SchemeColorValues::Accent6 => theme_colors.accent6,
+    a::SchemeColorValues::Hyperlink => theme_colors.hyperlink,
+    a::SchemeColorValues::FollowedHyperlink => theme_colors.followed_hyperlink,
+    a::SchemeColorValues::PhColor => None,
+  }
+}
+
+fn drawingml_preset_color_value(value: a::PresetColorValues) -> Option<RgbColor> {
+  match value {
+    a::PresetColorValues::White => Some(RgbColor {
+      r: 255,
+      g: 255,
+      b: 255,
+    }),
+    a::PresetColorValues::Black => Some(RgbColor { r: 0, g: 0, b: 0 }),
+    _ => None,
+  }
 }
 
 fn decode_xml_attr_value(attr: &Attribute<'_>, decoder: quick_xml::Decoder) -> Option<String> {
   let decoded = decoder.decode(attr.value.as_ref()).ok()?;
   Some(unescape(&decoded).ok()?.into_owned())
-}
-
-fn drawing_image_properties_from_xml(
-  xml: &str,
-  theme_colors: &ThemeColors,
-) -> Option<DrawingImageProperties> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(true);
-  let mut properties = DrawingImageProperties::default();
-  loop {
-    match reader.read_event().ok()? {
-      Event::Empty(event) | Event::Start(event) if event.name().as_ref().ends_with(b":blip") => {
-        for attr in event.attributes().with_checks(false).flatten() {
-          if attr.key.as_ref().ends_with(b":embed") || attr.key.as_ref() == b"embed" {
-            properties.relationship_id = decode_xml_attr_value(&attr, reader.decoder());
-          }
-        }
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"hlinkClick") =>
-      {
-        for attr in event.attributes().with_checks(false).flatten() {
-          if attr.key.as_ref().ends_with(b":id") || attr.key.as_ref() == b"id" {
-            properties.hyperlink_relationship_id = decode_xml_attr_value(&attr, reader.decoder());
-          }
-        }
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"srcRect") =>
-      {
-        properties.crop = image_crop_from_relative_rect(&event, reader.decoder());
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"fillRect") =>
-      {
-        properties.crop = image_crop_from_relative_rect(&event, reader.decoder());
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"xfrm") =>
-      {
-        apply_image_transform_attrs(&mut properties, &event, reader.decoder());
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"lum") =>
-      {
-        apply_image_luminance_attrs(&mut properties, &event, reader.decoder());
-      }
-      Event::Empty(event) | Event::Start(event)
-        if qname_ends_with(event.name().as_ref(), b"grayscl") =>
-      {
-        properties.effects.grayscale = true;
-      }
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"duotone") => {
-        if let Some(fragment) = read_outer_xml_fragment(&mut reader, event)
-          && let Some(duotone) = image_duotone_colors(&fragment, theme_colors)
-        {
-          properties.effects.duotone = Some(duotone);
-        }
-      }
-      Event::Eof => return properties.relationship_id.is_some().then_some(properties),
-      _ => {}
-    }
-  }
-}
-
-fn image_crop_from_relative_rect(
-  event: &quick_xml::events::BytesStart<'_>,
-  decoder: quick_xml::Decoder,
-) -> ImageCrop {
-  let mut crop = ImageCrop::default();
-  for attr in event.attributes().with_checks(false).flatten() {
-    let value = decode_xml_attr_value(&attr, decoder)
-      .as_deref()
-      .and_then(|value| value.parse::<i32>().ok())
-      .map(relative_rect_attr_to_fraction)
-      .unwrap_or(0.0);
-    match attr.key.as_ref() {
-      b"l" => crop.left = value,
-      b"t" => crop.top = value,
-      b"r" => crop.right = value,
-      b"b" => crop.bottom = value,
-      _ => {}
-    }
-  }
-  crop
-}
-
-fn apply_image_transform_attrs(
-  properties: &mut DrawingImageProperties,
-  event: &quick_xml::events::BytesStart<'_>,
-  decoder: quick_xml::Decoder,
-) {
-  for attr in event.attributes().with_checks(false).flatten() {
-    let value = decode_xml_attr_value(&attr, decoder);
-    match attr.key.as_ref() {
-      b"rot" => {
-        properties.rotation_deg = value
-          .as_deref()
-          .and_then(|value| value.parse::<i32>().ok())
-          .map(|value| value as f32 / units::DRAWINGML_ANGLE_UNITS_PER_DEGREE)
-          .unwrap_or(0.0);
-      }
-      b"flipH" => properties.flip_horizontal = value.as_deref().is_some_and(xml_bool),
-      b"flipV" => properties.flip_vertical = value.as_deref().is_some_and(xml_bool),
-      _ => {}
-    }
-  }
-}
-
-fn apply_image_luminance_attrs(
-  properties: &mut DrawingImageProperties,
-  event: &quick_xml::events::BytesStart<'_>,
-  decoder: quick_xml::Decoder,
-) {
-  for attr in event.attributes().with_checks(false).flatten() {
-    let value = decode_xml_attr_value(&attr, decoder).and_then(|value| value.parse::<i32>().ok());
-    match attr.key.as_ref() {
-      b"bright" => properties.effects.brightness = value.map(|value| value / 1000),
-      b"contrast" => properties.effects.contrast = value.map(|value| value / 1000),
-      _ => {}
-    }
-  }
-}
-
-fn image_duotone_colors(xml: &str, theme_colors: &ThemeColors) -> Option<(RgbColor, RgbColor)> {
-  let mut colors = Vec::new();
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        colors.push(resolve_scheme_color_from_reader(&mut reader, event, theme_colors)?.color);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        colors.push(resolve_empty_scheme_color(&event, theme_colors)?.color);
-      }
-      Event::Empty(event) if qname_ends_with(event.name().as_ref(), b"prstClr") => {
-        colors.push(drawingml_preset_color(&event)?);
-      }
-      Event::Eof => break,
-      _ => {}
-    }
-  }
-
-  Some((colors.first().copied()?, colors.get(1).copied()?))
-}
-
-fn drawingml_preset_color(event: &quick_xml::events::BytesStart<'_>) -> Option<RgbColor> {
-  match attr_value(event, b"val")?.as_ref() {
-    "white" => Some(RgbColor {
-      r: 255,
-      g: 255,
-      b: 255,
-    }),
-    "black" => Some(RgbColor { r: 0, g: 0, b: 0 }),
-    _ => None,
-  }
-}
-
-fn relative_rect_attr_to_fraction(value: i32) -> f32 {
-  (value as f32 / units::DRAWINGML_PERCENT_SCALE)
-    .clamp(0.0, units::DRAWINGML_MAX_FRACTION_BELOW_ONE)
-}
-
-fn xml_bool(value: &str) -> bool {
-  matches!(value, "1" | "true" | "t" | "on")
 }
 
 fn drawing_textbox_content(xml: &str) -> Option<w::TextBoxContent> {
@@ -12381,10 +12515,11 @@ mod tests {
 
   #[test]
   fn drawing_image_properties_preserve_crop_and_transform() {
-    let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
+    let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:nvPicPr><pic:cNvPr id="1" name="Picture 1"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
-    let properties =
-      drawing_image_properties_from_xml(xml, &ThemeColors::default()).expect("image properties");
+    let picture = pic::Picture::from_bytes(xml.as_bytes()).expect("picture");
+    let properties = drawing_picture_image_properties(&picture, &ThemeColors::default())
+      .expect("image properties");
 
     assert_eq!(properties.relationship_id.as_deref(), Some("rId7"));
     assert!((properties.crop.left - 0.1).abs() < 0.001);

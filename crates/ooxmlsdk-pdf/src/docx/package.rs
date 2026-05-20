@@ -2,13 +2,15 @@ use std::collections::HashMap;
 
 use ooxmlsdk::common::RelationshipTargetKind;
 use ooxmlsdk::parts::{
-  chart_part::ChartPart, endnotes_part::EndnotesPart, footer_part::FooterPart,
-  footnotes_part::FootnotesPart, header_part::HeaderPart, image_part::ImagePart,
-  main_document_part::MainDocumentPart, numbering_definitions_part::NumberingDefinitionsPart,
+  chart_part::ChartPart, diagram_colors_part::DiagramColorsPart,
+  diagram_data_part::DiagramDataPart, diagram_persist_layout_part::DiagramPersistLayoutPart,
+  endnotes_part::EndnotesPart, footer_part::FooterPart, footnotes_part::FootnotesPart,
+  header_part::HeaderPart, image_part::ImagePart, main_document_part::MainDocumentPart,
+  numbering_definitions_part::NumberingDefinitionsPart,
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
-use ooxmlsdk::sdk::SdkPart;
+use ooxmlsdk::sdk::{RelatedPart, SdkPart};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
@@ -58,87 +60,68 @@ pub(super) struct ImageResource {
 
 impl ImageCatalog {
   pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
-    let mut catalog = Self::from_image_parts(package, main.image_parts(package), |image_part| {
-      main.get_id_of_part(package, image_part)
-    });
+    let mut catalog = Self::from_image_parts(package, main.related_parts_of_type(package));
     catalog.charts_by_relationship_id =
-      Self::chart_parts(package, main.chart_parts(package), |chart_part| {
-        main.get_id_of_part(package, chart_part)
-      });
-    catalog.diagram_colors_by_relationship_id =
-      Self::xml_parts(package, main.diagram_colors_parts(package), |part| {
-        main.get_id_of_part(package, part)
-      });
-    catalog.diagram_data_by_relationship_id =
-      Self::xml_parts(package, main.diagram_data_parts(package), |part| {
-        main.get_id_of_part(package, part)
-      });
+      Self::chart_parts(package, main.related_parts_of_type(package));
+    catalog.diagram_colors_by_relationship_id = Self::xml_parts(
+      package,
+      main.related_parts_of_type::<_, DiagramColorsPart>(package),
+    );
+    catalog.diagram_data_by_relationship_id = Self::xml_parts(
+      package,
+      main.related_parts_of_type::<_, DiagramDataPart>(package),
+    );
     catalog.diagram_drawings_by_relationship_id = Self::xml_parts(
       package,
-      main.diagram_persist_layout_parts(package),
-      |part| main.get_id_of_part(package, part),
+      main.related_parts_of_type::<_, DiagramPersistLayoutPart>(package),
     );
     catalog
   }
 
   pub(super) fn load_from_header(package: &WordprocessingDocument, header: &HeaderPart) -> Self {
-    Self::from_image_parts(package, header.image_parts(package), |image_part| {
-      header.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, header.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_footer(package: &WordprocessingDocument, footer: &FooterPart) -> Self {
-    Self::from_image_parts(package, footer.image_parts(package), |image_part| {
-      footer.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, footer.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_footnotes(
     package: &WordprocessingDocument,
     footnotes: &FootnotesPart,
   ) -> Self {
-    Self::from_image_parts(package, footnotes.image_parts(package), |image_part| {
-      footnotes.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, footnotes.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_endnotes(
     package: &WordprocessingDocument,
     endnotes: &EndnotesPart,
   ) -> Self {
-    Self::from_image_parts(package, endnotes.image_parts(package), |image_part| {
-      endnotes.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, endnotes.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_comments(
     package: &WordprocessingDocument,
     comments: &WordprocessingCommentsPart,
   ) -> Self {
-    Self::from_image_parts(package, comments.image_parts(package), |image_part| {
-      comments.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, comments.related_parts_of_type(package))
   }
 
   pub(super) fn load_from_numbering(
     package: &WordprocessingDocument,
     numbering: &NumberingDefinitionsPart,
   ) -> Self {
-    Self::from_image_parts(package, numbering.image_parts(package), |image_part| {
-      numbering.get_id_of_part(package, image_part)
-    })
+    Self::from_image_parts(package, numbering.related_parts_of_type(package))
   }
 
   fn from_image_parts<'a>(
     package: &WordprocessingDocument,
-    image_parts: impl Iterator<Item = ImagePart> + 'a,
-    relationship_id: impl Fn(&ImagePart) -> Option<&'a str>,
+    image_parts: impl Iterator<Item = RelatedPart<'a, ImagePart>> + 'a,
   ) -> Self {
     let mut by_relationship_id = HashMap::new();
-    for image_part in image_parts {
-      let Some(relationship_id) = relationship_id(&image_part) else {
-        continue;
-      };
+    for related_part in image_parts {
+      let relationship_id = related_part.relationship_id();
+      let image_part = related_part.part();
       let Some(data) = image_part.data_to_vec(package) else {
         continue;
       };
@@ -162,25 +145,22 @@ impl ImageCatalog {
 
   fn chart_parts<'a>(
     package: &WordprocessingDocument,
-    chart_parts: impl Iterator<Item = ChartPart> + 'a,
-    relationship_id: impl Fn(&ChartPart) -> Option<&'a str>,
+    chart_parts: impl Iterator<Item = RelatedPart<'a, ChartPart>> + 'a,
   ) -> HashMap<String, String> {
-    Self::xml_parts(package, chart_parts, relationship_id)
+    Self::xml_parts(package, chart_parts)
   }
 
   fn xml_parts<'a, P>(
     package: &WordprocessingDocument,
-    parts: impl Iterator<Item = P> + 'a,
-    relationship_id: impl Fn(&P) -> Option<&'a str>,
+    parts: impl Iterator<Item = RelatedPart<'a, P>> + 'a,
   ) -> HashMap<String, String>
   where
     P: SdkPart,
   {
     let mut by_relationship_id = HashMap::new();
-    for part in parts {
-      let Some(relationship_id) = relationship_id(&part) else {
-        continue;
-      };
+    for related_part in parts {
+      let relationship_id = related_part.relationship_id();
+      let part = related_part.part();
       let Some(data) = part.data_to_vec(package) else {
         continue;
       };

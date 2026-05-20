@@ -1075,6 +1075,13 @@ fn package_relationship_method_tokens(
     }
 
     #[inline]
+    pub fn related_parts_of_type<T: crate::sdk::SdkPart>(
+      &self,
+    ) -> impl Iterator<Item = crate::sdk::RelatedPart<'_, T>> + '_ {
+      crate::sdk::SdkPackage::related_parts_of_type(self)
+    }
+
+    #[inline]
     pub fn get_id_of_part<T: crate::sdk::SdkPart>(&self, part: &T) -> Option<&str> {
       crate::sdk::SdkPackage::get_id_of_part(self, part)
     }

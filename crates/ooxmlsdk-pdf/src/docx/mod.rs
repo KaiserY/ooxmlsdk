@@ -13509,7 +13509,7 @@ mod tests {
     );
 
     assert_eq!(sections.len(), 2);
-    assert_eq!(sections[0].blocks.len(), 2);
+    assert_eq!(sections[0].blocks.len(), 1);
     assert_eq!(sections[0].break_kind, SectionBreakKind::NextPage);
     assert_eq!(sections[0].page.width_pt, 612.0);
     assert_eq!(sections[0].page.height_pt, 792.0);

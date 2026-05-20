@@ -3890,10 +3890,8 @@ mod tests {
 
   #[test]
   fn lowers_openxml_empty_element_fields_to_unit_fields() {
-    let schema = read_codegen_ir_schema_json(
-      "../../sdk_data/schemas/schemas_microsoft_com_office_drawing_2013_main_command.json",
-    );
-    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+    let generated =
+      render_workspace_schema("schemas_microsoft_com_office_drawing_2013_main_command");
 
     assert!(
       generated.contains("# [sdk (empty_child (office2016 , qname = \"oac:CT_Empty/oac:fill\"))]")
@@ -3920,10 +3918,7 @@ mod tests {
 
   #[test]
   fn omits_abstract_empty_base_types_without_element_name() {
-    let schema = read_codegen_ir_schema_json(
-      "../../sdk_data/schemas/schemas_microsoft_com_office_powerpoint_2022_08_main.json",
-    );
-    let generated = gen_schema_from_ir(&schema, false).unwrap().to_string();
+    let generated = render_workspace_schema("schemas_microsoft_com_office_powerpoint_2022_08_main");
 
     assert!(!generated.contains("pub struct EmptyType"));
     assert!(
@@ -3981,6 +3976,24 @@ mod tests {
     let codegen_context = CodegenContext::new(leaked_schemas);
 
     (leaked_schemas, codegen_context)
+  }
+
+  fn render_workspace_schema(module_name: &str) -> String {
+    let (schemas, context) = load_workspace_codegen_inputs();
+    let ir_modules: Vec<_> = schemas
+      .iter()
+      .map(|schema| build_codegen_ir(schema, &context).expect("build ir"))
+      .collect();
+    let ir_refs: Vec<_> = ir_modules.iter().collect();
+    let type_graph = TypeContainmentGraph::from_modules(&ir_refs);
+    let ir = ir_modules
+      .iter()
+      .find(|ir| ir.module_name == module_name)
+      .expect("schema module");
+
+    gen_schema_from_ir_with_type_graph(ir, false, &type_graph)
+      .expect("render schema")
+      .to_string()
   }
 
   #[test]

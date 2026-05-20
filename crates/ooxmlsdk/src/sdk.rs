@@ -1666,6 +1666,20 @@ pub trait SdkPackage: Clone + Sized + 'static {
   }
 
   #[inline]
+  fn related_parts_of_type<T: SdkPart>(&self) -> impl Iterator<Item = RelatedPart<'_, T>> + '_
+  where
+    Self: Sized,
+  {
+    let storage = crate::sdk::SdkPackage::storage(self);
+    crate::sdk::SdkPackage::relationships(self)
+      .part_relationships()
+      .filter_map(move |relationship| {
+        relationship_target_as_part::<T>(storage, relationship)
+          .map(|part| RelatedPart::new(relationship.id(), relationship.relationship_type(), part))
+      })
+  }
+
+  #[inline]
   fn get_id_of_part<T: SdkPart>(&self, part: &T) -> Option<&str> {
     let target_part_id = part.part_id();
     crate::sdk::SdkPackage::relationships(self)
@@ -2123,6 +2137,46 @@ pub trait SdkPackage: Clone + Sized + 'static {
 }
 
 #[cfg(feature = "parts")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelatedPart<'a, T> {
+  relationship_id: &'a str,
+  relationship_type: &'a str,
+  part: T,
+}
+
+#[cfg(feature = "parts")]
+impl<'a, T> RelatedPart<'a, T> {
+  #[inline]
+  pub const fn new(relationship_id: &'a str, relationship_type: &'a str, part: T) -> Self {
+    Self {
+      relationship_id,
+      relationship_type,
+      part,
+    }
+  }
+
+  #[inline]
+  pub const fn relationship_id(&self) -> &'a str {
+    self.relationship_id
+  }
+
+  #[inline]
+  pub const fn relationship_type(&self) -> &'a str {
+    self.relationship_type
+  }
+
+  #[inline]
+  pub const fn part(&self) -> &T {
+    &self.part
+  }
+
+  #[inline]
+  pub fn into_part(self) -> T {
+    self.part
+  }
+}
+
+#[cfg(feature = "parts")]
 pub trait SdkPart: Clone + Sized + 'static {
   const RELATIONSHIP_TYPE: &'static str;
   const PATH_PREFIX: &'static str;
@@ -2213,19 +2267,9 @@ pub trait SdkPart: Clone + Sized + 'static {
     P: SdkPackage,
     T: SdkPart,
   {
-    crate::sdk::SdkPackage::storage(package)
-      .relationships(self.part_id())
-      .into_iter()
-      .flat_map(|relationships| relationships.iter())
-      .find_map(|relationship| {
-        crate::common::relationship_type_matches(
-          relationship.relationship_type(),
-          relationship_type,
-        )
-        .then(|| relationship.target_part_id())
-        .flatten()
-        .map(|part_id| T::from_relationship_id(relationship.id(), part_id))
-      })
+    self
+      .child_related_part_by_relationship_type(package, relationship_type)
+      .map(RelatedPart::into_part)
   }
 
   #[inline]
@@ -2234,6 +2278,57 @@ pub trait SdkPart: Clone + Sized + 'static {
     package: &'a P,
     relationship_type: &'a str,
   ) -> impl Iterator<Item = T> + 'a
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    self
+      .child_related_parts_by_relationship_type(package, relationship_type)
+      .map(RelatedPart::into_part)
+  }
+
+  #[inline]
+  fn related_part_of_type<'a, P, T>(&'a self, package: &'a P) -> Option<RelatedPart<'a, T>>
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    self.child_related_part_by_relationship_type(package, T::RELATIONSHIP_TYPE)
+  }
+
+  #[inline]
+  fn related_parts_of_type<'a, P, T>(
+    &'a self,
+    package: &'a P,
+  ) -> impl Iterator<Item = RelatedPart<'a, T>> + 'a
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    self.child_related_parts_by_relationship_type(package, T::RELATIONSHIP_TYPE)
+  }
+
+  #[inline]
+  fn child_related_part_by_relationship_type<'a, P, T>(
+    &'a self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> Option<RelatedPart<'a, T>>
+  where
+    P: SdkPackage,
+    T: SdkPart,
+  {
+    self
+      .child_related_parts_by_relationship_type(package, relationship_type)
+      .next()
+  }
+
+  #[inline]
+  fn child_related_parts_by_relationship_type<'a, P, T>(
+    &'a self,
+    package: &'a P,
+    relationship_type: &'a str,
+  ) -> impl Iterator<Item = RelatedPart<'a, T>> + 'a
   where
     P: SdkPackage,
     T: SdkPart,
@@ -2249,7 +2344,13 @@ pub trait SdkPart: Clone + Sized + 'static {
         )
         .then(|| relationship.target_part_id())
         .flatten()
-        .map(|part_id| T::from_relationship_id(relationship.id(), part_id))
+        .map(|part_id| {
+          RelatedPart::new(
+            relationship.id(),
+            relationship.relationship_type(),
+            T::from_relationship_id(relationship.id(), part_id),
+          )
+        })
       })
   }
 

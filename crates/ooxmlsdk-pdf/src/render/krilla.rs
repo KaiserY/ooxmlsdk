@@ -41,6 +41,7 @@ const LO_ARIAL_BOLD_11PT_VERTICAL_SCALE: f32 = 1.07;
 const LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT: f32 = 20.0 / crate::units::TWIPS_PER_POINT;
 const LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT: f32 =
   LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
+const LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT: f32 = 19.0 / crate::units::TWIPS_PER_POINT;
 // Source: LibreOffice vcl/source/pdf/pdfwriter_impl.cxx
 // PDFWriterImpl::emitWidgetAnnotations() applies iRectMargin = 1 for
 // non-signature widget annotation rectangles.
@@ -417,19 +418,11 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
           (bounds.left, bounds.right)
         };
         let left = lo_swrect_leading_edge(left) - LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
-        let top = lo_swrect_leading_edge(bounds.top);
+        let top = lo_swrect_leading_edge(bounds.top) - LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT;
         let right = lo_swrect_trailing_x_edge(right) + LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT;
-        let bottom =
-          lo_swrect_leading_edge(bounds.bottom) + LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT;
-        // Source: LibreOffice sw/source/core/text/itrform2.cxx obtains the
-        // widget location from SwTextCursor::GetCharRect() after the bidi text
-        // frame has been laid out. In this path the exported bidi control
-        // rectangle is one Writer expansion unit lower than the text ink box.
-        let bidi_block_offset = if bounds.paragraph_bidi {
-          LO_CONTENT_CONTROL_WIDGET_EXPANSION_PT
-        } else {
-          0.0
-        };
+        let bottom = lo_swrect_leading_edge(bounds.bottom)
+          + LO_CONTENT_CONTROL_WIDGET_BLOCK_EXPANSION_PT
+          - LO_CONTENT_CONTROL_WIDGET_VERTICAL_OFFSET_PT;
         let (field_type, field_value, field_flags) = widget_annotation_field(widget, &bounds.text);
         Some(WidgetAnnotationSpec {
           page_index,
@@ -438,13 +431,9 @@ fn collect_form_widget_annotations(document: &LayoutDocument) -> Vec<WidgetAnnot
           field_flags,
           rect: [
             round_annotation_coordinate(left - LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
-            round_annotation_coordinate(
-              page_height - bottom - bidi_block_offset + LO_PDF_WIDGET_ANNOTATION_MARGIN_PT,
-            ),
+            round_annotation_coordinate(page_height - bottom + LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
             round_annotation_coordinate(right + LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
-            round_annotation_coordinate(
-              page_height - top - bidi_block_offset - LO_PDF_WIDGET_ANNOTATION_MARGIN_PT,
-            ),
+            round_annotation_coordinate(page_height - top - LO_PDF_WIDGET_ANNOTATION_MARGIN_PT),
           ],
         })
       })
@@ -980,8 +969,18 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
       0..text.text.len(),
     )];
   }
-  let split_portions = text.pdf_text_segmentation == PdfTextSegmentation::Portion
-    || (text.preserve_text_portion && (text.style.underline || text.style.strikethrough));
+  let decorated_edge_space = (text.style.underline || text.style.strikethrough)
+    && (text.text.starts_with(char::is_whitespace) || text.text.ends_with(char::is_whitespace));
+  let split_decorated_portions =
+    text.preserve_text_portion && (text.style.underline || text.style.strikethrough);
+  if decorated_edge_space
+    && text.pdf_text_segmentation != PdfTextSegmentation::Portion
+    && !split_decorated_portions
+  {
+    return edge_whitespace_text_portion_ranges(text);
+  }
+  let split_portions =
+    text.pdf_text_segmentation == PdfTextSegmentation::Portion || split_decorated_portions;
   if !split_portions && text.hyperlink_url.is_some() && !text.text.contains('\t') {
     return vec![(PaintTextPortionKind::Link, 0..text.text.len())];
   }
@@ -1014,6 +1013,38 @@ fn text_portion_ranges(text: &TextItem) -> Vec<(PaintTextPortionKind, std::ops::
       PaintTextPortionKind::Text
     };
     ranges.push((kind, start..text.text.len()));
+  }
+  ranges
+}
+
+fn edge_whitespace_text_portion_ranges(
+  text: &TextItem,
+) -> Vec<(PaintTextPortionKind, std::ops::Range<usize>)> {
+  let kind = if text.hyperlink_url.is_some() {
+    PaintTextPortionKind::Link
+  } else {
+    PaintTextPortionKind::Text
+  };
+  let leading_end = text
+    .text
+    .char_indices()
+    .find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index))
+    .unwrap_or(text.text.len());
+  let trailing_start = text
+    .text
+    .char_indices()
+    .rev()
+    .find_map(|(index, ch)| (!ch.is_whitespace()).then_some(index + ch.len_utf8()))
+    .unwrap_or(0);
+  let mut ranges = Vec::new();
+  if leading_end > 0 {
+    ranges.push((kind.clone(), 0..leading_end));
+  }
+  if leading_end < trailing_start {
+    ranges.push((kind.clone(), leading_end..trailing_start));
+  }
+  if trailing_start < text.text.len() {
+    ranges.push((kind, trailing_start..text.text.len()));
   }
   ranges
 }

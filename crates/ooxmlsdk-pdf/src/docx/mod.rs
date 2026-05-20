@@ -98,13 +98,15 @@ pub(crate) fn extract(
     .map(|body| {
       body_sections(
         body,
-        &styles,
-        &mut numbering,
-        &images,
-        &hyperlinks,
-        &custom_xml_bindings,
-        &mut form_widget_ids,
-        no_column_balance,
+        BodySectionEnv {
+          styles: &styles,
+          numbering: &mut numbering,
+          images: &images,
+          hyperlinks: &hyperlinks,
+          custom_xml_bindings: &custom_xml_bindings,
+          form_widget_ids: &mut form_widget_ids,
+          no_column_balance,
+        },
       )
     })
     .unwrap_or_else(|| vec![default_section(Vec::new())]);
@@ -1150,20 +1152,30 @@ fn resolve_section_repeating_blocks(
   }
 }
 
-fn body_sections(
-  body: &w::Body,
-  styles: &StylesCatalog,
-  numbering: &mut NumberingCatalog,
-  images: &ImageCatalog,
-  hyperlinks: &HyperlinkCatalog,
-  custom_xml_bindings: &CustomXmlBindings,
-  form_widget_ids: &mut FormWidgetIdAllocator,
+struct BodySectionEnv<'a> {
+  styles: &'a StylesCatalog,
+  numbering: &'a mut NumberingCatalog,
+  images: &'a ImageCatalog,
+  hyperlinks: &'a HyperlinkCatalog,
+  custom_xml_bindings: &'a CustomXmlBindings,
+  form_widget_ids: &'a mut FormWidgetIdAllocator,
   no_column_balance: bool,
-) -> Vec<ImportedSection> {
+}
+
+fn body_sections(body: &w::Body, env: BodySectionEnv<'_>) -> Vec<ImportedSection> {
   let mut sections = Vec::new();
   let mut current_blocks = Vec::new();
   let mut previous_properties = None;
   let mut pending_drop_cap_text = None;
+  let BodySectionEnv {
+    styles,
+    numbering,
+    images,
+    hyperlinks,
+    custom_xml_bindings,
+    form_widget_ids,
+    no_column_balance,
+  } = env;
 
   for choice in &body.body_choice {
     match choice {
@@ -4531,6 +4543,11 @@ fn push_sdt_run(
   let Some(content) = sdt.sdt_content_run.as_ref() else {
     return;
   };
+  let start = inlines.len();
+  let showing_placeholder = sdt
+    .sdt_properties
+    .as_ref()
+    .is_some_and(sdt_showing_placeholder);
   let widget_id = sdt
     .sdt_properties
     .as_ref()
@@ -4644,14 +4661,29 @@ fn push_sdt_run(
     }
   }
   flush_unclosed_complex_field(inlines, &mut complex_field);
+  if showing_placeholder {
+    for inline in &mut inlines[start..] {
+      if let InlineItem::Text(run) = inline {
+        run.preserve_text_portion = true;
+      }
+    }
+  }
   if let Some(widget_id) = widget_id {
     inlines.push(InlineItem::FormWidgetEnd(widget_id));
   }
 }
 
+fn sdt_showing_placeholder(properties: &w::SdtProperties) -> bool {
+  properties
+    .sdt_properties_choice
+    .iter()
+    .any(|choice| matches!(choice, w::SdtPropertiesChoice::WShowingPlcHdr(_)))
+}
+
 fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec<String>)> {
   let mut kind = None;
   let mut entries = Vec::new();
+  let mut showing_placeholder = false;
   for choice in &properties.sdt_properties_choice {
     match choice {
       w::SdtPropertiesChoice::WComboBox(combo_box) => {
@@ -4668,8 +4700,14 @@ fn sdt_form_widget(properties: &w::SdtProperties) -> Option<(FormWidgetKind, Vec
       w::SdtPropertiesChoice::WRichText | w::SdtPropertiesChoice::WText(_) => {
         kind = Some(FormWidgetKind::Text);
       }
+      w::SdtPropertiesChoice::WShowingPlcHdr(_) => {
+        showing_placeholder = true;
+      }
       _ => {}
     }
+  }
+  if kind.is_none() && showing_placeholder {
+    kind = Some(FormWidgetKind::Text);
   }
   kind.map(|kind| (kind, entries))
 }
@@ -5447,7 +5485,7 @@ fn floating_image_placement(anchor: &wp::Anchor) -> FloatingImagePlacement {
     .or_else(|| Some(vertical_image_reference(anchor.vertical_position.as_ref())))
     .unwrap_or_default();
   let layout_in_cell = anchor.layout_in_cell.as_bool()
-    || (!simple_position.is_some()
+    || (simple_position.is_none()
       && matches!(
         (horizontal_relative_to, vertical_relative_to),
         (HorizontalImageReference::Character, _) | (_, VerticalImageReference::Line)
@@ -8132,8 +8170,9 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
     match choice {
       v::GroupChoice::VGroup(group) => push_group_shapes(group, inlines, images),
       v::GroupChoice::VRect(rectangle) => {
-        let style =
-          transform.and_then(|transform| transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), rectangle.style.as_deref())
+        });
         if let Some(shape) = vml_rectangle_shape_with_style(rectangle, style.as_deref(), images) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -8142,13 +8181,15 @@ fn push_group_shapes(group: &v::Group, inlines: &mut Vec<InlineItem>, images: &I
         let style = transform.and_then(|transform| {
           transform.child_anchor_style(group.style.as_deref(), round_rectangle.style.as_deref())
         });
-        if let Some(shape) = vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref()) {
+        if let Some(shape) = vml_round_rectangle_shape_with_style(round_rectangle, style.as_deref())
+        {
           inlines.push(InlineItem::Shape(shape));
         }
       }
       v::GroupChoice::VShape(shape) => {
-        let style =
-          transform.and_then(|transform| transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref()));
+        let style = transform.and_then(|transform| {
+          transform.child_anchor_style(group.style.as_deref(), shape.style.as_deref())
+        });
         if let Some(shape) = vml_shape_shape_with_style(shape, style.as_deref(), images) {
           inlines.push(InlineItem::Shape(shape));
         }
@@ -9295,7 +9336,11 @@ impl VmlGroupTransform {
     Some(output.join(";"))
   }
 
-  fn child_anchor_style(self, group_style: Option<&str>, child_style: Option<&str>) -> Option<String> {
+  fn child_anchor_style(
+    self,
+    group_style: Option<&str>,
+    child_style: Option<&str>,
+  ) -> Option<String> {
     let transformed = self.child_style(child_style)?;
     let parent = vml_image_style(group_style);
     if !parent.absolute_position {
@@ -9306,8 +9351,14 @@ impl VmlGroupTransform {
     let mut output = vec![
       transformed,
       "position:absolute".to_string(),
-      format!("margin-left:{}pt", parent.horizontal_offset_pt + child.horizontal_offset_pt),
-      format!("margin-top:{}pt", parent.vertical_offset_pt + child.vertical_offset_pt),
+      format!(
+        "margin-left:{}pt",
+        parent.horizontal_offset_pt + child.horizontal_offset_pt
+      ),
+      format!(
+        "margin-top:{}pt",
+        parent.vertical_offset_pt + child.vertical_offset_pt
+      ),
     ];
     output.push(vml_horizontal_reference_style(parent.horizontal_relative_to).to_string());
     output.push(vml_vertical_reference_style(parent.vertical_relative_to).to_string());
@@ -12319,6 +12370,16 @@ mod tests {
   }
 
   #[test]
+  fn compatibility_mode_reads_word_2013_fixture_setting() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let path = root.join("test-data/ooxmlsdk-pdf-test/libreoffice/tdf88496.docx");
+    let mut package = WordprocessingDocument::new(std::fs::File::open(path).unwrap()).unwrap();
+    let main = package.main_document_part().unwrap().clone();
+
+    assert_eq!(compatibility_mode(&mut package, &main), 15);
+  }
+
+  #[test]
   fn drawing_image_properties_preserve_crop_and_transform() {
     let xml = r#"<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><pic:blipFill><a:blip r:embed="rId7"/><a:srcRect l="10000" t="20000" r="30000" b="40000"/></pic:blipFill><pic:spPr><a:xfrm rot="5400000" flipH="1" flipV="true"/></pic:spPr></pic:pic>"#;
 
@@ -13436,13 +13497,15 @@ mod tests {
 
     let sections = body_sections(
       &body,
-      &StylesCatalog::default(),
-      &mut numbering,
-      &ImageCatalog::default(),
-      &HyperlinkCatalog::default(),
-      &CustomXmlBindings::default(),
-      &mut FormWidgetIdAllocator::default(),
-      false,
+      BodySectionEnv {
+        styles: &StylesCatalog::default(),
+        numbering: &mut numbering,
+        images: &ImageCatalog::default(),
+        hyperlinks: &HyperlinkCatalog::default(),
+        custom_xml_bindings: &CustomXmlBindings::default(),
+        form_widget_ids: &mut FormWidgetIdAllocator::default(),
+        no_column_balance: false,
+      },
     );
 
     assert_eq!(sections.len(), 2);

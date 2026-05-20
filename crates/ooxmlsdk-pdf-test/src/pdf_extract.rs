@@ -959,13 +959,32 @@ fn lopdf_text(document: &LopdfDocument, object: &LopdfObject) -> Result<String, 
     .dereference(object)
     .map_err(|error| format!("lopdf could not dereference string: {error}"))?;
   match object {
-    LopdfObject::String(value, _) => Ok(normalize_extracted_text(&String::from_utf8_lossy(value))),
+    LopdfObject::String(value, _) => Ok(normalize_extracted_text(&pdf_string_text(value))),
     LopdfObject::Name(value) => Ok(String::from_utf8_lossy(value).to_string()),
     _ => Err(format!(
       "lopdf expected string-like object, found {}",
       object.enum_variant()
     )),
   }
+}
+
+fn pdf_string_text(value: &[u8]) -> String {
+  if let Some(text) = pdf_utf16_string(value, &[0xfe, 0xff], u16::from_be_bytes) {
+    return text;
+  }
+  if let Some(text) = pdf_utf16_string(value, &[0xff, 0xfe], u16::from_le_bytes) {
+    return text;
+  }
+  String::from_utf8_lossy(value).to_string()
+}
+
+fn pdf_utf16_string(value: &[u8], bom: &[u8; 2], convert: fn([u8; 2]) -> u16) -> Option<String> {
+  let content = value.strip_prefix(bom)?;
+  let units = content
+    .chunks_exact(2)
+    .map(|chunk| convert([chunk[0], chunk[1]]))
+    .collect::<Vec<_>>();
+  Some(String::from_utf16_lossy(&units))
 }
 
 fn lopdf_rect(document: &LopdfDocument, object: &LopdfObject) -> Result<String, String> {
@@ -1284,6 +1303,7 @@ fn temp_pdf_path() -> std::path::PathBuf {
 
 fn normalize_extracted_text(text: &str) -> String {
   text
+    .replace('\t', " ")
     .lines()
     .map(|line| line.trim_end())
     .collect::<Vec<_>>()

@@ -10,14 +10,18 @@ use ooxmlsdk::parts::{
   wordprocessing_comments_part::WordprocessingCommentsPart,
   wordprocessing_document::WordprocessingDocument,
 };
+use ooxmlsdk::schemas::{
+  schemas_openxmlformats_org_drawingml_2006_chart as c,
+  schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+};
 use ooxmlsdk::sdk::{RelatedPart, SdkPart};
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct ImageCatalog {
   pub(super) by_relationship_id: HashMap<String, ImageResource>,
-  pub(super) charts_by_relationship_id: HashMap<String, String>,
-  pub(super) diagram_colors_by_relationship_id: HashMap<String, String>,
-  pub(super) diagram_data_by_relationship_id: HashMap<String, String>,
+  pub(super) charts_by_relationship_id: HashMap<String, c::ChartSpace>,
+  pub(super) diagram_colors_by_relationship_id: HashMap<String, dgm::ColorsDefinition>,
+  pub(super) diagram_data_by_relationship_id: HashMap<String, dgm::DataModelRoot>,
   pub(super) diagram_drawings_by_relationship_id: HashMap<String, String>,
 }
 
@@ -59,22 +63,30 @@ pub(super) struct ImageResource {
 }
 
 impl ImageCatalog {
-  pub(super) fn load(package: &WordprocessingDocument, main: &MainDocumentPart) -> Self {
+  pub(super) fn load(package: &mut WordprocessingDocument, main: &MainDocumentPart) -> Self {
     let mut catalog = Self::from_image_parts(package, main.related_parts_of_type(package));
-    catalog.charts_by_relationship_id =
-      Self::chart_parts(package, main.related_parts_of_type(package));
-    catalog.diagram_colors_by_relationship_id = Self::xml_parts(
-      package,
-      main.related_parts_of_type::<_, DiagramColorsPart>(package),
-    );
-    catalog.diagram_data_by_relationship_id = Self::xml_parts(
-      package,
-      main.related_parts_of_type::<_, DiagramDataPart>(package),
-    );
-    catalog.diagram_drawings_by_relationship_id = Self::xml_parts(
-      package,
-      main.related_parts_of_type::<_, DiagramPersistLayoutPart>(package),
-    );
+    let chart_parts = main
+      .related_parts_of_type::<_, ChartPart>(package)
+      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .collect::<Vec<_>>();
+    catalog.charts_by_relationship_id = Self::chart_parts(package, chart_parts);
+    let diagram_color_parts = main
+      .related_parts_of_type::<_, DiagramColorsPart>(package)
+      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .collect::<Vec<_>>();
+    catalog.diagram_colors_by_relationship_id =
+      Self::diagram_color_parts(package, diagram_color_parts);
+    let diagram_data_parts = main
+      .related_parts_of_type::<_, DiagramDataPart>(package)
+      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .collect::<Vec<_>>();
+    catalog.diagram_data_by_relationship_id = Self::diagram_data_parts(package, diagram_data_parts);
+    let diagram_drawing_parts = main
+      .related_parts_of_type::<_, DiagramPersistLayoutPart>(package)
+      .map(|part| (part.relationship_id().to_string(), part.into_part()))
+      .collect::<Vec<_>>();
+    catalog.diagram_drawings_by_relationship_id =
+      Self::diagram_drawing_parts(package, diagram_drawing_parts);
     catalog
   }
 
@@ -144,30 +156,63 @@ impl ImageCatalog {
   }
 
   fn chart_parts<'a>(
-    package: &WordprocessingDocument,
-    chart_parts: impl Iterator<Item = RelatedPart<'a, ChartPart>> + 'a,
-  ) -> HashMap<String, String> {
-    Self::xml_parts(package, chart_parts)
+    package: &mut WordprocessingDocument,
+    chart_parts: impl IntoIterator<Item = (String, ChartPart)> + 'a,
+  ) -> HashMap<String, c::ChartSpace> {
+    let mut by_relationship_id = HashMap::new();
+    for (relationship_id, chart_part) in chart_parts {
+      let Ok(chart_space) = chart_part.root_element(package) else {
+        continue;
+      };
+      by_relationship_id.insert(relationship_id, chart_space.clone());
+    }
+    by_relationship_id
   }
 
-  fn xml_parts<'a, P>(
-    package: &WordprocessingDocument,
-    parts: impl Iterator<Item = RelatedPart<'a, P>> + 'a,
-  ) -> HashMap<String, String>
-  where
-    P: SdkPart,
-  {
+  fn diagram_color_parts<'a>(
+    package: &mut WordprocessingDocument,
+    parts: impl IntoIterator<Item = (String, DiagramColorsPart)> + 'a,
+  ) -> HashMap<String, dgm::ColorsDefinition> {
     let mut by_relationship_id = HashMap::new();
-    for related_part in parts {
-      let relationship_id = related_part.relationship_id();
-      let part = related_part.part();
-      let Some(data) = part.data_to_vec(package) else {
+    for (relationship_id, part) in parts {
+      let Ok(root) = part.root_element(package) else {
         continue;
       };
-      let Ok(xml) = String::from_utf8(data) else {
+      by_relationship_id.insert(relationship_id, root.clone());
+    }
+    by_relationship_id
+  }
+
+  fn diagram_data_parts<'a>(
+    package: &mut WordprocessingDocument,
+    parts: impl IntoIterator<Item = (String, DiagramDataPart)> + 'a,
+  ) -> HashMap<String, dgm::DataModelRoot> {
+    let mut by_relationship_id = HashMap::new();
+    for (relationship_id, part) in parts {
+      let Ok(root) = part.root_element(package) else {
         continue;
       };
-      by_relationship_id.insert(relationship_id.to_string(), xml);
+      by_relationship_id.insert(relationship_id, root.clone());
+    }
+    by_relationship_id
+  }
+
+  fn diagram_drawing_parts<'a>(
+    package: &mut WordprocessingDocument,
+    parts: impl IntoIterator<Item = (String, DiagramPersistLayoutPart)> + 'a,
+  ) -> HashMap<String, String> {
+    let mut by_relationship_id = HashMap::new();
+    for (relationship_id, part) in parts {
+      let Ok(root) = part.root_element(package) else {
+        continue;
+      };
+      let Ok(bytes) = root.to_bytes() else {
+        continue;
+      };
+      let Ok(xml) = String::from_utf8(bytes) else {
+        continue;
+      };
+      by_relationship_id.insert(relationship_id, xml);
     }
     by_relationship_id
   }

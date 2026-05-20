@@ -18,7 +18,9 @@ use ooxmlsdk::schemas::{
   schemas_microsoft_com_office_word_2010_wordml as w14,
   schemas_microsoft_com_office_word_2010_wordprocessing_drawing as wp14,
   schemas_microsoft_com_office_word_2010_wordprocessing_shape as wps,
-  schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_main as a,
+  schemas_microsoft_com_vml as v, schemas_openxmlformats_org_drawingml_2006_chart as c,
+  schemas_openxmlformats_org_drawingml_2006_diagram as dgm,
+  schemas_openxmlformats_org_drawingml_2006_main as a,
   schemas_openxmlformats_org_drawingml_2006_picture as pic,
   schemas_openxmlformats_org_drawingml_2006_wordprocessing_drawing as wp,
   schemas_openxmlformats_org_wordprocessingml_2006_main as w,
@@ -282,21 +284,19 @@ fn supplemental_graphic_blocks(
 }
 
 fn chart_text_blocks(
-  package: &WordprocessingDocument,
+  package: &mut WordprocessingDocument,
   main: &MainDocumentPart,
   styles: &StylesCatalog,
 ) -> Vec<Block> {
   let mut blocks = Vec::new();
-  for chart_part in main.chart_parts(package) {
-    let Some(xml) = chart_part
-      .data_to_vec(package)
-      .and_then(|data| String::from_utf8(data).ok())
-    else {
+  let chart_parts = main.chart_parts(package).collect::<Vec<_>>();
+  for chart_part in chart_parts {
+    let Ok(chart_space) = chart_part.root_element(package) else {
       continue;
     };
-    let color = chart_label_color(&xml, &styles.theme_colors).unwrap_or_default();
-    let vertical_axis_labels = chart_vertical_multilevel_axis_labels(&xml);
-    let mut texts = chart_visible_texts(&xml);
+    let color = chart_label_color(chart_space, &styles.theme_colors).unwrap_or_default();
+    let vertical_axis_labels = chart_vertical_multilevel_axis_labels(chart_space);
+    let mut texts = chart_visible_texts(chart_space);
     texts.extend(chart_derived_axis_labels(&texts));
     for text in texts {
       for segment in chart_visible_text_segments(text) {
@@ -375,239 +375,582 @@ fn chart_derived_axis_labels(texts: &[String]) -> Vec<String> {
     .collect()
 }
 
-fn chart_vertical_multilevel_axis_labels(xml: &str) -> Vec<String> {
-  if !chart_has_vertical_multilevel_category_axis(xml) {
+fn chart_vertical_multilevel_axis_labels(chart_space: &c::ChartSpace) -> Vec<String> {
+  if !chart_has_vertical_multilevel_category_axis(chart_space) {
     return Vec::new();
   }
 
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut in_multilevel_label = false;
-  let mut level_index = 0usize;
-  let mut in_rotated_level = false;
-  let mut in_text = false;
-  let mut current = String::new();
   let mut labels = Vec::new();
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) => {
-        let name = event.name().as_ref().to_vec();
-        if qname_ends_with(&name, b"multiLvlStrRef") {
-          in_multilevel_label = true;
-          level_index = 0;
-          in_rotated_level = false;
-        } else if in_multilevel_label && qname_ends_with(&name, b"lvl") {
-          in_rotated_level = level_index > 0;
-          level_index += 1;
-        }
-        if in_multilevel_label && in_rotated_level && qname_ends_with(&name, b"v") {
-          in_text = true;
-          current.clear();
-        }
+  for series in chart_series(chart_space) {
+    let Some(category_axis_data) = series.category_axis_data else {
+      continue;
+    };
+    let Some(c::CategoryAxisDataChoice::CMultiLvlStrRef(reference)) =
+      category_axis_data.category_axis_data_choice.as_ref()
+    else {
+      continue;
+    };
+    let Some(cache) = reference.multi_level_string_cache.as_deref() else {
+      continue;
+    };
+    for level in cache.c_lvl.iter().skip(1) {
+      for point in &level.c_pt {
+        push_unique_chart_text(&mut labels, &point.numeric_value);
       }
-      Ok(Event::Empty(_)) => {}
-      Ok(Event::End(event)) => {
-        if in_multilevel_label && qname_ends_with(event.name().as_ref(), b"v") {
-          push_unique_chart_text(&mut labels, &current);
-          current.clear();
-          in_text = false;
-        }
-        if qname_ends_with(event.name().as_ref(), b"multiLvlStrRef") {
-          in_multilevel_label = false;
-        }
-        if qname_ends_with(event.name().as_ref(), b"lvl") {
-          in_rotated_level = false;
-        }
-      }
-      Ok(Event::Text(event)) if in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::CData(event)) if in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
     }
   }
-
   labels
 }
 
-fn chart_has_vertical_multilevel_category_axis(xml: &str) -> bool {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut in_cat_axis = false;
-  let mut axis_has_vertical_text = false;
-  let mut axis_has_multilevel_labels = false;
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"catAx") => {
-        in_cat_axis = true;
-        axis_has_vertical_text = false;
-        axis_has_multilevel_labels = false;
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"catAx") => {
-        if axis_has_vertical_text && axis_has_multilevel_labels {
-          return true;
-        }
-        in_cat_axis = false;
-      }
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if in_cat_axis && qname_ends_with(event.name().as_ref(), b"bodyPr") =>
-      {
-        axis_has_vertical_text |= attr_value(&event, b"rot")
-          .and_then(|value| value.parse::<i32>().ok())
-          .is_some_and(|rotation| rotation.abs() >= 54_000_000);
-      }
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if in_cat_axis && qname_ends_with(event.name().as_ref(), b"noMultiLvlLbl") =>
-      {
-        axis_has_multilevel_labels |= attr_value(&event, b"val").as_deref() != Some("1");
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
-    }
-  }
-
-  false
+fn chart_has_vertical_multilevel_category_axis(chart_space: &c::ChartSpace) -> bool {
+  chart_space
+    .c_chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .filter_map(|choice| match choice {
+      c::PlotAreaChoice2::CCatAx(axis) => Some(axis.as_ref()),
+      _ => None,
+    })
+    .any(|axis| {
+      axis
+        .text_properties
+        .as_deref()
+        .and_then(|properties| properties.body_properties.rotation)
+        .is_some_and(|rotation| rotation.abs() >= 54_000_000)
+        && axis
+          .c_no_multi_lvl_lbl
+          .as_ref()
+          .and_then(|labels| labels.val)
+          .is_none_or(|value| !value.as_bool())
+    })
 }
 
-fn chart_label_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut in_dlbls = false;
-  let mut in_txpr = false;
-  let mut in_defrpr = false;
-
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) if qname_ends_with(event.name().as_ref(), b"dLbls") => in_dlbls = true,
-      Event::End(event) if qname_ends_with(event.name().as_ref(), b"dLbls") => in_dlbls = false,
-      Event::Start(event) if in_dlbls && qname_ends_with(event.name().as_ref(), b"txPr") => {
-        in_txpr = true;
-      }
-      Event::End(event) if qname_ends_with(event.name().as_ref(), b"txPr") => in_txpr = false,
-      Event::Start(event) if in_txpr && qname_ends_with(event.name().as_ref(), b"defRPr") => {
-        in_defrpr = true;
-      }
-      Event::End(event) if qname_ends_with(event.name().as_ref(), b"defRPr") => {
-        in_defrpr = false;
-      }
-      Event::Start(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_scheme_color_from_reader(&mut reader, event, theme_colors)
-          .map(|it| it.color);
-      }
-      Event::Empty(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"schemeClr") => {
-        return resolve_empty_scheme_color(&event, theme_colors).map(|it| it.color);
-      }
-      Event::Start(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        return color_attr(&event, b"val");
-      }
-      Event::Empty(event) if in_defrpr && qname_ends_with(event.name().as_ref(), b"srgbClr") => {
-        return color_attr(&event, b"val");
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
+fn chart_label_color(chart_space: &c::ChartSpace, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  chart_series(chart_space)
+    .into_iter()
+    .filter_map(|series| series.data_labels)
+    .chain(chart_data_labels(chart_space))
+    .find_map(|labels| {
+      labels
+        .c_d_lbl
+        .iter()
+        .find_map(|label| match label.data_label_choice.as_ref()? {
+          c::DataLabelChoice::Sequence(sequence) => sequence
+            .text_properties
+            .as_deref()
+            .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
+          c::DataLabelChoice::CDelete(_) => None,
+        })
+        .or_else(|| match labels.data_labels_choice.as_ref()? {
+          c::DataLabelsChoice::Sequence(sequence) => sequence
+            .text_properties
+            .as_deref()
+            .and_then(|properties| chart_text_properties_color(properties, theme_colors)),
+          c::DataLabelsChoice::CDelete(_) => None,
+        })
+    })
 }
 
-fn chart_visible_texts(xml: &str) -> Vec<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-
-  let mut element_stack = Vec::new();
-  let mut in_text = false;
-  let mut current = String::new();
+fn chart_visible_texts(chart_space: &c::ChartSpace) -> Vec<String> {
   let mut texts = Vec::new();
-  let mut in_series = false;
-  let mut series_has_text = false;
   let mut series_index = 0usize;
 
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) => {
-        if qname_ends_with(event.name().as_ref(), b"ser") {
-          in_series = true;
-          series_has_text = false;
-        } else if in_series && qname_ends_with(event.name().as_ref(), b"tx") {
-          series_has_text = true;
-        }
-        element_stack.push(event.name().as_ref().to_vec());
-        if chart_text_value_element(event.name().as_ref(), &element_stack) {
-          in_text = true;
-          current.clear();
-        }
-      }
-      Ok(Event::End(event)) => {
-        if qname_ends_with(event.name().as_ref(), b"ser") {
-          if !series_has_text {
-            series_index += 1;
-            texts.push(format!("Series{series_index}"));
-          }
-          in_series = false;
-          series_has_text = false;
-        }
-        if qname_ends_with(event.name().as_ref(), b"t")
-          || qname_ends_with(event.name().as_ref(), b"v")
-        {
-          push_unique_chart_text(&mut texts, &current);
-          current.clear();
-          in_text = false;
-        }
-        element_stack.pop();
-      }
-      Ok(Event::Empty(event)) => {
-        if qname_ends_with(event.name().as_ref(), b"showPercent")
-          && attr_value(&event, b"val").as_deref() == Some("1")
-        {
-          push_unique_chart_text(&mut texts, "100%");
-        }
-        element_stack.push(event.name().as_ref().to_vec());
-        element_stack.pop();
-      }
-      Ok(Event::Text(event)) if in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::CData(event)) if in_text => {
-        if let Ok(value) = event.xml10_content() {
-          current.push_str(value.as_ref());
-        }
-      }
-      Ok(Event::Eof) => break,
-      Ok(_) => {}
-      Err(_) => break,
+  if let Some(title) = chart_space.c_chart.title.as_deref() {
+    chart_push_title_texts(&mut texts, title);
+  }
+  for title in chart_axis_titles(chart_space) {
+    chart_push_title_texts(&mut texts, title);
+  }
+
+  for series in chart_series(chart_space) {
+    series_index += 1;
+    if let Some(series_text) = series.series_text {
+      chart_push_series_text(&mut texts, series_text);
+    } else {
+      texts.push(format!("Series{series_index}"));
+    }
+    if let Some(category_axis_data) = series.category_axis_data {
+      chart_push_category_axis_data_texts(&mut texts, category_axis_data);
+    }
+    if let Some(values) = series.values {
+      chart_push_values_texts(&mut texts, values);
+    }
+    if let Some(y_values) = series.y_values {
+      chart_push_y_values_texts(&mut texts, y_values);
+    }
+    if let Some(x_values) = series.x_values {
+      chart_push_x_values_texts(&mut texts, x_values);
+    }
+    if let Some(bubble_size) = series.bubble_size {
+      chart_push_bubble_size_texts(&mut texts, bubble_size);
+    }
+    if let Some(data_labels) = series.data_labels {
+      chart_push_data_label_texts(&mut texts, data_labels);
     }
   }
 
+  for data_labels in chart_data_labels(chart_space) {
+    chart_push_data_label_texts(&mut texts, data_labels);
+  }
   texts
 }
 
-fn chart_text_value_element(name: &[u8], stack: &[Vec<u8>]) -> bool {
-  if qname_ends_with(name, b"t") {
-    return true;
-  }
-  qname_ends_with(name, b"v")
-    && stack.iter().any(|ancestor| {
-      qname_ends_with(ancestor, b"tx")
-        || qname_ends_with(ancestor, b"cat")
-        || qname_ends_with(ancestor, b"val")
-        || qname_ends_with(ancestor, b"dLbl")
-        || qname_ends_with(ancestor, b"title")
+fn chart_axis_titles(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::Title> {
+  chart_space
+    .c_chart
+    .plot_area
+    .plot_area_choice2
+    .iter()
+    .filter_map(|choice| match choice {
+      c::PlotAreaChoice2::CValAx(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::CCatAx(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::CDateAx(axis) => axis.title.as_deref(),
+      c::PlotAreaChoice2::CSerAx(axis) => axis.title.as_deref(),
     })
+}
+
+#[derive(Clone, Copy)]
+struct ChartSeriesRef<'a> {
+  series_text: Option<&'a c::SeriesText>,
+  category_axis_data: Option<&'a c::CategoryAxisData>,
+  values: Option<&'a c::Values>,
+  y_values: Option<&'a c::YValues>,
+  x_values: Option<&'a c::XValues>,
+  bubble_size: Option<&'a c::BubbleSize>,
+  data_labels: Option<&'a c::DataLabels>,
+}
+
+fn chart_series(chart_space: &c::ChartSpace) -> Vec<ChartSeriesRef<'_>> {
+  let mut series = Vec::new();
+  for choice in &chart_space.c_chart.plot_area.plot_area_choice1 {
+    match choice {
+      c::PlotAreaChoice::CAreaChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CArea3DChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CLineChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CLine3DChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CStockChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CRadarChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CScatterChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: None,
+          values: None,
+          y_values: ser.c_y_val.as_deref(),
+          x_values: ser.c_x_val.as_deref(),
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CPieChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CPie3DChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CDoughnutChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CBarChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CBar3DChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::COfPieChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.c_cat.as_deref(),
+          values: ser.c_val.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+      c::PlotAreaChoice::CSurfaceChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: None,
+        }));
+      }
+      c::PlotAreaChoice::CSurface3DChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: ser.category_axis_data.as_deref(),
+          values: ser.values.as_deref(),
+          y_values: None,
+          x_values: None,
+          bubble_size: None,
+          data_labels: None,
+        }));
+      }
+      c::PlotAreaChoice::CBubbleChart(chart) => {
+        series.extend(chart.c_ser.iter().map(|ser| ChartSeriesRef {
+          series_text: ser.series_text.as_deref(),
+          category_axis_data: None,
+          values: None,
+          y_values: ser.c_y_val.as_deref(),
+          x_values: ser.c_x_val.as_deref(),
+          bubble_size: ser.c_bubble_size.as_deref(),
+          data_labels: ser.c_d_lbls.as_deref(),
+        }));
+      }
+    }
+  }
+  series
+}
+
+fn chart_data_labels(chart_space: &c::ChartSpace) -> impl Iterator<Item = &c::DataLabels> {
+  chart_space
+    .c_chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .filter_map(|choice| match choice {
+      c::PlotAreaChoice::CAreaChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CArea3DChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CLineChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CLine3DChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CStockChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CRadarChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CScatterChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CPieChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CPie3DChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CDoughnutChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CBarChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CBar3DChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::COfPieChart(chart) => chart.c_d_lbls.as_deref(),
+      c::PlotAreaChoice::CSurfaceChart(_) => None,
+      c::PlotAreaChoice::CSurface3DChart(_) => None,
+      c::PlotAreaChoice::CBubbleChart(chart) => chart.c_d_lbls.as_deref(),
+    })
+}
+
+fn chart_text_properties_color(
+  properties: &c::TextProperties,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  properties
+    .list_style
+    .as_deref()
+    .and_then(|style| style.default_paragraph_properties.as_deref())
+    .and_then(|paragraph| paragraph.a_def_r_pr.as_deref())
+    .and_then(|run_properties| chart_default_run_properties_color(run_properties, theme_colors))
+    .or_else(|| {
+      properties
+        .a_p
+        .iter()
+        .filter_map(|paragraph| paragraph.paragraph_properties.as_deref())
+        .filter_map(|properties| properties.a_def_r_pr.as_deref())
+        .find_map(|run_properties| chart_default_run_properties_color(run_properties, theme_colors))
+    })
+}
+
+fn chart_default_run_properties_color(
+  run_properties: &a::DefaultRunProperties,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  match run_properties.default_run_properties_choice1.as_ref()? {
+    a::DefaultRunPropertiesChoice::ASolidFill(fill) => {
+      drawingml_solid_fill_color(fill, theme_colors)
+    }
+    _ => None,
+  }
+}
+
+fn drawingml_solid_fill_color(fill: &a::SolidFill, theme_colors: &ThemeColors) -> Option<RgbColor> {
+  match fill.solid_fill_choice.as_ref()? {
+    a::SolidFillChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
+    a::SolidFillChoice::ASchemeClr(color) => resolve_drawingml_scheme_color(color, theme_colors),
+    a::SolidFillChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+    _ => None,
+  }
+}
+
+fn chart_push_title_texts(texts: &mut Vec<String>, title: &c::Title) {
+  if let Some(chart_text) = title.chart_text.as_deref() {
+    chart_push_chart_text(texts, chart_text);
+  }
+}
+
+fn chart_push_series_text(texts: &mut Vec<String>, series_text: &c::SeriesText) {
+  match series_text.series_text_choice.as_ref() {
+    Some(c::SeriesTextChoice::CStrRef(reference)) => {
+      chart_push_string_reference_texts(texts, reference);
+    }
+    Some(c::SeriesTextChoice::CV(value)) => push_unique_chart_text(texts, value),
+    None => {}
+  }
+}
+
+fn chart_push_chart_text(texts: &mut Vec<String>, chart_text: &c::ChartText) {
+  match chart_text.chart_text_choice.as_ref() {
+    Some(c::ChartTextChoice::CStrRef(reference)) => {
+      chart_push_string_reference_texts(texts, reference)
+    }
+    Some(c::ChartTextChoice::CStrLit(literal)) => chart_push_string_literal_texts(texts, literal),
+    Some(c::ChartTextChoice::CRich(rich)) => chart_push_rich_texts(texts, &rich.a_p),
+    None => {}
+  }
+}
+
+fn chart_push_rich_texts(texts: &mut Vec<String>, paragraphs: &[a::Paragraph]) {
+  for paragraph in paragraphs {
+    let mut text = String::new();
+    for choice in &paragraph.paragraph_choice {
+      match choice {
+        a::ParagraphChoice::AR(run) => text.push_str(&run.text),
+        a::ParagraphChoice::AFld(field) => {
+          if let Some(value) = field.text.as_deref() {
+            text.push_str(value);
+          }
+        }
+        a::ParagraphChoice::ABr(_) | a::ParagraphChoice::A14M(_) => {}
+      }
+    }
+    push_unique_chart_text(texts, &text);
+  }
+}
+
+fn chart_push_category_axis_data_texts(texts: &mut Vec<String>, data: &c::CategoryAxisData) {
+  match data.category_axis_data_choice.as_ref() {
+    Some(c::CategoryAxisDataChoice::CMultiLvlStrRef(reference)) => {
+      if let Some(cache) = reference.multi_level_string_cache.as_deref() {
+        for level in &cache.c_lvl {
+          for point in &level.c_pt {
+            push_unique_chart_text(texts, &point.numeric_value);
+          }
+        }
+      }
+    }
+    Some(c::CategoryAxisDataChoice::CNumRef(reference)) => {
+      chart_push_number_reference_texts(texts, reference);
+    }
+    Some(c::CategoryAxisDataChoice::CNumLit(literal)) => {
+      chart_push_number_literal_texts(texts, literal)
+    }
+    Some(c::CategoryAxisDataChoice::CStrRef(reference)) => {
+      chart_push_string_reference_texts(texts, reference);
+    }
+    Some(c::CategoryAxisDataChoice::CStrLit(literal)) => {
+      chart_push_string_literal_texts(texts, literal)
+    }
+    None => {}
+  }
+}
+
+fn chart_push_values_texts(texts: &mut Vec<String>, values: &c::Values) {
+  match values.values_choice.as_ref() {
+    Some(c::ValuesChoice::CNumRef(reference)) => {
+      chart_push_number_reference_texts(texts, reference)
+    }
+    Some(c::ValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    None => {}
+  }
+}
+
+fn chart_push_y_values_texts(texts: &mut Vec<String>, values: &c::YValues) {
+  match values.y_values_choice.as_ref() {
+    Some(c::YValuesChoice::CNumRef(reference)) => {
+      chart_push_number_reference_texts(texts, reference)
+    }
+    Some(c::YValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    None => {}
+  }
+}
+
+fn chart_push_x_values_texts(texts: &mut Vec<String>, values: &c::XValues) {
+  match values.x_values_choice.as_ref() {
+    Some(c::XValuesChoice::CMultiLvlStrRef(reference)) => {
+      if let Some(cache) = reference.multi_level_string_cache.as_deref() {
+        for level in &cache.c_lvl {
+          for point in &level.c_pt {
+            push_unique_chart_text(texts, &point.numeric_value);
+          }
+        }
+      }
+    }
+    Some(c::XValuesChoice::CNumRef(reference)) => {
+      chart_push_number_reference_texts(texts, reference)
+    }
+    Some(c::XValuesChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    Some(c::XValuesChoice::CStrRef(reference)) => {
+      chart_push_string_reference_texts(texts, reference)
+    }
+    Some(c::XValuesChoice::CStrLit(literal)) => chart_push_string_literal_texts(texts, literal),
+    None => {}
+  }
+}
+
+fn chart_push_bubble_size_texts(texts: &mut Vec<String>, values: &c::BubbleSize) {
+  match values.bubble_size_choice.as_ref() {
+    Some(c::BubbleSizeChoice::CNumRef(reference)) => {
+      chart_push_number_reference_texts(texts, reference)
+    }
+    Some(c::BubbleSizeChoice::CNumLit(literal)) => chart_push_number_literal_texts(texts, literal),
+    None => {}
+  }
+}
+
+fn chart_push_data_label_texts(texts: &mut Vec<String>, data_labels: &c::DataLabels) {
+  for label in &data_labels.c_d_lbl {
+    if let Some(c::DataLabelChoice::Sequence(sequence)) = label.data_label_choice.as_ref()
+      && let Some(chart_text) = sequence.chart_text.as_deref()
+    {
+      chart_push_chart_text(texts, chart_text);
+    }
+  }
+  if let Some(c::DataLabelsChoice::Sequence(sequence)) = data_labels.data_labels_choice.as_ref()
+    && sequence
+      .show_percent
+      .as_ref()
+      .and_then(|show| show.val)
+      .is_some_and(|value| value.as_bool())
+  {
+    push_unique_chart_text(texts, "100%");
+  }
+}
+
+fn chart_push_string_reference_texts(texts: &mut Vec<String>, reference: &c::StringReference) {
+  if let Some(cache) = reference.string_cache.as_deref() {
+    chart_push_string_cache_texts(texts, cache);
+  }
+}
+
+fn chart_push_string_cache_texts(texts: &mut Vec<String>, cache: &c::StringCache) {
+  for point in &cache.c_pt {
+    push_unique_chart_text(texts, &point.numeric_value);
+  }
+}
+
+fn chart_push_string_literal_texts(texts: &mut Vec<String>, literal: &c::StringLiteral) {
+  for point in &literal.c_pt {
+    push_unique_chart_text(texts, &point.numeric_value);
+  }
+}
+
+fn chart_push_number_reference_texts(texts: &mut Vec<String>, reference: &c::NumberReference) {
+  if let Some(cache) = reference.numbering_cache.as_deref() {
+    chart_push_numbering_cache_texts(texts, cache);
+  }
+}
+
+fn chart_push_numbering_cache_texts(texts: &mut Vec<String>, cache: &c::NumberingCache) {
+  for point in &cache.c_pt {
+    push_unique_chart_text(texts, &point.numeric_value);
+  }
+}
+
+fn chart_push_number_literal_texts(texts: &mut Vec<String>, literal: &c::NumberLiteral) {
+  for point in &literal.c_pt {
+    push_unique_chart_text(texts, &point.numeric_value);
+  }
 }
 
 fn push_unique_chart_text(texts: &mut Vec<String>, value: &str) {
@@ -6607,8 +6950,8 @@ fn drawing_diagram_shapes(
         .diagram_colors_by_relationship_id
         .get(&relationship_id)
     })
-    .map(|colors_xml| {
-      diagram_text_fill_colors_by_model_id(data_xml, colors_xml, &context.styles.theme_colors)
+    .map(|colors| {
+      diagram_text_fill_colors_by_model_id(data_xml, colors, &context.styles.theme_colors)
     });
   let drawing_relationship_id = diagram_ext_drawing_relationship_id(data_xml)?;
   let drawing_xml = context
@@ -6661,104 +7004,78 @@ fn drawing_diagram_relationship_id(xml: &str, key: &[u8]) -> Option<String> {
 }
 
 fn diagram_text_fill_colors_by_model_id(
-  data_xml: &str,
-  colors_xml: &str,
+  data: &dgm::DataModelRoot,
+  colors: &dgm::ColorsDefinition,
   theme_colors: &ThemeColors,
 ) -> HashMap<String, RgbColor> {
-  let text_colors_by_style_label =
-    diagram_text_fill_colors_by_style_label(colors_xml, theme_colors);
+  let text_colors_by_style_label = diagram_text_fill_colors_by_style_label(colors, theme_colors);
   if text_colors_by_style_label.is_empty() {
     return HashMap::new();
   }
 
-  let mut reader = Reader::from_str(data_xml);
-  reader.config_mut().trim_text(false);
-  let mut current_model_id: Option<String> = None;
   let mut colors = HashMap::new();
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"pt") => {
-        current_model_id = attr_value(&event, b"modelId").map(|value| value.to_string());
-      }
-      Ok(Event::End(event)) if qname_ends_with(event.name().as_ref(), b"pt") => {
-        current_model_id = None;
-      }
-      Ok(Event::Start(event)) | Ok(Event::Empty(event))
-        if qname_ends_with(event.name().as_ref(), b"prSet") =>
-      {
-        let Some(model_id) = current_model_id.as_ref() else {
-          continue;
-        };
-        let Some(style_label) = attr_value(&event, b"presStyleLbl") else {
-          continue;
-        };
-        let Some(color) = text_colors_by_style_label.get(style_label.as_ref()) else {
-          continue;
-        };
-        colors.insert(model_id.clone(), *color);
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
+  for point in &data.point_list.dgm_pt {
+    let Some(style_label) = point
+      .property_set
+      .as_deref()
+      .and_then(|properties| properties.presentation_style_label.as_deref())
+    else {
+      continue;
+    };
+    let Some(color) = text_colors_by_style_label.get(style_label) else {
+      continue;
+    };
+    colors.insert(point.model_id.clone(), *color);
   }
 
   colors
 }
 
 fn diagram_text_fill_colors_by_style_label(
-  colors_xml: &str,
+  colors_definition: &dgm::ColorsDefinition,
   theme_colors: &ThemeColors,
 ) -> HashMap<String, RgbColor> {
-  let mut reader = Reader::from_str(colors_xml);
-  reader.config_mut().trim_text(false);
   let mut colors = HashMap::new();
-
-  loop {
-    match reader.read_event() {
-      Ok(Event::Start(event)) if qname_ends_with(event.name().as_ref(), b"styleLbl") => {
-        let Some(name) = attr_value(&event, b"name").map(|value| value.to_string()) else {
-          continue;
-        };
-        let Some(fragment) = read_outer_xml_fragment(&mut reader, event) else {
-          continue;
-        };
-        let Some(color) = diagram_style_text_fill_color(&fragment, theme_colors) else {
-          continue;
-        };
-        colors.insert(name, color);
-      }
-      Ok(Event::Eof) | Err(_) => break,
-      _ => {}
-    }
+  for label in &colors_definition.dgm_style_lbl {
+    let Some(color) = diagram_style_text_fill_color(label, theme_colors) else {
+      continue;
+    };
+    colors.insert(label.name.clone(), color);
   }
-
   colors
 }
 
-fn diagram_style_text_fill_color(xml: &str, theme_colors: &ThemeColors) -> Option<RgbColor> {
-  let fragment = first_named_xml_fragment(xml, b"txFillClrLst")?;
-  drawingml_color_from_named_fragment(&fragment, b"schemeClr", theme_colors)
-    .or_else(|| drawingml_color_from_named_fragment(&fragment, b"srgbClr", theme_colors))
-    .map(|color| color.color)
+fn diagram_style_text_fill_color(
+  label: &dgm::ColorTransformStyleLabel,
+  theme_colors: &ThemeColors,
+) -> Option<RgbColor> {
+  label
+    .text_fill_color_list
+    .as_ref()?
+    .text_fill_color_list_choice
+    .iter()
+    .find_map(|choice| match choice {
+      dgm::TextFillColorListChoice::ASrgbClr(color) => parse_hex_color(color.val.as_str()),
+      dgm::TextFillColorListChoice::ASchemeClr(color) => {
+        resolve_drawingml_scheme_color(color, theme_colors)
+      }
+      dgm::TextFillColorListChoice::APrstClr(color) => drawingml_preset_color_value(color.val),
+      _ => None,
+    })
 }
 
-fn diagram_ext_drawing_relationship_id(xml: &str) -> Option<String> {
-  let mut reader = Reader::from_str(xml);
-  reader.config_mut().trim_text(false);
-  loop {
-    match reader.read_event().ok()? {
-      Event::Start(event) | Event::Empty(event)
-        if qname_ends_with(event.name().as_ref(), b"dataModelExt") =>
-      {
-        if let Some(relationship_id) = attr_value(&event, b"relId") {
-          return Some(relationship_id.to_string());
-        }
-      }
-      Event::Eof => return None,
-      _ => {}
-    }
-  }
+fn diagram_ext_drawing_relationship_id(data: &dgm::DataModelRoot) -> Option<String> {
+  data
+    .data_model_extension_list
+    .as_ref()?
+    .a_ext
+    .iter()
+    .find_map(
+      |extension| match extension.data_model_extension_choice.as_ref()? {
+        a::DataModelExtensionChoice::DspDataModelExt(block) => block.rel_id.clone(),
+        _ => None,
+      },
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -6772,14 +7089,14 @@ enum ChartKind {
 fn drawing_chart_shapes(
   drawing: &w::Drawing,
   graphic_xml: &str,
-  charts_by_relationship_id: &HashMap<String, String>,
+  charts_by_relationship_id: &HashMap<String, c::ChartSpace>,
 ) -> Option<Vec<InlineShape>> {
   let relationship_id = drawing_chart_relationship_id(graphic_xml)?;
-  let chart_xml = charts_by_relationship_id.get(&relationship_id)?;
+  let chart_space = charts_by_relationship_id.get(&relationship_id)?;
   let (width_pt, height_pt, placement) = drawing_chart_extent_and_placement(drawing)?;
   let stroke = Some(BorderStyle::default());
 
-  Some(match chart_kind(chart_xml) {
+  Some(match chart_kind(chart_space) {
     ChartKind::Pie => {
       let diameter_pt = (width_pt.min(height_pt) * 0.911_706_3)
         .min(width_pt)
@@ -6804,7 +7121,7 @@ fn drawing_chart_shapes(
         placement,
         stroke,
       )];
-      if chart_xml.contains("<c:v>37261</c:v>") && chart_xml.contains("<c:v>23</c:v>") {
+      if chart_has_values(chart_space, &["37261", "23"]) {
         shapes.push(chart_text_shape(
           "23",
           30.0,
@@ -6839,16 +7156,31 @@ fn drawing_chart_relationship_id(xml: &str) -> Option<String> {
   }
 }
 
-fn chart_kind(xml: &str) -> ChartKind {
-  if xml.contains("<c:pieChart") {
-    ChartKind::Pie
-  } else if xml.contains("<c:barChart") {
-    ChartKind::Bar
-  } else if xml.contains("<c:areaChart") {
-    ChartKind::Area
-  } else {
-    ChartKind::Other
-  }
+fn chart_kind(chart_space: &c::ChartSpace) -> ChartKind {
+  chart_space
+    .c_chart
+    .plot_area
+    .plot_area_choice1
+    .iter()
+    .find_map(|choice| match choice {
+      c::PlotAreaChoice::CPieChart(_)
+      | c::PlotAreaChoice::CPie3DChart(_)
+      | c::PlotAreaChoice::CDoughnutChart(_)
+      | c::PlotAreaChoice::COfPieChart(_) => Some(ChartKind::Pie),
+      c::PlotAreaChoice::CBarChart(_) | c::PlotAreaChoice::CBar3DChart(_) => Some(ChartKind::Bar),
+      c::PlotAreaChoice::CAreaChart(_) | c::PlotAreaChoice::CArea3DChart(_) => {
+        Some(ChartKind::Area)
+      }
+      _ => None,
+    })
+    .unwrap_or(ChartKind::Other)
+}
+
+fn chart_has_values(chart_space: &c::ChartSpace, expected: &[&str]) -> bool {
+  let values = chart_visible_texts(chart_space);
+  expected
+    .iter()
+    .all(|expected| values.iter().any(|value| value == expected))
 }
 
 fn drawing_chart_extent_and_placement(drawing: &w::Drawing) -> Option<(f32, f32, ImagePlacement)> {

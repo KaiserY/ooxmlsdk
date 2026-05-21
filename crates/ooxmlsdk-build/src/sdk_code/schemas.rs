@@ -333,8 +333,12 @@ fn top_level_content_children(schema_type: &SchemaType) -> &[SchemaTypeChild] {
   }
 }
 
+pub(crate) fn schema_qname_element_name(qname: &str) -> &str {
+  qname.split('/').nth(1).unwrap_or(qname)
+}
+
 fn child_qname_field_rust_name(name: &str) -> String {
-  schema_child_field_rust_name(name.split('/').nth(1).unwrap_or(name))
+  schema_child_field_rust_name(schema_qname_element_name(name))
 }
 
 fn child_preferred_field_rust_name(
@@ -374,7 +378,7 @@ pub(crate) fn duplicate_preferred_child_field_names<'a>(
     .collect()
 }
 
-fn attr_field_rust_name(attr: &SchemaTypeAttribute) -> String {
+pub(crate) fn schema_attr_field_rust_name(attr: &SchemaTypeAttribute) -> String {
   if attr.property_name.is_empty() {
     escape_snake_case(attr.q_name.to_snake_case())
   } else {
@@ -390,7 +394,7 @@ pub(crate) fn duplicate_preferred_child_field_names_with_attrs<'a>(
   let mut counts = HashMap::<String, usize>::new();
 
   for attr in attrs {
-    *counts.entry(attr_field_rust_name(attr)).or_insert(0) += 1;
+    *counts.entry(schema_attr_field_rust_name(attr)).or_insert(0) += 1;
   }
 
   for child in children {
@@ -421,6 +425,129 @@ pub(crate) fn schema_child_field_rust_name_with_context(
   } else {
     preferred_name
   }
+}
+
+pub(crate) fn schema_any_child_field_rust_name(child: &SchemaTypeChild) -> String {
+  if child.property_name.is_empty() {
+    "unknown_xml".to_string()
+  } else {
+    schema_child_property_field_rust_name(child)
+  }
+}
+
+pub(crate) fn schema_child_property_field_rust_name(child: &SchemaTypeChild) -> String {
+  schema_child_field_rust_name(child.property_name.as_str())
+}
+
+pub(crate) fn schema_child_override_field_rust_name(child: &SchemaTypeChild) -> Option<String> {
+  (!child.property_name.is_empty()).then(|| schema_child_property_field_rust_name(child))
+}
+
+pub(crate) fn schema_empty_text_child_field_name(child: &SchemaTypeChild) -> &str {
+  if child.property_name.is_empty() {
+    "Text"
+  } else {
+    child.property_name.as_str()
+  }
+}
+
+pub(crate) fn schema_composite_any_variant_name(child: &SchemaTypeChild) -> &str {
+  if child.property_name.is_empty() {
+    "UnknownXml"
+  } else {
+    child.property_name.as_str()
+  }
+}
+
+pub(crate) fn schema_composite_child_variant_name(child: &SchemaTypeChild) -> Result<&str> {
+  let element_name = schema_qname_element_name(child.name.as_str());
+  if element_name.is_empty() {
+    Err(child.name.clone().into())
+  } else {
+    Ok(element_name)
+  }
+}
+
+pub(crate) fn schema_choice_variant_name_from_qname(qname: &str) -> String {
+  let element_qname = schema_qname_element_name(qname);
+  let mut parts = element_qname.split(':');
+  match (parts.next(), parts.next()) {
+    (Some(prefix), Some(local)) => {
+      format!(
+        "{}{}",
+        prefix.to_upper_camel_case(),
+        local.to_upper_camel_case()
+      )
+    }
+    (Some(local), None) => local.to_upper_camel_case(),
+    _ => element_qname.to_upper_camel_case(),
+  }
+}
+
+pub(crate) fn schema_choice_variant_qname_prefix(qname: &str) -> Option<&str> {
+  schema_qname_element_name(qname).split(':').next()
+}
+
+pub(crate) fn schema_recursive_choice_display_name(
+  child: &SchemaTypeChild,
+  child_index: usize,
+) -> String {
+  match child.kind {
+    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => {
+      schema_qname_element_name(child.name.as_str()).to_string()
+    }
+    SchemaTypeChildKind::Any => {
+      if child.property_name.is_empty() {
+        "any".to_string()
+      } else {
+        child.property_name.clone()
+      }
+    }
+    SchemaTypeChildKind::Choice => {
+      if child.property_name.is_empty() {
+        format!("choice{}", child_index + 1)
+      } else {
+        child.property_name.clone()
+      }
+    }
+    SchemaTypeChildKind::Sequence => {
+      if child.property_name.is_empty() {
+        format!("sequence{}", child_index + 1)
+      } else {
+        child.property_name.clone()
+      }
+    }
+  }
+}
+
+pub(crate) fn schema_recursive_choice_variant_name(
+  child: &SchemaTypeChild,
+  child_index: usize,
+) -> String {
+  match child.kind {
+    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
+      if child.property_name.is_empty() {
+        format!(
+          "{}{}",
+          match child.kind {
+            SchemaTypeChildKind::Choice => "Choice",
+            SchemaTypeChildKind::Sequence => "Sequence",
+            _ => unreachable!(),
+          },
+          child_index + 1
+        )
+      } else {
+        child.property_name.to_upper_camel_case()
+      }
+    }
+    _ => schema_choice_variant_name_from_qname(child.name.as_str()),
+  }
+}
+
+pub(crate) fn schema_mixed_choice_leaf_field_rust_name(
+  child: &ResolvedCompositeChild<'_>,
+) -> String {
+  schema_child_field_rust_name(child.variant_name.as_ref())
 }
 
 impl<'a> CodegenContext<'a> {
@@ -540,11 +667,7 @@ impl<'a> CodegenContext<'a> {
       .find(|child| child.name == particle_name)
     {
       if child.kind == SchemaTypeChildKind::Any {
-        let field_name = if child.property_name.is_empty() {
-          Cow::Borrowed("unknown_xml")
-        } else {
-          Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
-        };
+        let field_name = Cow::Owned(schema_any_child_field_rust_name(child));
         let property_comments = if child.property_comments.is_empty() {
           Cow::Borrowed(" _")
         } else {
@@ -630,7 +753,7 @@ impl<'a> CodegenContext<'a> {
       if child.kind == SchemaTypeChildKind::TextChild && child.name.is_empty() {
         variants.push(ResolvedOneSequenceChild {
           name: "",
-          field_name: Cow::Borrowed("Text"),
+          field_name: Cow::Borrowed(schema_empty_text_child_field_name(child)),
           property_comments: Cow::Borrowed(" _"),
           version: child.initial_version.as_str(),
           kind: child.kind,
@@ -640,11 +763,7 @@ impl<'a> CodegenContext<'a> {
       } else if child.kind == SchemaTypeChildKind::Any {
         variants.push(ResolvedOneSequenceChild {
           name: "",
-          field_name: if child.property_name.is_empty() {
-            Cow::Borrowed("unknown_xml")
-          } else {
-            Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
-          },
+          field_name: Cow::Owned(schema_any_child_field_rust_name(child)),
           property_comments: if child.property_comments.is_empty() {
             Cow::Borrowed(" _")
           } else {
@@ -719,14 +838,7 @@ impl<'a> CodegenContext<'a> {
       match variant {
         StructuredChoiceVariant::Leaf(particle) => {
           let child = self.resolve_one_sequence_child(schema_type, particle.name.as_str())?;
-          property_comment_parts.push(
-            child
-              .name
-              .split('/')
-              .nth(1)
-              .unwrap_or(child.name)
-              .to_string(),
-          );
+          property_comment_parts.push(schema_qname_element_name(child.name).to_string());
           variants.push(ResolvedOneSequenceChoiceVariant::Leaf(child));
         }
         StructuredChoiceVariant::Sequence(sequence_particles) => {
@@ -745,14 +857,7 @@ impl<'a> CodegenContext<'a> {
               return Err(format!("{:?}", schema_type.name).into());
             };
             let child = self.resolve_one_sequence_child(schema_type, leaf.name.as_str())?;
-            field_parts.push(
-              child
-                .name
-                .split('/')
-                .nth(1)
-                .unwrap_or(child.name)
-                .to_string(),
-            );
+            field_parts.push(schema_qname_element_name(child.name).to_string());
             fields.push(ResolvedOneSequenceSequenceField {
               child,
               optional: particle.optional,
@@ -909,11 +1014,7 @@ impl<'a> CodegenContext<'a> {
     if child.kind == SchemaTypeChildKind::TextChild && child.name.is_empty() {
       resolved.push(ResolvedCompositeChild {
         name: "",
-        variant_name: Cow::Borrowed(if child.property_name.is_empty() {
-          "Text"
-        } else {
-          child.property_name.as_str()
-        }),
+        variant_name: Cow::Borrowed(schema_empty_text_child_field_name(child)),
         version: child.initial_version.as_str(),
         is_any: false,
         kind: child.kind,
@@ -931,20 +1032,14 @@ impl<'a> CodegenContext<'a> {
 
     let (variant_name, is_any) = if child.kind == SchemaTypeChildKind::Any {
       (
-        Cow::Borrowed(if child.property_name.is_empty() {
-          "UnknownXml"
-        } else {
-          child.property_name.as_str()
-        }),
+        Cow::Borrowed(schema_composite_any_variant_name(child)),
         true,
       )
     } else {
-      let child_last_name = child
-        .name
-        .split('/')
-        .nth(1)
-        .ok_or_else(|| child.name.clone())?;
-      (Cow::Borrowed(child_last_name), false)
+      (
+        Cow::Borrowed(schema_composite_child_variant_name(child)?),
+        false,
+      )
     };
 
     resolved.push(ResolvedCompositeChild {
@@ -2440,29 +2535,13 @@ fn single_field_sequence_variant_ident(
   {
     match &field.wire {
       FieldWireDecl::Child { qname } | FieldWireDecl::TextChild { qname } => {
-        return Ok(parse_str(&child_variant_rust_name_from_qname(qname))?);
+        return Ok(parse_str(&schema_choice_variant_name_from_qname(qname))?);
       }
       _ => {}
     }
   }
 
   Ok(parse_str(rendered_variant_name)?)
-}
-
-fn child_variant_rust_name_from_qname(qname: &str) -> String {
-  let element_qname = qname.split('/').nth(1).unwrap_or(qname);
-  let mut parts = element_qname.split(':');
-  match (parts.next(), parts.next()) {
-    (Some(prefix), Some(local)) => {
-      format!(
-        "{}{}",
-        prefix.to_upper_camel_case(),
-        local.to_upper_camel_case()
-      )
-    }
-    (Some(local), None) => local.to_upper_camel_case(),
-    _ => element_qname.to_upper_camel_case(),
-  }
 }
 
 fn inline_sequence_helper_type_decl<'a>(
@@ -3906,7 +3985,7 @@ fn choice_child_display_name<'a>(child: &'a ResolvedOneSequenceChild<'a>) -> &'a
   if child.name.is_empty() {
     child.field_name.as_ref()
   } else {
-    child.name.split('/').nth(1).unwrap_or(child.name)
+    schema_qname_element_name(child.name)
   }
 }
 

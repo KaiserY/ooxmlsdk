@@ -15,8 +15,13 @@ use crate::sdk_code::schemas::{
   ResolvedOneSequenceChoiceVariant, ResolvedOneSequenceSequenceVariant,
   ResolvedOneSequenceStructuredChoice, duplicate_preferred_child_field_names_with_attrs,
   one_sequence_choice_enum_name, one_sequence_choice_field_name,
-  one_sequence_choice_sequence_struct_name, schema_child_field_rust_name,
-  schema_child_field_rust_name_with_context,
+  one_sequence_choice_sequence_struct_name, schema_any_child_field_rust_name,
+  schema_attr_field_rust_name, schema_child_field_rust_name_with_context,
+  schema_child_override_field_rust_name, schema_choice_variant_name_from_qname,
+  schema_choice_variant_qname_prefix, schema_composite_any_variant_name,
+  schema_composite_child_variant_name, schema_empty_text_child_field_name,
+  schema_mixed_choice_leaf_field_rust_name, schema_qname_element_name,
+  schema_recursive_choice_display_name, schema_recursive_choice_variant_name,
 };
 use crate::sdk_code::versioning::effective_version;
 use crate::sdk_data::sdk_data_model::{
@@ -24,8 +29,7 @@ use crate::sdk_data::sdk_data_model::{
   SchemaTypeChild, SchemaTypeChildKind, SchemaTypeCompositeKind, SchemaTypeXmlHeader,
 };
 use crate::simple_type::simple_type_mapping;
-use crate::utils::escape_snake_case;
-use heck::{ToSnakeCase, ToUpperCamelCase};
+use heck::ToUpperCamelCase;
 
 fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
   let mut counts = std::collections::HashMap::<String, usize>::new();
@@ -47,7 +51,7 @@ fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
     }
 
     let base_name = variant.rust_name.clone();
-    let prefix_name = variant_qname_prefix(variant)
+    let prefix_name = variant_qname_prefix_from_decl(variant)
       .map(|prefix| format!("{}{}", prefix.to_upper_camel_case(), base_name))
       .filter(|candidate| !candidate.is_empty());
 
@@ -70,31 +74,14 @@ fn disambiguate_choice_variant_names(members: &mut [MemberDecl]) {
   }
 }
 
-fn variant_qname_prefix(variant: &VariantDecl) -> Option<&str> {
+fn variant_qname_prefix_from_decl(variant: &VariantDecl) -> Option<&str> {
   let qname = match &variant.wire {
     VariantWireDecl::Child { qnames }
     | VariantWireDecl::Sequence { qnames }
     | VariantWireDecl::TextChild { qnames } => qnames.first()?,
     VariantWireDecl::Any | VariantWireDecl::Text => return None,
   };
-  let element_qname = qname.split('/').nth(1).unwrap_or(qname.as_str());
-  element_qname.split(':').next()
-}
-
-fn child_variant_rust_name(qname: &str) -> String {
-  let element_qname = qname.split('/').nth(1).unwrap_or(qname);
-  let mut parts = element_qname.split(':');
-  match (parts.next(), parts.next()) {
-    (Some(prefix), Some(local)) => {
-      format!(
-        "{}{}",
-        prefix.to_upper_camel_case(),
-        local.to_upper_camel_case()
-      )
-    }
-    (Some(local), None) => local.to_upper_camel_case(),
-    _ => element_qname.to_upper_camel_case(),
-  }
+  schema_choice_variant_qname_prefix(qname)
 }
 
 pub fn build_codegen_ir(schema: &Schema, context: &CodegenContext<'_>) -> Result<SchemaModuleDecl> {
@@ -596,12 +583,9 @@ fn safe_pure_child_choice_inline_candidate(
 
 fn is_math_child_choice_payload(qnames: &[String]) -> bool {
   !qnames.is_empty()
-    && qnames.iter().all(|qname| {
-      qname
-        .split('/')
-        .nth(1)
-        .is_some_and(|element| element.starts_with("m:"))
-    })
+    && qnames
+      .iter()
+      .all(|qname| schema_qname_element_name(qname).starts_with("m:"))
 }
 
 fn choice_payload_qnames_match_parent(
@@ -1312,7 +1296,7 @@ fn promote_single_repeated_child_to_xml_other_choice(
   let choice_name = format!("{}Choice", schema_type.class_name);
   let mut choice_members = vec![
     MemberDecl::Variant(VariantDecl {
-      rust_name: child_variant_rust_name(&qname),
+      rust_name: schema_choice_variant_name_from_qname(&qname),
       docs: field.docs.clone(),
       version: field.version.clone(),
       wire: VariantWireDecl::Child {
@@ -1503,11 +1487,7 @@ fn build_recursive_one_sequence_choice_members(
         let mut resolved_child = if child.kind == SchemaTypeChildKind::Any {
           ResolvedOneSequenceChild {
             name: "",
-            field_name: if child.property_name.is_empty() {
-              std::borrow::Cow::Borrowed("unknown_xml")
-            } else {
-              std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
-            },
+            field_name: std::borrow::Cow::Owned(schema_any_child_field_rust_name(child)),
             property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
               " _"
             } else {
@@ -1522,14 +1502,7 @@ fn build_recursive_one_sequence_choice_members(
           context.resolve_one_sequence_child(schema_type, child.name.as_str())?
         };
 
-        if !child.property_name.is_empty() {
-          resolved_child.field_name =
-            std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()));
-        }
-        if !child.property_comments.is_empty() {
-          resolved_child.property_comments =
-            std::borrow::Cow::Borrowed(child.property_comments.as_str());
-        }
+        apply_sequence_child_overrides(&mut resolved_child, child);
 
         if !field_name_set.insert(resolved_child.field_name.to_string()) {
           continue;
@@ -1726,7 +1699,7 @@ fn recursive_choice_variant_names_are_unique(
   let mut names = used_variant_names.clone();
   leafs
     .iter()
-    .all(|child| names.insert(child_variant_rust_name(child.name.as_str())))
+    .all(|child| names.insert(schema_choice_variant_name_from_qname(child.name.as_str())))
 }
 
 fn track_recursive_choice_leaf(
@@ -1736,7 +1709,7 @@ fn track_recursive_choice_leaf(
 ) {
   if is_required_recursive_choice_leaf(child) {
     used_leaf_names.insert(child.name.clone());
-    used_variant_names.insert(child_variant_rust_name(child.name.as_str()));
+    used_variant_names.insert(schema_choice_variant_name_from_qname(child.name.as_str()));
   }
 }
 
@@ -1797,11 +1770,7 @@ fn build_recursive_choice_leaf_variant_decl(
   let resolved_child = if child.kind == SchemaTypeChildKind::Any {
     ResolvedOneSequenceChild {
       name: "",
-      field_name: if child.property_name.is_empty() {
-        std::borrow::Cow::Borrowed("unknown_xml")
-      } else {
-        std::borrow::Cow::Owned(schema_child_field_rust_name(child.property_name.as_str()))
-      },
+      field_name: std::borrow::Cow::Owned(schema_any_child_field_rust_name(child)),
       property_comments: std::borrow::Cow::Borrowed(if child.property_comments.is_empty() {
         " _"
       } else {
@@ -1835,7 +1804,7 @@ fn build_recursive_choice_sequence_variant_decl(
     " Sequence of {}",
     sequence_leafs
       .iter()
-      .map(|field| field.name.split('/').nth(1).unwrap_or(field.name.as_str()))
+      .map(|field| schema_qname_element_name(&field.name))
       .collect::<Vec<_>>()
       .join(", ")
   );
@@ -2058,56 +2027,11 @@ fn build_recursive_choice_docs(choice_child: &SchemaTypeChild) -> String {
 }
 
 fn recursive_choice_display_name(child: &SchemaTypeChild, child_index: usize) -> String {
-  match child.kind {
-    SchemaTypeChildKind::Child | SchemaTypeChildKind::TextChild => child
-      .name
-      .split('/')
-      .nth(1)
-      .unwrap_or(child.name.as_str())
-      .to_string(),
-    SchemaTypeChildKind::Any => {
-      if child.property_name.is_empty() {
-        "any".to_string()
-      } else {
-        child.property_name.clone()
-      }
-    }
-    SchemaTypeChildKind::Choice => {
-      if child.property_name.is_empty() {
-        format!("choice{}", child_index + 1)
-      } else {
-        child.property_name.clone()
-      }
-    }
-    SchemaTypeChildKind::Sequence => {
-      if child.property_name.is_empty() {
-        format!("sequence{}", child_index + 1)
-      } else {
-        child.property_name.clone()
-      }
-    }
-  }
+  schema_recursive_choice_display_name(child, child_index)
 }
 
 fn recursive_choice_variant_name(child: &SchemaTypeChild, child_index: usize) -> String {
-  match child.kind {
-    SchemaTypeChildKind::Choice | SchemaTypeChildKind::Sequence => {
-      if child.property_name.is_empty() {
-        format!(
-          "{}{}",
-          match child.kind {
-            SchemaTypeChildKind::Choice => "Choice",
-            SchemaTypeChildKind::Sequence => "Sequence",
-            _ => unreachable!(),
-          },
-          child_index + 1
-        )
-      } else {
-        child.property_name.to_upper_camel_case()
-      }
-    }
-    _ => child_variant_rust_name(child.name.as_str()),
-  }
+  schema_recursive_choice_variant_name(child, child_index)
 }
 
 struct RecursiveChoiceNameAllocator {
@@ -2214,11 +2138,7 @@ fn build_attr_member_decl(
   let attr_type_kind =
     classify_attr_type(attr.r#type.as_str()).ok_or_else(|| attr.r#type.clone())?;
   Ok(MemberDecl::Field(FieldDecl {
-    rust_name: if attr.property_name.is_empty() {
-      escape_snake_case(attr.q_name.to_snake_case())
-    } else {
-      escape_snake_case(attr.property_name.to_snake_case())
-    },
+    rust_name: schema_attr_field_rust_name(attr),
     docs: attr.property_comments.clone(),
     version: attr.version.clone(),
     wire: FieldWireDecl::Attribute {
@@ -2893,7 +2813,7 @@ fn build_simple_one_choice_variant_decl(
   } else if variant.name.is_empty() {
     variant.field_name.to_upper_camel_case()
   } else {
-    child_variant_rust_name(variant.name)
+    schema_choice_variant_name_from_qname(variant.name)
   };
 
   Ok(MemberDecl::Variant(VariantDecl {
@@ -3096,7 +3016,7 @@ fn build_one_sequence_choice_variant_decl(
     } else if variant.name.is_empty() {
       variant.field_name.to_upper_camel_case()
     } else {
-      child_variant_rust_name(variant.name)
+      schema_choice_variant_name_from_qname(variant.name)
     },
     docs: variant.property_comments.to_string(),
     version: variant.version.to_string(),
@@ -3286,7 +3206,7 @@ fn build_single_field_sequence_choice_variant_decl(
     rust_name: if field.child.name.is_empty() {
       field.child.field_name.to_upper_camel_case()
     } else {
-      child_variant_rust_name(field.child.name)
+      schema_choice_variant_name_from_qname(field.child.name)
     },
     docs: field.child.property_comments.to_string(),
     version: effective_version(field.child.version, field.initial_version).to_string(),
@@ -3397,10 +3317,8 @@ fn apply_sequence_child_overrides<'a>(
   resolved_child: &mut crate::sdk_code::schemas::ResolvedOneSequenceChild<'a>,
   schema_child: &'a SchemaTypeChild,
 ) {
-  if !schema_child.property_name.is_empty() {
-    resolved_child.field_name = std::borrow::Cow::Owned(schema_child_field_rust_name(
-      schema_child.property_name.as_str(),
-    ));
+  if let Some(field_name) = schema_child_override_field_rust_name(schema_child) {
+    resolved_child.field_name = std::borrow::Cow::Owned(field_name);
   }
 
   if !schema_child.property_comments.is_empty() {
@@ -3612,7 +3530,7 @@ fn build_mixed_choice_children_members(
               " Sequence of {}",
               sequence_leafs
                 .iter()
-                .map(|field| field.name.split('/').nth(1).unwrap_or(field.name))
+                .map(|field| schema_qname_element_name(field.name))
                 .collect::<Vec<_>>()
                 .join(", ")
             ),
@@ -3884,11 +3802,7 @@ fn push_mixed_resolved_child<'a>(
   {
     resolved.push(ResolvedCompositeChild {
       name: "",
-      variant_name: std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
-        "Text"
-      } else {
-        child.property_name.as_str()
-      }),
+      variant_name: std::borrow::Cow::Borrowed(schema_empty_text_child_field_name(child)),
       version: child.initial_version.as_str(),
       is_any: false,
       kind: child.kind,
@@ -3904,16 +3818,12 @@ fn push_mixed_resolved_child<'a>(
   let (variant_name, is_any) =
     if child.kind == crate::sdk_data::sdk_data_model::SchemaTypeChildKind::Any {
       (
-        std::borrow::Cow::Borrowed(if child.property_name.is_empty() {
-          "UnknownXml"
-        } else {
-          child.property_name.as_str()
-        }),
+        std::borrow::Cow::Borrowed(schema_composite_any_variant_name(child)),
         true,
       )
     } else {
       (
-        std::borrow::Cow::Borrowed(child.name.split('/').nth(1).unwrap_or(child.name.as_str())),
+        std::borrow::Cow::Borrowed(schema_composite_child_variant_name(child)?),
         false,
       )
     };
@@ -3968,7 +3878,7 @@ fn build_mixed_choice_property_comments(children: &[ResolvedCompositeChild<'_>])
           "sequence of {}",
           sequence_leafs
             .iter()
-            .map(|field| field.name.split('/').nth(1).unwrap_or(field.name))
+            .map(|field| schema_qname_element_name(field.name))
             .collect::<Vec<_>>()
             .join(", ")
         )
@@ -3987,9 +3897,7 @@ fn build_mixed_choice_leaf_variant_decl(
 ) -> Result<MemberDecl> {
   let synthetic_child = ResolvedOneSequenceChild {
     name: child.name,
-    field_name: std::borrow::Cow::Owned(escape_snake_case(
-      child.variant_name.to_string().to_snake_case(),
-    )),
+    field_name: std::borrow::Cow::Owned(schema_mixed_choice_leaf_field_rust_name(child)),
     property_comments: std::borrow::Cow::Borrowed(" _"),
     version: child.version,
     kind: child.kind,
@@ -4076,7 +3984,7 @@ fn build_generic_children_members(
             " Sequence of {}",
             sequence_leafs
               .iter()
-              .map(|field| field.name.split('/').nth(1).unwrap_or(field.name))
+              .map(|field| schema_qname_element_name(field.name))
               .collect::<Vec<_>>()
               .join(", ")
           ),
